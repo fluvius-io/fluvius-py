@@ -1,0 +1,6 @@
+MODEL_RESOURCE_ATTRIB = '__driver__'
+MODEL_NAME_ATTRIB = '__model_name__'
+INTRA_DOMAIN_SCOPE_FIELD = '_sid'
+INTRA_DOMAIN_ITEM_ID_FIELD = '_iid'
+ITEM_ID_FIELD = '_id'
+ETAG_FIELD = '_etag'

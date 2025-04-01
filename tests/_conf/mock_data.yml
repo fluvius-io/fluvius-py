@@ -1,0 +1,28 @@
+inputs:
+  name: file
+  recursive: false
+  paths: 'tests/_data/mock_data*.csv'
+reader:
+  name: csv
+pipelines:
+  output_test_01:
+    mapping:
+      COUNTER: '_COUNTER'
+      INDEX: '_INDEX'
+      ID: 'id'
+      First Name: 'first_name'
+      Last Name: 'last_name'
+      IP Address: 'ip_address'
+      Gender: 'gender'
+  output_test_02:
+    mapping:
+      COUNTER: '_COUNTER'
+      INDEX: '_INDEX'
+      ID: 'id'
+      First Name: 'last_name'
+      Last Name: 'first_name'
+      IP Address: 'ip_address'
+      Gender: 'gender'
+writer:
+  name: csv
+  path: '/tmp'

@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>API landing page : {{app_name}}</title>
+    <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
+    <script src="//code.jquery.com/jquery-3.5.1.min.js"></script>
+</head>
+
+<body>
+    <div class="app-container app-theme-white body-tabs-shadow fixed-sidebar fixed-header">
+        <div class="app-main">
+            <div class="app-sidebar sidebar-shadow">
+                <div class="scrollbar-sidebar">
+                    <div class="app-sidebar__inner">
+                        <ul class="vertical-nav-menu" id="nav">
+                            <li class="app-sidebar__heading">Function</li>
+                            <li>
+                                <a href="#auth-required">Current user</a>
+                            </li>
+                            <li>
+                                <a href="#login-required">Current User (redirect to login)</a>
+                            </li>
+                            <li>
+                                <a href="#mqtt-client">MQTT Client</a>
+                            </li>
+                            <li>
+                                <a href="/oauth/login">Login</a>
+                            </li>
+                            <li>
+                                <a href="/oauth/logout">Logout</a>
+                            </li>
+                            <li class="app-sidebar__heading">API</li>
+                            {% for api in api_list %}
+                            <li><a href="#{{api.hash}}">{{api.name}}</a></li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="app-main__outer">
+                <div class="app-main__inner">
+                    <div class="app-page-title" id="copyDiv">
+                        <div class="page-title-wrapper">
+                            <div>
+                                <button type="button" class="hamburger close-sidebar-btn hamburger--elastic"
+                                    data-class="closed-sidebar">
+                                    <span class="hamburger-box">
+                                        <span class="hamburger-inner"></span>
+                                    </span>
+                                </button>
+                            </div>
+                            <div class="page-title-heading">
+                                <div class="page-title-subheading" id="urlSwagger">
+                                </div>
+                            </div>
+                            <div class="page-title-actions">
+                                <button type="button" class="btn-shadow btn btn-dark" onclick="copyUrl()">
+                                    Copy URL
+                                </button>
+                                <div class="d-inline-block">
+                                    <button type="button" class="btn-shadow btn btn-dark" onclick="openNewTab()">
+                                        Open in new tab
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <iframe id="swagger_screen" src="" width="100%" frameborder="0"></iframe>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script type="text/javascript" src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        api_list = {{ api_list | tojson }};
+        function_list = [{
+                "url": "/~dev/auth-required",
+                "hash": "auth-required"
+            },
+            {
+                "url": "/~dev/login-required",
+                "hash": "login-required"
+            },
+            {
+                "url": "/~dev/mqtt-client/index.html",
+                "hash": "mqtt-client"
+            },
+            {
+                "url": "/oauth/login",
+                "hash": "login"
+            }
+        ]
+    </script>
+    <script>
+        url = ""
+        arr_url = window.location.href.split("/");
+        protocol = arr_url[0] + "//"
+        hostname = arr_url[2]
+        window.onload = loadSwagger;
+        window.onhashchange = loadSwagger;
+
+        function loadSwagger() {
+            hash = window.location.hash.substring(1);
+            api = api_list.find(element => element.hash == hash);
+            func = function_list.find(element => element.hash == hash);
+            if (api != undefined) {
+                url = protocol + hostname + api.url;
+                if (api.url.search("http") != -1) {
+                    url = api.url;
+                }
+            }
+            if (func != undefined) {
+                url = protocol + hostname + func.url;
+                if (func.url.search("http") != -1) {
+                    url = func.url;
+                }
+            }
+            document.getElementById('swagger_screen').src = url;
+            document.getElementById('urlSwagger').innerHTML = url;
+        }
+
+        function selectText(element) {
+            if (document.selection) { // IE
+                var range = document.body.createTextRange();
+                range.moveToElementText(document.getElementById(element));
+                range.select();
+            } else if (window.getSelection) {
+                var range = document.createRange();
+                range.selectNode(document.getElementById(element));
+                window.getSelection().removeAllRanges();
+                window.getSelection().addRange(range);
+            }
+        }
+
+        function copyUrl() {
+            var copyText = document.getElementById("urlSwagger");
+            selectText("urlSwagger");
+            document.execCommand("copy");
+        }
+
+        function openNewTab() {
+            window.open(document.getElementById("urlSwagger").innerHTML);
+        }
+    </script>
+</body>
+
+</html>

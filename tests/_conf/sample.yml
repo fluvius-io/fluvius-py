@@ -1,0 +1,5 @@
+pipelines:
+  test_output:
+    mapping:
+      first: 'firstName'
+      last: 'lastName'

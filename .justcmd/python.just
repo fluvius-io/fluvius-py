@@ -1,0 +1,25 @@
+export PYTHONPATH 	:= "./lib:./src:./tests/_lib:./examples"
+export FLUVIUS_CONFIG_FILE := "config.ini"
+
+TEST_FILES 			:= "*"
+TEST_LOG_LEVEL  	:= "info"
+TEST_PARAMS			:= env("TEST_PARAMS", "")
+
+# Run pytests on [TEST_MODULES], stop on first failure, quiet. Example: `just pytest "*"`
+test TEST_MODULES:
+	pytest -x -q \
+		--log-cli-level={{TEST_LOG_LEVEL}} \
+		--log-level={{TEST_LOG_LEVEL}} \
+		--html=tests/logs/report.html \
+		--self-contained-html --color=yes \
+		{{TEST_PARAMS}} \
+		./tests/{{TEST_MODULES}}/test_{{TEST_FILES}}.py
+
+# Run pytests on [TEST_MODULES], all tests, verbose.
+test-all TEST_MODULES:
+	@pytest -v \
+		--log-cli-level={{TEST_LOG_LEVEL}} \
+		--log-level={{TEST_LOG_LEVEL}} \
+		--html=tests/logs/report.html \
+		--self-contained-html \
+		./tests/{{TEST_MODULES}}/test_{{TEST_FILES}}.py

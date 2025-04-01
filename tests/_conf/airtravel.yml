@@ -1,0 +1,21 @@
+reader:
+  name: csv
+pipelines:
+  test_output:
+    mapping:
+      index: '_INDEX'
+      month: 'Month'
+      first_year: '1958'
+      second_year: '1959'
+      last_year: '1960'
+  test_output2:
+    mapping:
+      index: '_INDEX'
+      month: 'Month'
+      first_year: '1958'
+      second_year: '1959'
+      last_year: '1960'
+writer:
+  name: csv
+  path: '/tmp'
+
