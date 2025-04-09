@@ -35,10 +35,10 @@ COST_FACTOR = 9901
 # of the hash algorithm hash_name is used, e.g. 64 for SHA-512.
 
 
-def make_hash(password):
+def make_hash(password, encoding="utf-8"):
     '''Generate a random salt and return a new hash for the password.'''
     if isinstance(password, str):
-        passwd = bytearray(password, "utf-8")
+        passwd = bytearray(password, encoding)
     elif isinstance(password, (bytearray, bytes)):
         passwd = password
     else:
@@ -60,9 +60,9 @@ def make_hash(password):
     )
 
 
-def check_hash(password, hash_):
+def check_hash(password, hash_value, encoding="utf-8"):
     if isinstance(password, str):
-        passwd = bytearray(password, "ascii")
+        passwd = bytearray(password, encoding)
     elif isinstance(password, (bytearray, bytes)):
         passwd = password
     else:
@@ -70,7 +70,7 @@ def check_hash(password, hash_):
             "Password must be either a string or bytes: {}".format(type(password)))
 
     '''Check a password against an existing hash.'''
-    algorithm, hash_function, cost_factor, salt, hash_a = hash_.split("$")
+    algorithm, hash_function, cost_factor, salt, hash_a = hash_value.split("$")
     # salt   = b64decode(salt)
     salt = bytearray(salt, "ascii")
     assert algorithm == "PBKDF2"
@@ -99,17 +99,3 @@ def generate_base32_code(length=6):
         'W', 'X', 'Y', 'Z', '2', '3', '4', '5', '6', '7']
     random_code = random.choices(base32_code, k=length)
     return "".join(random_code)
-
-
-if __name__ == '__main__':
-    import sys
-    if len(sys.argv) == 2:
-        print(make_hash(sys.argv[1]))
-    elif len(sys.argv) == 3:
-        print(check_hash(sys.argv[1], sys.argv[2]))
-    else:
-        print(f'Generate password hash.')
-        print(f' - Usage: {sys.argv[0]} <password>')
-        print(f'')
-        print(f'Check password hash')
-        print(f' - Usage: {sys.argv[0]} <password> <hash_check>')

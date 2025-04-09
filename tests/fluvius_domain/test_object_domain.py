@@ -1,7 +1,8 @@
 import pytest
 
-from fluvius.domain import context, Event
+from fluvius.domain import context, Event, logger
 from fluvius.data import identifier
+
 from object_domain.domain import ObjectDomain
 from object_domain.storage import PeopleEconomistResource, populate_fixture_data
 
@@ -56,6 +57,7 @@ async def test_object_domain(ctx):
     remove_command = domain.create_command('remove-object', 'people-economist', FIXTURE_ID, None)
 
     resps = await domain.handle_request(ctx, update_command, create_command, remove_command)
+    assert len(resps) == 2
     # state = domain.statemgr
 
     # assert all(isinstance(evt, Event) for evt in evts) and len(evts) == 6
