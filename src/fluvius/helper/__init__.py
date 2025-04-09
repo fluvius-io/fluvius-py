@@ -1,8 +1,9 @@
+import functools
+import inspect
 import os
 import re
 import shutil
 import tempfile
-import functools
 from contextlib import contextmanager
 from itertools import chain
 from operator import itemgetter
@@ -13,6 +14,11 @@ from fluvius import logger
 
 
 RX_DELIMITER_SPLITTER = re.compile(r"[\.#]")
+
+
+async def when(val):
+    return await val if inspect.isawaitable(val) else val
+
 
 
 def load_yaml(filepath):

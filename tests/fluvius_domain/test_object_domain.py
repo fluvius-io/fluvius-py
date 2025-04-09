@@ -43,8 +43,6 @@ def clean_state(state):
 async def test_object_domain(ctx):
     await populate_fixture_data()
     domain = ObjectDomain()
-    # aggroot = domain.create_aggroot('people-economist', FIXTURE_ID)
-
     id1 = identifier.UUID_GENF("ABC123")
     create_payload = {
         '_id': id1,  # Pin down the ID for easier testing,
@@ -52,9 +50,11 @@ async def test_object_domain(ctx):
         'name': {'family': 'Keynes', 'given': 'John', 'middle': 'Maynard'}
     }
 
-    update_command = domain.create_command('update-object', 'people-economist', FIXTURE_ID, {'job': 'economist'})
-    create_command = domain.create_command('create-object', 'people-economist', FIXTURE_ID, create_payload)
-    remove_command = domain.create_command('remove-object', 'people-economist', FIXTURE_ID, None)
+    create_command = domain.create_command('create-object', create_payload, aggroot=('people-economist', FIXTURE_ID))
+
+    with domain.aggroot('people-economist', FIXTURE_ID):
+        update_command = domain.create_command('update-object', {'job': 'economist'})
+        remove_command = domain.create_command('remove-object')
 
     resps = await domain.handle_request(ctx, update_command, create_command, remove_command)
     assert len(resps) == 2

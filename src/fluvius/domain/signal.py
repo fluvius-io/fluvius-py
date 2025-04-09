@@ -2,7 +2,7 @@ import blinker
 import enum
 
 from functools import wraps
-from .helper import when
+from fluvius.helper import when
 
 
 class DomainSignal(enum.Enum):

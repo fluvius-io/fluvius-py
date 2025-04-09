@@ -3,6 +3,8 @@ import queue
 from functools import wraps
 from contextlib import asynccontextmanager
 from fluvius.error import BadRequestError, PreconditionFailedError
+from fluvius.data import UUID_TYPE
+from typing import NamedTuple
 
 from . import config, logger
 
@@ -21,8 +23,11 @@ DEFAULT_RESPONSE_TYPE = config.DEFAULT_RESPONSE_TYPE
 ALL_RESOURCES = _AGGROOT_RESOURCES.ALL
 
 
-class AggregateRoot(ResourceReference):
-    pass
+class AggregateRoot(NamedTuple):
+    resource: str
+    identifier: UUID_TYPE
+    domain_sid: UUID_TYPE = None
+    domain_iid: UUID_TYPE = None
 
 
 def action(evt_key, aggroot=None, emit_event=True):

@@ -1,22 +1,25 @@
 import os
 import queue
 
+from contextlib import contextmanager
+from operator import itemgetter
+from pyrsistent import PClass, field
 from types import SimpleNamespace
+from typing import Iterator
+
 from fluvius.helper import camel_to_lower
 from fluvius.helper.timeutil import timestamp
 from fluvius.helper.registry import ClassRegistry
-from fluvius.domain import logger, config  # noqa
-from operator import itemgetter
-from pyrsistent import PClass, field
-from typing import Iterator
+from fluvius.error import ForbiddenError
 
+from . import logger, config  # noqa
 from . import activity as act
 from . import command as cc
 from . import event as ce
 from . import message as cm
 from . import response as cres
 
-from .aggregate import Aggregate, RestrictedAggregateProxy
+from .aggregate import Aggregate, RestrictedAggregateProxy, AggregateRoot
 from .context import DomainContext
 from .decorators import DomainEntityRegistry
 from .exceptions import CommandProcessingError
@@ -61,6 +64,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
     _cmd_processors = tuple()
     _msg_dispatchers = tuple()
     _entity_registry = dict()
+    _active_aggroot = None
 
     _REGISTRY = {}
 
@@ -154,21 +158,39 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             for dispatcher in self.msg_dispatchers(msg):
                 await dispatcher(msg)
 
-    def create_command(self, cmd_key, resource, identifier, payload, domain_sid=None, domain_iid=None):
+    @contextmanager
+    def aggroot(self, *args):
+        if self._active_aggroot is not None:
+            raise RuntimeError('Multiple aggroot is not allowed (#1).')
+
+        self._active_aggroot = AggregateRoot(*args)
+        yield self._active_aggroot
+        self._active_aggroot = None
+
+    def create_command(self, cmd_key, cmd_data=None, aggroot=None):
+        if aggroot is None:
+            aggroot = self._active_aggroot
+        else:
+            if self._active_aggroot is not None:
+                raise RuntimeError('Multiple aggroot is not allowed (#2)')
+
+            if isinstance(aggroot, tuple):
+                aggroot = AggregateRoot(*aggroot)
+
         cmd_envelop = self.lookup_command(cmd_key)
 
-        if not include_aggroot(resource, cmd_envelop.__aggroot_spec__):
-            raise RuntimeError('Command [%s] does not allow aggroot of resource [%s]' % (cmd_key, resource))
+        if not include_aggroot(aggroot.resource, cmd_envelop.__aggroot_spec__):
+            raise ForbiddenError('D10011', 'Command [%s] does not allow aggroot of resource [%s]' % (cmd_key, aggroot.resource))
 
         return cmd_envelop(
             domain=self.__domain__,
-            command=cmd_key,
             revision=self.__revision__,
-            resource=resource,
-            identifier=identifier,
-            domain_sid=domain_sid,
-            domain_iid=domain_iid,
-            payload=payload,
+            command=cmd_key,
+            payload=cmd_data,
+            resource=aggroot.resource,
+            identifier=aggroot.identifier,
+            domain_sid=aggroot.domain_sid,
+            domain_iid=aggroot.domain_iid,
         )
 
     async def authorize_command(self, cmd):
