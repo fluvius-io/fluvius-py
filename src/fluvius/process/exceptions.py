@@ -1,4 +1,4 @@
-from fluvius.base.exceptions import UnprocessableError
+from fluvius.exceptions import UnprocessableError
 
 
 class StepTransitionError(UnprocessableError):

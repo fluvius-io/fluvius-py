@@ -5,7 +5,7 @@ from sanic.request import Request
 from sanic.response import HTTPResponse, json
 
 from fluvius_oauth.blueprint import auth_required
-from fluvius.base.exceptions import BadRequestError
+from fluvius.exceptions import BadRequestError
 from fluvius.sanic import logger, config
 
 from .response import response_handler

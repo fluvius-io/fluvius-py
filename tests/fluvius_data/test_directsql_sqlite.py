@@ -4,7 +4,7 @@ import pytest
 from enum import Enum
 from sqlalchemy.dialects.postgresql import UUID
 
-from fluvius.base.exceptions import UnprocessableError
+from fluvius.exceptions import UnprocessableError
 from fluvius.data import logger
 from fluvius.data.data_driver import SqlaDriver
 from fluvius.data.data_manager import DataAccessManager

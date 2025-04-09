@@ -1,7 +1,7 @@
 import re
 from fluvius.data import BackendQuery, nullable
-from fluvius_query.schema import QuerySchema
-from fluvius_query import config
+from .schema import QuerySchema
+from . import config
 
 from pyrsistent import PClass, field
 

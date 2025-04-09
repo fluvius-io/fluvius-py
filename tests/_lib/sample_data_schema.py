@@ -3,7 +3,7 @@ import pytest
 from enum import Enum
 import asyncpg
 
-from fluvius.base.exceptions import UnprocessableError
+from fluvius.exceptions import UnprocessableError
 from fluvius.helper import camel_to_lower
 from fluvius.data.data_driver import SqlaDriver
 from fluvius.data.data_manager import DataAccessManager

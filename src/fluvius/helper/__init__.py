@@ -8,7 +8,7 @@ from itertools import chain
 from operator import itemgetter
 from typing import Dict, List, Optional, Pattern, Tuple, Union
 
-from fluvius.base.exceptions import BadRequestError
+from fluvius.exceptions import BadRequestError
 from fluvius import logger
 
 

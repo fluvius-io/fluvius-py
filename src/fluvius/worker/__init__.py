@@ -1,6 +1,6 @@
 __version__ = "1.0.0"
 
-from .cfg import config, logger
+from .conf import config, logger
 from .client import WorkerClient
 from .datadef import DomainWorkerRequest
 from .tracker import SQLWorkTracker, JobStatus, WorkerStatus

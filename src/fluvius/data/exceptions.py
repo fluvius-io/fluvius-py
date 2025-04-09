@@ -1,4 +1,4 @@
-from fluvius.base.exceptions import (  # noqa
+from fluvius.exceptions import (  # noqa
     NotFoundError,
     InternalServerError,
     UnprocessableError

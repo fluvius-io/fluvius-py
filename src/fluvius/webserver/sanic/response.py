@@ -2,7 +2,7 @@ from fluvius.sanic import logger, config  # noqa
 from sanic import response
 from fluvius.data.serializer import serialize_json
 from fluvius.domain.entity import CQRS_ENTITY_KEY
-from fluvius.base.exceptions import BadRequestError
+from fluvius.exceptions import BadRequestError
 
 
 RAISE_INTERNAL_ERROR = True

@@ -1,6 +1,7 @@
-from fluvius.base.exceptions import UnauthorizedError
-from fluvius_query import field
+from fluvius.exceptions import UnauthorizedError
 from .schema import QuerySchema
+
+from . import field
 
 
 class BaseQueryModel(QuerySchema):

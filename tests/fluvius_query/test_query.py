@@ -1,7 +1,7 @@
 import pytest
-from fluvius_query.base import BaseQueryModel
-from fluvius_query import QuerySchema, QueryMeta, StringField, logger, config
-from fluvius_query.handler import QueryHandler, ParsedParams, PgQueryHandler
+from fluvius.query.base import BaseQueryModel
+from fluvius.query import QuerySchema, QueryMeta, StringField, logger, config
+from fluvius.query.handler import QueryHandler, ParsedParams, PgQueryHandler
 from fluvius.data.serializer import serialize_json
 from sample_data_model import *
 

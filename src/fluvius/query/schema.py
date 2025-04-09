@@ -3,10 +3,12 @@ import re
 from types import SimpleNamespace
 from pyrsistent import PClass, field
 from fluvius.data import nullable
-from fluvius.base.helper import _assert
-from fluvius_query import operator, logger, config
-from fluvius_query.field import QueryField
+from fluvius.helper import _assert
 from fluvius.data.query import operator_statement
+
+from .field import QueryField
+
+from . import operator, logger, config
 
 DEFAULT_DATASET_FIELD = "_dataset"
 DEFAULT_DELETED_FIELD = "_deleted"

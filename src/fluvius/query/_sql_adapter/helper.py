@@ -1,5 +1,5 @@
 import asyncpg
-from fluvius.base.exceptions import UnprocessableError, sanic_error_handler
+from fluvius.exceptions import UnprocessableError, sanic_error_handler
 from sanic.request import Request
 from sanic.response import json
 from fluvius_query import logger, config
