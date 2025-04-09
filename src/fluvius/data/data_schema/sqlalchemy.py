@@ -2,7 +2,7 @@ import sqlalchemy as sa
 
 from fluvius.data.constant import ITEM_ID_FIELD
 from sqlalchemy.orm import declarative_base
-from fluvius.base.helper import camel_to_lower
+from fluvius.helper import camel_to_lower
 
 
 # Create the base class for all models

@@ -7,7 +7,7 @@ import sys
 from logging import handlers
 from typing import Any, List, Optional
 
-from fluvius.base.cfg import ModuleConfig, config, getConfig
+from fluvius.conf import ModuleConfig, default_config, getConfig
 
 
 class NoConfigValue(Exception):
@@ -118,7 +118,7 @@ def __closure__():  # noqa: C901
             for handler in log_handlers:
                 handler.setFormatter(logging.Formatter(formatter, log_datefmt))
 
-            if config.LOG_COLORED:
+            if default_config.LOG_COLORED:
                 import coloredlogs
                 coloredlogs.install(
                     fmt=formatter,
@@ -145,7 +145,7 @@ def __closure__():  # noqa: C901
         log_config = log_config or getConfig(module_name)
         return setupLogger(module_name, log_config)
 
-    return getLogger, setupLogger(None, config)
+    return getLogger, setupLogger(None, default_config)
 
 
-getLogger, logger = __closure__()
+getLogger, default_logger = __closure__()

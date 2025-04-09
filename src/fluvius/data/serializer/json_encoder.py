@@ -9,7 +9,7 @@ from pyrsistent import PClass, PRecord
 from fluvius.data.data_schema.sqlalchemy import SqlaDataSchema
 from fluvius.data import logger
 
-from fluvius.base.timeutil import datetime_to_str
+from fluvius.helper.timeutil import datetime_to_str
 
 DATE_FORMAT = '%Y-%m-%d'
 BYTES_DECODER = 'utf_8'

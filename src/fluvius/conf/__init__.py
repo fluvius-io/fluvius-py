@@ -1,16 +1,25 @@
 import configparser
 import json
 import logging
+import os
 import re
+
 from types import ModuleType
-from typing import Any, Dict, Union
+from typing import Any, Dict, Union, Callable
 from ast import literal_eval
 
 from . import sysdefaults
-from ..setup import env
+
+
+def env(name: str, defval: Any, redacted: bool = False, coercer: Callable[[Any], Any] = None):
+    ''' Extract environment value to use as configuration variable
+    '''
+    value = os.environ.get(name, defval)
+    return coercer(value) if callable(coercer) else value
+
 
 FLUVIUS_DEFAULT_SECTION = env("FLUVIUS_DEFAULT_SECTION", "sysdefaults")
-FLUVIUS_CONFIG_MODULE = env("FLUVIUS_CONFIG_MODULE", "fluvius.base.cfg.sysdefaults")
+FLUVIUS_CONFIG_MODULE = env("FLUVIUS_CONFIG_MODULE", "fluvius.config.sysdefaults")
 FLUVIUS_CONFIG_FILES = env("FLUVIUS_CONFIG_FILE", "base.ini|config.ini").split('|')
 DEBUG_ALL_CONFIG_VALUE = "#ALL"
 
@@ -82,7 +91,7 @@ def __module_config__():  # noqa: C901
                         vdebug[k] = (values[k], type(values[k]), FLUVIUS_CONFIG_FILES)
                     except configparser.NoOptionError:
                         values[k] = v
-                        vdebug[k] = _trace[k] if _trace else (v, type(v), conf.__name__)
+                        vdebug[k] = _trace[k] if _trace else (v, type(v), getattr(conf, '__name__', '<unknown-name>'))
 
             for conf in defaults + (sysdefaults,):
                 load_config(conf)
@@ -154,4 +163,4 @@ def __module_config__():  # noqa: C901
     return ModuleConfig, get_config, default_config
 
 
-ModuleConfig, getConfig, config = __module_config__()
+ModuleConfig, getConfig, default_config = __module_config__()

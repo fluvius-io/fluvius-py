@@ -1,7 +1,6 @@
 import iso8601
 from datetime import datetime, UTC
-
-from .cfg import config
+from fluvius import config
 
 EPOCH = datetime.fromtimestamp(0, UTC)
 

@@ -1,14 +1,14 @@
+import asyncpg
 import pytest
 
 from enum import Enum
-import asyncpg
-
-from fluvius.data.data_schema.sqlalchemy import SqlaDataSchema, sa
-from fluvius.data.data_driver import SqlaDriver
-from fluvius.base.exceptions import UnprocessableError
 from sqlalchemy.dialects.postgresql import UUID
-from fluvius.data.data_manager import DataAccessManager
+
+from fluvius.base.exceptions import UnprocessableError
 from fluvius.data import logger
+from fluvius.data.data_driver import SqlaDriver
+from fluvius.data.data_manager import DataAccessManager
+from fluvius.data.data_schema.sqlalchemy import SqlaDataSchema, sa
 from fluvius.data.identifier import identifier_factory
 from sample_data_model import sample_data_access_manager
 
@@ -48,10 +48,4 @@ async def test_sql_insert():
     logger.info("COMPANY RECORD: %s", await fetch_id(sample_data_access_manager, _id_1))
     record = await fetch_id(sample_data_access_manager, _id_2)
     assert isinstance(record, CompanyModel)
-
-
-# async def test_sql_data_manager():
-#     company = CompanyModel(_id="4", business_name="DEF4", name="XYZ", system_entity=True)
-#     async with sample_data_access_manager.transaction(None) as proxy:
-#         await sample_data_access_manager.insert_record(company)
 

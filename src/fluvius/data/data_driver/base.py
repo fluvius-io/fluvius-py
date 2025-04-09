@@ -2,7 +2,7 @@ from pyrsistent import PClass
 from contextlib import contextmanager, asynccontextmanager
 from datetime import datetime
 from dataclasses import is_dataclass, dataclass, field
-from fluvius.base.helper import camel_to_lower
+from fluvius.helper import camel_to_lower
 from fluvius.data import logger, config
 from fluvius.data.constant import *
 

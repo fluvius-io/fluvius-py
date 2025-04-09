@@ -21,12 +21,3 @@ run-updatedb:
 
 doc:
 	docpress serve
-
-proto:
-	protoc -I=./proto/src --python_out=./src/fluvius/domain/proto "./proto/src/_common.proto"
-	protoc -I=./proto/src --python_out=./src/fluvius/domain/proto "./proto/src/command.proto"
-	protoc -I=./proto/src --python_out=./src/fluvius/domain/proto "./proto/src/event.proto"
-	protoc -I=./proto/src --python_out=./src/fluvius/domain/proto "./proto/src/context.proto"
-	protoc -I=./proto/src --python_out=./src/fluvius/domain/proto "./proto/src/profile.proto"
-	protoc -I=./proto/src --python_out=./src/fluvius/domain/proto "./proto/src/request.proto"
-	protoc -I=./proto/src --python_out=./src/fluvius/domain/proto "./proto/src/response.proto"

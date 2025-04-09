@@ -4,7 +4,7 @@ from enum import Enum
 import asyncpg
 
 from fluvius.base.exceptions import UnprocessableError
-from fluvius.base.helper import camel_to_lower
+from fluvius.helper import camel_to_lower
 from fluvius.data.data_driver import SqlaDriver
 from fluvius.data.data_manager import DataAccessManager
 from fluvius.data.data_schema.sqlalchemy import SqlaDataSchema, sa
