@@ -18,7 +18,7 @@ from arq.worker import func as arq_func
 from fluvius.helper import _assert, camel_to_lower_underscore
 from fluvius.helper.timeutil import timestamp
 from fluvius.domain.context import DomainTransport
-from fluvius.domain.helper import when
+from fluvius.data.helper import when
 from fluvius_worker import config, event, logger
 from fluvius_worker.serializer import default_deserializer, default_serializer
 from fluvius_worker.helper import build_redis_settings

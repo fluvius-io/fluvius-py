@@ -1,7 +1,7 @@
 import enum
 import warnings
 from datetime import datetime
-from fluvius.domain.helper import timestamp
+from fluvius.data.helper import timestamp
 
 from .datadef import nullable, identifier_factory, UUID_TYPE, field
 from .record import DomainEntityRecord

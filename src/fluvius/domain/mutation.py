@@ -1,8 +1,9 @@
 from datetime import datetime
 from enum import Enum
 from pyrsistent import PClass, field
+from fluvius.data.helper import nullable
+
 from .datadef import UUID_TYPE, DomainDataModel, BackendQuery, serialize_mapping
-from .helper import nullable
 
 
 def validate_data_record(data):

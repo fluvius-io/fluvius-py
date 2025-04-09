@@ -1,4 +1,4 @@
-from fluvius.domain.helper import nullable
+from fluvius.data.helper import nullable
 from fluvius.data import (
     DataResource, ResourceProperty,
     ResourcePropertySchema, DataAccessInterface,
