@@ -22,6 +22,7 @@ async def hello_world(ctx, *args, **kwargs):
     await asyncio.sleep(1.0)
     return "HELLO"
 
+
 @WorkerSample.cron(second=tuple(range(1, 60, 5)))
 async def hello_world(ctx, *args, **kwargs):
     logger.warning('HELLO WORLD: ARGS: %s KWARGS: %s', args, kwargs)

@@ -1,4 +1,4 @@
-from fluvius.rule import KnowledgeBase, kb_rule, kb_cond, KnowledgeEngine, WorkingMemory, config, datadef
+from fluvius.rulepy import KnowledgeBase, kb_rule, kb_cond, KnowledgeEngine, WorkingMemory, config, datadef
 from pyrsistent import PRecord, field, pmap
 import pytest
 
