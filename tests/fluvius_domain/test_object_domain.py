@@ -1,6 +1,7 @@
 import pytest
 
-from fluvius.domain import context, identifier, Event
+from fluvius.domain import context, Event
+from fluvius.data import identifier
 from object_domain.domain import ObjectDomain
 from object_domain.storage import PeopleEconomistResource, populate_fixture_data
 
@@ -9,7 +10,7 @@ FIXTURE_ID = identifier.UUID_GENF("100")
 
 
 @pytest.fixture
-async def ctx():
+def ctx():
     return context.DomainContext(
         domain='test',
         user_id=FIXTURE_ID,

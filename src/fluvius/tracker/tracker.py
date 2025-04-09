@@ -7,8 +7,8 @@ from dataclasses import asdict, is_dataclass
 
 from fluvius.data import DataFeedManager
 from fluvius.helper.timeutil import timestamp
-from fluvius_tracker import config, logger
 from .model import SQLTrackerConnector
+from . import config, logger
 
 COLLECT_TRACEBACK = config.COLLECT_TRACEBACK
 

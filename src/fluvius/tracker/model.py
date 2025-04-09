@@ -8,7 +8,8 @@ from sqlalchemy.dialects import postgresql as pg
 
 from fluvius.helper.timeutil import timestamp
 from fluvius.data import SqlaDataSchema, SqlaDriver, UUID_GENR
-from fluvius_tracker import config, logger
+
+from . import config, logger
 
 
 class JobStatus(Enum):

@@ -3,6 +3,7 @@ import logging
 
 from .conf import defaults
 
+__version__ = "1.0.0"
 __all__ = ('config', 'logger', 'setupModule')
 
 
@@ -12,7 +13,7 @@ def setupModule(module_name, *upstreams):
 
     def _config_name(module):
         if isinstance(module, str):
-            for suffix in ('.cfg', '.conf', '._config', '.config'):
+            for suffix in ('._meta', '.conf', '._config', '.config', '.cfg'):
                 if module.endswith(suffix):
                     return module.rstrip(suffix)
 

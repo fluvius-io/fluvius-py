@@ -1,4 +1,4 @@
-from .cfg import config, logger
+from ._meta import config, logger
 from .schema import QuerySchema, QueryMeta
 from .field import QueryField, StringField
 

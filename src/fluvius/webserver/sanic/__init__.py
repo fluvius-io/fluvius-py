@@ -1,12 +1,10 @@
-from .cfg import config, logger
+from .conf import config, logger
 from .context import SanicContext, SanicDomainServiceProxy
 from .blueprint import setup_domain_blueprint
 from .lightq import setup_lightq
 from .helper import configure_domain, create_app
 from .handler import sanic_error_handler
 
-
-__version__ = "1.0.0"
 __all__ = (
     "config",
     "configure_domain",

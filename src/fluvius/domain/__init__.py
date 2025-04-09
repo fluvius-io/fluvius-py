@@ -1,6 +1,4 @@
-from fluvius.data import identifier
-
-from .cfg import config, logger
+from ._meta import config, logger
 from .aggregate import Aggregate
 from .command import Command, CommandState, CommandEnvelop
 from .context import DomainContext
@@ -14,7 +12,6 @@ from .record import DomainEntityRecord
 from .response import DomainResponse
 from .state import StateManager, data_query
 
-__version__ = "1.3.0"
 __all__ = (
     "Aggregate",
     "CommandEnvelop",

@@ -1,4 +1,4 @@
-from .cfg import config, logger
+from ._meta import config, logger
 from .helper import nullable, generate_etag, timestamp
 from .identifier import UUID_TYPE, UUID_GENF, UUID_GENR, identifier_factory
 from .serializer import FluviusJSONEncoder as JSONEncoder, serialize_mapping, serialize_json, deserialize_json
@@ -11,7 +11,6 @@ from .data_manager import DataAccessManager, DataFeedManager, ReadonlyDataManage
 from .query import BackendQuery
 
 
-__version__ = "1.0.0"
 __all__ = (
     "BackendQuery",
     "config",

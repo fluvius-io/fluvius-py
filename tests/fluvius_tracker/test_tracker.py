@@ -1,4 +1,4 @@
-from fluvius_tracker import SQLTracker
+from fluvius.tracker import SQLTracker
 import pytest
 
 class SampleSQLTracker(SQLTracker, trackers=('worker', 'worker-job', 'job-relation')):
