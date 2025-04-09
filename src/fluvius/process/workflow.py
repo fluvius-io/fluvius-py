@@ -15,9 +15,9 @@ __all__ = ('Role', 'Step', 'Stage', 'Workflow', 'st_connect', 'wf_connect', 'con
 
 ALL_STATES = object()
 
-def transition(to_state, allowed_labels=(ALL_STATES,)):
+def transition(to_state, allowed_states=(ALL_STATES,)):
     def _decorator(func):
-        func.__transition__ = (to_state, allowed_labels)
+        func.__transition__ = (to_state, allowed_states)
         return func
     return _decorator
 
@@ -35,7 +35,7 @@ def transition(to_state, allowed_labels=(ALL_STATES,)):
     #         if to_state in cls.__transitions__:
     #             raise ValueError(f'Duplicated transition handler to state [{to_state}]')
 
-    #         cls.__transitions__[to_state] = allowed_labels, self.func
+    #         cls.__transitions__[to_state] = allowed_states, self.func
 
     #         # then replace ourself with the original method
     #         setattr(cls, name, self.func)
@@ -48,7 +48,7 @@ class Role(object):
         self.__title__ = title
 
 
-def validate_step_labels(states, start):
+def validate_step_states(states, start):
     states = validate_labels(*states)
 
     if start is None:
@@ -64,15 +64,15 @@ def validate_step_labels(states, start):
 class Step(object):
     __start__ = None
     __multi__ = False  # Allow multiple instance of the same step in a workflow
-    __labels__ = ('CREATED','RUNNING', 'FINISHED')
+    __states__ = ('CREATED','RUNNING', 'FINISHED')
 
     def __init_subclass__(cls, title=None, stage=None, label=None, start=None, multi=False):
         cls.__title__ = title or cls.__title__
         cls.__stage__ = stage or cls.__stage__
         cls.__multi__ = multi
 
-        cls.__labels__, cls.__start__ = validate_step_labels(
-            label or cls.__labels__,
+        cls.__states__, cls.__start__ = validate_step_states(
+            label or cls.__states__,
             start or cls.__start__
         )
 
@@ -80,7 +80,7 @@ class Step(object):
 
         assert cls.__title__ is not None
         assert cls.__stage__ is not None
-        assert isinstance(cls.__labels__, tuple)
+        assert isinstance(cls.__states__, tuple)
         assert cls.__start__ is not None
 
         for attr in dir(cls):
@@ -88,14 +88,14 @@ class Step(object):
             if not hasattr(func, '__transition__'):
                 continue
 
-            to_state, allowed_labels = func.__transition__
-            if to_state not in cls.__labels__:
-                raise WorkflowConfigurationError('P01301', f'State [{to_state}] is not define in Step states {cls.__labels__}')
+            to_state, allowed_states = func.__transition__
+            if to_state not in cls.__states__:
+                raise WorkflowConfigurationError('P01301', f'State [{to_state}] is not define in Step states {cls.__states__}')
 
             if to_state in cls.__transitions__:
                 raise WorkflowConfigurationError('P01302', f'Duplicated transition handler to state [{to_state}]')
 
-            cls.__transitions__[to_state] = allowed_labels, func
+            cls.__transitions__[to_state] = allowed_states, func
 
 
     def __init__(self, **data):

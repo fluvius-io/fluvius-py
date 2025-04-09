@@ -19,7 +19,7 @@ class WorkflowStateProxy(object):
             step = wf_engine._stmap[selector]
             self._id = step_id = step._id
             self._data = step._data
-            self.transit = partial(wf_engine._transit_step, step_id, step_id)
+            self.set_state = partial(wf_engine._transit_step, step_id, step_id)
             self.finish = partial(wf_engine._finish_step, step_id, step_id)
             self.recover = partial(wf_engine._recover_step, step_id, step_id)
         else:
@@ -32,7 +32,7 @@ class WorkflowStateProxy(object):
         self.memorize = partial(wf_engine._memorize, step_id)
         self.memory = partial(wf_engine._getmem, step_id)
 
-        self.transit_step = partial(wf_engine._transit_step, step_id)
+        self.set_step_state = partial(wf_engine._transit_step, step_id)
         self.finish_step = partial(wf_engine._finish_step, step_id)
         self.recover_step = partial(wf_engine._recover_step, step_id)
 
@@ -337,8 +337,8 @@ class WorkflowEngine(object):
         if status is None:
             status = step.status
 
-        if label not in step.__labels__:
-            raise WorkflowExecutionError('P0100X', f'Invalid step states: {label}. Allowed states: {step.__labels__}')
+        if label not in step.__states__:
+            raise WorkflowExecutionError('P0100X', f'Invalid step states: {label}. Allowed states: {step.__states__}')
 
         src_label  = step.label
         if label == src_label:
@@ -349,10 +349,10 @@ class WorkflowEngine(object):
 
         # State transition has a handling function
         if label in transitions:
-            allowed_labels, transition_hook = transitions[label]
+            allowed_states, transition_hook = transitions[label]
 
-            if ALL_STATES not in allowed_labels and src_label not in allowed_labels:
-                raise WorkflowExecutionError('P0100X', f'Transition to label [{label}] is limited to: {allowed_labels}. Current label: {src_label}')
+            if ALL_STATES not in allowed_states and src_label not in allowed_states:
+                raise WorkflowExecutionError('P0100X', f'Transition to label [{label}] is limited to: {allowed_states}. Current label: {src_label}')
 
             transition_hook(self.state_proxy(step.selector), src_label)
 

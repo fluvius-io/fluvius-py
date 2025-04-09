@@ -22,7 +22,7 @@ def test_workflow():
 
         def on_started(wf_state, wf_params):
             step3 = wf_state.add_step('Step03', selector=st01)
-            step3.transit('MOON')
+            step3.set_state('MOON')
 
         class Step01(Step, title='Step 03', stage=Stage01):
             pass
@@ -35,16 +35,16 @@ def test_workflow():
 
 
         class Step03(Step, title="Step 03", stage=Stage01):
-            __labels__ = ('TAKE', 'ME', 'TO', 'THE', 'MOON')
+            __states__ = ('TAKE', 'ME', 'TO', 'THE', 'MOON')
 
             @st_connect('test-event')
             def test_event_step(step, event):
                 step.memorize(test_step_key="value")
                 s1 = step.add_step('Step02b', test_key_02="value")
                 s2 = step.add_step('Step02', test_key_02=str(s1._id))
-                step.transit('TAKE')
-                s1.transit('RUNNING')
-                s2.transit('RUNNING')
+                step.set_state('TAKE')
+                s1.set_state('RUNNING')
+                s2.set_state('RUNNING')
                 assert step._id == s1._data.src_step_id and s2._data.src_step_id == step._id
                 yield f"test_event_step ACTION! #2 {s1} & {s2}"
                 yield f"{step.memory()}"
