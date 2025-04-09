@@ -2,7 +2,7 @@
 
 import os
 import hashlib
-import random
+import secrets
 
 from base64 import b64decode, b64encode
 
@@ -14,6 +14,11 @@ HASH_FUNCTION = "sha256"  # Must be in hashlib.
 # amount of time on your server. Measure with:
 # python -m timeit -s 'import passwords as p' 'p.make_hash("something")'
 COST_FACTOR = 9901
+
+BASE32_TABLE = [
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
+    'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V',
+    'W', 'X', 'Y', 'Z', '2', '3', '4', '5', '6', '7']
 
 
 # hashlib.pbkdf2_hmac(hash_name, password, salt, iterations, dklen=None)
@@ -79,23 +84,10 @@ def check_hash(password, hash_value, encoding="utf-8"):
                                  int(cost_factor), len(hash_a))
     # Same as "return hash_a == hash_b" but takes a constant time.
     # See http://carlos.bueno.org/2011/10/timing.html
-    diff = 0
-    for char_a, char_b in zip(hash_a, hash_b):
-        diff |= char_a ^ char_b
-
-    return diff == 0
+    # See https://docs.python.org/3/library/secrets.html#secrets.compare_digest
+    return secrets.compare_digest(hash_a, hash_b)
 
 
-def secret_coverage(value):
-    hash = make_hash(value)
-    suffix = value[-2:]
-    return f"{hash}:{suffix}"
-
-
-def generate_base32_code(length=6):
-    base32_code = [
-        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
-        'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V',
-        'W', 'X', 'Y', 'Z', '2', '3', '4', '5', '6', '7']
-    random_code = random.choices(base32_code, k=length)
-    return "".join(random_code)
+def token_base32(length=6):
+    random_codes = (secrets.choice(BASE32_TABLE) for i in range(length))
+    return "".join(random_codes)

@@ -1,1 +1,1 @@
-from .conf import config, logger
+from ._meta import config, logger

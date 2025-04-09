@@ -10,7 +10,7 @@ def test_setup_module():
 
 
 def test_hashes():
-    from fluvius.auth.hashes import check_hash, make_hash
+    from fluvius.auth.hashes import check_hash, make_hash, token_base32
 
     HASH_STRINGS = [
         "Hello, world!",                  # English (ASCII)
@@ -41,3 +41,5 @@ def test_hashes():
         h = make_hash(s)
         assert check_hash(s, h)
         assert not check_hash(s[:-1] + '.', h)
+
+    assert len(token_base32(10)) == 10

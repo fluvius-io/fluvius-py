@@ -1,7 +1,43 @@
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+
+[metadata]
+name = "fluvius"
+version = "1.0.0"
+
+
 [project]
-name = "fluvius-py"
-version = "0.1.0"
-description = "Add your description here"
+name = "fluvius"
+version = "1.0.0"
+authors = [
+  { name="Hung X. Le", email="hunglx@adaptive-bits.com" },
+  { name="Phu V. Nguyen", email="phunv@adaptive-bits.com" },
+]
+description = "Fluvius Framework (https://fluvius.io)"
 readme = "README.md"
-requires-python = ">=3.13"
-dependencies = []
+requires-python = ">=3.9"
+license = {text = "Proprietary"}
+dependencies = [
+    "aiohttp>=3.11.11",
+    "asyncpg>=0.30.0",
+    "blinker>=1.9.0",
+    "pyrsistent>=0.20.0",
+    "ruff>=0.9.1",
+    "sqlalchemy>=2.0.37",
+    "ulid-py>=1.1.0",
+]
+
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+
+[tool.black]
+line-length = 119

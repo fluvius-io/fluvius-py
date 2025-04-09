@@ -1,4 +1,4 @@
-from .cfg import logger, config  # noqa
+from . import logger, config  # noqa
 
 from collections import namedtuple
 from fluvius.error import NotFoundError
