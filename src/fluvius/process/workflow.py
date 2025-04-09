@@ -4,8 +4,8 @@ from fluvius.data import logger, config
 
 from fluvius.data.data_contract import DataContract, field
 from fluvius.data import UUID_GENF, UUID_GENR,nullable
-from fluvius.base.registry import ClassRegistry
-from fluvius.base.helper import camel_to_lower
+from fluvius.helper.registry import ClassRegistry
+from fluvius.helper import camel_to_lower
 
 from .router import EventRouter, st_connect, wf_connect, connect
 from .datadef import WorkflowStep, validate_labels

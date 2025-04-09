@@ -7,7 +7,7 @@ from fluvius.domain.activity import ActivityType
 from fluvius.domain.context import DomainTransport
 
 from fluvius.data import SqlaDataSchema, SqlaDriver, UUID_GENR, DataFeedManager
-from fluvius.base.helper import camel_to_lower
+from fluvius.helper import camel_to_lower
 
 
 LOG_STORE_SCHEMA = config.SQL_LOG_STORE_NAMESPACE

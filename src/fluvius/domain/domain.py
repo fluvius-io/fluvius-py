@@ -2,9 +2,9 @@ import os
 import queue
 
 from types import SimpleNamespace
-from fluvius.base.helper import camel_to_lower
-from fluvius.base.timeutil import timestamp
-from fluvius.base.registry import ClassRegistry
+from fluvius.helper import camel_to_lower
+from fluvius.helper.timeutil import timestamp
+from fluvius.helper.registry import ClassRegistry
 from fluvius.domain import logger, config  # noqa
 from operator import itemgetter
 from pyrsistent import PClass, field

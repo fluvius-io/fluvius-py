@@ -1,7 +1,7 @@
 from functools import wraps
 from typing import Union
 from sanic import response
-from fluvius.exceptions import DEBUG_APP_EXCEPTION, AppException
+from fluvius.error import DEBUG_APP_EXCEPTION, AppException
 from pyrsistent import InvariantException
 
 from . import logger

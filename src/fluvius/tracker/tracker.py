@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from dataclasses import asdict, is_dataclass
 
 from fluvius.data import DataFeedManager
-from fluvius.base.timeutil import timestamp
+from fluvius.helper.timeutil import timestamp
 from fluvius_tracker import config, logger
 from .model import SQLTrackerConnector
 

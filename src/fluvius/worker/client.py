@@ -5,7 +5,7 @@ import asyncio
 from dataclasses import is_dataclass, asdict
 
 from datetime import datetime
-from fluvius.exceptions import BadRequestError
+from fluvius.error import BadRequestError
 from fluvius.data import UUID_GENR, UUID_TYPE
 from fluvius_worker import config, logger
 from fluvius_worker.helper import build_redis_settings

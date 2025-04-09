@@ -1,7 +1,7 @@
 import re
 import enum
 from fluvius.data.helper import identifier_factory, nullable, generate_etag, when, timestamp  # noqa -- @TODO: remove after resolve compatibility
-from fluvius.exceptions import BadRequestError
+from fluvius.error import BadRequestError
 
 RX_CQRS_IDENTIFIER = re.compile(
     r"^([a-z][a-z\d\-]*[a-z\d]\.)*([a-z][a-z\d\-]*[a-z\d])$"

@@ -1,7 +1,7 @@
 from enum import IntEnum
 from datetime import datetime
 from fluvius.data import timestamp, config, logger  # noqa
-from fluvius.base.timeutil import parse_iso_datestring
+from fluvius.helper.timeutil import parse_iso_datestring
 
 from fluvius.data.data_contract import PClass, field
 from fluvius.data.helper import nullable as nullable_type, nullable, generate_etag

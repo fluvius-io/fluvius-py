@@ -1,4 +1,4 @@
-from fluvius.exceptions import UnauthorizedError
+from fluvius.error import UnauthorizedError
 from .schema import QuerySchema
 
 from . import field

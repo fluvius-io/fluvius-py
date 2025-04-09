@@ -1,8 +1,8 @@
 import pytest
 
 from fluvius.domain import context, identifier, Event
-from object_example.domain import ObjectDomain
-from object_example.storage import PeopleEconomistResource, populate_fixture_data
+from object_domain.domain import ObjectDomain
+from object_domain.storage import PeopleEconomistResource, populate_fixture_data
 
 
 FIXTURE_ID = identifier.UUID_GENF("100")

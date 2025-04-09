@@ -6,7 +6,7 @@ from dataclasses import asdict, is_dataclass
 
 from sqlalchemy.dialects import postgresql as pg
 
-from fluvius.base.timeutil import timestamp
+from fluvius.helper.timeutil import timestamp
 from fluvius.data import SqlaDataSchema, SqlaDriver, UUID_GENR
 from fluvius_tracker import config, logger
 

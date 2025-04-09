@@ -1,4 +1,4 @@
-from fluvius.query.operator import FieldQueryOperator
+from .operator import FieldQueryOperator
 
 
 RANGE_OPERATOR_KIND = "range"

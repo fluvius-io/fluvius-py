@@ -2,7 +2,7 @@ import functools
 import inspect
 import queue
 
-from fluvius.base.helper import camel_to_lower
+from fluvius.helper import camel_to_lower
 
 from . import event as ce
 from . import command as cc

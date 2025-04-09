@@ -2,7 +2,7 @@ import queue
 
 from functools import wraps
 from contextlib import asynccontextmanager
-from fluvius.exceptions import BadRequestError, PreconditionFailedError
+from fluvius.error import BadRequestError, PreconditionFailedError
 
 from . import config, logger
 

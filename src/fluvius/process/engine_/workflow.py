@@ -2,8 +2,8 @@
 
 # from fluvius.data.data_contract import DataContract, field
 # from fluvius.data import UUID_GENF, nullable
-# from fluvius.base.registry import ClassRegistry
-# from fluvius.base.helper import camel_to_lower
+# from fluvius.helper.registry import ClassRegistry
+# from fluvius.helper import camel_to_lower
 
 # from .resource import WorkflowInstance, WorkflowStage as WorkflowStageResource
 # from .router import EventRouter

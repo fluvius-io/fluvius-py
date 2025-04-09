@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 from functools import partial, wraps
 from fluvius.data import UUID_GENF, UUID_GENR, UUID_TYPE
-from fluvius.base.timeutil import timestamp
+from fluvius.helper.timeutil import timestamp
 from . import logger
 
 from .exceptions import WorkflowExecutionError, WorkflowConfigurationError

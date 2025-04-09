@@ -3,7 +3,7 @@ import re
 from fluvius_query import operator, parser, config
 from fluvius_query.field import EmbedField, DateTimeField, RANGE_OPERATOR_KIND
 from fluvius_query import logger
-from fluvius.exceptions import BadRequestError
+from fluvius.error import BadRequestError
 from stop_words import get_stop_words
 
 from .base import QueryBuilder

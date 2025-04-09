@@ -1,5 +1,5 @@
 from fluvius import logger
-from fluvius.base.helper import camel_to_lower
+from fluvius.helper import camel_to_lower
 from pyrsistent import pmap
 
 

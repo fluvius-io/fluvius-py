@@ -1,8 +1,8 @@
 import asyncio
 
 from fluvius_worker import logger, SQLWorkTracker, export_task, export_cron, DomainWorker
-from object_example.domain import ObjectDomain
-from object_example.storage import PeopleEconomistResource, populate_fixture_data
+from object_domain.domain import ObjectDomain
+from object_domain.storage import PeopleEconomistResource, populate_fixture_data
 
 NS = 'cqrs-worker-sample'
 

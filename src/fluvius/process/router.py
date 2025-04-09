@@ -1,7 +1,7 @@
 from .cfg import logger, config  # noqa
 
 from collections import namedtuple
-from fluvius.exceptions import NotFoundError
+from fluvius.error import NotFoundError
 
 
 EventHandler = namedtuple('EventHandler', 'workflow_key step_key routing_func, handler_func')

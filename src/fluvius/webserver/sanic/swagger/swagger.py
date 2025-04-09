@@ -1,7 +1,7 @@
 import os
 import yaml
 
-from fluvius.base.helper import load_yaml
+from fluvius.helper import load_yaml
 from jinja2 import Environment, PackageLoader
 from sanic.blueprints import Blueprint
 from sanic.response import file, html, text

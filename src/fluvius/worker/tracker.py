@@ -4,7 +4,7 @@ import functools
 from types import SimpleNamespace
 from fluvius_worker import config, logger
 from fluvius.data import exceptions, UUID_GENF, UUID_TYPE
-from fluvius.base.timeutil import timestamp
+from fluvius.helper.timeutil import timestamp
 from fluvius_tracker import SQLTrackerManager, JobStatus, WorkerStatus
 
 COLLECT_TRACEBACK = True

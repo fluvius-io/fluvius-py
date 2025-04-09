@@ -2,7 +2,7 @@
 # from .cfg import logger, config  # noqa
 
 # from fluvius.data import UUID_GENR, C, UUID_GENF, PropertyList, Q
-# from fluvius.base.helper import camel_to_lower
+# from fluvius.helper import camel_to_lower
 
 # from .resource import WorkflowDAL, WorkflowInstance, WorkflowMemory, WorkflowParams
 # from .status import WorkflowStatus
