@@ -21,6 +21,11 @@ class UpdateObjectBaseCmd(CommandEnvelop):
 
 @_command("update-object")
 class UpdateObjectCmd(UpdateObjectBaseCmd):
+    class Meta:
+        tags = ["transaction"]
+        resource = "bank-account"
+        description = "Withdraw money"
+
     async def _process(agg, sta, cmd, root):
         ''' Demonstrate inline handler definition,
             NOTE: this should be a pure function - no reference to `self` or `cls` '''

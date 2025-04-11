@@ -23,6 +23,7 @@ COMMAND_PROCESSOR_FUNC = '_process'
 COMMAND_PAYLOAD_FIELD = 'payload'
 MESSAGE_DISPATCHER_FUNC = '_dispatch'
 HANDLER_MARKER = '_handler'
+META_ATTRIBUTES = 'Meta'
 DEBUG = False
 
 
@@ -116,6 +117,8 @@ def _validate_domain_command(cls):
     if issubclass(cls, cc.Command):
         attrs = {name: handler for name, handler in _locate_handler(cls, COMMAND_PROCESSOR_FUNC)}
         attrs[COMMAND_PAYLOAD_FIELD] = command_field(cls, mandatory=True)
+        attrs[META_ATTRIBUTES] = cls.__dict__.pop(META_ATTRIBUTES, None)
+
         return type(f"{cls.__name__}Wrapped", (cc.CommandEnvelopTemplate, ), attrs)
 
     if issubclass(cls, cc.CommandEnvelop):
