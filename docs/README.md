@@ -1,7 +1,5 @@
-# fluvius-py
+# Fluvius Library
 
-Fluvius Framework in Python
+Fluvius - A library for building domain driven backend API with Python
 
-# notes
-
-https://github.com/jsonurl/specification/
+Copyright (c) 2025 [River Flow Solutions, Jsc.](https://riverflow.solutions)

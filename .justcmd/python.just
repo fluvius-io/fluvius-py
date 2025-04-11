@@ -5,6 +5,10 @@ TEST_FILES 			:= "*"
 TEST_LOG_LEVEL  	:= "info"
 TEST_PARAMS			:= env("TEST_PARAMS", "")
 
+# Build python package for distribution into ./dist
+build:
+	uv build
+
 # Run pytests on [TEST_MODULES], stop on first failure, quiet. Example: `just pytest "*"`
 test TEST_MODULES:
 	pytest -x -q \
