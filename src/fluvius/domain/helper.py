@@ -58,7 +58,7 @@ def cleanup_auto_fields(data: dict, extra_fields=None):
     return dict(_process(data))
 
 
-def prepare_aggroot_spec(resource_spec):
+def prepare_resource_spec(resource_spec):
     ''' Prepare the spec for [include_aggroot] '''
 
     if not resource_spec:
@@ -79,7 +79,7 @@ def prepare_aggroot_spec(resource_spec):
     raise ValueError(f'Invalid aggroot resources specification: {resource_spec}')
 
 
-def include_aggroot(resource, resource_spec):
+def include_resource(resource, resource_spec):
     ''' Determine if a certain aggroot should be included in an operation
         - True: include the aggroot object
         - False: do not include.

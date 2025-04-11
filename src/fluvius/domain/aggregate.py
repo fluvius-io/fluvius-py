@@ -13,7 +13,7 @@ from .datadef import ResourceReference, generate_etag, field, timestamp, DomainD
 from .event import Event
 from .message import DomainMessage
 from .response import DomainResponse
-from .helper import consume_queue, prepare_aggroot_spec, include_aggroot, _AGGROOT_RESOURCES
+from .helper import consume_queue, include_resource, _AGGROOT_RESOURCES
 
 from . import mutation
 
@@ -30,14 +30,14 @@ class AggregateRoot(NamedTuple):
     domain_iid: UUID_TYPE = None
 
 
-def action(evt_key, aggroot=None, emit_event=True):
+def action(evt_key, resource=None, emit_event=True):
     def _decorator(func):
         func.__domain_event__ = evt_key
-        aggroot_spec = prepare_aggroot_spec(aggroot)
+        resource_spec = prepare_resource_spec(resource)
 
         @wraps(func)
         async def wrapper(self, *args, **evt_args):
-            if include_aggroot(self.command.resource, aggroot_spec):
+            if include_resource(self.command.resource, resource_spec):
                 evt_data = await func(self, self.statemgr, self.aggroot, *args, **evt_args)
             else:
                 evt_data = await func(self, self.statemgr, *args, **evt_args)

@@ -14,7 +14,7 @@ from . import logger
 from .datadef import serialize_mapping
 from .entity import CQRS_ENTITY_MARKER, DomainEntityType, CQRS_ENTITY_KEY
 from .exceptions import DomainEntityError
-from .helper import consume_queue, prepare_aggroot_spec, _AGGROOT_RESOURCES
+from .helper import consume_queue, prepare_resource_spec, _AGGROOT_RESOURCES
 from .command import field as command_field
 
 NONE_TYPE = type(None)
@@ -226,7 +226,7 @@ class DomainEntityRegistry(object):
     def command(domain_cls, cls_or_key, aggroot=_AGGROOT_RESOURCES.ALL, fetch=True):
         def decorator(cls):
             cls = _validate_domain_command(cls)
-            cls.__aggroot_spec__ = prepare_aggroot_spec(aggroot)
+            cls.__resource_spec__ = prepare_resource_spec(aggroot)
             cls.__aggroot_fetch__ = fetch
 
             domain_cls._register_entity(cls, key, DomainEntityType.COMMAND)

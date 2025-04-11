@@ -23,7 +23,7 @@ from .aggregate import Aggregate, RestrictedAggregateProxy, AggregateRoot
 from .context import DomainContext
 from .decorators import DomainEntityRegistry
 from .exceptions import CommandProcessingError
-from .helper import consume_queue, include_aggroot
+from .helper import consume_queue, include_resource
 from .logstore import DomainLogStore
 from .signal import DomainSignal as sig, DomainSignalManager
 from .state import StateManager, ReadonlyDataManagerProxy
@@ -179,7 +179,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
         cmd_envelop = self.lookup_command(cmd_key)
 
-        if not include_aggroot(aggroot.resource, cmd_envelop.__aggroot_spec__):
+        if not include_resource(aggroot.resource, cmd_envelop.__resource_spec__):
             raise ForbiddenError('D10011', 'Command [%s] does not allow aggroot of resource [%s]' % (cmd_key, aggroot.resource))
 
         return cmd_envelop(
