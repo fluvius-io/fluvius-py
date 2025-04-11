@@ -2,10 +2,10 @@ import traceback
 import asyncio
 import functools
 from types import SimpleNamespace
-from fluvius_worker import config, logger
+from . import config, logger
 from fluvius.data import exceptions, UUID_GENF, UUID_TYPE
 from fluvius.helper.timeutil import timestamp
-from fluvius_tracker import SQLTrackerManager, JobStatus, WorkerStatus
+from fluvius.tracker import SQLTrackerManager, JobStatus, WorkerStatus, config as tracker_config
 
 COLLECT_TRACEBACK = True
 
@@ -39,7 +39,7 @@ class FluviusWorkerTracker(SQLTrackerManager):
 
         async def register_job_handle(context, *args, **kwargs):
             try:
-                job_handle = await self.fetch_entry('worker-job', format_uuid(context.job_id))
+                job_handle = await self.fetch_entry(tracker_config.WORKER_JOB_TABLE, format_uuid(context.job_id))
                 assert job_handle.worker_id is None, "Job already registered by another worker."
                 return await self.update_entry(
                     job_handle,
@@ -51,7 +51,7 @@ class FluviusWorkerTracker(SQLTrackerManager):
                 )
             except (exceptions.ItemNotFoundError, ValueError):
                 logger.info('Job entry has not been registered by client [%s = %s].', func.__name__, context.job_id)
-                job_handle = await self.add_entry('worker-job',
+                job_handle = await self.add_entry(tracker_config.WORKER_JOB_TABLE,
                     _id=format_uuid(context.job_id),
                     args=args,
                     kwargs=kwargs,
@@ -78,7 +78,7 @@ class FluviusWorkerTracker(SQLTrackerManager):
             try:
                 result = await func(context, *args, **kwargs)
             except asyncio.exceptions.CancelledError as e:
-                data = await self.fetch_entry('worker-job', job_handle._id)
+                data = await self.fetch_entry(tracker_config.WORKER_JOB_TABLE, job_handle._id)
                 if data.job_status != JobStatus.CANCELED:
                     await self.update_entry(job_handle,
                         job_status=JobStatus.CANCELED,

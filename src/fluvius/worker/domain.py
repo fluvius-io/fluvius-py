@@ -1,7 +1,9 @@
-from fluvius_worker import FluviusWorker, logger, export_cron, export_task
-from fluvius_worker.datadef import DomainWorkerRequest, DomainWorkerCommand
-from fluvius_worker.client import WorkerClient
 from fluvius.domain.context import DomainTransport
+
+from .datadef import DomainWorkerRequest, DomainWorkerCommand
+from .client import WorkerClient
+
+from . import FluviusWorker, logger, export_cron, export_task
 
 
 DEBUG = True

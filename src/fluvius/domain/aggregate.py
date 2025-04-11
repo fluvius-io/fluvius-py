@@ -13,7 +13,7 @@ from .datadef import ResourceReference, generate_etag, field, timestamp, DomainD
 from .event import Event
 from .message import DomainMessage
 from .response import DomainResponse
-from .helper import consume_queue, include_resource, _AGGROOT_RESOURCES
+from .helper import consume_queue, include_resource, prepare_resource_spec, _AGGROOT_RESOURCES
 
 from . import mutation
 

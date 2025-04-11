@@ -271,7 +271,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
                 message=f"{str(e)}. Query: {query}"
             )
 
-    async def update_one(self, resource, updates, q, **query):
+    async def update_one(self, resource, updates, q=None, **query):
         query = BackendQuery.create(q, **query)
 
         if not query.identifier:
@@ -280,7 +280,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
         data_schema = self.schema_lookup(resource)
         stmt = self.build_update(data_schema, query, updates)
         cursor = await self.session.execute(stmt)
-        self._check_no_item_modified(cursor, query)
+        self._check_no_item_modified(cursor, 1, query)
         return self._unwrap_result(cursor)
 
     async def remove_one(self, resource, q: BackendQuery=None, **query):
@@ -292,7 +292,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
         ''' @TODO: Add etag checking for batch items '''
         stmt = self.build_delete(data_schema, query)
         cursor = await self.session.execute(stmt)
-        self._check_no_item_modified(cursor, query)
+        self._check_no_item_modified(cursor, 1, query)
         return self._unwrap_result(cursor)
 
     async def insert(self, resource, values: dict):

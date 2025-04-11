@@ -5,7 +5,7 @@ from asyncio.exceptions import CancelledError
 from types import SimpleNamespace
 from dataclasses import asdict, is_dataclass
 
-from fluvius.data import DataFeedManager
+from fluvius.data import DataAccessManagerBase, UUID_GENR
 from fluvius.helper.timeutil import timestamp
 from .model import SQLTrackerConnector
 from . import config, logger
@@ -32,29 +32,25 @@ class NullTracker(TrackerInterface):
     pass
 
 
-class SQLTrackerManager(DataFeedManager):
+class SQLTrackerManager(DataAccessManagerBase):
     __connector__ = SQLTrackerConnector
+    __auto_model__ = True
+
+    def __init_subclass__(cls):
+        super().__init_subclass__()
 
     async def add_entry(self, resource, **data):
-        record = self.create(resource, **data)
-        backend = self.get_resource(resource)
+        data['_id'] = UUID_GENR()
+        await self.connector.insert(resource, data)
+        return self._wrap_model(resource, data)
 
-        async with self.transaction():
-            await backend.insert_record(record)
-
-        return record
-
-    async def update_entry(self, entry, **kwargs):
-        backend = self.get_record_resource(entry)
-        async with self.transaction(label='update'):
-            handle = await backend.fetch(identifier=entry._id)
-            await backend.update_record(handle, **kwargs)
-            return handle
+    async def update_entry(self, record, **updates):
+        resource = self.lookup_resource(record)
+        return await self.connector.update_one(resource, updates, identifier=record._id)
 
     async def fetch_entry(self, resource, handle_id):
-        backend = self.get_resource(resource)
-        async with self.transaction(label='update'):
-            return await backend.fetch(identifier=handle_id)
+        item = await self.connector.find_one(resource, identifier=handle_id)
+        return self._wrap_model(resource, item)
 
 
 class SQLTracker(SQLTrackerManager):

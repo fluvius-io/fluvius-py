@@ -1,7 +1,7 @@
 from pyrsistent import PClass, field, pvector_field
 from fluvius.domain.aggregate import AggregateRoot
 from fluvius.domain.context import DomainContext
-from fluvius.domain.helper import identifier_factory, nullable
+from fluvius.data.helper import identifier_factory, nullable
 from fluvius.data import UUID_GENR, UUID_TYPE
 
 def pclass_factory(cls):

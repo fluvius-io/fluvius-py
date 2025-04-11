@@ -1,5 +1,5 @@
 import arq
-from fluvius_worker import config
+from . import config
 
 
 def build_redis_settings(user_settings=None):

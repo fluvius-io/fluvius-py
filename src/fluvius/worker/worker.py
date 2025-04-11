@@ -15,14 +15,14 @@ from arq.cron import CronJob, cron as arq_cron
 from arq.logs import default_log_config
 from arq.worker import func as arq_func
 
-from fluvius.helper import _assert, camel_to_lower_underscore
+from fluvius.helper import _assert, camel_to_lower_underscore, when
 from fluvius.helper.timeutil import timestamp
+from fluvius.tracker import config as tracker_config
 from fluvius.domain.context import DomainTransport
-from fluvius.data.helper import when
-from fluvius_worker import config, event, logger
-from fluvius_worker.serializer import default_deserializer, default_serializer
-from fluvius_worker.helper import build_redis_settings
-from fluvius_worker.tracker import JobStatus, WorkerStatus
+from . import config, event, logger
+from .serializer import default_deserializer, default_serializer
+from .helper import build_redis_settings
+from .tracker import JobStatus, WorkerStatus
 
 
 # @TODO: Remove this.
@@ -182,7 +182,7 @@ class FluviusWorker(arq.Worker):
             yield key, client
 
     def validate_tracker(self, tracker):
-        from fluvius_worker.tracker import FluviusWorkerTracker
+        from .tracker import FluviusWorkerTracker
 
         if tracker is None:
             return None
@@ -371,8 +371,9 @@ class FluviusWorker(arq.Worker):
         if not self._tracker:
             return
 
+        self._tracker.connect()
         self._handle = await self._tracker.add_entry(
-            'worker',
+            tracker_config.ARQ_WORKER_TABLE,
             hostname=socket.gethostname(),
             start_time=timestamp(),
             queue_name=self.__queue_name__,

@@ -1,10 +1,10 @@
 import asyncio
-from fluvius_worker import FluviusWorker, logger, SQLWorkTracker, export_task, export_cron
+from fluvius.worker import FluviusWorker, logger, SQLWorkTracker, export_task, export_cron
 
 
 class WorkerSample(FluviusWorker):
-    namespace = 'worker-sample'
-    tracker = SQLWorkTracker
+    __queue_name__ = 'worker-sample'
+    __tracker__ = SQLWorkTracker
 
     @export_cron(second=tuple(range(1, 60, 2)))
     async def sample_cron(self, ctx, *args, **kwargs):

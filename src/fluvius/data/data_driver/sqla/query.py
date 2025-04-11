@@ -188,7 +188,7 @@ class QueryBuilder(object):
         q = BackendQuery.create(query_data)
 
         stmt = update(data_schema)
-        stmt = self._build_where(stmt, q)
+        stmt = self._build_where(data_schema, stmt, q)
         stmt = self._build_values(stmt, values)
 
         return stmt

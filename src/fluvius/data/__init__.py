@@ -8,6 +8,7 @@ from .data_model import DataModel
 from .data_schema import SqlaDataSchema
 from .data_driver import DataDriver, SqlaDriver
 from .data_manager import DataAccessManager, DataFeedManager, ReadonlyDataManagerProxy, data_query, item_query, value_query, list_query
+from .data_manager.manager import DataAccessManagerBase
 from .query import BackendQuery
 
 

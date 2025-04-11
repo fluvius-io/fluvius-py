@@ -7,8 +7,6 @@ class SampleDataAccessManager(DataAccessManager):
     __auto_model__ = True
 
 
-sample_data_access_manager = SampleDataAccessManager()
-
 @SampleDataAccessManager.register_model('company')
 class CompanyModel(NamespaceModel):
     pass

@@ -10,9 +10,9 @@ from fluvius.data.data_driver import SqlaDriver
 from fluvius.data.data_manager import DataAccessManager
 from fluvius.data.data_schema.sqlalchemy import SqlaDataSchema, sa
 from fluvius.data.identifier import identifier_factory
-from sample_data_model import sample_data_access_manager
+from sample_data_model import SampleDataAccessManager
 
-
+sample_data_access_manager = SampleDataAccessManager()
 CompanyModel = sample_data_access_manager.lookup_model('company')
 
 async def fetch_id(dam, _id):

@@ -7,9 +7,10 @@ from dataclasses import is_dataclass, asdict
 from datetime import datetime
 from fluvius.error import BadRequestError
 from fluvius.data import UUID_GENR, UUID_TYPE
-from fluvius_worker import config, logger
-from fluvius_worker.helper import build_redis_settings
-from fluvius_worker.tracker import FluviusWorkerTracker, JobStatus
+from fluvius.tracker import config as tracker_config
+from . import config, logger
+from .helper import build_redis_settings
+from .tracker import FluviusWorkerTracker, JobStatus
 
 
 # DEBUG = config.DEBUG
@@ -81,7 +82,7 @@ class WorkerClient(object):
     async def cancel_job(self, job_id):
         job_handle = None
         if self._tracker:
-            job_handle = await self._tracker.fetch_entry('worker-job', job_id)
+            job_handle = await self._tracker.fetch_entry(tracker_config.WORKER_JOB_TABLE, job_id)
 
             if job_handle is None or job_handle.job_status != JobStatus.RECEIVED:
                 raise BadRequestError(
@@ -115,7 +116,7 @@ class WorkerClient(object):
         data["job_status"] = JobStatus.SUBMITTED
         data["job_progress"] = -1
         data["job_try"] = 0
-        await self._tracker.add_entry('worker-job', **data)
+        await self._tracker.add_entry(tracker_config.WORKER_JOB_TABLE, **data)
         return job
 
     async def enqueue_job(self, job_name, *args, **options):
