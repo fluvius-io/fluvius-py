@@ -1,5 +1,5 @@
 import pytest
-from fluvius_worker import WorkerClient, logger, SQLWorkTracker
+from fluvius.worker import WorkerClient, logger, SQLWorkTracker
 
 class ClientSample(WorkerClient):
     namespace = 'worker-sample'
