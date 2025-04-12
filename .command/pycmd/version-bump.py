@@ -21,7 +21,11 @@ def parse_version_str(version_str):
 
 def version_to_str(version):
     """Convert Version namedtuple to '1.2.3-final' string."""
-    return f"{version.major}.{version.minor}.{version.patch}-{version.label}"
+    if version.label not in ('', 'final', 'none'):
+        return f"{version.major}.{version.minor}.{version.patch}-{version.label}"
+
+    return f"{version.major}.{version.minor}.{version.patch}"
+
 
 
 def get_version():
@@ -110,7 +114,7 @@ def update_release(release_type, release_value=-1):
             next_version = Version(current.major, current.minor, current.patch + 1, current.label)
             set_version(next_version)
         case 'label':
-            next_version = Version(current.major, current.minor, current.patch, release_value)
+            next_version = Version(current.major, current.minor, current.patch, release_value[0])
             set_version(next_version)
         case _:
             click.echo("Current version:", version_to_str(current))
