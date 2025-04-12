@@ -5,6 +5,8 @@ import re
 from pathlib import Path
 from collections import namedtuple
 
+RX_PEP440_LABEL = re.compile(r"^(a|b|rc|post|dev)(\d*)$", re.VERBOSE)
+
 PYPROJECT_PATH = Path("pyproject.toml")
 INIT_PATH = Path("src/fluvius/__init__.py")  # 👈 Replace with your actual package path
 
@@ -93,21 +95,34 @@ def set_version(version: Version):
 
 @click.command()
 @click.argument('release_type')
-@click.argument('release_value', nargs=-1)
-def update_release(release_type, release_value=-1):
+@click.argument('release_label', nargs=-1)
+def update_release(release_type, release_label=None):
     current = get_version()
+    if isinstance(release_label, tuple):
+        release_label = release_label[0]
+
+    if not release_label or release_label.strip().lower() == 'none':
+        release_label =  None
+
+    if release_label and not RX_PEP440_LABEL.match(release_label):
+        raise ValueError(f'Invalid release label [{release_label}]. Must follow PEP-440.')
+
+
     match release_type.lower():
         case 'major':
-            next_version = Version(current.major + 1, 0, 0, current.label)
+            next_version = Version(current.major + 1, 0, 0, release_label or current.label)
             set_version(next_version)
         case 'minor':
-            next_version = Version(current.major, current.minor + 1, 0, current.label)
+            next_version = Version(current.major, current.minor + 1, 0, release_label or current.label)
             set_version(next_version)
         case 'patch':
-            next_version = Version(current.major, current.minor, current.patch + 1, current.label)
+            next_version = Version(current.major, current.minor, current.patch + 1, release_label or current.label)
             set_version(next_version)
         case 'label':
-            next_version = Version(current.major, current.minor, current.patch, release_value[0])
+            if not release_label:
+                raise ValueError('Release label is not provided.')
+
+            next_version = Version(current.major, current.minor, current.patch, release_label)
             set_version(next_version)
         case _:
             click.echo("Current version:", version_to_str(current))
