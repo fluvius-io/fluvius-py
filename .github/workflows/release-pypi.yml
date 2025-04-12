@@ -1,16 +1,15 @@
-name: Publish Python Package to GitHub Release
-
-# on:
-#   release:
-#     types: [published]
+name: Publish Python Package on Tagged Release
 
 on:
   push:
     tags:
-      - 'releases/gh/*'
+      - 'releases/pypi/*'
+
+permissions:
+  contents: write  # Needed to create/upload GitHub Releases
 
 jobs:
-  build:
+  build-and-release:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,14 +24,19 @@ jobs:
       - name: Install uv
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH  # Ensure uv is in PATH
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Install build backend
+        run: uv pip install build
 
       - name: Build the package
-        run: uv build
+        run: uv run python -m build
 
-      - name: Upload release assets
+      - name: Create GitHub release and upload artifacts
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
           files: |
             dist/*.tar.gz
             dist/*.whl
