@@ -51,6 +51,7 @@ def get_version():
 
     return parse_version_str(toml_version_str)
 
+
 def set_version(version: Version):
     version_str = version_to_str(version)
 
@@ -89,14 +90,6 @@ def set_version(version: Version):
     click.echo(sh.git('commit', f'-m', f'Bump version to: {version_str}'))
     click.echo(sh.git('tag', f'releases/gh/{version_str}'))
 
-# # Example usage
-# if __name__ == "__main__":
-#     current = get_version()
-#     click.echo("Current version:", version_to_str(current))
-
-#     # Example: bump patch version
-#     next_version = Version(current.major, current.minor, current.patch + 1, current.label)
-#     set_version(next_version)
 
 @click.command()
 @click.argument('release_type')
