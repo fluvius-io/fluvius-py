@@ -50,7 +50,7 @@ def get_version():
 def set_version(version: Version):
     version_str = version_to_str(version)
 
-    prompt = f'Set Library Version: {version_str} >> Do you want to continue?'
+    prompt = f'Commit all pending changes and set library version to: {version_str} \n>> Do you want to continue?'
     if not click.confirm(prompt, default=False):
         click.echo("❌ Action cancelled.")
         return
@@ -66,7 +66,7 @@ def set_version(version: Version):
         raise ValueError("Version field not found in pyproject.toml")
 
     PYPROJECT_PATH.write_text(new_pyproject_content)
-    print(f"[pyproject.toml] Updated to version {version_str}")
+    click.echo(f"[pyproject.toml] Updated to version {version_str}")
 
     # Update __init__.py
     init_content = INIT_PATH.read_text()
@@ -79,16 +79,16 @@ def set_version(version: Version):
         raise ValueError("No __version__ declaration found in __init__.py")
 
     INIT_PATH.write_text(new_init_content)
-    print(f"[{INIT_PATH}] __version__ updated to {version_str}")
+    click.echo(f"[{INIT_PATH}] __version__ updated to {version_str}")
 
-    sh.git('add', f'.')
-    sh.git('commit', f'-m', f'Bump version to: {version_str}')
-    sh.git('tag', f'releases/gh/{version_str}')
+    click.echo(sh.git('add', f'.'))
+    click.echo(sh.git('commit', f'-m', f'Bump version to: {version_str}'))
+    click.echo(sh.git('tag', f'releases/gh/{version_str}'))
 
 # # Example usage
 # if __name__ == "__main__":
 #     current = get_version()
-#     print("Current version:", version_to_str(current))
+#     click.echo("Current version:", version_to_str(current))
 
 #     # Example: bump patch version
 #     next_version = Version(current.major, current.minor, current.patch + 1, current.label)
@@ -113,7 +113,7 @@ def update_release(release_type, release_value=-1):
             next_version = Version(current.major, current.minor, current.patch, release_value)
             set_version(next_version)
         case _:
-            print("Current version:", version_to_str(current))
+            click.echo("Current version:", version_to_str(current))
     return 0
 
 
