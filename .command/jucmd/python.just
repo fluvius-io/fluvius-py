@@ -27,3 +27,4 @@ test-all TEST_MODULES:
 		--html=tests/logs/report.html \
 		--self-contained-html \
 		./tests/{{TEST_MODULES}}/test_{{TEST_FILES}}.py
+

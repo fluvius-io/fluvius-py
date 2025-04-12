@@ -10,12 +10,12 @@ build-backend = "setuptools.build_meta"
 
 [metadata]
 name = "fluvius"
-version = "0.1.0"
+version = "0.1.2-final"
 
 
 [project]
 name = "fluvius"
-version = "0.1.0"
+version = "0.1.2-final"
 authors = [
   { name="Hung X. Le", email="hunglx@adaptive-bits.com" },
   { name="Phu V. Nguyen", email="phunv@adaptive-bits.com" },

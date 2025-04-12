@@ -1,5 +1,6 @@
-import '.justcmd/_entry.just'
-import '.justcmd/python.just'
+import '.command/jucmd/_default.just'
+import '.command/jucmd/python.just'
+import '.command/jucmd/release.just'
 
 help:
 	just --list --list-submodules
