@@ -4,12 +4,12 @@ from fluvius.data.data_model import DataClassModel, field, NamespaceModel
 
 class SampleDataAccessManager(DataAccessManager):
     __connector__ = SQLiteConnector
-    __auto_model__ = True
+    __auto_model__ = 'schema'
 
 
-@SampleDataAccessManager.register_model('company')
-class CompanyModel(NamespaceModel):
-    pass
+# @SampleDataAccessManager.register_model('company')
+# class CompanyModel(NamespaceModel):
+#     pass
 
 # class CompanyModel(DataModel):
 #     _id: UUID

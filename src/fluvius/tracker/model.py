@@ -1,10 +1,11 @@
 from enum import Enum
-import sqlalchemy as sa
 
 from arq.jobs import Job
 from dataclasses import asdict, is_dataclass
 
+import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pg
+from sqlalchemy.orm import mapped_column, relationship, Mapped
 
 from fluvius.helper.timeutil import timestamp
 from fluvius.data import SqlaDataSchema, SqlaDriver, UUID_GENR
@@ -88,9 +89,9 @@ class WorkerJob(SQLTrackerDataModel):
 
     queue_name = sa.Column(sa.String)
     function = sa.Column(sa.String)
-    args = sa.Column(pg.JSONB)
-    kwargs = sa.Column(pg.JSONB)
-    result = sa.Column(pg.JSONB)
+    args = mapped_column(sa.JSON().with_variant(pg.JSONB(), "postgresql"))
+    kwargs = mapped_column(sa.JSON().with_variant(pg.JSONB(), "postgresql"))
+    result = mapped_column(sa.JSON().with_variant(pg.JSONB(), "postgresql"))
     err_message = sa.Column(sa.String)
     err_trace = sa.Column(sa.String)
 

@@ -12,14 +12,15 @@ class CompanyQuery(QuerySchema):
 
     class Meta:
         query_identifier = 'company'
-        backend_resource = 'company-model'
+        backend_resource = 'company'
 
 
 @pytest.mark.asyncio
 async def test_query():
 
     pp = ParsedParams(args={"!or": [{"business_name!ne": "ABC1"},{"business_name": "DEF3"}]})
-    hd = PgQueryHandler(SampleDataAccessManager())
+    am = SampleDataAccessManager().connect()
+    hd = PgQueryHandler(am)
     # meta = QueryHandler._registry["sample-resource"]._meta
     # logger.info(meta)
     # logger.info([o.meta() for o in meta.query_params.values()])

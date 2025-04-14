@@ -168,10 +168,12 @@ class DataAccessManagerBase(object):
         return self.__config__(**config)
 
     def connect(self, *args, **kwargs):
-        return self.connector.connect(*args, **kwargs)
+        self.connector.connect(*args, **kwargs)
+        return self
 
     def disconnect(self):
-        return self.connector.disconnect()
+        self.connector.disconnect()
+        return self
 
     @asynccontextmanager
     async def transaction(self, *args, **kwargs):
@@ -182,6 +184,7 @@ class DataAccessManagerBase(object):
 
     async def flush(self):
         await self.connector.flush()
+        return self
 
     @property
     def context(self):
@@ -224,10 +227,14 @@ class DataAccessManagerBase(object):
 
     @classmethod
     def _wrap_model_list(cls, resource, item_list):
-        return [self._wrap_model(resource, data) for data in item_list]
+        return [cls._wrap_model(resource, data) for data in item_list]
 
     async def query(self, query, *params, unwrapper=list_unwrapper, **query_options):
         return await self.connector.query(query, *params, unwrapper=unwrapper, **query_options)
+
+    def dump_log(cls):
+        logger.info('cls._RESOURCES = %s', str(cls._RESOURCES))
+        logger.info('cls._MODEL = %s', str(cls._RESOURCES))
 
 
 class DataFeedManager(DataAccessManagerBase):

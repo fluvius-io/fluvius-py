@@ -10,11 +10,11 @@ build:
 	uv build
 
 # Run pytests on [TEST_MODULES], stop on first failure, quiet. Example: `just pytest "*"`
-test TEST_MODULES:
+test TEST_MODULES="*":
 	pytest -x -q \
 		--log-cli-level={{TEST_LOG_LEVEL}} \
 		--log-level={{TEST_LOG_LEVEL}} \
-		--html=tests/logs/report.html \
+		--html=temp/tests-report.html \
 		--self-contained-html --color=yes \
 		{{TEST_PARAMS}} \
 		./tests/{{TEST_MODULES}}/test_{{TEST_FILES}}.py
@@ -24,7 +24,7 @@ test-all TEST_MODULES:
 	@pytest -v \
 		--log-cli-level={{TEST_LOG_LEVEL}} \
 		--log-level={{TEST_LOG_LEVEL}} \
-		--html=tests/logs/report.html \
+		--html=temp/tests-report.html \
 		--self-contained-html \
 		./tests/{{TEST_MODULES}}/test_{{TEST_FILES}}.py
 

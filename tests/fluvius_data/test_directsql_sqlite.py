@@ -3,6 +3,7 @@ import pytest
 
 from enum import Enum
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import create_engine, text
 
 from fluvius.error import UnprocessableError
 from fluvius.data import logger
@@ -10,7 +11,7 @@ from fluvius.data.data_driver import SqlaDriver
 from fluvius.data.data_manager import DataAccessManager
 from fluvius.data.data_schema.sqlalchemy import SqlaDataSchema, sa
 from fluvius.data.identifier import identifier_factory
-from sample_data_model import SampleDataAccessManager
+from sample_data_model import SampleDataAccessManager, SampleSchemaModelBase
 
 sample_data_access_manager = SampleDataAccessManager()
 CompanyModel = sample_data_access_manager.lookup_model('company')
@@ -26,8 +27,10 @@ async def test_sql_insert():
     sample_data_access_manager.connect()
     db = sample_data_access_manager.connector._async_session._async_engine
     async with db.begin() as conn:
-        await conn.run_sync(SqlaDataSchema.metadata.drop_all)
-        await conn.run_sync(SqlaDataSchema.metadata.create_all)
+        await conn.execute(text("ATTACH DATABASE 'temp/domain-audit.db' AS 'domain-audit'"))
+        await conn.execute(text("ATTACH DATABASE 'temp/fluvius-tracker.db' AS 'fluvius-tracker'"))
+        await conn.run_sync(SampleSchemaModelBase.metadata.drop_all)
+        await conn.run_sync(SampleSchemaModelBase.metadata.create_all)
 
     _id_1 = "ABC_1"
     _id_2 = "ABC_2"
