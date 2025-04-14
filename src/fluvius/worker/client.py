@@ -14,7 +14,7 @@ from .tracker import FluviusWorkerTracker, JobStatus
 
 
 # DEBUG = config.DEBUG
-DEBUG = True
+DEBUG = False
 
 class WorkerClient(object):
     ''' Client connects with the workers via:

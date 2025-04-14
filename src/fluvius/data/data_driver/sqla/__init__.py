@@ -63,17 +63,13 @@ def build_dsn(config):
 class _AsyncSessionConnection(object):
     def __init__(self, config, **kwargs):
         self._config = config or kwargs
+        self._async_engine, self._session = self.set_bind(bind_dsn=self._config, loop=None, echo=False, **kwargs)
 
-    @property
-    def connected(self):
-        return hasattr(self, "_async_engine")
-
-    @property
     def session(self):
         if not hasattr(self, "_async_engine"):
             raise ValueError('AsyncSession connection is not established.')
 
-        return self._session
+        return self._session()
 
     async def connection(self):
         if hasattr(self, "_connection"):
@@ -82,25 +78,8 @@ class _AsyncSessionConnection(object):
         self._connection = await self._session.connection()
         return self._connection
 
-    def connect(self, **kwargs):
-        if self.connected:
-            raise ValueError('Engine already setup.')
-
-        bind_dsn = build_dsn(self._config)
-        self.set_bind(bind_dsn=bind_dsn, loop=None, echo=False, **kwargs)
-        self._async_engine.connect()
-        self._session = async_scoped_session(
-            session_factory=async_sessionmaker(
-                bind=self._async_engine,
-                expire_on_commit=False,
-                autoflush=True,
-                autobegin=True
-            ),
-            scopefunc=current_task
-        )
-
-    def _setup_sql_statement(self, dialect):
-        sqla_dialect = importlib.import_module(f'sqlalchemy.dialects.{dialect}')
+    def _setup_sql_statement(self, sqla_dialect):
+        # sqla_dialect = importlib.import_module(f'sqlalchemy.dialects.{dialect}')
         self.insert = getattr(sqla_dialect, 'insert', sa.insert)
         self.update = getattr(sqla_dialect, 'update', sa.update)
         self.select = getattr(sqla_dialect, 'select', sa.select)
@@ -110,8 +89,12 @@ class _AsyncSessionConnection(object):
         return self._async_engine.begin()
 
     def set_bind(self, bind_dsn, loop=None, pool_size=10, **kwargs):
+        bind_dsn = build_dsn(bind_dsn)
         if not isinstance(bind_dsn, URL):
             raise ValueError('Invalid URI: {0}'.format(bind_dsn))
+
+        if hasattr(self, "_async_engine"):
+            raise ValueError('Engine already setup.')
 
         engine = create_async_engine(
             bind_dsn,
@@ -121,10 +104,18 @@ class _AsyncSessionConnection(object):
             **kwargs
         )
 
-        self._setup_sql_statement(engine.dialect.name)
-        self._async_engine = engine
+        self._setup_sql_statement(engine.dialect)
+        session = async_scoped_session(
+            session_factory=async_sessionmaker(
+                bind=engine ,
+                expire_on_commit=False,
+                autoflush=True,
+                autobegin=True
+            ),
+            scopefunc=current_task
+        )
 
-        return engine
+        return engine, session
 
     async def dispose(self):
         if self._async_engine is None:
@@ -139,14 +130,18 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
     def __init__(self, db_dsn=None, **kwargs):
         self._dsn = db_dsn if db_dsn else self.__db_dsn__
+        self._async_session = _AsyncSessionConnection(self.dsn)
+
         logger.info(f'Driver [{self.__class__.__name__}] setup with DSN: {self.dsn}')
 
     def __init_subclass__(cls):
         cls._schema_model = {}
 
-    @property
     def session(self):
-        return self._async_session.session
+        return self._async_session.session()
+
+    def connection(self):
+        return self._async_session.connection()
 
     @property
     def dsn(self):
@@ -157,17 +152,18 @@ class SqlaDriver(DataDriver, QueryBuilder):
         return self._dsn
 
     def connect(self, *args, **kwargs):
-        if not hasattr(self, '_async_session'):
-            self._async_session = _AsyncSessionConnection(self.dsn)
+        pass
+        # if not hasattr(self, '_async_session'):
+        #     self._async_session = _AsyncSessionConnection(self.dsn)
 
-        async_session = self._async_session
+        # async_session = self._async_session
 
-        if not async_session.connected:
-            async_session.connect(*args, **kwargs)
-        elif args or kwargs:
-            logger.warning('Reusing existing connection. Parameters ignored: ARGS = %s | KWARGS = %s', args, kwargs)
+        # if not async_session.connected:
+        #     async_session.connect(*args, **kwargs)
+        # elif args or kwargs:
+        #     logger.warning('Reusing existing connection. Parameters ignored: ARGS = %s | KWARGS = %s', args, kwargs)
 
-        return async_session.begin()
+        # return async_session.begin()
 
     async def disconnect(self):
         async_session = cls._async_session
@@ -196,8 +192,8 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
     @asynccontextmanager
     async def transaction(self, *args, **kwargs):
-        _session = self._async_session.session
-        async with _session.begin() as async_session_transaction:
+        # _session = self._async_session.session
+        async with self.session() as async_session_transaction:
             try:
                 yield async_session_transaction
                 await async_session_transaction.commit()
@@ -208,8 +204,8 @@ class SqlaDriver(DataDriver, QueryBuilder):
                 await async_session_transaction.rollback()
                 raise
 
-    async def flush(self):
-        return await self._async_session.session.flush()
+    # async def flush(self):
+    #     return await self._async_session.session.flush()
 
     async def find_all(self, resource, q: BackendQuery=None, /, **query):
         # @TODO: Clarify the use of this function
@@ -239,7 +235,8 @@ class SqlaDriver(DataDriver, QueryBuilder):
         data_schema = self.schema_lookup(resource)
         query = BackendQuery.create(q, **query)
         stmt = self.build_select(data_schema, query)
-        cursor = await self.session.execute(stmt)
+        async with self.session() as sess:
+            cursor = await sess.execute(stmt)
         items = cursor.scalars().all()
         DEBUG_CONNECTOR and logger.info("\n[FIND_ALL] %r\n=> [RESULT] %d items", query, len(items))
         return items
@@ -260,7 +257,8 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
         data_schema = self.schema_lookup(resource)
         stmt = self.build_select(data_schema, query)
-        cursor = await self.session.execute(stmt)
+        async with self.session() as sess:
+            cursor = await sess.execute(stmt)
         DEBUG_CONNECTOR and logger.info("\n[FIND_ONE] %r\n=> [QUERY] %s items", query, cursor)
 
         try:
@@ -280,7 +278,8 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
         data_schema = self.schema_lookup(resource)
         stmt = self.build_update(data_schema, query, updates)
-        cursor = await self.session.execute(stmt)
+        async with self.session() as sess:
+            cursor = await sess.execute(stmt)
         self._check_no_item_modified(cursor, 1, query)
         return self._unwrap_result(cursor)
 
@@ -292,7 +291,8 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
         ''' @TODO: Add etag checking for batch items '''
         stmt = self.build_delete(data_schema, query)
-        cursor = await self.session.execute(stmt)
+        async with self.session() as sess:
+            cursor = await sess.execute(stmt)
         self._check_no_item_modified(cursor, 1, query)
         return self._unwrap_result(cursor)
 
@@ -300,7 +300,8 @@ class SqlaDriver(DataDriver, QueryBuilder):
         try:
             data_schema = self.schema_lookup(resource)
             stmt = self.build_insert(data_schema, values)
-            cursor = await self.session.execute(stmt)
+            async with self.session() as sess:
+                cursor = await sess.execute(stmt)
         except (asyncpg.exceptions.UniqueViolationError, exc.IntegrityError) as e:
             raise UnprocessableError(
                 errcode="L1209",
@@ -330,12 +331,13 @@ class SqlaDriver(DataDriver, QueryBuilder):
             set_=set_fields
         )
 
-        cursor = await self.session.execute(stmt)
+        async with self.session() as sess:
+            cursor = await sess.execute(stmt)
         DEBUG_CONNECTOR and logger.info("UPSERT %d items => %r", len(values), cursor.rowcount)
         self._check_no_item_modified(cursor)
         return self._unwrap_result(cursor)
 
-    async def native_query(cls, query, *params, unwrapper):
+    async def native_query(self, query, *params, unwrapper):
         if isinstance(query, PikaQueryBuilder):
             stmt = query.get_sql()
         elif isinstance(query, str):
@@ -346,7 +348,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
         # @TODO: validate whether this method is effective/efficient or not
         # It is working for now.
         # conn = await cls._async_session.session.connection()
-        conn = await cls._async_session.connection()
+        conn = await self.connection()
         cursor = await conn.exec_driver_sql(stmt, params)
 
         DEBUG_CONNECTOR and logger.info("[SQL QUERY] %s\n   [QUERY PARAMS] %s", query, params)

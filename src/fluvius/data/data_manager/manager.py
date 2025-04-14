@@ -102,11 +102,9 @@ class DataAccessManagerBase(object):
         for resource_name, schema_model in self.connector._schema_model.items():
             model = self._gen_model(schema_model)
             try:
-                self.register_model(resource_name)(model)
-                self.__class__._AUTO[resource_name] = True
-                logger.info(f'Auto-generated model: {resource_name} => {model}')
+                self.register_model(resource_name, auto_model=True)(model)
             except ResourceAlreadyRegistered:
-                logger.info(f'Model already registered: {resource_name}')
+                logger.warning(f'Model already registered: {resource_name}')
 
 
     def _gen_model(self, schema_model):
@@ -116,21 +114,22 @@ class DataAccessManagerBase(object):
         return type(f"{schema_model.__name__}_Model", (NamespaceModel, ), {})
 
     @classmethod
-    def register_model(cls, resource: str):
+    def register_model(cls, resource: str, auto_model: bool=False):
         def _decorator(model_cls: DataModel):
             if not issubclass(model_cls, DataModel):
-                logger.info(f'Data manager model is not a subclass of DataModel: {model_cls}')
+                logger.warning(f'Data manager model is not a subclass of DataModel: {model_cls}')
 
             if model_cls in cls._RESOURCES:
-                raise ValueError(f'Model already registered: {model_cls} => {cls._RESOURCES[model_cls]}')
+                raise ResourceAlreadyRegistered(f'Model already registered: {model_cls} => {cls._RESOURCES[model_cls]}')
 
             if resource in cls._MODELS and not cls._AUTO.get(resource):
                 raise ResourceAlreadyRegistered(f'Resource already registered: {resource} => {cls._MODELS[resource]}')
 
             cls._RESOURCES[model_cls] = resource
             cls._MODELS[resource] = model_cls
+            cls._AUTO[resource] = auto_model
 
-            logger.info(f'Registered model: {resource} => {model_cls}')
+            logger.info(f'Register {"auto-generated" if auto_model else ""} model: {resource} => {model_cls}')
             return model_cls
 
         return _decorator
