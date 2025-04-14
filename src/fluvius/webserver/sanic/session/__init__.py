@@ -8,11 +8,7 @@ __all__ = ('MemcacheSessionInterface', 'RedisSessionInterface',
            'InMemorySessionInterface', 'MongoDBSessionInterface',
            'AIORedisSessionInterface', 'Session')
 
-__version__ = "1.0.0"
-
-
-class Session:
-
+class Session(object):
     def __init__(self, app=None, interface=None):
         if app:
             self.init_app(app, interface=interface)

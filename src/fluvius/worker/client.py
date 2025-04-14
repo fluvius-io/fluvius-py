@@ -12,9 +12,8 @@ from . import config, logger
 from .helper import build_redis_settings
 from .tracker import FluviusWorkerTracker, JobStatus
 
+DEBUG = config.DEBUG
 
-# DEBUG = config.DEBUG
-DEBUG = False
 
 class WorkerClient(object):
     ''' Client connects with the workers via:

@@ -7,7 +7,7 @@ from fluvius.data import exceptions, UUID_GENF, UUID_TYPE
 from fluvius.helper.timeutil import timestamp
 from fluvius.tracker import SQLTrackerManager, JobStatus, WorkerStatus, config as tracker_config
 
-COLLECT_TRACEBACK = True
+COLLECT_TRACEBACK = config.COLLECT_TRACEBACK
 
 def format_uuid(_id):
     if isinstance(_id, UUID_TYPE):

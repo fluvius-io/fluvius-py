@@ -26,12 +26,26 @@ requires-python = ">=3.9"
 license = "MIT"
 dependencies = [
     "aiohttp>=3.11.11",
+    "arq>=0.26.3",
     "asyncpg>=0.30.0",
     "blinker>=1.9.0",
+    "click>=8.1.8",
     "pyrsistent>=0.20.0",
     "ruff>=0.9.1",
+    "sanic>=25.3.0",
     "sqlalchemy>=2.0.37",
     "ulid-py>=1.1.0",
+    "whenever>=0.7.3",
+]
+
+[dependency-groups]
+dev = [
+    "pyinstrument>=5.0.1",
+    "pytest>=8.3.5",
+    "pytest-asyncio>=0.26.0",
+    "pytest-html>=4.1.1",
+    "sanic-testing>=24.6.0",
+    "yappi>=1.6.10",
 ]
 
 

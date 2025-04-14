@@ -3,10 +3,10 @@ from fluvius.domain.context import DomainTransport
 from .datadef import DomainWorkerRequest, DomainWorkerCommand
 from .client import WorkerClient
 
-from . import FluviusWorker, logger, export_cron, export_task
+from . import FluviusWorker, logger, config, export_cron, export_task
 
 
-DEBUG = True
+DEBUG = config.DEBUG
 
 
 class DomainWorker(FluviusWorker):

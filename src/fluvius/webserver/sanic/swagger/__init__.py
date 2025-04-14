@@ -10,4 +10,3 @@ def configure_sanic_swagger(app):
 
 
 __all__ = ('config', 'logger')
-__version__ = "1.0.0"

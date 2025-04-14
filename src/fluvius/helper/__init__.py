@@ -4,6 +4,7 @@ import os
 import re
 import shutil
 import tempfile
+
 from contextlib import contextmanager
 from itertools import chain
 from operator import itemgetter
@@ -18,7 +19,6 @@ RX_DELIMITER_SPLITTER = re.compile(r"[\.#]")
 
 async def when(val):
     return await val if inspect.isawaitable(val) else val
-
 
 
 def load_yaml(filepath):
