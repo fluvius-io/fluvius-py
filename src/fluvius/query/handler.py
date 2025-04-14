@@ -69,7 +69,7 @@ class QueryHandler(object):
         backend_query = self.construct_query(query_schema, query_params)
 
         backend_query = await self.check_query(query_schema, backend_query)
-        results, meta = await self.execute_query(query_schema, backend_query)
+        results, meta = await self.run_query(query_schema, backend_query)
 
         return self.process_result(results, meta)
 
@@ -87,7 +87,7 @@ class QueryHandler(object):
             sort=query_params.sort
         )
 
-    async def execute_query(self, query_schema, backend_query: BackendQuery):
+    async def run_query(self, query_schema, backend_query: BackendQuery):
         """ Execute the backend query with the state manager and return """
         return backend_query, None
 
@@ -109,9 +109,9 @@ class PgQueryHandler(QueryHandler):
     def manager(self):
         return self._manager
 
-    async def execute_query(self, query_schema, backend_query: BackendQuery):
+    async def run_query(self, query_schema, backend_query: BackendQuery):
         """ Execute the backend query with the state manager and return """
-        result = await self.manager.select(query_schema.meta.backend_resource, backend_query)
+        result = await self.manager.find_all(query_schema.meta.backend_resource, backend_query)
         return list(result), None
 
     async def check_query(self, query_schema, backend_query):

@@ -114,7 +114,7 @@ class InMemoryDriver(DataDriver):
         pass
 
     @classmethod
-    async def raw_query(cls, query, *params, **options):
+    async def native_query(cls, query, *params, **options):
         return query
 
     def defaults(self):

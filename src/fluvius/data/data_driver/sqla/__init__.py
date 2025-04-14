@@ -236,8 +236,9 @@ class SqlaDriver(DataDriver, QueryBuilder):
         }
         Output: List(list of fields is selected)
         '''
+        data_schema = self.schema_lookup(resource)
         query = BackendQuery.create(q, **query)
-        stmt = self.build_select(query)
+        stmt = self.build_select(data_schema, query)
         cursor = await self.session.execute(stmt)
         items = cursor.scalars().all()
         DEBUG_CONNECTOR and logger.info("\n[FIND_ALL] %r\n=> [RESULT] %d items", query, len(items))
@@ -334,7 +335,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
         self._check_no_item_modified(cursor)
         return self._unwrap_result(cursor)
 
-    async def raw_query(cls, query, *params, unwrapper):
+    async def native_query(cls, query, *params, unwrapper):
         if isinstance(query, PikaQueryBuilder):
             stmt = query.get_sql()
         elif isinstance(query, str):

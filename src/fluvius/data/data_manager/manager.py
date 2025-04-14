@@ -55,7 +55,7 @@ def data_query(key_or_func=None, **query_options):
             else:
                 params = tuple()
 
-            return await self.raw_query(query, *params, **query_options)
+            return await self.native_query(query, *params, **query_options)
 
         return wrapper
 
@@ -357,8 +357,8 @@ class DataAccessManager(DataAccessManagerBase):
             result.append(await self.connector.upsert_record(resource, record))
         return result
 
-    async def raw_query(self, *args, **kwargs):
-        return await self.connector.raw_query(*args, **kwargs)
+    async def native_query(self, *args, **kwargs):
+        return await self.connector.native_query(*args, **kwargs)
 
 
 class ReadonlyDataManagerProxy(object):
