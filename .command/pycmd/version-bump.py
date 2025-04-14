@@ -1,3 +1,4 @@
+import os
 import sh
 import click
 import tomllib  # Python 3.11+
@@ -9,7 +10,7 @@ from collections import namedtuple
 RX_PEP440_LABEL = re.compile(r"^(a|b|rc|post|dev)(\d*)$", re.VERBOSE)
 RX_VERSION_STR =  re.compile(r"(\d+)\.(\d+)\.(\d+)-?([\w]*)")
 PYPROJECT_PATH = Path("pyproject.toml")
-INIT_PATH = Path("src/fluvius/__init__.py")  # 👈 Replace with your actual package path
+INIT_FILE_PATH = Path("src/fluvius/__init__.py")  # 👈 Replace with your actual package path
 
 Version = namedtuple("Version", ["major", "minor", "patch", "label"])
 
@@ -37,7 +38,7 @@ def get_version():
     toml_version_str = pyproject["project"]["version"]
 
     # Read from __init__.py using regex
-    init_content = INIT_PATH.read_text()
+    init_content = INIT_FILE_PATH.read_text()
     match = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', init_content)
     if not match:
         raise click.ClickException("No __version__ declaration found in __init__.py")
@@ -76,7 +77,7 @@ def set_version(version: Version):
     click.echo(f"[pyproject.toml] Updated to version {version_str}")
 
     # Update __init__.py
-    init_content = INIT_PATH.read_text()
+    init_content = INIT_FILE_PATH.read_text()
     new_init_content, count = re.subn(
         r'__version__\s*=\s*["\']([^"\']+)["\']',
         f'__version__ = "{version_str}"',
@@ -85,8 +86,8 @@ def set_version(version: Version):
     if count == 0:
         raise click.ClickException("No __version__ declaration found in __init__.py")
 
-    INIT_PATH.write_text(new_init_content)
-    click.echo(f"[{INIT_PATH}] __version__ updated to {version_str}")
+    INIT_FILE_PATH.write_text(new_init_content)
+    click.echo(f"[{INIT_FILE_PATH}] __version__ updated to {version_str}")
 
     click.echo(sh.git('add', f'.'))
     click.echo(sh.git('commit', f'-m', f'Bump version to: {version_str}'))
@@ -131,6 +132,7 @@ def update_release(release_type, release_label=None):
         case _:
             click.echo(f"Current version: {version_to_str(current)}")
             click.echo(f"   - Usage: release [major|minor|patch|label] [label_value]")
+
     return 0
 
 
