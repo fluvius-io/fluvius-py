@@ -1,0 +1,127 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  PYTHONPATH: "./lib:./src:./tests/_lib:./examples"
+  FLUVIUS_CONFIG_FILE: ".github/workflows/config/config.test.ini"
+  TEST_LOG_LEVEL: "info"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11"]
+
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: fluvius_test
+          POSTGRES_PASSWORD: iyHu5WBQxiVXyLLJaYO0XJec
+          POSTGRES_DB: fluvius_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        run: |
+          pip install uv
+          uv --version
+
+      - name: Create test config
+        run: |
+          mkdir -p .github/workflows/config
+          echo "[fluvius.sanic]" > .github/workflows/config/config.test.ini
+          echo "DEBUG_EXCEPTION = True" >> .github/workflows/config/config.test.ini
+          echo "" >> .github/workflows/config/config.test.ini
+          echo "[fluvius.worker]" >> .github/workflows/config/config.test.ini
+          echo "JOB_MANAGER_DSN = postgresql+asyncpg://fluvius_test:iyHu5WBQxiVXyLLJaYO0XJec@localhost:5432/fluvius_test" >> .github/workflows/config/config.test.ini
+          echo "" >> .github/workflows/config/config.test.ini
+          echo "[fluvius.tracker]" >> .github/workflows/config/config.test.ini
+          echo "TRACKER_DSN = postgresql+asyncpg://fluvius_test:iyHu5WBQxiVXyLLJaYO0XJec@localhost:5432/fluvius_test" >> .github/workflows/config/config.test.ini
+
+      - name: Install dependencies
+        run: |
+          uv pip install -e .
+          uv pip install pyinstrument pytest pytest-asyncio pytest-html sanic-testing yappi
+          uv pip install mypy ruff
+
+      - name: Setup database
+        run: |
+          python tests/fluvius_worker/update_db.py
+
+      - name: Lint with ruff
+        run: |
+          ruff check .
+
+      - name: Type checking with mypy
+        run: |
+          mypy --ignore-missing-imports src/
+
+      - name: Test with pytest
+        run: |
+          python -m pytest -xvs \
+            --log-cli-level=$TEST_LOG_LEVEL \
+            --log-level=$TEST_LOG_LEVEL \
+            --html=temp/tests-report.html \
+            --self-contained-html --color=yes \
+            ./tests/
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-report-py${{ matrix.python-version }}
+          path: temp/tests-report.html
+          retention-days: 7
+
+  package:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        run: |
+          pip install uv
+          uv --version
+
+      - name: Build package
+        run: |
+          uv pip install build
+          uv build
+
+      - name: Archive package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-artifacts
+          path: |
+            dist/
+          retention-days: 7

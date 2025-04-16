@@ -1,0 +1,165 @@
+name: Advanced Tests
+
+on:
+  schedule:
+    # Run weekly on Sunday at 01:00 UTC
+    - cron: '0 1 * * 0'
+  workflow_dispatch:
+
+env:
+  PYTHONPATH: "./lib:./src:./tests/_lib:./examples"
+  FLUVIUS_CONFIG_FILE: ".github/workflows/config/config.test.ini"
+  TEST_LOG_LEVEL: "info"
+
+jobs:
+  test-modules:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11"]
+        module: [
+          "fluvius_base",
+          "fluvius_data",
+          "fluvius_domain",
+          "fluvius_process",
+          "fluvius_query",
+          "fluvius_rulepy",
+          "fluvius_tracker",
+          "fluvius_worker"
+        ]
+
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: fluvius_test
+          POSTGRES_PASSWORD: iyHu5WBQxiVXyLLJaYO0XJec
+          POSTGRES_DB: fluvius_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        run: |
+          pip install uv
+          uv --version
+
+      - name: Create test config
+        run: |
+          mkdir -p .github/workflows/config
+          echo "[fluvius.sanic]" > .github/workflows/config/config.test.ini
+          echo "DEBUG_EXCEPTION = True" >> .github/workflows/config/config.test.ini
+          echo "" >> .github/workflows/config/config.test.ini
+          echo "[fluvius.worker]" >> .github/workflows/config/config.test.ini
+          echo "JOB_MANAGER_DSN = postgresql+asyncpg://fluvius_test:iyHu5WBQxiVXyLLJaYO0XJec@localhost:5432/fluvius_test" >> .github/workflows/config/config.test.ini
+          echo "" >> .github/workflows/config/config.test.ini
+          echo "[fluvius.tracker]" >> .github/workflows/config/config.test.ini
+          echo "TRACKER_DSN = postgresql+asyncpg://fluvius_test:iyHu5WBQxiVXyLLJaYO0XJec@localhost:5432/fluvius_test" >> .github/workflows/config/config.test.ini
+
+      - name: Install dependencies
+        run: |
+          uv pip install -e .
+          uv pip install pyinstrument pytest pytest-asyncio pytest-html sanic-testing yappi
+          uv pip install mypy ruff
+
+      - name: Setup database
+        run: |
+          python tests/fluvius_worker/update_db.py
+
+      - name: Test ${{ matrix.module }}
+        run: |
+          python -m pytest -xvs \
+            --log-cli-level=$TEST_LOG_LEVEL \
+            --log-level=$TEST_LOG_LEVEL \
+            --html=temp/tests-report-${{ matrix.module }}.html \
+            --self-contained-html --color=yes \
+            ./tests/${{ matrix.module }}/
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-report-${{ matrix.module }}
+          path: temp/tests-report-${{ matrix.module }}.html
+          retention-days: 7
+
+  performance-test:
+    runs-on: ubuntu-latest
+    needs: test-modules
+    if: ${{ success() || failure() }}
+
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: fluvius_test
+          POSTGRES_PASSWORD: iyHu5WBQxiVXyLLJaYO0XJec
+          POSTGRES_DB: fluvius_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        run: |
+          pip install uv
+          uv --version
+
+      - name: Create test config
+        run: |
+          mkdir -p .github/workflows/config
+          echo "[fluvius.sanic]" > .github/workflows/config/config.test.ini
+          echo "DEBUG_EXCEPTION = True" >> .github/workflows/config/config.test.ini
+          echo "" >> .github/workflows/config/config.test.ini
+          echo "[fluvius.worker]" >> .github/workflows/config/config.test.ini
+          echo "JOB_MANAGER_DSN = postgresql+asyncpg://fluvius_test:iyHu5WBQxiVXyLLJaYO0XJec@localhost:5432/fluvius_test" >> .github/workflows/config/config.test.ini
+          echo "" >> .github/workflows/config/config.test.ini
+          echo "[fluvius.tracker]" >> .github/workflows/config/config.test.ini
+          echo "TRACKER_DSN = postgresql+asyncpg://fluvius_test:iyHu5WBQxiVXyLLJaYO0XJec@localhost:5432/fluvius_test" >> .github/workflows/config/config.test.ini
+
+      - name: Install dependencies
+        run: |
+          uv pip install -e .
+          uv pip install pyinstrument pytest pytest-asyncio pytest-html sanic-testing yappi
+          uv pip install mypy ruff
+
+      - name: Setup database
+        run: |
+          python tests/fluvius_worker/update_db.py
+
+      - name: Run performance tests
+        run: |
+          mkdir -p temp/performance
+          python -m pyinstrument tests/fluvius_worker/run_worker.py -r html -o temp/performance/worker-profile.html
+          python -m pyinstrument tests/fluvius_worker/run_client.py -r html -o temp/performance/client-profile.html
+
+      - name: Upload performance results
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-reports
+          path: temp/performance/
+          retention-days: 7
