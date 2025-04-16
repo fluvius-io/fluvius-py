@@ -38,19 +38,16 @@ class DomainTransport(enum.Enum):
     COMMAND_LINE = 'CLI'
 
 
-def none_serializer(obj, value):
-    return None
-
-
 class DomainContext(DomainEntityRecord):
-    domain = field(type=str, mandatory=True)
-    revision = field(type=int, mandatory=True)
     transport = field(type=DomainTransport,
                       factory=DomainTransport,
                       mandatory=True)
+    serial = field(type=int, mandatory=True)
     source = field(type=(str, type(None)), initial=lambda: None)
     timestamp = field(type=datetime, initial=timestamp)
     headers = field(type=dict, initial=dict)
-    user_id = field(type=nullable(UUID_TYPE), factory=identifier_factory, initial=None)
-    realm_id = field(type=nullable(UUID_TYPE), factory=identifier_factory, initial=None)
     dataset_id = field(type=nullable(UUID_TYPE), factory=identifier_factory, initial=None)
+    organization_id = field(type=nullable(UUID_TYPE), factory=identifier_factory, initial=None)
+    profile_id = field(type=nullable(UUID_TYPE), factory=identifier_factory, initial=None)
+    realm_id = field(type=nullable(UUID_TYPE), factory=identifier_factory, initial=None)
+    user_id = field(type=nullable(UUID_TYPE), factory=identifier_factory, initial=None)

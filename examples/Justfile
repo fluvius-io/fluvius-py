@@ -1,0 +1,10 @@
+export PYTHONPATH   := "../lib:../src:./"
+export FLUVIUS_CONFIG_FILE := "config.ini"
+
+
+help:
+    just --list
+
+## Run sanic application
+run-sanic-app:
+    sanic sample_app.webserver:app --dev -p 8000

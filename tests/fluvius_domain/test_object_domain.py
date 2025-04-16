@@ -2,12 +2,14 @@ import pytest
 
 from fluvius.domain import context, Event, logger
 from fluvius.data import identifier
+from fluvius.helper.timeutil import timestamp
 
 from object_domain.domain import ObjectDomain
 from object_domain.storage import PeopleEconomistResource, populate_fixture_data
 
 
 FIXTURE_ID = identifier.UUID_GENF("100")
+FIXTURE_ID_02 = identifier.UUID_GENF("101")
 
 
 @pytest.fixture
@@ -15,6 +17,8 @@ def ctx():
     return context.DomainContext(
         domain='test',
         user_id=FIXTURE_ID,
+        realm_id=FIXTURE_ID_02,
+        timestamp=timestamp(),
         revision=0,
         headers={
             "if-match": "RNDFIX:QVWxxb9UuRr3vvYEZF3wZGFdBWc"

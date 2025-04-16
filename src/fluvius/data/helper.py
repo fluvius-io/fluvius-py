@@ -3,6 +3,7 @@ import secrets
 import datetime
 
 from fluvius.data.identifier import identifier_factory  # noqa
+from fluvius.helper.timeutil import timestamp
 
 
 NONE_TYPE = type(None)
@@ -16,8 +17,7 @@ def generate_etag(ctx=None, **kwargs):
     return secrets.token_urlsafe()
 
 
-def timestamp():
-    return datetime.datetime.now(datetime.UTC)
+
 
 
 

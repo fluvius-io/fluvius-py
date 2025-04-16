@@ -1,46 +1,35 @@
-from datetime import datetime
-
 from fluvius.domain.context import DomainTransport
 
 from sanic import Sanic
 from sanic.response import json
-from fluvius_connector.sentry import configure_sentry
-from fluvius_swagger import configure_sanic_swagger
-from fluvius_toolbox import configure_toolbox
 
-from fluvius.sanic import config
+from fluvius.helper.timeutil import timestamp
 from .context import SanicContext, SanicDomainServiceProxy
+
+from . import config, logger
 
 IDEMPOTENCY_KEY = config.IDEMPOTENCY_KEY
 
 
-def create_app(module, configure_logging=False, **kwargs):
-    modcfg = module.config
+def create_server(modcfg, configure_logging=False, **kwargs):
     app = Sanic(modcfg.APPLICATION_NAME, configure_logging=configure_logging, **kwargs)
-    app.ctx.__namespace__ = module.__name__
-    app.ctx.__version__ = module.__version__
     app.config.update(modcfg.as_dict())
 
-    configure_profiler(app)
+    configure_sanic_profiler(app)
+    configure_domain_support(app)
 
-    configure_toolbox(app)
-    configure_sentry(app, release_version=f"{modcfg.APPLICATION_NAME} @ {module.__version__}")
-    configure_sanic_swagger(app)
-    configure_domain(app)
-
-    # @TODO: this is not generic enough and may break (i.e. query vs command)
-    @app.route("/~app-summary")
+    @app.route("/~/app-summary")
     async def status_resp(request):
         return json({
-            "application": module.__name__,
-            "version": module.__version__,
-            "timestamp": str(datetime.utcnow())
+            "name": modcfg.APPLICATION_NAME,
+            "serial_no": modcfg.APPLICATION_SERIAL_NUMBER,
+            "build_time": modcfg.APPLICATION_BUILD_TIME,
         })
 
     return app
 
 
-def configure_profiler(app):
+def configure_sanic_profiler(app):
     if not config.ENABLE_PROFILER:
         return app
 
@@ -65,27 +54,32 @@ def configure_profiler(app):
     return app
 
 
-def configure_domain(app, revision=1):
-    initial_context = SanicContext.create(
-        _service_proxy=SanicDomainServiceProxy(app),
+def configure_domain_support(app):
+    initial_context = SanicContext(
         # Attach request object for later reference
         # TODO: Depreciate this line or define a proper interface for CQRS Request
-        namespace=app.name,
-        revision=revision,
-        source=config.CQRS_SOURCE,
+        source=app.name,
+        serial=app.config.APPLICATION_SERIAL_NUMBER,
         transport=DomainTransport.SANIC
     )
 
-    @app.on_request(priority=100)
-    def add_domain_context(request):
-        request.ctx.domain_context = initial_context.set(
-            timestamp=datetime.utcnow(),
-            _request=request,
-            _session=request.cookies.get("session")
+    def get_domain_context(request):
+        ctx = request.ctx
+        return initial_context.set(
+            timestamp=timestamp(),
+            user_id=req_ctx.user_id,
+            profile_id=req_ctx.profile_id,
+            organization_id=req_ctx.organization_id
         )
+
+    def get_service_proxy(request):
+        pass
 
     @app.on_response(priority=100)
     def add_idempotency_key(request, response):
         response.headers[IDEMPOTENCY_KEY] = request.headers.get(IDEMPOTENCY_KEY)
+
+    app.ctx.domain_context = get_domain_context
+    app.ctx.service_proxy = get_service_proxy
 
     return app

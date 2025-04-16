@@ -81,7 +81,6 @@ class Aggregate(object):
         self._evt_queue = queue.Queue()
         self._context = context
         self._command = command
-        self._timestamp = timestamp()
         self._aggroot = (
             await self.fetch_command_aggroot(command) \
             if command.__aggroot_fetch__ else command.resource_reference()
@@ -171,7 +170,7 @@ class Aggregate(object):
 
     def audit_updated(self):
         return dict(
-            _updated=self.timestamp,
+            _updated=self.context.timestamp,
             _updater=self.context.user_id,
             _etag=generate_etag(self.context)
         )
@@ -179,7 +178,7 @@ class Aggregate(object):
     def audit_created(self):
         return dict(
             _realm=self.context.realm_id,
-            _created=self.timestamp,
+            _created=self.context.timestamp,
             _creator=self.context.user_id,
             _etag=generate_etag(self.context)
         )
@@ -204,10 +203,6 @@ class Aggregate(object):
             raise RuntimeError('Aggregate context is not initialized.')
 
         return self._command
-
-    @property
-    def timestamp(self):
-        return self._timestamp
 
     def consume_events(self):
         return consume_queue(self._evt_queue)

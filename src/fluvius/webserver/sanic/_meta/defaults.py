@@ -9,3 +9,11 @@ IDEMPOTENCY_KEY = 'Idempotency-Key'
 RESPONSE_STATUS_KEY = 'Response-Status'
 CQRS_SOURCE = None
 ENABLE_PROFILER = True
+
+
+# Keycloak configuration
+KC_CLIENT_ID = "sanic-app"
+KC_CLIENT_SECRET = "your-client-secret"
+KC_REALM = "master"
+KC_SERVER_URL = "http://localhost:8080/auth"
+KC_ACCESS_TOKEN_EXPIRATION = 86400  # 24 hours in seconds
