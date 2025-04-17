@@ -2,6 +2,7 @@ from fluvius.domain.context import DomainTransport
 
 from sanic import Sanic
 from sanic.response import json
+from sanic_session import Session, InMemorySessionInterface
 
 from fluvius.helper.timeutil import timestamp
 from .context import SanicContext, SanicDomainServiceProxy
@@ -16,6 +17,9 @@ def create_server(modcfg, configure_logging=False, **kwargs):
     app.config.update(config.as_dict())
     app.config.update(modcfg.as_dict())
 
+    Session(app, interface=InMemorySessionInterface(
+        expiry=3600, sessioncookie=True,
+        httponly=True, cookie_name=app.name, prefix="session:"))
     configure_sanic_profiler(app)
     configure_domain_support(app)
 

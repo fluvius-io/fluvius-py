@@ -12,10 +12,11 @@ ENABLE_PROFILER = True
 
 
 # Keycloak configuration
-KC_CLIENT_ID = "sanic-app"
-KC_CLIENT_SECRET = "your-client-secret"
-KC_REALM = "master"
-KC_SERVER_URL = "http://localhost:8080"
+KC_CLIENT_ID = "sample_app"
+KC_CLIENT_SECRET = "W2kAi1iqvVJhrAMVj1YnVQXx0GxNUDiV"
+KC_REALM = "dev-1.fluvius.io"
+KC_SERVER_URL = "https://id.adaptive-bits.com/auth"
 KC_ACCESS_TOKEN_EXPIRATION = 86400  # 24 hours in seconds
 KC_CLIENT_PRIVATE_KEY = None
 KC_CLIENT_PRIVATE_KEY_FILE = None
+KC_CLIENT_PRIVATE_PASSWORD = "sample_app_private_key_client"
