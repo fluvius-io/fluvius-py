@@ -8,3 +8,6 @@ help:
 ## Run sanic application
 run-sanic-app:
     sanic sample_app.webserver:app --dev -p 8000
+
+run-fastapi:
+    cd fastapi_app && PYTHONPATH="../../lib:../../src" uvicorn main:app --reload
