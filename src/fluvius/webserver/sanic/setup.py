@@ -13,6 +13,7 @@ IDEMPOTENCY_KEY = config.IDEMPOTENCY_KEY
 
 def create_server(modcfg, configure_logging=False, **kwargs):
     app = Sanic(modcfg.APPLICATION_NAME, configure_logging=configure_logging, **kwargs)
+    app.config.update(config.as_dict())
     app.config.update(modcfg.as_dict())
 
     configure_sanic_profiler(app)
