@@ -117,7 +117,7 @@ class DataAccessManagerBase(object):
     def register_model(cls, resource: str, auto_model: bool=False):
         def _decorator(model_cls: DataModel):
             if not issubclass(model_cls, DataModel):
-                logger.warning(f'Data manager model is not a subclass of DataModel: {model_cls}')
+                logger.warning(f'Data model is not a subclass of DataModel: {model_cls}')
 
             if model_cls in cls._RESOURCES:
                 raise ResourceAlreadyRegistered(f'Model already registered: {model_cls} => {cls._RESOURCES[model_cls]}')

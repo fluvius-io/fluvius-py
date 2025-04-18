@@ -18,21 +18,8 @@ def auth_required(inject_ctx=True):
     def decorator(endpoint):
         @wraps(endpoint)
         async def wrapper(request: Request, *args, **kwargs):
-            # You can optionally decode and validate the token here
-            if not (id_token := request.cookies.get("id_token")):
+            if not getattr(request.state, 'auth_context', None):
                 raise HTTPException(status_code=401, detail="Not authenticated.")
-
-            try:
-                user = request.session.get("user")
-                if not user:
-                    raise ValueError()
-            except (KeyError, ValueError):
-                raise HTTPException(status_code=401, detail="User logged out.")
-
-            request.state.auth = SimpleNamespace(
-                user = user,
-                token = id_token
-            )
 
             return await endpoint(request, *args, **kwargs)
 
@@ -128,12 +115,14 @@ def setup_authentication(app, config=config):
     @app.get("/auth/verify")
     @auth_required()
     async def protected(request: Request):
-        if not (user := request.state.auth.user):
+        if not (user := request.state.auth_context.user):
             raise HTTPException(status_code=401, detail=f"Not logged in: {user}")
 
         return {
-            "message": f"Hello {user.get('preferred_username')}",
-            "user": user
+            "message": f"OK",
+            "auth_context": request.state.auth_context,
+            "domain_context": request.state.domain_context.serialize(),
+            "headers": dict(request.headers)
         }
 
     @app.get("/auth/logout")

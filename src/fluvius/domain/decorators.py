@@ -266,8 +266,6 @@ class DomainEntityRegistry(object):
         domain_cls._entity_registry[identifier] = entity_cls
         DEBUG and logger.info("[REGISTERED ENTITY] %s/%d [%s]", domain_name, kind, key)
 
-
-
     @classmethod
     def entity_registered(cls, entity_cls):
         try:

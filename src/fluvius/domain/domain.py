@@ -218,7 +218,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         if no_handler:
             raise RuntimeError('Command has no handler: %s' % cmd)
 
-    async def process_command(self, ctx, stm, cmd) -> Iterator[ce.Event]:
+    async def _process_command_internal(self, ctx, stm, cmd) -> Iterator[ce.Event]:
         await self.logstore.add_command(cmd)
         await self.publish(sig.COMMAND_READY, cmd)
 
@@ -253,7 +253,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
         await self.publish(sig.COMMAND_COMPLETED, cmd)
 
-    async def handle_request(self, context, *commands):
+    async def process_command(self, context, *commands):
         # Ensure saving of context before processing command
         if not commands:
             logger.warning('No commands provided to process.')
@@ -272,7 +272,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
                     domain=self.__domain__,
                     revision=self.__revision__
                 ))
-                async for evt in self.process_command(context, stm, auth_cmd):
+                async for evt in self._process_command_internal(context, stm, auth_cmd):
                     await self.logstore.add_event(evt)
             
             # Before exiting transaction manager context                    

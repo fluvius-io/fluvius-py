@@ -65,14 +65,16 @@ class DomainWorker(FluviusWorker):
 
             command = domain.create_command(
                 cmd_key,
-                cmddata.resource,
-                cmddata.identifier,
                 cmddata.payload,
-                cmddata.domain_sid,
-                cmddata.domain_iid
+                aggroot=(
+                    cmddata.resource,
+                    cmddata.identifier,
+                    cmddata.domain_sid,
+                    cmddata.domain_iid
+                )
             )
 
-            return await domain.handle_request(context, command)
+            return await domain.process_command(context, command)
 
         return _handle_request
 
@@ -88,15 +90,17 @@ class DomainWorker(FluviusWorker):
         cmds = [
             domain.create_command(
                 cmddata.command,
-                cmddata.resource,
-                cmddata.identifier,
                 cmddata.payload,
-                cmddata.domain_sid,
-                cmddata.domain_iid
+                aggroot=(
+                    cmddata.resource,
+                    cmddata.identifier,
+                    cmddata.domain_sid,
+                    cmddata.domain_iid
+                )
             )
             for cmddata in commands
         ]
-        return await domain.handle_request(context, *cmds)
+        return await domain.process_command(context, *cmds)
 
     def _register_domain_handlers(self, domain):
         for cmd_key, cmd_cls, qual_name in domain.enumerate_command():
