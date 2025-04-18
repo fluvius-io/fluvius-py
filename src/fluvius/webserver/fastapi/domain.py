@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 from fluvius.domain import Domain
+from fluvius.data import UUID_TYPE
 from fluvius.domain.manager import DomainManager
 from fluvius.domain.context import DomainContext, DomainTransport
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -57,7 +58,13 @@ class DomainMiddleware(BaseHTTPMiddleware):
 
 class FastAPIDomainManager(DomainManager):
     def _wrap_command(self, domain, cmd_key, qual_name):
-        async def _command_handler(request, resource, identifier=None, domain_sid=None, domain_iid=None):
+        async def _command_handler(
+            request: Request,
+            resource: str,
+            identifier: UUID_TYPE=None,
+            domain_sid: UUID_TYPE=None,
+            domain_iid: UUID_TYPE=None
+        ):
             domain_ctx = request.state.domain_context
             command_payload = request.json()
             command_aggroot = AggregateRoot(resource, identifier, domain_sid, domain_iid)
@@ -74,16 +81,15 @@ class FastAPIDomainManager(DomainManager):
 
 def configure_domain_support(app, config=config):
     manager = FastAPIDomainManager(app)
-    initial_context = DomainContext(
+
+    app.add_middleware(DomainMiddleware, DomainContext(
         source=config.APPLICATION_TITLE,
         serial=config.APPLICATION_SERIAL_NUMBER,
         transport=DomainTransport.SANIC
-    )
-
-    app.add_middleware(DomainMiddleware, initial_context)
+    ))
     for namespace, command, handler in manager.enumerate_command_handlers():
         uri_pattern = f'/{namespace}:{command}/{{resource}}/{{identifier}}'
-        uri_pattern_sid = f'/{namespace}:{command}/~{{domain_sid}}/{{resource}}/{{identifier}}'
+        uri_pattern_sid = f'/{namespace}:{command}/~{{domain_sid}}:{{domain_iid}}/{{resource}}/{{identifier}}'
         handler = app.get(uri_pattern)(handler)
         handler = app.get(uri_pattern_sid)(handler)
     return app
