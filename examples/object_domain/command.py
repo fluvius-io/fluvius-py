@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 from fluvius.domain import Command
-from fluvius.data import BlankModel, DataModel
+from fluvius.data import BlankModel, DataModel, serialize_mapping
 from .domain import _command, _processor
 from . import logger
 
@@ -15,24 +15,12 @@ class UpdateObjectCmd(Command):
         endpoints = None
 
     async def _process(self, aggregate, statemgr, payload, rootobj):
-        data = serialize_model(payload)
+        data = serialize_mapping(payload)
 
         ''' Demonstrate inline handler definition,
             NOTE: this should be a pure function - no reference to `self` or `cls` '''
         await aggregate.update(content=data)
 
-
-def serialize_model(payload):
-    if isinstance(payload, dict):
-        return payload
-
-    if isinstance(payload, BlankModel):
-        return payload.__dict__
-
-    if isinstance(payload, DataModel):
-        return DataModel.dict(payload)
-
-    raise ValueError('Unable to serialize model')
 
 @_command("create-object")
 class CreateObjectCmd(Command):
@@ -40,13 +28,13 @@ class CreateObjectCmd(Command):
         return args
 
     async def _process(self, aggregate, statemgr, payload, rootobj):
-        data = serialize_model(payload)
+        data = serialize_mapping(payload)
         economist = statemgr.create('people-economist', data)
         logger.info('/3rd/ Non-annotated processor (default) called: %s', rootobj)
 
         # Use: create_typed_resp(cmd.payload, resp_type="object-response") if needed
         yield aggregate.create_response(data)
-        yield aggregate.create_typed_resp("object-response", data)
+        yield aggregate.create_response(data, _type="object-response")
 
     @_processor(priority=10)
     def _testing_high_priority(self, agg, stm, dat, ref):

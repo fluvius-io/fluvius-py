@@ -1,6 +1,6 @@
 import json
 from .json_encoder import FluviusJSONEncoder
-from fluvius.data.data_model import DataModel
+from fluvius.data.data_model import DataModel, BlankModel
 
 
 def serialize_json(data: dict, cls=FluviusJSONEncoder, **kwargs) -> str:
@@ -19,6 +19,9 @@ def serialize_mapping(data, **kwargs):
         return data
 
     if isinstance(data, DataModel):
-        return data.serialize()
+        return data.dict()
+
+    if isinstance(data, BlankModel):
+        return data.__dict__
 
     raise ValueError('Unable to serialize value to mapping: %s' % str(data))
