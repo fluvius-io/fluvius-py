@@ -1,4 +1,5 @@
 from enum import IntEnum
+from fluvius.data import BlankModel, DataModel
 from .mutation import MutationType  # noqa
 
 
@@ -54,3 +55,23 @@ class EventState(IntEnum):
     RETRY_3 = 102
     FAILED = 500
     CANCELED = 501
+
+
+class DomainEntity(object):
+    __meta_schema__ = BlankModel
+
+    class Data(BlankModel):
+        pass
+
+    class Meta(BlankModel):
+        pass
+
+    def __init_subclass__(cls):
+        if cls.__dict__.get('__abstract__'):
+            return
+
+        cls.Meta = cls.__meta_schema__(**cls.Meta.__dict__)
+        if not issubclass(cls.Data, (DataModel, BlankModel)):
+            raise ValueError(f'Invalid Entity Data Model: {cls.Data}')
+
+

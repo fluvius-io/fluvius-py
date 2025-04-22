@@ -9,9 +9,9 @@ from typing import NamedTuple
 from . import config, logger
 
 from .activity import ActivityType, ActivityLog
-from .event import Event
-from .message import MessageBundle
-from .response import DomainResponse
+from .event import Event, EventRecord
+from .message import MessageRecord
+from .response import DomainResponse, ResponseRecord
 from .helper import consume_queue, include_resource, prepare_resource_spec, _AGGROOT_RESOURCES
 
 from . import mutation
@@ -121,38 +121,43 @@ class Aggregate(object):
         except KeyError:
             evt_class = Event
 
-        evt = evt_class(
-            name=evt_key,
+        data = evt_class.Data.create(data)
+        evt = EventRecord(
+            event=evt_key,
             args=evt_args,
-            data=data if isinstance(data, dict) else {"_result": data}
+            data=data
         )
 
         self._evt_queue.put(evt)
         return evt
 
-    def create_response(self, data, **kwargs):
-        if isinstance(data, DomainResponse):
-            return data
-
-        rsp_cls = self.lookup_response(DEFAULT_RESPONSE_TYPE)
-        return rsp_cls(data=data, **kwargs)
-
-    def create_typed_resp(self, resp_type, data, **kwargs):
-        rsp_cls = self.lookup_response(resp_type)
-        return rsp_cls(data=data, **kwargs)
+    def create_response(self, data, _type=None, **kwargs):
+        type_ = _type or DEFAULT_RESPONSE_TYPE
+        rsp_cls = self.lookup_response(type_)
+        data = rsp_cls.Data.create(data)
+        return ResponseRecord(data=data, response=type_)
 
     def create_message(self, msg_key, data=None, **kwargs):
         msg_cls = self.lookup_message(msg_key)
-        return msg_cls(
-            aggroot=self.aggroot, domain=self.domain_name, data=data, **kwargs
+        return MessageRecord(
+            message=msg_key,
+            aggroot=self.aggroot,
+            domain=self.domain_name,
+            data=msg_cls.Data(**data),
+            **kwargs
         )
 
     def init_resource(self, resource, data=None, **kwargs):
         return self.statemgr.create(resource, data, **kwargs, **self.audit_created())
 
     def create_activity(
-        self, message, data=None, msglabel=None,
-        msgtype=ActivityType.USER_ACTION, logroot=None, code=0, **kwargs
+        self,
+        message,
+        data=None, msglabel=None,
+        msgtype=ActivityType.USER_ACTION,
+        logroot=None,
+        code=0,
+        **kwargs
     ):
         return ActivityLog.create(
             logroot=logroot or self.aggroot,
@@ -224,7 +229,6 @@ class RestrictedAggregateProxy(object):
         # # Disabled infavor of expose create_* methods
         self.create_message = aggregate.create_message
         self.create_response = aggregate.create_response
-        self.create_typed_resp = aggregate.create_typed_resp
         self.create_activity = aggregate.create_activity
 
         self.get_context = aggregate.get_context

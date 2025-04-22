@@ -71,7 +71,7 @@ def _assert_domain_message(*msg_class):
     for msg_cls in msg_class:
         if not issubclass(msg_cls, cm.Message):
             raise DomainEntityError(
-                f"Handled event must be subclass of [fluvius.domain.MessageBundle] [{msg_cls}] [E1400]"
+                f"Handled event must be subclass of [fluvius.domain.MessageRecord] [{msg_cls}] [E1400]"
             )
 
 
@@ -111,7 +111,7 @@ def _validate_domain_message(cls):
                 (cls, bcls),
             )
 
-    if issubclass(cls, cm.MessageBundle):
+    if issubclass(cls, cm.MessageRecord):
         return cls
 
     raise ValueError(f"Invalid CQRS message class: {cls}")
@@ -138,16 +138,16 @@ def _validate_domain_entity(cls):
 
 def _locate_handler(cls, name_match=None, domain_cls=None):
     for name in dir(cls):
-        attr = getattr(cls, name)
+        func = getattr(cls, name)
         if name == name_match:
-            yield name, attr
+            yield name, func
             continue
 
-        if callable(attr) and hasattr(attr, HANDLER_MARKER_FIELD):
-            assert domain_cls is None or domain_cls == getattr(attr, HANDLER_MARKER_FIELD), \
+        if inspect.isfunction(func) and hasattr(func, HANDLER_MARKER_FIELD):
+            assert domain_cls is None or domain_cls == getattr(func, HANDLER_MARKER_FIELD), \
                 "Handler [%s] is registered with a different domain." % str(attr)
 
-            yield name, attr
+            yield name, func
 
 class DomainEntityRegistry(object):
     @classmethod
@@ -198,7 +198,7 @@ class DomainEntityRegistry(object):
         return decorator
 
     @classmethod
-    def command(domain_cls, cls_or_key, aggroot='_ALL', fetch=True):
+    def command(domain_cls, cls_or_key, aggroot='_ALL'):
         def decorator(cls):
             cls = _validate_domain_command(cls)
             domain_cls._register_entity(cls, key, DomainEntityType.COMMAND)
@@ -207,8 +207,8 @@ class DomainEntityRegistry(object):
                 the definition of the entity class.
             '''
             for name, cmd_handler in _locate_handler(cls, COMMAND_PROCESSOR_FUNC):
-                wrapper = domain_cls.command_processor(cls)
-                setattr(cls, COMMAND_PROCESSOR_FUNC, wrapper(cmd_handler))
+                _decorator = domain_cls.command_processor(cls)
+                setattr(cls, COMMAND_PROCESSOR_FUNC, _decorator(cmd_handler))
 
             DEBUG and logger.info("[REGISTERED COMMAND] %s/%d [%s]", domain_cls, cls, key)
             return cls

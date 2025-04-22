@@ -1,18 +1,22 @@
-from fluvius.data import UUID_GENR, nullable, field, serialize_mapping
+from fluvius.data import UUID_TYPE, nullable, field, serialize_mapping, identifier_factory, DataModel, BlankModel
 from .record import DomainEntityRecord
+from .entity import DomainEntity
 
 
-class DomainResponse(DomainEntityRecord):
-    _domain = 'response'
+class ResponseRecord(DomainEntityRecord):
+    response = field(str)
+    src_cmd = field(type=UUID_TYPE, factory=identifier_factory)
+    data = field(type=dict, factory=serialize_mapping)
 
-    kind = field()
-    data = field(type=nullable(dict), factory=serialize_mapping)
-    src_cmd = field()
-    transact = field()
 
-    @classmethod
-    def defaults(cls):
-        return dict(_id=UUID_GENR())
+class ResponseMeta(DataModel):
+    key: str = None
+    name: str = None
+    tags: list[str] = tuple()
 
+
+class DomainResponse(DomainEntity):
+    __meta_schema__ = ResponseMeta
+    __abstract__ = True
 
 __all__ = ("DomainResponse",)

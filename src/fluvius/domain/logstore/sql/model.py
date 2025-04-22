@@ -65,12 +65,18 @@ class ActivityLog(DomainLogBaseModel):
 
 class EventLog(DomainLogBaseModel):
     domain = sa.Column(sa.String)
-    name = sa.Column(sa.String)
+    event = sa.Column(sa.String)
     identifier = sa.Column(pg.UUID)
     resource = sa.Column(sa.String)
     src_cmd = sa.Column(pg.UUID)
-    src_evt = sa.Column(pg.UUID)
     args = sa.Column(pg.JSON)
+    data = sa.Column(pg.JSON)
+
+
+class MessageLog(DomainLogBaseModel):
+    domain = sa.Column(sa.String)
+    src_cmd = sa.Column(pg.UUID)
+    message = sa.Column(sa.String)
     data = sa.Column(pg.JSON)
 
 

@@ -1,7 +1,7 @@
 from account_transaction.domain import TransactionManagerDomain
 from fluvius.domain.record import field
 from fluvius.domain.response import DomainResponse
-from fluvius.domain.message import MessageBundle
+from fluvius.domain.message import MessageRecord
 
 
 _entity = TransactionManagerDomain.entity
@@ -14,5 +14,5 @@ class GeneralResponse(DomainResponse):
 
 
 @_entity
-class GeneralMessage(MessageBundle):
+class GeneralMessage(MessageRecord):
     data = field(type=dict)

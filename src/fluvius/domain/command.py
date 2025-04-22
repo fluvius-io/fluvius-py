@@ -2,7 +2,7 @@ from typing import Optional, Dict, List, Annotated, Any
 from fluvius.data import UUID_TYPE, UUID_GENR, identifier_factory, nullable, field, DataModel, Field, BlankModel
 
 from .aggregate import AggregateRoot
-from .entity import CommandState, DOMAIN_ENTITY_MARKER
+from .entity import CommandState, DOMAIN_ENTITY_MARKER, DomainEntity
 from .record import DomainEntityRecord
 from .context import DomainContext
 
@@ -48,17 +48,9 @@ class CommandMeta(DataModel):
     scoped_by: Optional[Dict] = None
 
 
-class Command(object):
-    Meta = BlankModel()
-    Payload = BlankModel
-
-    def __init__(self):
-        pass
-
-    def __init_subclass__(cls):
-        cls.Meta = CommandMeta(**cls.Meta.__dict__)
-        if not issubclass(cls.Payload, (DataModel, BlankModel)):
-            raise ValueError(f'Invalid Command Payload: {cls.Payload}')
+class Command(DomainEntity):
+    __meta_schema__ = CommandMeta
+    __abstract__ = True
 
 
 __all__ = ("Command",)

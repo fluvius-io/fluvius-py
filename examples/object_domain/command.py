@@ -5,20 +5,6 @@ from .domain import _command, _processor
 from . import logger
 
 
-# class UpdateObjectBaseCmd(CommandDefinition):
-#     def __invariant__(self):
-#         content = self.payload
-
-#         return (
-#             (bool(content), "Pay load must not be empty. [%s]" % content),
-#             (
-#                 not content.get("_etag"),
-#                 "Payload must not contain readonly fields.",
-#             ),
-#         )
-
-#     payload = field(type=dict, mandatory=True)
-
 
 @_command("update-object")
 class UpdateObjectCmd(Command):
@@ -27,9 +13,6 @@ class UpdateObjectCmd(Command):
         resources = ("people-economist", )
         description = "Withdraw money"
         endpoints = None
-
-    class Payload(BlankModel):
-        pass
 
     async def _process(self, aggregate, statemgr, payload, rootobj):
         data = serialize_model(payload)
@@ -53,7 +36,6 @@ def serialize_model(payload):
 
 @_command("create-object")
 class CreateObjectCmd(Command):
-
     def command_method_echo(self, *args):
         return args
 

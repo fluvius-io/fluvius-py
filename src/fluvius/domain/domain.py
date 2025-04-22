@@ -211,16 +211,18 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
     def create_command(self, cmd_key, cmd_data=None, aggroot=None):
         aggroot = self._validate_aggroot(aggroot)
-        command = self.lookup_command(cmd_key)
+        cmd_cls = self.lookup_command(cmd_key)
 
-        if not include_resource(aggroot.resource, command.Meta.resources):
+        if not include_resource(aggroot.resource, cmd_cls.Meta.resources):
             raise ForbiddenError('D10011', 'Command [%s] does not allow aggroot of resource [%s]' % (cmd_key, aggroot.resource))
+
+        data = cmd_cls.Data.create(cmd_data)
 
         return cc.CommandBundle(
             domain=self.__domain__,
             revision=self.__revision__,
             command=cmd_key,
-            payload=cmd_data,
+            payload=data,
             resource=aggroot.resource,
             identifier=aggroot.identifier,
             domain_sid=aggroot.domain_sid,
@@ -257,7 +259,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         await self.publish(sig.COMMAND_READY, cmd)
 
         async for particle in self._invoke_processors(ctx, stm, cmd):
-            if not isinstance(particle, (ce.Event, cm.MessageBundle, cres.DomainResponse, act.ActivityLog)):
+            if not isinstance(particle, (ce.EventRecord, cm.MessageRecord, cres.ResponseRecord, act.ActivityLog)):
                 raise RuntimeError(
                     'Items returned from command processor must be a domain entity (event, messages, etc.). '
                     'Got: [%s] while processing command: %s', particle, cmd)
@@ -265,15 +267,15 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             # set trace values
             particle = particle.set(src_cmd=cmd._id)
 
-            if isinstance(particle, ce.Event):
+            if isinstance(particle, ce.EventRecord):
                 # Note: need some outline about how an event is handled
                 # and the mutations are generated.
                 await self.publish(sig.EVENT_COMMITED, cmd, event=particle)
                 yield particle
-            elif isinstance(particle, cm.MessageBundle):
+            elif isinstance(particle, cm.MessageRecord):
                 self.msg_queue.put(particle)
                 await self.publish(sig.MESSAGE_RECEIVED, cmd, message=particle)
-            elif isinstance(particle, cres.DomainResponse):
+            elif isinstance(particle, cres.ResponseRecord):
                 self.rsp_queue.put(particle)
                 await self.publish(sig.RESPONSE_RECEIVED, cmd, response=particle)
             elif isinstance(particle, act.ActivityLog):
