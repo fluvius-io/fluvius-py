@@ -10,9 +10,9 @@ def create_app(config=config, **kwargs):
     @app.get("/~/app-summary")
     async def status_resp(request: Request):
         return {
-            "name": modcfg.APPLICATION_NAME,
-            "serial_no": modcfg.APPLICATION_SERIAL_NUMBER,
-            "build_time": modcfg.APPLICATION_BUILD_TIME,
+            "name": config.APPLICATION_TITLE,
+            "serial_no": config.APPLICATION_SERIAL_NUMBER,
+            "build_time": config.APPLICATION_BUILD_TIME,
         }
 
     configure_domain_support(app)

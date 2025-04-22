@@ -1,4 +1,4 @@
-from .datadef import UUID_GENR, nullable, field, serialize_mapping
+from fluvius.data import UUID_GENR, nullable, field, serialize_mapping
 from .record import DomainEntityRecord
 
 

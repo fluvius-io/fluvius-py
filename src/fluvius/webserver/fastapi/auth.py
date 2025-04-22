@@ -11,7 +11,7 @@ from fastapi.responses import RedirectResponse
 
 import httpx
 
-from . import config, logger
+from . import config as base_conf, logger
 
 
 def auth_required(inject_ctx=True):
@@ -26,7 +26,7 @@ def auth_required(inject_ctx=True):
         return wrapper
     return decorator
 
-def setup_authentication(app, config=config):
+def setup_authentication(app, config=base_conf):
     DEFAULT_REDIRECT_URI = config.DEFAULT_REDIRECT_URI
 
     # === Keycloak Configuration ===

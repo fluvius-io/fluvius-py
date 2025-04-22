@@ -11,8 +11,7 @@ from . import message as cm
 from . import resource as cx
 from . import response as cr
 from . import logger
-from .datadef import serialize_mapping
-from .entity import CQRS_ENTITY_MARKER, DomainEntityType, CQRS_ENTITY_KEY
+from .entity import DOMAIN_ENTITY_MARKER, DomainEntityType, DOMAIN_ENTITY_KEY
 from .exceptions import DomainEntityError
 from .helper import consume_queue, prepare_resource_spec, _AGGROOT_RESOURCES
 from .command import field as command_field
@@ -21,10 +20,12 @@ NONE_TYPE = type(None)
 NAMESPACE_SEP = ":"
 COMMAND_PROCESSOR_FUNC = '_process'
 COMMAND_PAYLOAD_FIELD = 'payload'
+COMMAND_PAYLOAD_SCHEMA_FIELD = '__schema__'
 MESSAGE_DISPATCHER_FUNC = '_dispatch'
-HANDLER_MARKER = '_handler'
+HANDLER_MARKER_FIELD = '__domain_handler__'
+HANDLER_PRIORITY_FIELD = '__priority__'
 META_ATTRIBUTES = 'Meta'
-DEBUG = False
+DEBUG = True
 
 
 class OrderCounter:
@@ -51,23 +52,14 @@ def _assert_coroutine_func(func):
         )
 
 
-def _validate_command(cls):
-    data_types = cls._pclass_fields[COMMAND_PAYLOAD_FIELD].type
-    for t in data_types:
-        if issubclass(t, (cc.Command, dict, NONE_TYPE)):
-            continue
-
-        raise ValueError('Invalid command data type: %s' % str(t))
-
-
-def _assert_domain_command(*cmd_class):
-    for cmd_cls in cmd_class:
-        if not issubclass(cmd_cls, cc.CommandEnvelop):
+def _assert_domain_command(*cmd_classes):
+    for cmd_cls in cmd_classes:
+        if not issubclass(cmd_cls, cc.Command):
             raise DomainEntityError(
-                f"Handled command must be subclass of [fluvius.domain.CommandEnvelop] [{cmd_cls}] [E14001]"
+                f"Command must be subclass of [fluvius.domain.Command] [{cmd_cls}] [E14001]"
             )
 
-        if not hasattr(cmd_cls, CQRS_ENTITY_MARKER):
+        if not hasattr(cmd_cls, DOMAIN_ENTITY_MARKER):
             logger.warn(
                 "[EA3F5] Command handler target is not a [domain_entity]."
                 " Handler may process multiple command types. [%s] [W0042]",
@@ -77,9 +69,9 @@ def _assert_domain_command(*cmd_class):
 
 def _assert_domain_message(*msg_class):
     for msg_cls in msg_class:
-        if not issubclass(msg_cls, cm.DomainMessage):
+        if not issubclass(msg_cls, cm.Message):
             raise DomainEntityError(
-                f"Handled event must be subclass of [fluvius.domain.DomainMessage] [{msg_cls}] [E1400]"
+                f"Handled event must be subclass of [fluvius.domain.MessageBundle] [{msg_cls}] [E1400]"
             )
 
 
@@ -97,53 +89,36 @@ def _assert_domain_external_event(evt_cls, domain_cls):
         )
 
 
-def _validate_command_data(cls):
-    data_types = cls._pclass_fields[COMMAND_PAYLOAD_FIELD].type
-    for t in data_types:
-        if issubclass(t, (cc.Command, dict, NONE_TYPE)):
-            continue
-
-        raise ValueError('Invalid command data type: %s' % str(t))
-
-
 def _validate_domain_command(cls):
     for bcls in cls.__bases__:
-        if hasattr(bcls, CQRS_ENTITY_MARKER):
+        if hasattr(bcls, DOMAIN_ENTITY_MARKER):
             raise DomainEntityError(
                 "[E14002] CQRS Entity [%s] must not inherit another CQRS Entity [%s]",
                 (cls, bcls),
             )
 
-    if issubclass(cls, cc.Command):
-        attrs = {name: handler for name, handler in _locate_handler(cls, COMMAND_PROCESSOR_FUNC)}
-        attrs[COMMAND_PAYLOAD_FIELD] = command_field(cls, mandatory=True)
-        attrs[META_ATTRIBUTES] = cls.__dict__.pop(META_ATTRIBUTES, None)
+    if not issubclass(cls, cc.Command):
+        raise ValueError(f"Invalid CQRS command class: {cls}")
 
-        return type(f"{cls.__name__}Wrapped", (cc.CommandEnvelopTemplate, ), attrs)
-
-    if issubclass(cls, cc.CommandEnvelop):
-        _validate_command_data(cls)
-        return cls
-
-    raise ValueError(f"Invalid CQRS command class: {cls}")
+    return cls
 
 
 def _validate_domain_message(cls):
     for bcls in cls.__bases__:
-        if hasattr(bcls, CQRS_ENTITY_MARKER):
+        if hasattr(bcls, DOMAIN_ENTITY_MARKER):
             raise DomainEntityError(
                 "[E14002] CQRS Entity [%s] must not inherit another CQRS Entity [%s]",
                 (cls, bcls),
             )
 
-    if issubclass(cls, cm.DomainMessage):
+    if issubclass(cls, cm.MessageBundle):
         return cls
 
     raise ValueError(f"Invalid CQRS message class: {cls}")
 
 def _validate_domain_entity(cls):
     for bcls in cls.__bases__:
-        if hasattr(bcls, CQRS_ENTITY_MARKER):
+        if hasattr(bcls, DOMAIN_ENTITY_MARKER):
             raise DomainEntityError(
                 "[E14002] CQRS Entity [%s] must not inherit another CQRS Entity [%s]",
                 (cls, bcls),
@@ -168,8 +143,8 @@ def _locate_handler(cls, name_match=None, domain_cls=None):
             yield name, attr
             continue
 
-        if callable(attr) and hasattr(attr, HANDLER_MARKER):
-            assert domain_cls is None or domain_cls == getattr(attr, HANDLER_MARKER), \
+        if callable(attr) and hasattr(attr, HANDLER_MARKER_FIELD):
+            assert domain_cls is None or domain_cls == getattr(attr, HANDLER_MARKER_FIELD), \
                 "Handler [%s] is registered with a different domain." % str(attr)
 
             yield name, attr
@@ -186,8 +161,8 @@ class DomainEntityRegistry(object):
                 raise ValueError(
                     '[E14007] Entity already registered [%s] within domain [%s]', identifier, cls.__domain__)
 
-            setattr(cls, CQRS_ENTITY_MARKER, (key, kind, domain_name))
-            setattr(cls, CQRS_ENTITY_KEY, key)
+            setattr(cls, DOMAIN_ENTITY_MARKER, (key, kind, domain_name))
+            setattr(cls, DOMAIN_ENTITY_KEY, key)
 
             domain_cls._register_entity(cls, key, kind)
             return cls
@@ -223,12 +198,9 @@ class DomainEntityRegistry(object):
         return decorator
 
     @classmethod
-    def command(domain_cls, cls_or_key, aggroot=_AGGROOT_RESOURCES.ALL, fetch=True):
+    def command(domain_cls, cls_or_key, aggroot='_ALL', fetch=True):
         def decorator(cls):
             cls = _validate_domain_command(cls)
-            cls.__resource_spec__ = prepare_resource_spec(aggroot)
-            cls.__aggroot_fetch__ = fetch
-
             domain_cls._register_entity(cls, key, DomainEntityType.COMMAND)
 
             ''' @NOTE: Allow command handlers, message dispatchers to be included within
@@ -238,7 +210,7 @@ class DomainEntityRegistry(object):
                 wrapper = domain_cls.command_processor(cls)
                 setattr(cls, COMMAND_PROCESSOR_FUNC, wrapper(cmd_handler))
 
-            DEBUG and logger.info("[REGISTERED COMMAND] %s/%d [%s]", domain_name, kind, key)
+            DEBUG and logger.info("[REGISTERED COMMAND] %s/%d [%s]", domain_cls, cls, key)
             return cls
 
         key = cls_or_key
@@ -258,8 +230,8 @@ class DomainEntityRegistry(object):
             raise ValueError(
                 '[E14007] Entity already registered [%s] within domain [%s]', identifier, domain_name)
 
-        setattr(entity_cls, CQRS_ENTITY_MARKER, (key, kind, domain_name))
-        setattr(entity_cls, CQRS_ENTITY_KEY, key)
+        setattr(entity_cls, DOMAIN_ENTITY_MARKER, (key, kind, domain_name))
+        setattr(entity_cls, DOMAIN_ENTITY_KEY, key)
 
         # Make sure we don't mess-up any registry in parent classes
         domain_cls._entity_registry = domain_cls._entity_registry.copy()
@@ -269,99 +241,109 @@ class DomainEntityRegistry(object):
     @classmethod
     def entity_registered(cls, entity_cls):
         try:
-            key, kind, domain_name = getattr(entity_cls, CQRS_ENTITY_MARKER)
+            key, kind, domain_name = getattr(entity_cls, DOMAIN_ENTITY_MARKER)
             return (key, kind) in cls._entity_registry
         except AttributeError:
             return False
 
     @classmethod
-    def command_processor(domain_cls, *cmd_class, priority=0):
+    def command_processor(cls, *cmd_classes, priority=0):
         def decorator(func):
-            _assert_domain_command(*cmd_class)
+            _assert_domain_command(*cmd_classes)
 
-            if not cmd_class:
+            if not cmd_classes:
                 ''' This is likely an inline handler (i.e. no command class supplied)
                     Just mark the attributes for later registration '''
-                func._priority = priority
-                setattr(func, HANDLER_MARKER, domain_cls)
+                setattr(func, HANDLER_PRIORITY_FIELD, priority)
+                setattr(func, HANDLER_MARKER_FIELD, cls)
                 return func
 
             # Priotize the pre-set attributes
-            _priority = OrderCounter.priotize(getattr(func, '_priority', priority))
+            _priority = getattr(func, HANDLER_PRIORITY_FIELD, priority)
+            _priority = OrderCounter.priotize(_priority)
 
-            # Use tuple arithmetic since modify the list in place may change parent class handlers
-            if inspect.isasyncgenfunction(func):
-                @functools.wraps(func)
-                async def wrapped_func(agg, stm, cmd):
-                    ''' NOTE: we don't need to wrap the function in another
-                        async generator, just returns the iterator directly. '''
-                    root = agg.get_aggroot()
-                    cmd_data = cmd.payload if isinstance(cmd, cc.CommandEnvelopTemplate) else cmd
-                    it = func(agg, stm, cmd_data, root)
+            for cmd_cls in cmd_classes:
+                # Use tuple arithmetic since modify the list in place may change parent class handlers
+                if inspect.isasyncgenfunction(func):
+                    @functools.wraps(func)
+                    async def wrapped_func(agg, stm, cmd):
+                        ''' NOTE: we don't need to wrap the function in another
+                            async generator, just returns the iterator directly. '''
+                        command = cmd_cls()
+                        rootobj = agg.get_aggroot()
+                        payload = cmd.payload
+                        it = func(command, agg, stm, payload, rootobj)
 
-                    async for particle in it:
-                        yield particle
+                        async for particle in it:
+                            yield particle
 
-            elif inspect.iscoroutinefunction(func):
-                @functools.wraps(func)
-                async def wrapped_func(agg, stm, cmd):
-                    root = agg.get_aggroot()
-                    cmd_data = cmd.payload if isinstance(cmd, cc.CommandEnvelopTemplate) else cmd
-                    resp = await func(agg, stm, cmd_data, root)
+                elif inspect.iscoroutinefunction(func):
+                    @functools.wraps(func)
+                    async def wrapped_func(agg, stm, cmd):
+                        command = cmd_cls()
+                        rootobj = agg.get_aggroot()
+                        payload = cmd.payload
+                        resp = await func(command, agg, stm, payload, rootobj)
 
-                    if resp is None:
-                        return
+                        if resp is None:
+                            return
 
-                    yield agg.create_response(resp)
+                        yield agg.create_response(resp)
 
-            elif callable(func):
-                @functools.wraps(func)
-                async def wrapped_func(agg, stm, cmd):
-                    root = agg.get_aggroot()
-                    cmd_data = cmd.payload if isinstance(cmd, cc.CommandEnvelopTemplate) else cmd
-                    resp = func(agg, stm, cmd_data, root)
+                elif callable(func):
+                    @functools.wraps(func)
+                    async def wrapped_func(agg, stm, cmd):
+                        command = cmd_cls()
+                        rootobj = agg.get_aggroot()
+                        payload = cmd.payload
+                        resp = func(command, agg, stm, payload, rootobj)
 
-                    if resp is None:
-                        return
+                        if resp is None:
+                            return
 
-                    yield agg.create_response(resp)
+                        yield agg.create_response(resp)
 
-            else:
-                raise ValueError('Invalid command handler: %s' % str(func))
+                else:
+                    raise ValueError('Invalid command handler: %s' % str(func))
 
-            domain_cls._cmd_processors += ((_priority, cmd_class, wrapped_func),)
+                cmd_key = getattr(cmd_cls, DOMAIN_ENTITY_KEY)
+                cls._cmd_processors += ((_priority, cmd_key, cmd_cls, wrapped_func),)
 
             def _error(*args, **kwargs):
-                raise RuntimeError('CQRS handlers are not meant to call directly.')
+                raise RuntimeError('Domain Command Handlers are not meant to call directly.')
 
             return _error
 
-        if len(cmd_class) == 1 and inspect.isfunction(cmd_class[0]):
-            cmd_class, _func = tuple(), cmd_class[0]
+        if len(cmd_classes) == 1 and inspect.isfunction(cmd_classes[0]):
+            cmd_classes, _func = tuple(), cmd_classes[0]
             return decorator(_func)
 
         return decorator
 
     @classmethod
-    def message_dispatcher(domain_cls, *msg_cls, priority=0):
-        _assert_domain_message(*msg_cls)
+    def message_dispatcher(cls, *msg_classes, priority=0):
+        _assert_domain_message(*msg_classes)
 
         def decorator(func):
             _assert_coroutine_func(func)
 
-            if not msg_cls:
+            if not msg_classes:
                 ''' This is likely an inline handler (i.e. no command class supplied)
                     Just mark the attributes for later registration '''
-                func._priority = priority
-                setattr(func, HANDLER_MARKER, True)
+                setattr(func, HANDLER_PRIORITY_FIELD, priority)
+                setattr(func, HANDLER_MARKER_FIELD, True)
                 return func
 
             # Priotize the pre-set attributes
-            _priority = OrderCounter.priotize(getattr(func, '_priority', priority))
-            domain_cls._msg_dispatchers += ((_priority, msg_cls, func), )
+            _priority = getattr(func, HANDLER_PRIORITY_FIELD, priority)
+            _priority = OrderCounter.priotize(_priority)
+
+            for msg_cls in msg_classes:
+                msg_key = getattr(msg_cls, DOMAIN_ENTITY_KEY)
+                cls._msg_dispatchers += ((_priority, msg_key, msg_cls, func), )
 
             def _error(*args, **kwargs):
-                raise RuntimeError('CQRS message dispatchers are not meant to call directly.')
+                raise RuntimeError('Domain Message Dispatchers are not meant to call directly.')
 
             return _error
 

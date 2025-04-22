@@ -1,3 +1,4 @@
+from fluvius.domain.manager import DomainManager
 from fluvius.domain.context import DomainTransport
 
 from .datadef import DomainWorkerRequest, DomainWorkerCommand
@@ -9,60 +10,28 @@ from . import FluviusWorker, logger, config, export_cron, export_task
 DEBUG = config.DEBUG
 
 
-class DomainWorker(FluviusWorker):
-    __domains__ = tuple()
-    __whitelisted_commands__ = None
-    __blacklisted_commands__ = None
-
+class DomainWorker(FluviusWorker, DomainManager):
     def __init__(self, *args, **kwargs):
-        self._pre_init()
+        self._register_domain_functions()
         super().__init__(*args, **kwargs)
-        self._post_init()
 
-    def _pre_init(self):
-        self._domains = self._initialize_domains(self.__domains__)
-        if not self._domains:
-            raise ValueError(f'No domains registered for worker: {cls}')
+    def _register_domain_functions(self):
+        self.initialize_domains(self)
+        self._functions += tuple(
+            self._generate_handler(*params)
+            for params in self.enumerate_commands()
+        )
 
-        for domain in self._domains:
-            self._functions += tuple(self._register_domain_handlers(domain))
-
-    def _post_init(self):
-        self._domain_ctx = {
-            domain.domain_name: domain.setup_context(
-                transport=DomainTransport.REDIS,
-            ) for domain in self._domains
-        }
-
-    def _initialize_domains(self, domains):
-        from fluvius.domain import Domain
-
-        def _validate():
-            for domain_cls in domains:
-                if not issubclass(domain_cls, Domain):
-                    raise ValueError(f'Invalid CQRS Domain: {domain_cls}')
-
-                yield domain_cls(self)
-
-        return tuple(_validate())
-
-    def setup_context(self, domain, worker_ctx, **kwargs):
-        return domain.setup_context(**kwargs)
-
-    def _wrap_command(self, domain, cmd_key, qual_name):
+    def _generate_handler(self, domain, qual_name, cmd_key, cmd_cls):
         @export_task(name=qual_name)
         async def _handle_request(ctx, request: DomainWorkerRequest):
-            context = self.setup_context(
-                domain,
-                ctx,
+            context = domain.setup_context(
                 headers=request.headers,
                 transport=DomainTransport.REDIS,
                 source=request.context.source
             )
 
             cmddata = request.command
-            assert cmddata.command == cmd_key
-
             command = domain.create_command(
                 cmd_key,
                 cmddata.payload,
@@ -74,43 +43,9 @@ class DomainWorker(FluviusWorker):
                 )
             )
 
-            return await domain.process_command(context, command)
+            return await domain.process_command(command, context=context)
 
         return _handle_request
-
-    @export_task
-    async def process_commands(ctx, *commands, headers=None):
-        domain = self._domains[0]
-        context = self.setup_context(
-            domain,
-            ctx,
-            headers=headers,
-            transport=DomainTransport.REDIS
-        )
-        cmds = [
-            domain.create_command(
-                cmddata.command,
-                cmddata.payload,
-                aggroot=(
-                    cmddata.resource,
-                    cmddata.identifier,
-                    cmddata.domain_sid,
-                    cmddata.domain_iid
-                )
-            )
-            for cmddata in commands
-        ]
-        return await domain.process_command(context, *cmds)
-
-    def _register_domain_handlers(self, domain):
-        for cmd_key, cmd_cls, qual_name in domain.enumerate_command():
-            if self.__blacklisted_commands__ and qual_name in self.__blacklisted_commands__:
-                continue
-
-            if self.__whitelisted_commands__ and qual_name not in self.__whitelisted_commands__:
-                continue
-
-            yield self._wrap_command(domain, cmd_key, qual_name)
 
 
 class DomainWorkerClient(WorkerClient):

@@ -2,8 +2,8 @@ from enum import IntEnum
 from .mutation import MutationType  # noqa
 
 
-CQRS_ENTITY_MARKER = "_domain_entity"
-CQRS_ENTITY_KEY = "_domain"
+DOMAIN_ENTITY_MARKER = "__entity_marker__"
+DOMAIN_ENTITY_KEY = "__entity_key__"
 
 
 class DomainEntityType(IntEnum):

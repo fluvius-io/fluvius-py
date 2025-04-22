@@ -17,6 +17,9 @@ run-cqrs-client:
 run-client:
 	python tests/fluvius_worker/run_client.py
 
+run SCRIPT:
+	python {{SCRIPT}}
+
 run-updatedb:
 	python tests/fluvius_worker/update_db.py
 

@@ -1,6 +1,6 @@
 import asyncio
 
-from fluvius_worker import logger, SQLWorkTracker, export_task, export_cron, DomainWorker
+from fluvius.worker import logger, SQLWorkTracker, export_task, export_cron, DomainWorker
 from object_domain.domain import ObjectDomain
 from object_domain.storage import PeopleEconomistResource, populate_fixture_data
 
@@ -11,15 +11,9 @@ class OBJDM2(ObjectDomain):
 
 
 class DomainWorkerSample(DomainWorker):
-    queue_name = NS
-    tracker = SQLWorkTracker
-    domains = (ObjectDomain, OBJDM2)
-
-    # @export_cron(second=tuple(range(1, 60, 2)))
-    # async def sample_cron(self, ctx, *args, **kwargs):
-    #     logger.info('SAMPLE CRON: ARGS: %s KWARGS: %s', args, kwargs)
-    #     logger.info("CONTEXT: %s", ctx)
-    #     return "sample_cron"
+    __queue_name__ = NS
+    __tracker__ = SQLWorkTracker
+    __domains__ = (ObjectDomain, OBJDM2)
 
 
 @DomainWorkerSample.task
@@ -31,15 +25,6 @@ async def hello_world(ctx, *args, **kwargs):
     await asyncio.sleep(1.0)
     return "HELLO"
 
-# @DomainWorkerSample.cron(second=tuple(range(1, 60, 5)))
-# async def hello_world(ctx, *args, **kwargs):
-#     logger.info('HELLO WORLD: ARGS: %s KWARGS: %s', args, kwargs)
-#     logger.info("CONTEXT: %s", ctx)
-#     await ctx.update_progress(50, "half-way ...")
-#     return "HELLO"
-
-
-# async def main():
 worker = DomainWorkerSample()
 worker.run()
 

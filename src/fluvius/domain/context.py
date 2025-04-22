@@ -3,7 +3,7 @@ import warnings
 from datetime import datetime
 from fluvius.data.helper import timestamp
 
-from .datadef import nullable, identifier_factory, UUID_TYPE, field
+from fluvius.data import nullable, identifier_factory, UUID_TYPE, field
 from .record import DomainEntityRecord
 
 
@@ -36,18 +36,20 @@ class DomainTransport(enum.Enum):
     KAFKA = 'KAFKA'
     RABITTMQ = 'RABITTMQ'
     COMMAND_LINE = 'CLI'
+    UNKNOWN = 'UNKNOWN'
 
 
 class DomainContext(DomainEntityRecord):
+    domain = field(type=str, initial=lambda: '<no-name>')
+    revision = field(type=int, initial=lambda: 0)
     transport = field(type=DomainTransport,
                       factory=DomainTransport,
+                      initial=lambda: DomainTransport.UNKNOWN,
                       mandatory=True)
-    serial = field(type=int, mandatory=True)
+    # serial = field(type=int, mandatory=True, initial=lambda: 0)
     source = field(type=(str, type(None)), initial=lambda: None)
     timestamp = field(type=datetime, initial=timestamp)
     headers = field(type=dict, initial=dict)
-    dataset_id = field(type=nullable(UUID_TYPE), factory=identifier_factory, initial=None)
-    organization_id = field(type=nullable(UUID_TYPE), factory=identifier_factory, initial=None)
-    profile_id = field(type=nullable(UUID_TYPE), factory=identifier_factory, initial=None)
+    # profile_id = field(type=nullable(UUID_TYPE), factory=identifier_factory, initial=None)
     realm_id = field(type=nullable(UUID_TYPE), factory=identifier_factory, initial=None)
     user_id = field(type=nullable(UUID_TYPE), factory=identifier_factory, initial=None)

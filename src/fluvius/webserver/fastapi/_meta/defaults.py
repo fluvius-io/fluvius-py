@@ -1,8 +1,10 @@
 from fluvius import __version__
+from fluvius.helper.timeutil import timestamp
 
 APPLICATION_SERIAL_NUMBER = 1001
 APPLICATION_TITLE = 'Fluvius API'
 APPLICATION_VERSION = __version__
+APPLICATION_BUILD_TIME = str(timestamp())
 APPLICATION_SECRET_KEY = "super-secret-session-key-IUUUCBhv4NRDVB4ONpe8lcNJJY"
 COOKIE_HTTPS_ONLY = False       # Set True in production
 COOKIE_SAME_SITE_POLICY = "strict" # or "strict" for tighter CSRF

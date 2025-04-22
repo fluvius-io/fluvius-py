@@ -29,7 +29,16 @@ from .signal import DomainSignal as sig, DomainSignalManager
 from .state import StateManager, ReadonlyDataManagerProxy
 
 
-def _setup_handler_selector(handler_list):
+def _build_handler_map(handler_list):
+    _hmap = {}
+    for pri, key, cls_, func in sorted(handler_list, reverse=True, key=itemgetter(0)):
+        _hmap.setdefault(key, tuple())
+        _hmap[key] += (func,)
+
+    return _hmap
+
+
+def _setup_command_processor_selector(handler_list):
     ''' @TODO:
         1) Collect handler list from all bases classes rather than just the active class,
         since the handler list of the parent class may changed after the subclass is initialized.
@@ -37,17 +46,30 @@ def _setup_handler_selector(handler_list):
         2) DONE: Switch handler selector to use a dictionary mapping. If there are alot of registered
         items, a dictionary lookup could be faster
     '''
-    _hmap = {}
-    for pri, cmd_select, func in sorted(handler_list, reverse=True, key=itemgetter(0)):
-        for cmd in cmd_select:
-            _hmap.setdefault(cmd, tuple())
-            _hmap[cmd] += (func,)
-
-    def _select(command):
+    _hmap = _build_handler_map(handler_list)
+    def _select(bundle):
         try:
-            return _hmap[command.__class__]
+            return _hmap[bundle.command]
         except KeyError:
-            raise RuntimeError(f'No command handler provided for [{command.__class__.__name__}]')
+            raise RuntimeError(f'No command handler provided for [{command_bundle.command}]')
+
+    return _select
+
+def _setup_message_dispatcher_selector(handler_list):
+    ''' @TODO:
+        1) Collect handler list from all bases classes rather than just the active class,
+        since the handler list of the parent class may changed after the subclass is initialized.
+
+        2) DONE: Switch handler selector to use a dictionary mapping. If there are alot of registered
+        items, a dictionary lookup could be faster
+    '''
+    _hmap = _build_handler_map(handler_list)
+
+    def _select(bundle):
+        try:
+            return _hmap[bundle.message]
+        except KeyError:
+            raise RuntimeError(f'No message dispatcher provided for [{bundle.message}]')
 
     return _select
 
@@ -65,6 +87,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
     _msg_dispatchers = tuple()
     _entity_registry = dict()
     _active_aggroot = None
+    _active_context = None
 
     _REGISTRY = {}
 
@@ -86,6 +109,10 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         self._config = self.validate_domain_config(config)
         self._logstore = self.__logstore__(**config)
         self._statemgr = self.__statemgr__(**config)
+        self._context = self.__context__(
+            domain = self.__domain__,
+            revision = self.__revision__
+        )
 
         self.rsp_queue = queue.Queue()
         self.evt_queue = queue.Queue()
@@ -93,8 +120,8 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         self.cmd_queue = queue.Queue()
         self.act_queue = queue.Queue()
 
-        self.cmd_processors = _setup_handler_selector(self._cmd_processors)
-        self.msg_dispatchers = _setup_handler_selector(self._msg_dispatchers)
+        self.cmd_processors = _setup_command_processor_selector(self._cmd_processors)
+        self.msg_dispatchers = _setup_message_dispatcher_selector(self._msg_dispatchers)
         self.register_signals()
         self.logstore.connect()
         self.statemgr.connect()
@@ -167,7 +194,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         yield self._active_aggroot
         self._active_aggroot = None
 
-    def create_command(self, cmd_key, cmd_data=None, aggroot=None):
+    def _validate_aggroot(self, aggroot):
         if aggroot is None:
             aggroot = self._active_aggroot
         else:
@@ -175,14 +202,21 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
                 raise RuntimeError('Multiple aggroot is not allowed (#2)')
 
             if isinstance(aggroot, tuple):
-                aggroot = AggregateRoot(*aggroot)
+                return AggregateRoot(*aggroot)
 
-        cmd_envelop = self.lookup_command(cmd_key)
+        if not isinstance(aggroot, AggregateRoot):
+            raise RuntimeError(f'Invalid aggroot: {aggroot}')
 
-        if not include_resource(aggroot.resource, cmd_envelop.__resource_spec__):
+        return aggroot
+
+    def create_command(self, cmd_key, cmd_data=None, aggroot=None):
+        aggroot = self._validate_aggroot(aggroot)
+        command = self.lookup_command(cmd_key)
+
+        if not include_resource(aggroot.resource, command.Meta.resources):
             raise ForbiddenError('D10011', 'Command [%s] does not allow aggroot of resource [%s]' % (cmd_key, aggroot.resource))
 
-        return cmd_envelop(
+        return cc.CommandBundle(
             domain=self.__domain__,
             revision=self.__revision__,
             command=cmd_key,
@@ -199,12 +233,12 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
         return cmd
 
-    async def _invoke_processors(self, ctx, stm, cmd):
+    async def _invoke_processors(self, ctx, statemgr, cmd_bundle):
         no_handler = True
         aggregate = self.__aggregate__(self)
-        async with aggregate.command_aggregate(ctx, cmd) as agg_proxy:
-            for processor in self.cmd_processors(cmd):
-                async for particle in processor(agg_proxy, stm, cmd):
+        async with aggregate.command_aggregate(ctx, cmd_bundle) as agg_proxy:
+            for processor in self.cmd_processors(cmd_bundle):
+                async for particle in processor(agg_proxy, statemgr, cmd_bundle):
                     if particle is None:
                         continue
 
@@ -223,7 +257,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         await self.publish(sig.COMMAND_READY, cmd)
 
         async for particle in self._invoke_processors(ctx, stm, cmd):
-            if not isinstance(particle, (ce.Event, cm.DomainMessage, cres.DomainResponse, act.ActivityLog)):
+            if not isinstance(particle, (ce.Event, cm.MessageBundle, cres.DomainResponse, act.ActivityLog)):
                 raise RuntimeError(
                     'Items returned from command processor must be a domain entity (event, messages, etc.). '
                     'Got: [%s] while processing command: %s', particle, cmd)
@@ -236,7 +270,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
                 # and the mutations are generated.
                 await self.publish(sig.EVENT_COMMITED, cmd, event=particle)
                 yield particle
-            elif isinstance(particle, cm.DomainMessage):
+            elif isinstance(particle, cm.MessageBundle):
                 self.msg_queue.put(particle)
                 await self.publish(sig.MESSAGE_RECEIVED, cmd, message=particle)
             elif isinstance(particle, cres.DomainResponse):
@@ -253,11 +287,36 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
         await self.publish(sig.COMMAND_COMPLETED, cmd)
 
-    async def process_command(self, context, *commands):
+    @contextmanager
+    def context(self, ctx):
+        if self._active_context is not None:
+            raise RuntimeError('Multiple concurrent context is not allowed (#1).')
+
+        self._active_context = ctx
+        yield self._active_context
+        self._active_context = None
+
+
+    def _validate_context(self, ctx):
+        if ctx is None:
+            ctx = self._active_context
+        else:
+            if self._active_context is not None:
+                raise RuntimeError('Multiple concurrent context is not allowed (#2)')
+
+        if not isinstance(ctx, self.__context__):
+            raise RuntimeError(f'Invalid domain context: {ctx}. Must be a subclass of {self.__context__}')
+
+        return ctx
+
+
+    async def process_command(self, *commands, context=None):
         # Ensure saving of context before processing command
         if not commands:
             logger.warning('No commands provided to process.')
             return
+
+        context = self._validate_context(context)
 
         async with self.statemgr.transaction(context) as stm, \
                    self.logstore.transaction(context) as log:
@@ -290,9 +349,4 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             await self.publish(sig.TRIGGER_RECONCILIATION, cmd, statemgr=self.statemgr)
 
     def setup_context(self, **kwargs):
-        return self.__context__(
-            domain=self.domain_name,
-            revision=self.__revision__,
-            timestamp=timestamp(),
-            **kwargs
-        )
+        return self._context.set(**kwargs)

@@ -31,15 +31,6 @@ class DomainMiddleware(BaseHTTPMiddleware):
             token = id_token
         )
 
-    def get_domain_context(self, request):
-        auth_ctx = request.state.auth_context
-        if not auth_ctx:
-            return None
-
-        return self.base_context.set(
-                user_id = auth_ctx.user["sub"]
-        )
-
     async def dispatch(self, request: Request, call_next):
         try:
             request.state.auth_context = self.get_auth_context(request)
@@ -57,26 +48,63 @@ class DomainMiddleware(BaseHTTPMiddleware):
 
 
 class FastAPIDomainManager(DomainManager):
-    def _wrap_command(self, domain, cmd_key, qual_name):
-        async def _command_handler(
-            request: Request,
-            resource: str,
-            identifier: UUID_TYPE=None,
-            domain_sid: UUID_TYPE=None,
-            domain_iid: UUID_TYPE=None
-        ):
-            domain_ctx = request.state.domain_context
-            command_payload = request.json()
-            command_aggroot = AggregateRoot(resource, identifier, domain_sid, domain_iid)
-            command = domain.create_command(
-                cmd_key,
-                command_payload,
-                command_aggroot
+    def __init__(self, app):
+        self.initialize_domains(app)
+        tuple(
+            self._register_handler(app, *params)
+            for params in self.enumerate_commands()
+        )
+
+    def _generate_handler(self, domain, qual_name, cmd_key, cmd_cls):
+        async def _handle_request(request: Request, resource, identifier=None, scoping=None):
+            context = domain.setup_context(
+                headers=request.headers,
+                transport=DomainTransport.REDIS,
+                source=request.context.source
             )
 
-            return await domain.process_command(domain_ctx, command)
-        _command_handler.__name__ = f"{cmd_key}_handler"
-        return _command_handler
+            cmddata = request.command
+            command = domain.create_command(
+                cmd_key,
+                cmddata.payload,
+                aggroot=(
+                    cmddata.resource,
+                    cmddata.identifier,
+                    cmddata.domain_sid,
+                    cmddata.domain_iid
+                )
+            )
+
+            return await domain.process_command(command, context=context)
+
+        return _handle_request
+
+
+def fast_api_resource_command_handler(namespace, command, handler):
+    cmd_normal = f'/{namespace}:{command}'
+    cmd_scoped = f'/{namespace}:{command}/{{scoping:path}}'
+
+    uri_resource = '{cmd_normal}/{{resource}}/'
+    uri_resource_scoped  = f'/{namespace}:{command}/{{scoping:path}}/{{resource}}/'
+
+    uri_item_default = f'/{namespace}:{command}/{{resource}}/{{identifier}}'
+    uri_item_scoped  = f'/{namespace}:{command}/{{scoping:path}}/{{resource}}/{{identifier}}'
+
+    def _handler(resource: str, scoping: str=None, identifier=None):
+        # parse payload
+        payload = None
+        # parse aggroot
+        aggroot = None
+        return handler(command, payload, aggroot)
+
+
+def fast_api_query_handler(namespace, command, handler):
+    uri_resource_default = f'/{namespace}~{query}/{{resource}}/'
+    uri_resource_scoped  = f'/{namespace}~{query}/{{scoping:path}}/{{resource}}/'
+
+    uri_item_default = f'/{namespace}:{command}/{{resource}}/{{identifier}}'
+    uri_item_scoped  = f'/{namespace}:{command}/{{scoping:path}}/{{resource}}/{{identifier}}'
+
 
 
 def configure_domain_support(app, config=config):
@@ -89,9 +117,11 @@ def configure_domain_support(app, config=config):
     ))
     for namespace, command, handler in manager.enumerate_command_handlers():
         uri_pattern = f'/{namespace}:{command}/{{resource}}/{{identifier}}'
-        uri_pattern_sid = f'/{namespace}:{command}/~{{domain_sid}}:{{domain_iid}}/{{resource}}/{{identifier}}'
+        uri_pattern_sid = f'/{namespace}~{{domain_sid}}:{command}/{{resource}}/{{identifier}}'
+        # uri_pattern_sid = f'/{namespace}~{{domain_sid}}~{{query}}/{{resource}}/{{identifier}}'
         handler = app.get(uri_pattern)(handler)
         handler = app.get(uri_pattern_sid)(handler)
+        logger.warning('Registered: %s => %s', uri_pattern, str((namespace, command, handler)))
     return app
 
 

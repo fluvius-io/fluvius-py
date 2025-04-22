@@ -1,7 +1,7 @@
 from fluvius.sanic import logger, config  # noqa
 from sanic import response
 from fluvius.data.serializer import serialize_json
-from fluvius.domain.entity import CQRS_ENTITY_KEY
+from fluvius.domain.entity import DOMAIN_ENTITY_KEY
 from fluvius.error import BadRequestError
 
 
@@ -56,7 +56,7 @@ def response_handler(request, responses) -> response.HTTPResponse:
             return envelope(_resp=responses)
 
         if accept in ("application/json", "application/json+object"):
-            return envelope(**{getattr(r, CQRS_ENTITY_KEY): r.data for r in responses})
+            return envelope(**{getattr(r, DOMAIN_ENTITY_KEY): r.data for r in responses})
 
         if accept in ("application/json+single", "json/object"):
             return envelope(**check_data_response(responses))

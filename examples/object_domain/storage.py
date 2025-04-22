@@ -2,8 +2,8 @@ import inspect
 import os
 
 from fluvius.data.data_driver import InMemoryDriver
-from fluvius.domain.datadef import UUID_GENF, DomainResource, field
-from fluvius.domain import logger
+from fluvius.data import UUID_GENF, field, DataModel
+from fluvius.domain import logger, ImmutableDomainResource
 
 
 class ObjectExampleConnector(InMemoryDriver):
@@ -11,7 +11,7 @@ class ObjectExampleConnector(InMemoryDriver):
 
 
 @ObjectExampleConnector.register_schema('people-economist')
-class PeopleEconomistResource(DomainResource):
+class PeopleEconomistResource(ImmutableDomainResource):
     job = field()
     name = field(type=dict)
 

@@ -1,9 +1,7 @@
 from datetime import datetime
 from enum import Enum
-from pyrsistent import PClass, field
 from fluvius.data.helper import nullable
-
-from .datadef import UUID_TYPE, DomainDataModel, BackendQuery, serialize_mapping
+from fluvius.data import UUID_TYPE, BackendQuery, serialize_mapping, PClass, field
 
 
 def validate_data_record(data):
@@ -24,13 +22,13 @@ def BackendQueryField(**kwargs):
     return field(nullable(BackendQuery), **kwargs)
 
 
-class UpdatedTrail(DomainDataModel):
+class UpdatedTrail(PClass):
     _updated = field(datetime)
     _updater = field(UUID_TYPE)
     _etag = field(str)
 
 
-class CreatedTrail(DomainDataModel):
+class CreatedTrail(PClass):
     _updated = field(datetime)
     _updater = field(UUID_TYPE)
     _created = field(datetime)

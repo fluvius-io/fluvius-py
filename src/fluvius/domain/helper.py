@@ -86,17 +86,17 @@ def include_resource(resource, resource_spec):
         Otherwise, raise an exception.
     '''
 
-    if resource_spec is _AGGROOT_RESOURCES.N_A:
-        return False
-
-    if resource_spec is _AGGROOT_RESOURCES.ALL:
-        return True
-
     if not isinstance(resource_spec, tuple):
         raise ValueError(f'Invalid resource specs: {resource_spec}')
 
+    if '_NONE' in resource_spec:
+        return False
+
+    if '_ALL' in resource_spec:
+        return True
+
     if resource not in resource_spec:
-        raise BadRequestError(f'Unable to operate on resource [{resource}]. Allows: {resource_spec}')
+        raise BadRequestError("H10231", f'Unable to operate on resource: `{resource}`. Allows: {resource_spec}')
 
     return True
 

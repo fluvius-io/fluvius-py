@@ -11,7 +11,7 @@ from typing import List, Optional, Type, Union
 
 from fluvius.data import UUID_TYPE, UUID_GENR, logger, timestamp, config
 from fluvius.data.data_driver import DataDriver
-from fluvius.data.data_model import DataModel, NamespaceModel
+from fluvius.data.data_model import DataModel, BlankModel
 from fluvius.data.query import BackendQuery
 from fluvius.data.exceptions import ItemNotFoundError
 
@@ -111,13 +111,13 @@ class DataAccessManagerBase(object):
         if self.__auto_model__ == 'schema':
             return schema_model
 
-        return type(f"{schema_model.__name__}_Model", (NamespaceModel, ), {})
+        return type(f"{schema_model.__name__}_Model", (BlankModel, ), {})
 
     @classmethod
     def register_model(cls, resource: str, auto_model: bool=False):
         def _decorator(model_cls: DataModel):
-            if not issubclass(model_cls, DataModel):
-                logger.warning(f'Data model is not a subclass of DataModel: {model_cls}')
+            # if not issubclass(model_cls, DataModel):
+            #     logger.warning(f'Data model is not a subclass of DataModel: {model_cls}')
 
             if model_cls in cls._RESOURCES:
                 raise ResourceAlreadyRegistered(f'Model already registered: {model_cls} => {cls._RESOURCES[model_cls]}')

@@ -1,11 +1,12 @@
 import pytest
 import asyncio
-from fluvius_worker import DomainWorkerClient, logger, SQLWorkTracker, DomainWorkerRequest
-from fluvius.domain import context, identifier, Event
+from fluvius.worker import DomainWorkerClient, logger, SQLWorkTracker, DomainWorkerRequest
+from fluvius.domain import context, Event
+from fluvius.data import identifier
 
 class ClientSample(DomainWorkerClient):
-    queue_name = 'cqrs-worker-sample'
-    tracker = SQLWorkTracker
+    __queue_name__ = 'cqrs-worker-sample'
+    __tracker__ = SQLWorkTracker
 
 
 id1 = identifier.UUID_GENF("ABC123")

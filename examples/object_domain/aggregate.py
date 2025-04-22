@@ -22,7 +22,7 @@ class ObjectAggregate(Aggregate):
         await stm.insert_one('people-economist', person)
         return {'_id': person._id}
 
-    @action('object-removed', resource=ALL_RESOURCES)
+    @action('object-removed', resource='_ALL')
     async def remove(self, stm, obj):
         await stm.invalidate_one('people-economist', obj._id)
         return {'_id': obj._id}

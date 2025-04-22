@@ -3,15 +3,14 @@ import queue
 from functools import wraps
 from contextlib import asynccontextmanager
 from fluvius.error import BadRequestError, PreconditionFailedError
-from fluvius.data import UUID_TYPE
+from fluvius.data import UUID_TYPE, generate_etag, field, timestamp
 from typing import NamedTuple
 
 from . import config, logger
 
 from .activity import ActivityType, ActivityLog
-from .datadef import ResourceReference, generate_etag, field, timestamp, DomainDataModel
 from .event import Event
-from .message import DomainMessage
+from .message import MessageBundle
 from .response import DomainResponse
 from .helper import consume_queue, include_resource, prepare_resource_spec, _AGGROOT_RESOURCES
 
@@ -20,7 +19,7 @@ from . import mutation
 IF_MATCH_HEADER = config.IF_MATCH_HEADER
 IF_MATCH_VERIFY = config.IF_MATCH_VERIFY
 DEFAULT_RESPONSE_TYPE = config.DEFAULT_RESPONSE_TYPE
-ALL_RESOURCES = _AGGROOT_RESOURCES.ALL
+ALL_RESOURCES = '_ALL'
 
 
 class AggregateRoot(NamedTuple):
@@ -74,16 +73,15 @@ class Aggregate(object):
         )
 
     @asynccontextmanager
-    async def command_aggregate(self, context, command):
+    async def command_aggregate(self, context, command_bundle):
         if hasattr(self, '_context'):
             raise RuntimeError('Overlapping context: %s' % str(context))
 
         self._evt_queue = queue.Queue()
         self._context = context
-        self._command = command
+        self._command = command_bundle
         self._aggroot = (
-            await self.fetch_command_aggroot(command) \
-            if command.__aggroot_fetch__ else command.resource_reference()
+            await self.fetch_command_aggroot(command_bundle)
         )
 
         yield RestrictedAggregateProxy(self)

@@ -56,11 +56,10 @@ async def test_object_domain(ctx):
 
     create_command = domain.create_command('create-object', create_payload, aggroot=('people-economist', FIXTURE_ID))
 
-    with domain.aggroot('people-economist', FIXTURE_ID):
+    with domain.aggroot('people-economist', FIXTURE_ID) as agg, domain.context(ctx) as ctx:
         update_command = domain.create_command('update-object', {'job': 'economist'})
         remove_command = domain.create_command('remove-object')
-
-    resps = await domain.process_command(ctx, update_command, create_command, remove_command)
+        resps = await domain.process_command(update_command, create_command, remove_command)
     assert len(resps) == 2
     # state = domain.statemgr
 

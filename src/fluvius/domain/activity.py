@@ -1,6 +1,6 @@
 import enum
 
-from .datadef import ResourceReference, field, UUID_GENR, UUID_TYPE, nullable, identifier_factory
+from fluvius.data import field, UUID_GENR, UUID_TYPE, nullable, identifier_factory
 from .record import DomainEntityRecord
 
 

@@ -1,4 +1,4 @@
-from .datadef import ResourceReference, UUID_GENR, UUID_TYPE, identifier_factory, field, nullable
+from fluvius.data import UUID_GENR, UUID_TYPE, identifier_factory, field, nullable
 from .record import DomainEntityRecord
 
 
