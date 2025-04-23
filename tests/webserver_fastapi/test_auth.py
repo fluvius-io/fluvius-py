@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
 
 from fastapi import FastAPI
-from fluvius.webserver.fastapi import create_app, setup_authentication
+from fluvius.fastapi import create_app, setup_authentication
 
 
 def create_mock_id_token(payload, kid="test-key-id"):
@@ -115,7 +115,7 @@ def test_auth_callback(mock_keycloak, mock_jwt_decode, auth_client):
     mock_jwt_decode.return_value = mock_claims
     
     # Call the callback endpoint
-    with patch("fluvius.webserver.fastapi.auth.decode_id_token", return_value={"sub": "test-user-id"}):
+    with patch("fluvius.fastapi.auth.decode_id_token", return_value={"sub": "test-user-id"}):
         response = auth_client.get("/auth/callback", allow_redirects=False)
         assert response.status_code in (302, 307)  # Redirect status codes
         assert "id_token" in response.cookies

@@ -1,29 +1,12 @@
 from fastapi import FastAPI, Request
 from starlette.middleware.sessions import SessionMiddleware
-from .domain import configure_domain_support
 from .profiler import configure_profiler
 
 from . import config, logger
 
 def create_app(config=config, **kwargs):
     app = FastAPI(**kwargs)
-    @app.get("/~/app-summary")
-    async def status_resp(request: Request):
-        return {
-            "name": config.APPLICATION_TITLE,
-            "serial_no": config.APPLICATION_SERIAL_NUMBER,
-            "build_time": config.APPLICATION_BUILD_TIME,
-        }
 
-    configure_domain_support(app)
-    configure_session(app, config)
-
-    return app
-
-
-
-def configure_session(app, config=config):
-    # Last middleware added execute first
     app.add_middleware(
         SessionMiddleware,
         secret_key=config.APPLICATION_SECRET_KEY,
@@ -32,4 +15,14 @@ def configure_session(app, config=config):
         same_site=config.COOKIE_SAME_SITE_POLICY
     )
 
+    @app.get("/~/app-summary")
+    async def status_resp(request: Request):
+        return {
+            "name": config.APPLICATION_TITLE,
+            "serial_no": config.APPLICATION_SERIAL_NUMBER,
+            "build_time": config.APPLICATION_BUILD_TIME,
+        }
+
     return app
+
+

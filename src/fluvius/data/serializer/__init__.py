@@ -19,7 +19,7 @@ def serialize_mapping(data, **kwargs):
         return data
 
     if isinstance(data, DataModel):
-        return data.dict()
+        return data.model_dump()
 
     if isinstance(data, BlankModel):
         return data.__dict__

@@ -51,6 +51,7 @@ async def test_object_domain(ctx):
     create_payload = {
         '_id': id1,  # Pin down the ID for easier testing,
         'job': 'physicist',
+        'birthdate': '2032-04-23T10:20:30.400+02:30',
         'name': {'family': 'Keynes', 'given': 'John', 'middle': 'Maynard'}
     }
 

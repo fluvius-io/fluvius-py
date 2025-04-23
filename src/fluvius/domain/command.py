@@ -45,7 +45,9 @@ class CommandMeta(DataModel):
     tags: list[str] = None
     fetchroot: bool = True
     endpoints: Optional[Dict] = None
-    scoped_by: Optional[Dict] = None
+    scoped: Optional[Dict] = None
+    normal: bool = True
+    new_resource: bool = False
 
 
 class Command(DomainEntity):

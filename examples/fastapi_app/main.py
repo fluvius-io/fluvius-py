@@ -1,12 +1,11 @@
 from fastapi import Request
-from fluvius.webserver.fastapi import create_app, setup_authentication, auth_required
-from fluvius.webserver.fastapi.domain import FastAPIDomainManager
+from fluvius.fastapi import create_app, setup_authentication, auth_required
+from fluvius.fastapi.domain import configure_domain_support
 from object_domain.domain import ObjectDomain
-
-FastAPIDomainManager.register_domain(ObjectDomain)
 
 app = create_app()
 app = setup_authentication(app)
+app = configure_domain_support(app, ObjectDomain)
 
 
 @app.get("/protected")
@@ -20,7 +19,6 @@ async def protected(request: Request):
 
 # Item query ...
 @app.get("/protected/{identifier}")
-# @app.get("/protected/{identifier}/")
 @app.get("/protected/{scoping:path}/{identifier}")
 @auth_required()
 async def protected_2(request: Request, identifier, scoping=None):

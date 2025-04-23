@@ -1,18 +1,36 @@
+from typing import Optional
 from types import SimpleNamespace
 from fluvius.domain import Command
-from fluvius.data import BlankModel, DataModel, serialize_mapping
+from fluvius.data import BlankModel, DataModel, serialize_mapping, UUID_TYPE
+from datetime import datetime
+
 from .domain import _command, _processor
 from . import logger
 
 
+class PersonName(DataModel):
+    family: str
+    given: str
+    middle: str
+    title: Optional[str] = None
+
+class PersonModel(DataModel):
+    _id: UUID_TYPE
+    name: PersonName
+    birthdate: datetime
+    job: str
+
 
 @_command("update-object")
 class UpdateObjectCmd(Command):
+    ''' UpdateObject Command ...'''
     class Meta:
         tags = ("transaction",)
         resources = ("people-economist", )
         description = "Withdraw money"
         endpoints = None
+        normal = False
+        scoped = {'domain_sid': UUID_TYPE}
 
     async def _process(self, aggregate, statemgr, payload, rootobj):
         data = serialize_mapping(payload)
@@ -24,9 +42,16 @@ class UpdateObjectCmd(Command):
 
 @_command("create-object")
 class CreateObjectCmd(Command):
+    ''' CreateObject Command ...'''
+    class Meta:
+        new_resource = True
+
+    Data = PersonModel
+
     def command_method_echo(self, *args):
         return args
 
+    @_processor
     async def _process(self, aggregate, statemgr, payload, rootobj):
         data = serialize_mapping(payload)
         economist = statemgr.create('people-economist', data)

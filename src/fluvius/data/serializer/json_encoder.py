@@ -39,6 +39,9 @@ class FluviusJSONEncoder(JSONEncoder):
         if isinstance(obj, BlankModel):
             return obj.__dict__
 
+        if isinstance(obj, DataModel):
+            return obj.model_dump()
+
         if is_dataclass(obj):
             return asdict(obj)
 

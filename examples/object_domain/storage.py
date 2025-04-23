@@ -14,6 +14,7 @@ class ObjectExampleConnector(InMemoryDriver):
 class PeopleEconomistResource(ImmutableDomainResource):
     job = field()
     name = field(type=dict)
+    birthdate = field()
 
 
 async def populate_fixture_data():

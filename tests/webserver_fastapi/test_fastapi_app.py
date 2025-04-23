@@ -72,7 +72,7 @@ def test_app_summary_endpoint(client):
 
 def test_domain_registration():
     """Test that the ObjectDomain is properly registered."""
-    from fluvius.webserver.fastapi.domain import FastAPIDomainManager
+    from fluvius.fastapi.domain import FastAPIDomainManager
     from object_domain.domain import ObjectDomain
     
     # Check if ObjectDomain is in the registered domains

@@ -22,8 +22,8 @@ class DomainWorker(FluviusWorker, DomainManager):
             for params in self.enumerate_commands()
         )
 
-    def _generate_handler(self, domain, qual_name, cmd_key, cmd_cls):
-        @export_task(name=qual_name)
+    def _generate_handler(self, domain, cmd_cls, cmd_key, fq_name):
+        @export_task(name=fq_name)
         async def _handle_request(ctx, request: DomainWorkerRequest):
             context = domain.setup_context(
                 headers=request.headers,

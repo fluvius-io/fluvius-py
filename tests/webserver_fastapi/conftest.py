@@ -21,7 +21,7 @@ def mock_keycloak_config():
         "APPLICATION_BUILD_TIME": "2025-04-21T12:00:00Z"
     }
     
-    with patch("fluvius.webserver.fastapi.config", **config):
+    with patch("fluvius.fastapi.config", **config):
         yield config
 
 

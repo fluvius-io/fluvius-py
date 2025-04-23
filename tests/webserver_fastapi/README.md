@@ -7,13 +7,13 @@ This package contains tests for the FastAPI application located in `examples/fas
 To run these tests, make sure you have all the required dependencies installed:
 
 ```bash
-pip install -r tests/webserver_fastapi/requirements-test.txt
+pip install -r tests/fluvius_fastapi/requirements-test.txt
 ```
 
 Then run the tests using pytest:
 
 ```bash
-pytest tests/webserver_fastapi
+pytest tests/fluvius_fastapi
 ```
 
 ## Test Structure

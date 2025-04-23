@@ -73,13 +73,14 @@ class Aggregate(object):
         )
 
     @asynccontextmanager
-    async def command_aggregate(self, context, command_bundle):
+    async def command_aggregate(self, context, command_bundle, command_meta):
         if hasattr(self, '_context'):
             raise RuntimeError('Overlapping context: %s' % str(context))
 
         self._evt_queue = queue.Queue()
         self._context = context
         self._command = command_bundle
+        self._cmdmeta = command_meta
         self._aggroot = (
             await self.fetch_command_aggroot(command_bundle)
         )
@@ -87,6 +88,14 @@ class Aggregate(object):
         yield RestrictedAggregateProxy(self)
 
     async def fetch_command_aggroot(self, cmd):
+        if self._cmdmeta.Meta.new_resource:
+            return AggregateRoot(
+                self._command.resource,
+                self._command.identifier,
+                self._command.domain_sid,
+                self._command.domain_iid,
+            )
+
         def if_match():
             if self.context.source or (not IF_MATCH_VERIFY):
                 return None
@@ -139,6 +148,7 @@ class Aggregate(object):
 
     def create_message(self, msg_key, data=None, **kwargs):
         msg_cls = self.lookup_message(msg_key)
+
         return MessageRecord(
             message=msg_key,
             aggroot=self.aggroot,

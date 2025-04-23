@@ -7,6 +7,7 @@ from pyrsistent import PClass, field
 from types import SimpleNamespace
 from typing import Iterator
 
+from fluvius.data import UUID_GENR
 from fluvius.helper import camel_to_lower
 from fluvius.helper.timeutil import timestamp
 from fluvius.helper.registry import ClassRegistry
@@ -31,7 +32,7 @@ from .state import StateManager, ReadonlyDataManagerProxy
 
 def _build_handler_map(handler_list):
     _hmap = {}
-    for pri, key, cls_, func in sorted(handler_list, reverse=True, key=itemgetter(0)):
+    for pri, key, func in sorted(handler_list, reverse=True, key=itemgetter(0)):
         _hmap.setdefault(key, tuple())
         _hmap[key] += (func,)
 
@@ -181,9 +182,9 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         return os.path.join(cls.__domain__, f"@{command}", resource, str(identifier))
 
     async def dispatch_messages(self, msg_queue):
-        for msg in consume_queue(msg_queue):
-            for dispatcher in self.msg_dispatchers(msg):
-                await dispatcher(msg)
+        for msg_record in consume_queue(msg_queue):
+            for dispatcher in self.msg_dispatchers(msg_record.message):
+                await dispatcher(msg_record)
 
     @contextmanager
     def aggroot(self, *args):
@@ -235,10 +236,10 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
         return cmd
 
-    async def _invoke_processors(self, ctx, statemgr, cmd_bundle):
+    async def _invoke_processors(self, ctx, statemgr, cmd_bundle, cmd_meta):
         no_handler = True
         aggregate = self.__aggregate__(self)
-        async with aggregate.command_aggregate(ctx, cmd_bundle) as agg_proxy:
+        async with aggregate.command_aggregate(ctx, cmd_bundle, cmd_meta) as agg_proxy:
             for processor in self.cmd_processors(cmd_bundle):
                 async for particle in processor(agg_proxy, statemgr, cmd_bundle):
                     if particle is None:
@@ -252,13 +253,13 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
                 yield evt
 
         if no_handler:
-            raise RuntimeError('Command has no handler: %s' % cmd)
+            raise RuntimeError(f'Command has no handler: {cmd}')
 
     async def _process_command_internal(self, ctx, stm, cmd) -> Iterator[ce.Event]:
         await self.logstore.add_command(cmd)
         await self.publish(sig.COMMAND_READY, cmd)
-
-        async for particle in self._invoke_processors(ctx, stm, cmd):
+        meta = self.lookup_command(cmd.command)
+        async for particle in self._invoke_processors(ctx, stm, cmd, meta):
             if not isinstance(particle, (ce.EventRecord, cm.MessageRecord, cres.ResponseRecord, act.ActivityLog)):
                 raise RuntimeError(
                     'Items returned from command processor must be a domain entity (event, messages, etc.). '
@@ -342,7 +343,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         await self.publish(sig.TRANSACTION_COMMITTED, self)
         await self.trigger_reconciliation(self.cmd_queue)
         await self.dispatch_messages(self.msg_queue)
-        return [resp for resp in consume_queue(self.rsp_queue)]
+        return [resp.data for resp in consume_queue(self.rsp_queue)]
 
 
     async def trigger_reconciliation(self, cmd_queue):
@@ -351,4 +352,4 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             await self.publish(sig.TRIGGER_RECONCILIATION, cmd, statemgr=self.statemgr)
 
     def setup_context(self, **kwargs):
-        return self._context.set(**kwargs)
+        return self._context.set(_id=UUID_GENR(), **kwargs)

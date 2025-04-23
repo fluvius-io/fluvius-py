@@ -149,6 +149,57 @@ def _locate_handler(cls, name_match=None, domain_cls=None):
 
             yield name, func
 
+
+def _normalize_command_processor(cmd_cls, func):
+    if inspect.isasyncgenfunction(func):
+        @functools.wraps(func)
+        async def wrapped_func(agg, stm, cmd):
+            ''' NOTE: we don't need to wrap the function in another
+                async generator, just returns the iterator directly. '''
+            command = cmd_cls()
+            rootobj = agg.get_aggroot()
+            payload = cmd.payload
+            it = func(command, agg, stm, payload, rootobj)
+
+            async for particle in it:
+                yield particle
+        return wrapped_func
+
+    if inspect.iscoroutinefunction(func):
+        @functools.wraps(func)
+        async def wrapped_func(agg, stm, cmd):
+            command = cmd_cls()
+            rootobj = agg.get_aggroot()
+            payload = cmd.payload
+            resp = await func(command, agg, stm, payload, rootobj)
+
+            if resp is None:
+                return
+
+            yield agg.create_response(resp)
+
+        return wrapped_func
+
+    if inspect.isfunction(func):
+        @functools.wraps(func)
+        async def wrapped_func(agg, stm, cmd):
+            command = cmd_cls()
+            rootobj = agg.get_aggroot()
+            payload = cmd.payload
+            resp = func(command, agg, stm, payload, rootobj)
+
+            if resp is None:
+                return
+
+            yield agg.create_response(resp)
+
+        return wrapped_func
+
+    raise ValueError(f'Invalid command processor: {func}')
+
+def _normalize_message_dispatcher(msg_cls, func):
+    return func
+
 class DomainEntityRegistry(object):
     @classmethod
     def entity(domain_cls, cls_or_key):
@@ -248,15 +299,15 @@ class DomainEntityRegistry(object):
 
     @classmethod
     def command_processor(cls, *cmd_classes, priority=0):
-        def decorator(func):
-            _assert_domain_command(*cmd_classes)
+        def class_method_decorator(func):
+            ''' This is likely an inline handler (i.e. no command class supplied)
+                Mark the function for later registration '''
+            setattr(func, HANDLER_PRIORITY_FIELD, priority)
+            setattr(func, HANDLER_MARKER_FIELD, cls)
+            return func
 
-            if not cmd_classes:
-                ''' This is likely an inline handler (i.e. no command class supplied)
-                    Just mark the attributes for later registration '''
-                setattr(func, HANDLER_PRIORITY_FIELD, priority)
-                setattr(func, HANDLER_MARKER_FIELD, cls)
-                return func
+        def standalone_method_decorator(func):
+            _assert_domain_command(*cmd_classes)
 
             # Priotize the pre-set attributes
             _priority = getattr(func, HANDLER_PRIORITY_FIELD, priority)
@@ -264,50 +315,9 @@ class DomainEntityRegistry(object):
 
             for cmd_cls in cmd_classes:
                 # Use tuple arithmetic since modify the list in place may change parent class handlers
-                if inspect.isasyncgenfunction(func):
-                    @functools.wraps(func)
-                    async def wrapped_func(agg, stm, cmd):
-                        ''' NOTE: we don't need to wrap the function in another
-                            async generator, just returns the iterator directly. '''
-                        command = cmd_cls()
-                        rootobj = agg.get_aggroot()
-                        payload = cmd.payload
-                        it = func(command, agg, stm, payload, rootobj)
-
-                        async for particle in it:
-                            yield particle
-
-                elif inspect.iscoroutinefunction(func):
-                    @functools.wraps(func)
-                    async def wrapped_func(agg, stm, cmd):
-                        command = cmd_cls()
-                        rootobj = agg.get_aggroot()
-                        payload = cmd.payload
-                        resp = await func(command, agg, stm, payload, rootobj)
-
-                        if resp is None:
-                            return
-
-                        yield agg.create_response(resp)
-
-                elif callable(func):
-                    @functools.wraps(func)
-                    async def wrapped_func(agg, stm, cmd):
-                        command = cmd_cls()
-                        rootobj = agg.get_aggroot()
-                        payload = cmd.payload
-                        resp = func(command, agg, stm, payload, rootobj)
-
-                        if resp is None:
-                            return
-
-                        yield agg.create_response(resp)
-
-                else:
-                    raise ValueError('Invalid command handler: %s' % str(func))
-
+                cmd_processor = _normalize_command_processor(cmd_cls, func)
                 cmd_key = getattr(cmd_cls, DOMAIN_ENTITY_KEY)
-                cls._cmd_processors += ((_priority, cmd_key, cmd_cls, wrapped_func),)
+                cls._cmd_processors += ((_priority, cmd_key, cmd_processor),)
 
             def _error(*args, **kwargs):
                 raise RuntimeError('Domain Command Handlers are not meant to call directly.')
@@ -315,24 +325,22 @@ class DomainEntityRegistry(object):
             return _error
 
         if len(cmd_classes) == 1 and inspect.isfunction(cmd_classes[0]):
-            cmd_classes, _func = tuple(), cmd_classes[0]
-            return decorator(_func)
+            return class_method_decorator(cmd_classes[0])
 
-        return decorator
+        return standalone_method_decorator
 
     @classmethod
     def message_dispatcher(cls, *msg_classes, priority=0):
         _assert_domain_message(*msg_classes)
+        def class_method_decorator(func):
+            ''' This is likely an inline handler (i.e. no command class supplied)
+                Mark function for later registration '''
+            setattr(func, HANDLER_PRIORITY_FIELD, priority)
+            setattr(func, HANDLER_MARKER_FIELD, True)
+            return func
 
         def decorator(func):
             _assert_coroutine_func(func)
-
-            if not msg_classes:
-                ''' This is likely an inline handler (i.e. no command class supplied)
-                    Just mark the attributes for later registration '''
-                setattr(func, HANDLER_PRIORITY_FIELD, priority)
-                setattr(func, HANDLER_MARKER_FIELD, True)
-                return func
 
             # Priotize the pre-set attributes
             _priority = getattr(func, HANDLER_PRIORITY_FIELD, priority)
@@ -340,12 +348,16 @@ class DomainEntityRegistry(object):
 
             for msg_cls in msg_classes:
                 msg_key = getattr(msg_cls, DOMAIN_ENTITY_KEY)
-                cls._msg_dispatchers += ((_priority, msg_key, msg_cls, func), )
+                dispatcher = _normalize_message_dispatcher(msg_cls, func)
+                cls._msg_dispatchers += ((_priority, msg_key, func), )
 
             def _error(*args, **kwargs):
                 raise RuntimeError('Domain Message Dispatchers are not meant to call directly.')
 
             return _error
+
+        if len(cmd_classes) == 1 and inspect.isfunction(cmd_classes[0]):
+            return class_method_decorator(cmd_classes[0])
 
         return decorator
 
@@ -371,10 +383,10 @@ class DomainEntityRegistry(object):
 
     @classmethod
     def _enumerate_entity(cls, match_kind=None):
-        for (key, kind), item in cls._entity_registry.items():
+        for (key, kind), entity in cls._entity_registry.items():
             if match_kind is None or kind == match_kind:
-                qual_name = NAMESPACE_SEP.join((cls.__domain__, key))
-                yield (key, item, qual_name)
+                fq_name = NAMESPACE_SEP.join((cls.__domain__, key))
+                yield (entity, key, fq_name)
 
     @classmethod
     def enumerate_command(cls):

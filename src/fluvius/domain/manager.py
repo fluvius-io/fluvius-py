@@ -8,13 +8,18 @@ class DomainManager(object):
     __whitelisted_commands__ = tuple()
 
     @classmethod
-    def register_domain(cls, domain_cls, whitelist=None, blacklist=None):
-        if domain_cls in cls.__domains__:
-            raise RuntimeError(f'Domain already registered with domain manager: {domain_cls}')
+    def register_domain(cls, *domain_classes, whitelist=tuple(), blacklist=tuple()):
+        for domain_cls in domain_classes:
+            if not issubclass(domain_cls, Domain):
+                raise RuntimeError(f'Invalid domain: {domain_cls}')
 
-        cls.__domains__ += (domain_cls,)
-        # cls.__whitelist__[domain_cls] = whitelist or tuple()
-        # cls.__blacklist__[domain_cls] = blacklist or tuple()
+            if domain_cls in cls.__domains__:
+                raise RuntimeError(f'Domain already registered with domain manager: {domain_cls}')
+
+        cls.__domains__ += domain_classes
+        cls.__blacklisted_commands__ += blacklist
+        cls.__whitelisted_commands__ += whitelist
+
 
     def initialize_domains(self, app):
         if hasattr(self, '_domains'):
@@ -32,14 +37,14 @@ class DomainManager(object):
         return self._domains
 
     def _enumerate_command_handlers(self, domain):
-        for cmd_key, cmd_cls, qual_name in domain.enumerate_command():
-            if self.__blacklisted_commands__ and qual_name in self.__blacklisted_commands__:
+        for cmd_cls, cmd_key, fq_name in domain.enumerate_command():
+            # Never list blacklisted commands
+            if fq_name in self.__blacklisted_commands__:
                 continue
 
-            if self.__whitelisted_commands__ and qual_name not in self.__whitelisted_commands__:
-                continue
-
-            yield domain, qual_name, cmd_key, cmd_cls
+            if (not self.__whitelisted_commands__ or       # If no whitelist presence, enumerate all
+                fq_name in self.__whitelisted_commands__): # Always list whitelisted commands, except they are blacklisted
+                yield domain, cmd_cls, cmd_key, fq_name
 
 
     def enumerate_commands(self):

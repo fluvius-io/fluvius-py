@@ -86,7 +86,7 @@ def setup_domain_blueprint(domain_cls, connector, auth_decorator=auth_required):
                 "api_revision": api_revision,
                 "timestamp": str(datetime.utcnow()),
                 "supported_commands": sorted(
-                    [cmd for cmd, _ in domain_cls.enumerate_command()]),
+                    [cmd for _, cmd, _  in domain_cls.enumerate_command()]),
             }
         )
 
