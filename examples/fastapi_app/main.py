@@ -8,7 +8,7 @@ app = setup_authentication(app)
 app = configure_domain_support(app, ObjectDomain)
 
 
-@app.get("/protected")
+@app.get("/protected", tags=["Sample API"])
 @auth_required()
 async def protected(request: Request):
     user = request.state.auth_context.user
@@ -18,8 +18,8 @@ async def protected(request: Request):
 
 
 # Item query ...
-@app.get("/protected/{identifier}")
-@app.get("/protected/{scoping:path}/{identifier}")
+@app.get("/protected/{identifier}", tags=["Sample API"])
+@app.get("/protected/{scoping:path}/{identifier}", tags=["Sample API"])
 @auth_required()
 async def protected_2(request: Request, identifier, scoping=None):
     return {
@@ -28,8 +28,8 @@ async def protected_2(request: Request, identifier, scoping=None):
 
 
 # Resources query ...
-@app.get("/protected/{scoping:path}/")
-@app.get("/protected/")
+@app.get("/protected/{scoping:path}/", tags=["Sample API"])
+@app.get("/protected/", tags=["Sample API"])
 @auth_required()
 async def protected_3(request: Request, scoping=None):
     return {

@@ -7,7 +7,7 @@ help:
 
 ## Run sanic application
 run-sanic-app:
-    sanic sample_app.webserver:app --dev -p 8000
+    sanic sample_app.webserver:app --dev  -p 8000
 
 run-fastapi:
-    cd fastapi_app && PYTHONPATH="../../lib:../../src:../" uvicorn main:app --reload --reload-dir="../../src" --reload-dir="./"
+    cd fastapi_app && PYTHONPATH="../../lib:../../src:../" uvicorn main:app --host 0.0.0.0 --reload --reload-dir="../../src" --reload-dir="./"

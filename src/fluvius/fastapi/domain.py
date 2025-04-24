@@ -51,7 +51,8 @@ class FastAPIDomainManager(DomainManager):
             async def domain_metadata(request: Request):
                 return domain.metadata()
 
-        app.openapi_tags = tags
+        app.openapi_tags = app.openapi_tags or []
+        app.openapi_tags.extend(tags)
 
         for params in self.enumerate_commands():
             self._register_handler(app, *params)
@@ -101,7 +102,7 @@ class FastAPIDomainManager(DomainManager):
                 async def command_handler(
                     request: Request,
                     payload: PayloadType,
-                    resource: Annotated[str, Path(description='Unique key of the resource to be created')]
+                    resource: Annotated[str, Path(description=cmd_cls.Meta.resource_desc)]
                 ):
                     identifier = UUID_GENR()
                     return await _command_handler(request, payload, resource, identifier, {})
@@ -112,8 +113,8 @@ class FastAPIDomainManager(DomainManager):
                 async def scoped_command_handler(
                     request: Request,
                     payload: PayloadType,
-                    resource: Annotated[str, Path(description='Unique key of the resource to be created')],
-                    scoping: Annotated[str, Path(description=f'Resource scoping: `{scope_keys}`. E.g. `domain_sid~9948e2c3-b53a-4458-bf06-059d5d22ea9b`')]
+                    resource: Annotated[str, Path(description=cmd_cls.Meta.resource_desc)],
+                    scoping: Annotated[str, Path(description=f'Resource scoping: `{', '.join(scope_keys)}`. E.g. `domain_sid~H9cNmGXLEc8NWcZzSThA9S`')]
                 ):
                     identifier = UUID_GENR()
                     scope = parse_scoping(scoping, scope_schema)
@@ -125,7 +126,7 @@ class FastAPIDomainManager(DomainManager):
                 async def command_handler(
                     request: Request,
                     payload: PayloadType,
-                    resource: Annotated[str, Path(description='Unique key of the resource. E.g. `people-economist`')],
+                    resource: Annotated[str, Path(description=cmd_cls.Meta.resource_desc)],
                     identifier: Annotated[UUID_TYPE, Path(description="Resource identifier")],
                 ):
                     return await _command_handler(request, payload, resource, identifier, {})
@@ -138,9 +139,9 @@ class FastAPIDomainManager(DomainManager):
                 async def scoped_command_handler(
                     request: Request,
                     payload: PayloadType,
-                    resource: Annotated[str, Path(description='Unique key of the resource. E.g. `people-economist`')],
+                    resource: Annotated[str, Path(description=cmd_cls.Meta.resource_desc)],
                     identifier: Annotated[UUID_TYPE, Path(description="Resource identifier")],
-                    scoping: Annotated[str, Path(description=f'Resource scoping: `{scope_keys}`. E.g. `domain_sid~9948e2c3-b53a-4458-bf06-059d5d22ea9b`')]
+                    scoping: Annotated[str, Path(description=f'Resource scoping: `{', '.join(scope_keys)}`. E.g. `domain_sid~H9cNmGXLEc8NWcZzSThA9S`')]
                 ):
                     scope = parse_scoping(scoping, scope_schema)
                     return await _command_handler(request, payload, resource, identifier, scope)

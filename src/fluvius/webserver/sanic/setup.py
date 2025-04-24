@@ -23,7 +23,7 @@ def create_server(modcfg, configure_logging=False, **kwargs):
     configure_sanic_profiler(app)
     configure_domain_support(app)
 
-    @app.route("/~/app-summary")
+    @app.route("/~metadata")
     async def status_resp(request):
         return json({
             "name": modcfg.APPLICATION_NAME,

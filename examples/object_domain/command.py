@@ -14,13 +14,6 @@ class PersonName(DataModel):
     middle: str
     title: Optional[str] = None
 
-class PersonModel(DataModel):
-    _id: UUID_TYPE
-    name: PersonName
-    birthdate: datetime
-    job: str
-
-
 class UpdateObjectCmd(Command):
     ''' UpdateObject Command ...'''
 
@@ -40,12 +33,19 @@ class UpdateObjectCmd(Command):
         await aggregate.update(content=data)
 
 
+class PersonModel(DataModel):
+    _id: UUID_TYPE
+    name: PersonName
+    birthdate: datetime
+    job: str
+
 class CreateObjectCmd(Command):
     ''' CreateObject Command ...'''
     class Meta:
         key = 'create-object'
         name = 'Create Generic Object'
         new_resource = True
+        resource_desc = 'Resource key. E.g. `people-economist`'
 
     Data = PersonModel
 

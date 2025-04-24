@@ -63,7 +63,7 @@ def test_protected_endpoint_authorized(mock_state, client, mock_auth_context):
 
 def test_app_summary_endpoint(client):
     """Test the app summary endpoint returns application info."""
-    response = client.get("/~/app-summary")
+    response = client.get("/~metadata")
     assert response.status_code == 200
     assert "name" in response.json()
     assert "serial_no" in response.json()

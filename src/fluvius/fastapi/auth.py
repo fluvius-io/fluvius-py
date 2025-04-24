@@ -38,6 +38,13 @@ def setup_authentication(app, config=base_conf):
     KEYCLOAK_JWKS_URI = f"{KEYCLOAK_ISSUER}/protocol/openid-connect/certs"
     KEYCLOAK_LOGOUT_URI = f"{KEYCLOAK_BASE_URL}/realms/{KEYCLOAK_REALM}/protocol/openid-connect/logout"
 
+    app.openapi_tags = app.openapi_tags or []
+    app.openapi_tags.append({
+        "name": "Authentication",
+        "description": "OAuth/JWT authentication endpoints"
+    })
+
+    openapi_info = dict(tags=["Authentication"])
 
     # === OAuth Setup ===
     oauth = OAuth()
@@ -91,16 +98,16 @@ def setup_authentication(app, config=base_conf):
         app.state.jwks_keyset = JsonWebKey.import_key_set(data)  # Store JWKS in app state
 
     # === Routes ===
-    @app.get("/auth")
+    @app.get("/auth", **openapi_info)
     async def home():
         return {"message": "Go to /login to start OAuth2 login with Keycloak"}
 
-    @app.get("/auth/login")
+    @app.get("/auth/login", **openapi_info)
     async def login(request: Request):
         return await oauth.keycloak.authorize_redirect(request, DEFAULT_REDIRECT_URI)
 
-    @app.get("/auth/callback")
-    async def auth_callback(request: Request):
+    @app.get("/auth/callback", **openapi_info)
+    async def oauth_callback(request: Request):
         token = await oauth.keycloak.authorize_access_token(request)
         id_token = token.get("id_token")
         if not id_token:
@@ -112,9 +119,9 @@ def setup_authentication(app, config=base_conf):
         response.set_cookie('id_token', id_token)
         return response
 
-    @app.get("/auth/verify")
+    @app.get("/auth/verify", **openapi_info)
     @auth_required()
-    async def protected(request: Request):
+    async def verify_auth(request: Request):
         if not (user := request.state.auth_context.user):
             raise HTTPException(status_code=401, detail=f"Not logged in: {user}")
 
@@ -125,14 +132,16 @@ def setup_authentication(app, config=base_conf):
             "headers": dict(request.headers)
         }
 
-    @app.get("/auth/logout")
+    @app.get("/auth/logout", **openapi_info)
     async def logout(request: Request):
+        ''' Log out user locally (only for this API) '''
         request.session.clear()
         return {"message": "Logged out"}
 
 
-    @app.get("/auth/signoff")
-    async def signoff(request: Request):
+    @app.get("/auth/signoff", **openapi_info)
+    async def sign_off(request: Request):
+        ''' Log out user globally (including Keycloak) '''
         # 2. Logout from Keycloak using the logout endpoint
         access_token = request.cookies.get("id_token")
         if not access_token:
