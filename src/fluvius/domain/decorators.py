@@ -42,6 +42,9 @@ class OrderCounter:
 
 
 def _class_domain_key_infer(cls):
+    if cls.Meta.key:
+        return cls.Meta.key
+
     return camel_to_lower(cls.__name__)
 
 
@@ -111,7 +114,7 @@ def _validate_domain_message(cls):
                 (cls, bcls),
             )
 
-    if issubclass(cls, cm.MessageRecord):
+    if issubclass(cls, cm.Message):
         return cls
 
     raise ValueError(f"Invalid CQRS message class: {cls}")
@@ -202,10 +205,12 @@ def _normalize_message_dispatcher(msg_cls, func):
 
 class DomainEntityRegistry(object):
     @classmethod
-    def entity(domain_cls, cls_or_key):
+    def _entity(domain_cls, cls_or_key, validate_kind=None):
         def decorator(cls):
-            kind, cls = _validate_domain_entity(cls)
             domain_name = domain_cls.__domain__
+            kind, cls = _validate_domain_entity(cls)
+            if validate_kind and validate_kind != kind:
+                raise ValueError(f'Invalid entity type: {validate_kind} != {kind}')
 
             identifier = (key, kind)
             if identifier in domain_cls._entity_registry:
@@ -227,6 +232,14 @@ class DomainEntityRegistry(object):
         return decorator
 
     @classmethod
+    def response(domain_cls, cls_or_key):
+        return domain_cls._entity(cls_or_key, DomainEntityType.RESPONSE)
+
+    @classmethod
+    def event(domain_cls, cls_or_key):
+        return domain_cls._entity(cls_or_key, DomainEntityType.EVENT)
+
+    @classmethod
     def message(domain_cls, cls_or_key):
         def decorator(cls):
             msg_cls = _validate_domain_message(cls)
@@ -237,7 +250,7 @@ class DomainEntityRegistry(object):
 
             domain_cls._register_entity(cls, key, DomainEntityType.MESSAGE)
 
-            DEBUG and logger.info("[REGISTERED MESSAGE] %s/%d [%s]", domain_name, DomainEntityType.MESSAGE, key)
+            DEBUG and logger.info("[REGISTERED MESSAGE] %s/%d [%s]", domain_cls.__domain__, DomainEntityType.MESSAGE, key)
             return cls
 
         key = cls_or_key

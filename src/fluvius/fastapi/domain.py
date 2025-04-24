@@ -16,21 +16,43 @@ def uri(*elements):
     return  URI_SEP.join(('',) + elements)
 
 
-def parse_scoping(scoping_stmt):
-    def _parse(stmt):
+def parse_scoping(scoping_stmt, scope_schema):
+    def _parse():
         if not stmt:
             return
 
-        for part in stmt.split(URI_SEP):
+        for part in scoping_stmt.split(URI_SEP):
             key, _, value = part.partition(SCOPING_SEP)
-            yield (key or 'domain_sid', value)
+            key = key or 'domain_sid'
+            if key not in scope_schema:
+                yield (key, value)
+            else:
+                yield (key, scope_schema[key](value))
 
-    return dict(_parse(scoping_stmt))
+    return dict(_parse())
 
 
 class FastAPIDomainManager(DomainManager):
     def __init__(self, app):
         self.initialize_domains(app)
+        tags = []
+        for domain in self._domains:
+            metadata_uri = f"/{domain.__domain__}~metadata/"
+            tags.append({
+                "name": domain.Meta.name,
+                "description": domain.Meta.desc,
+                "externalDocs": {
+                    "description": "Metadata",
+                    "url": f"http://localhost:8000{metadata_uri}"
+                }
+            })
+
+            @app.get(metadata_uri, summary="Domain Metadata", tags=[domain.Meta.name])
+            async def domain_metadata(request: Request):
+                return domain.metadata()
+
+        app.openapi_tags = tags
+
         for params in self.enumerate_commands():
             self._register_handler(app, *params)
 
@@ -64,47 +86,66 @@ class FastAPIDomainManager(DomainManager):
             return await domain.process_command(command, context=context)
 
 
+        scope_schema = (cmd_cls.Meta.scope_required or cmd_cls.Meta.scope_optional)
+        default_path = bool(not cmd_cls.Meta.scope_required)
+        endpoint_info = dict(
+                    summary=cmd_cls.Meta.name or cmd_cls.__name__,
+                    description=cmd_cls.__doc__,
+                    tags=[domain.Meta.name]
+        )
+        if scope_schema:
+            scope_keys = list(scope_schema.keys())
+
         if cmd_cls.Meta.new_resource:
-            if cmd_cls.Meta.normal:
-                async def command_handler(request: Request, payload: PayloadType, resource: str):
-                    identifier = UUID_GENR()
-                    return await _command_handler(request, payload, resource, identifier, {})
-
-                command_handler.__doc__ = cmd_cls.__doc__
-                command_handler.__name__ = cmd_cls.__name__
-                app.post(uri(fq_name, "{resource}", "~new"))(command_handler)
-
-            if cmd_cls.Meta.scoped:
-                async def scoped_command_handler(request: Request, payload: PayloadType, resource: str, scoping: str):
-                    identifier = UUID_GENR()
-                    scope = parse_scoping(scoping)
-                    return await _command_handler(request, payload, resource, identifier, scope)
-
-                scoped_command_handler.__doc__ = cmd_cls.__doc__
-                scoped_command_handler.__name__ = cmd_cls.__name__
-                app.post(uri(fq_name, "{scoping:path}", "{resource}", "~new"))(scoped_command_handler)
-        else:
-            if cmd_cls.Meta.normal:
+            if default_path:
                 async def command_handler(
                     request: Request,
                     payload: PayloadType,
-                    resource: str,
-                    identifier: UUID_TYPE
+                    resource: Annotated[str, Path(description='Unique key of the resource to be created')]
+                ):
+                    identifier = UUID_GENR()
+                    return await _command_handler(request, payload, resource, identifier, {})
+
+                app.post(uri(fq_name, "{resource}", "~new"), **endpoint_info)(command_handler)
+
+            if scope_schema:
+                async def scoped_command_handler(
+                    request: Request,
+                    payload: PayloadType,
+                    resource: Annotated[str, Path(description='Unique key of the resource to be created')],
+                    scoping: Annotated[str, Path(description=f'Resource scoping: `{scope_keys}`. E.g. `domain_sid~9948e2c3-b53a-4458-bf06-059d5d22ea9b`')]
+                ):
+                    identifier = UUID_GENR()
+                    scope = parse_scoping(scoping, scope_schema)
+                    return await _command_handler(request, payload, resource, identifier, scope)
+
+                app.post(uri(fq_name, "{scoping:path}", "{resource}", "~new"), **endpoint_info)(scoped_command_handler)
+        else:
+            if default_path:
+                async def command_handler(
+                    request: Request,
+                    payload: PayloadType,
+                    resource: Annotated[str, Path(description='Unique key of the resource. E.g. `people-economist`')],
+                    identifier: Annotated[UUID_TYPE, Path(description="Resource identifier")],
                 ):
                     return await _command_handler(request, payload, resource, identifier, {})
 
-                command_handler.__doc__ = cmd_cls.__doc__
-                command_handler.__name__ = cmd_cls.__name__
-                app.post(uri(fq_name, "{resource}", "{identifier}"))(command_handler)
+                app.post(
+                    uri(fq_name, "{resource}", "{identifier}"), **endpoint_info
+                )(command_handler)
 
-            if cmd_cls.Meta.scoped:
-                async def scoped_command_handler(request: Request, payload: PayloadType, resource: str, identifier: UUID_TYPE, scoping: str):
-                    scope = parse_scoping(scoping)
+            if scope_schema:
+                async def scoped_command_handler(
+                    request: Request,
+                    payload: PayloadType,
+                    resource: Annotated[str, Path(description='Unique key of the resource. E.g. `people-economist`')],
+                    identifier: Annotated[UUID_TYPE, Path(description="Resource identifier")],
+                    scoping: Annotated[str, Path(description=f'Resource scoping: `{scope_keys}`. E.g. `domain_sid~9948e2c3-b53a-4458-bf06-059d5d22ea9b`')]
+                ):
+                    scope = parse_scoping(scoping, scope_schema)
                     return await _command_handler(request, payload, resource, identifier, scope)
 
-                scoped_command_handler.__doc__ = cmd_cls.__doc__
-                scoped_command_handler.__name__ = cmd_cls.__name__
-                app.post(uri(fq_name, "{scoping:path}", "{resource}", "{identifier}"))(scoped_command_handler)
+                app.post(uri(fq_name, "{scoping:path}", "{resource}", "{identifier}"), **endpoint_info)(scoped_command_handler)
 
 
     def query_handler(self, namespace, command, handler):
@@ -115,50 +156,46 @@ class FastAPIDomainManager(DomainManager):
         uri_item_scoped  = f'/{namespace}:{command}/{{scoping:path}}/{{resource}}/{{identifier}}'
 
 
-# class FluviusDomainMiddleware(BaseHTTPMiddleware):
-#     def __init__(self, app, domain_manager):
-#         super().__init__(app)
-#         self._dm = domain_manager
+class FluviusDomainMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, dm):
+        super().__init__(app)
+        self._dm = dm
 
-#     def get_auth_context(self, request):
-#         # You can optionally decode and validate the token here
-#         if not (id_token := request.cookies.get("id_token")):
-#             return None
+    def get_auth_context(self, request):
+        # You can optionally decode and validate the token here
+        if not (id_token := request.cookies.get("id_token")):
+            return None
 
-#         try:
-#             user = request.session.get("user")
-#             if not user:
-#                 return None
-#         except (KeyError, ValueError):
-#             return None
+        try:
+            user = request.session.get("user")
+            if not user:
+                return None
+        except (KeyError, ValueError):
+            return None
 
-#         return SimpleNamespace(
-#             user = user,
-#             token = id_token
-#         )
+        return SimpleNamespace(
+            user = user,
+            token = id_token
+        )
 
-#     async def dispatch_func(self, request: Request, call_next):
-#         try:
-#             request.state.auth_context = self.get_auth_context(request)
-#         except Exception as e:
-#             logger.exception(e)
-#             raise
+    async def dispatch(self, request: Request, call_next):
+        try:
+            request.state.auth_context = self.get_auth_context(request)
+        except Exception as e:
+            logger.exception(e)
+            raise
 
-#         response = await call_next(request)
+        response = await call_next(request)
 
-#         if idem_key := request.headers.get(IDEMPOTENCY_KEY):
-#             response.headers[IDEMPOTENCY_KEY] = idem_key
+        if idem_key := request.headers.get(IDEMPOTENCY_KEY):
+            response.headers[IDEMPOTENCY_KEY] = idem_key
 
-#         return response
+        return response
 
 
 def configure_domain_support(app, *domains, **kwargs):
     FastAPIDomainManager.register_domain(*domains, **kwargs)
-    FastAPIDomainManager(app)
-    # app.add_middleware(
-    #     FluviusDomainMiddleware,
-    #     domain_manager=FastAPIDomainManager(app)
-    # )
+    app.add_middleware(FluviusDomainMiddleware, dm=FastAPIDomainManager(app))
     return app
 
 

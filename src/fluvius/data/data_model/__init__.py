@@ -2,20 +2,21 @@ from types import SimpleNamespace
 from pydantic import BaseModel, Field
 
 
-def _create(cls, data=None, **kwargs):
-    if isinstance(data, BlankModel):
-        data = data.__dict__
-
-    if isinstance(data, BaseModel):
-        data = data.dict()
+def _create(cls, data=None, defaults=None, **kwargs):
+    base = {**defaults} if defaults else {}
 
     if isinstance(data, dict):
-        data = {**data, **kwargs}
+        base.update(data)
+    elif isinstance(data, (BlankModel, type)):
+        base.update(data.__dict__)
+    elif isinstance(data, BaseModel):
+        base.update(data.model_dump())
+    elif data is not None:
+        raise ValueError(f'Unable to extract data from object: {data}')
 
-    if data is None:
-        data = kwargs
-
-    return cls(**data)
+    # Fall through to this
+    base.update(kwargs)
+    return cls(**base)
 
 
 class DataModel(BaseModel):

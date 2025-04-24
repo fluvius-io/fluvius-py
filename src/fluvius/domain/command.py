@@ -38,15 +38,13 @@ class CommandBundle(DomainEntityRecord):
 
 
 class CommandMeta(DataModel):
-    key: str = None
-    name: str = None
-    desc: str = None
+    key: Optional[str] = None
+    name: Optional[str] = None
+    desc: Optional[str] = None
     resources: tuple[str] = ('_ALL', )
-    tags: list[str] = None
-    fetchroot: bool = True
-    endpoints: Optional[Dict] = None
-    scoped: Optional[Dict] = None
-    normal: bool = True
+    tags: list[str] = tuple()
+    scope_required: Optional[Dict] = None
+    scope_optional: Optional[Dict] = None
     new_resource: bool = False
 
 

@@ -5,9 +5,9 @@ from contextlib import contextmanager
 from operator import itemgetter
 from pyrsistent import PClass, field
 from types import SimpleNamespace
-from typing import Iterator
+from typing import Iterator, Optional
 
-from fluvius.data import UUID_GENR
+from fluvius.data import UUID_GENR, DataModel
 from fluvius.helper import camel_to_lower
 from fluvius.helper.timeutil import timestamp
 from fluvius.helper.registry import ClassRegistry
@@ -75,6 +75,12 @@ def _setup_message_dispatcher_selector(handler_list):
     return _select
 
 
+class DomainMeta(DataModel):
+    name: str = None
+    revision: int = 0
+    desc: Optional[str] = None
+
+
 class Domain(DomainSignalManager, DomainEntityRegistry):
     __domain__      = None
     __aggregate__   = None
@@ -92,6 +98,9 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
     _REGISTRY = {}
 
+    class Meta:
+        revision = 0
+
     def __init_subclass__(cls):
         if not hasattr(cls, '__domain__'):
             setattr(cls, '__domain__', camel_to_lower(cls.__name__))
@@ -99,7 +108,41 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         if cls.__domain__ in Domain._REGISTRY:
             raise ValueError(f'Domain already registered: {cls.__domain__}')
 
+        if not issubclass(cls.__aggregate__, Aggregate):
+            raise ValueError(f'Invalid domain aggregate: {cls.__aggregate__}')
+
         Domain._REGISTRY[cls.__domain__] = cls
+
+        class ResponseBase(cres.DomainResponse):
+            def __init_subclass__(rsp_cls):
+                super().__init_subclass__()
+                cls.response(rsp_cls)
+
+        class CommandBase(cc.Command):
+            def __init_subclass__(cmd_cls):
+                super().__init_subclass__()
+                cls.command(cmd_cls)
+
+        class EventBase(ce.Event):
+            def __init_subclass__(evt_cls):
+                super().__init_subclass__()
+                cls.event(evt_cls)
+
+        class MessageBase(cm.Message):
+            def __init_subclass__(msg_cls):
+                super().__init_subclass__()
+                cls.message(msg_cls)
+
+        cls.Response = ResponseBase
+        cls.Command = CommandBase
+        cls.Message = MessageBase
+        cls.Event = EventBase
+        cls.Meta = DomainMeta.create(cls.Meta, defaults={
+            'name': cls.__name__,
+            'key': cls.__domain__,
+            'desc': (cls.__doc__ or '').strip()
+        })
+
 
     @classmethod
     def get(cls, name):
@@ -353,3 +396,12 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
     def setup_context(self, **kwargs):
         return self._context.set(_id=UUID_GENR(), **kwargs)
+
+
+    def metadata(self):
+        return {
+            'name': self.Meta.name,
+            'desc': self.Meta.desc,
+            'revision': self.Meta.revision,
+            'commands': [name for _, name, _ in self.enumerate_command()]
+        }

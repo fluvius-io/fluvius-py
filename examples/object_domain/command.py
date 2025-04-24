@@ -1,12 +1,12 @@
 from typing import Optional
 from types import SimpleNamespace
-from fluvius.domain import Command
 from fluvius.data import BlankModel, DataModel, serialize_mapping, UUID_TYPE
 from datetime import datetime
 
-from .domain import _command, _processor
+from .domain import _command, _processor, ObjectDomain
 from . import logger
 
+Command = ObjectDomain.Command
 
 class PersonName(DataModel):
     family: str
@@ -21,16 +21,16 @@ class PersonModel(DataModel):
     job: str
 
 
-@_command("update-object")
 class UpdateObjectCmd(Command):
     ''' UpdateObject Command ...'''
+
     class Meta:
+        key = 'update-object'
         tags = ("transaction",)
         resources = ("people-economist", )
         description = "Withdraw money"
-        endpoints = None
         normal = False
-        scoped = {'domain_sid': UUID_TYPE}
+        scope_required = {'domain_sid': UUID_TYPE}
 
     async def _process(self, aggregate, statemgr, payload, rootobj):
         data = serialize_mapping(payload)
@@ -40,10 +40,11 @@ class UpdateObjectCmd(Command):
         await aggregate.update(content=data)
 
 
-@_command("create-object")
 class CreateObjectCmd(Command):
     ''' CreateObject Command ...'''
     class Meta:
+        key = 'create-object'
+        name = 'Create Generic Object'
         new_resource = True
 
     Data = PersonModel
@@ -73,9 +74,11 @@ class CreateObjectCmd(Command):
         assert self.command_method_echo(1, 2, 3) == (1, 2, 3)
 
 
-@_command("remove-object")
+# @_command("remove-object")
 class RemoveObjectCmd(Command):
-    pass
+    class Meta:
+        key = 'remove-object'
+        scope_optional = {'domain_sid': UUID_TYPE}
 
 
 @_processor(RemoveObjectCmd)

@@ -1,3 +1,4 @@
+from typing import Optional
 from fluvius.data import UUID_TYPE, nullable, field, serialize_mapping, identifier_factory, DataModel, BlankModel
 from .record import DomainEntityRecord
 from .entity import DomainEntity
@@ -10,8 +11,8 @@ class ResponseRecord(DomainEntityRecord):
 
 
 class ResponseMeta(DataModel):
-    key: str = None
-    name: str = None
+    key: Optional[str] = None
+    name: Optional[str] = None
     tags: list[str] = tuple()
 
 

@@ -34,6 +34,6 @@ __all__ = (
 )
 
 
-@Domain.entity
+@Domain.response
 class DefaultResponse(DomainResponse):
     pass

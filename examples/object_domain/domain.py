@@ -18,17 +18,21 @@ class CustomObjectStateManager(DataAccessManager):
 
 
 class ObjectDomain(Domain):
+    ''' Generic Object Domain, mostly for testing '''
+
     __domain__ = "generic-object"
     __aggregate__ = ObjectAggregate
     __statemgr__ = CustomObjectStateManager
     __logstore__ = SQLDomainLogStore
 
 
-_entity = ObjectDomain.entity
 _command = ObjectDomain.command
 _processor = ObjectDomain.command_processor
 
 
-@_entity
-class ObjectResponse(response.DomainResponse):
+class ObjectResponse(ObjectDomain.Response):
+    pass
+
+
+class ObjectMessage(ObjectDomain.Message):
     pass

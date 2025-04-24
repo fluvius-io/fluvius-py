@@ -1,3 +1,4 @@
+from typing import Optional
 from types import SimpleNamespace
 from fluvius.data import UUID_GENR, UUID_TYPE, nullable, identifier_factory, field, DataModel, BlankModel
 from .record import DomainEntityRecord
@@ -15,8 +16,8 @@ class MessageRecord(DomainEntityRecord):
 
 
 class MessageMeta(DataModel):
-    key: str = None
-    name: str = None
+    key: Optional[str] = None
+    name: Optional[str] = None
     tags: list[str] = tuple()
 
 
