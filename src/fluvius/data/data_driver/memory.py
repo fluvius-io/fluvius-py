@@ -33,21 +33,27 @@ def query_resource(store, q: BackendQuery):
 class InMemoryDriver(DataDriver):
     __filepath__ = None
 
+    def __init_subclass__(cls):
+        cls._MEMORY_STORE = {}
+
     @asynccontextmanager
     async def transaction(self, transaction_id=None):
         yield self
         self.commit()
 
+    @classmethod
     def _get_memory(self, resource):
-        store = self.__class__._MEMORY_STORE
+        store = self._MEMORY_STORE
         if resource not in store:
             store[resource] = {}
         return store[resource]
 
-    async def find(self, resource, q=None, **query):
-        query = BackendQuery.create(q, **query)
+    async def find(self, resource, query):
         store = self._get_memory(resource)
         return list(query_resource(store, query))
+
+    find_all = find
+    query = find
 
     async def find_one(self, resource, q=None, **query):
         query = BackendQuery.create(q, **query)
@@ -96,10 +102,12 @@ class InMemoryDriver(DataDriver):
 
         return cls._MEMORY_STORE
 
-    async def update(self, resource, query, changes):
+    async def update(self, resource, query, **changes):
         store = self._get_memory(resource)
         for item in await self.find(resource, query):
             store[item._id] = item.set(**changes)
+
+    update_one = update
 
     async def insert(self, resource, record):
         store = self._get_memory(resource)

@@ -61,7 +61,7 @@ async def test_object_domain(ctx):
         update_command = domain.create_command('update-object', {'job': 'economist'})
         remove_command = domain.create_command('remove-object')
         resps = await domain.process_command(update_command, create_command, remove_command)
-    assert len(resps) == 2
+    assert len(resps) == 1
     # state = domain.statemgr
 
     # assert all(isinstance(evt, Event) for evt in evts) and len(evts) == 6

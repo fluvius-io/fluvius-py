@@ -3,10 +3,11 @@ from collections import namedtuple
 from fluvius.data.helper import nullable
 from contextlib import contextmanager
 from pyrsistent import PClass, field, pvector_field
-from fluvius.data import UUID_TYPE, identifier_factory
+from fluvius.data import UUID_TYPE, identifier_factory, DataModel
 
 from . import config
 
+BACKEND_QUERY_LIMIT = config.BACKEND_QUERY_INTERNAL_LIMIT
 RX_PARAM_SPLIT = re.compile(r'(:|!)')
 OperatorStatement = namedtuple('OperatorStatement', 'field_key mode op_key')
 
@@ -48,6 +49,7 @@ class JoinStatement(PClass):
 class BackendQuery(PClass):
     identifier = field(nullable(UUID_TYPE, str), initial=None)
     select = field(tuple, factory=validate_list, initial=tuple)
+    etag = field(nullable(str), initial=None)
 
     # # @DONE: Make join a top-level concept, not an extension
     join = pvector_field(JoinStatement, optional=True)
@@ -57,8 +59,6 @@ class BackendQuery(PClass):
     sort    = field(tuple, factory=validate_list, initial=tuple)
     where   = field(nullable(dict), initial=dict)
     scope   = field(nullable(dict), initial=dict)
-
-
 
     @classmethod
     def create(cls, query_data=None, **kwargs):

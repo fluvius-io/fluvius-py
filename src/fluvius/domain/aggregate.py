@@ -36,10 +36,10 @@ def action(evt_key, resource=None, emit_event=True):
 
         @wraps(func)
         async def wrapper(self, *args, **evt_args):
-            if include_resource(self.command.resource, resource_spec):
-                evt_data = await func(self, self.statemgr, self.aggroot, *args, **evt_args)
-            else:
-                evt_data = await func(self, self.statemgr, *args, **evt_args)
+            if not include_resource(self._aggroot.resource, resource_spec):
+                raise ValueError('Action is not allowed on resource.')
+
+            evt_data = await func(self, self.statemgr, *args, **evt_args)
 
             if emit_event:
                 self.create_event(evt_key, evt_args, evt_data)

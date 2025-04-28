@@ -151,8 +151,8 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
     def __init__(self, app=None, **config):
         self._app = self.validate_application(app)
         self._config = self.validate_domain_config(config)
-        self._logstore = self.__logstore__(**config)
-        self._statemgr = self.__statemgr__(**config)
+        self._logstore = self.__logstore__(app, **config)
+        self._statemgr = self.__statemgr__(app, **config)
         self._context = self.__context__(
             domain = self.__domain__,
             revision = self.__revision__

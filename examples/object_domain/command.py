@@ -26,7 +26,7 @@ class UpdateObjectCmd(Command):
         normal = False
         scope_required = {'domain_sid': UUID_TYPE}
 
-    async def _process(self, aggregate, statemgr, payload, rootobj):
+    async def _process(self, aggregate, statemgr, payload):
         data = serialize_mapping(payload)
 
         ''' Demonstrate inline handler definition,

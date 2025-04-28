@@ -24,7 +24,7 @@ from fluvius.data.constant import (
 
 DEBUG = config.DEBUG
 ATTR_QUERY_MARKER = '__domain_query__'
-
+BACKEND_QUERY_LIMIT = config.BACKEND_QUERY_INTERNAL_LIMIT
 
 def list_unwrapper(cursor):
     return tuple(SimpleNamespace(**row._asdict()) for row in cursor.all())
@@ -75,7 +75,6 @@ class ResourceAlreadyRegistered(Exception):
 
 
 class DataAccessManagerBase(object):
-    __config__ = SimpleNamespace
     __connector__ = None
     __auto_model__ = False
 
@@ -89,10 +88,10 @@ class DataAccessManagerBase(object):
             if hasattr(method, ATTR_QUERY_MARKER)
         )
 
-    def __init__(self, **config):
-        self._config = self.validate_config(config)
+    def __init__(self, app, **config):
+        self._app = app
         self._proxy = ReadonlyDataManagerProxy(self)
-        self.setup_connector(**config)
+        self.setup_connector(config)
         self.setup_model()
 
     def setup_model(self):
@@ -179,7 +178,7 @@ class DataAccessManagerBase(object):
     def connector(self):
         return self._connector
 
-    def setup_connector(self, **config):
+    def setup_connector(self, config):
         con_cls = self.__connector__
         if not con_cls or not issubclass(con_cls, DataDriver):
             raise ValueError(f'Invalid data driver/connector: {con_cls}')
@@ -228,8 +227,8 @@ class DataAccessManagerBase(object):
         model_cls = cls.lookup_model(resource)
         return [cls._wrap_model(model_cls, data) for data in item_list]
 
-    async def query(self, query, *params, unwrapper=list_unwrapper, **query_options):
-        return await self.connector.query(query, *params, unwrapper=unwrapper, **query_options)
+    async def native_query(self, query, *params, unwrapper=list_unwrapper, **query_options):
+        return await self.connector.native_query(query, *params, unwrapper=unwrapper, **query_options)
 
     def dump_log(cls):
         logger.info('cls._RESOURCES = %s', str(cls._RESOURCES))
@@ -252,13 +251,15 @@ class DataFeedManager(DataAccessManagerBase):
         return await self.connector.insert(resource, data)
 
     async def update_data(self, resource, identifier, **data):
-        record = await self.connector.find_one(resource, identifier=identifier)
+        query = BackendQuery(identifier=identifier)
+        record = await self.connector.find_one(resource, query)
         record = await self.connector.update_record(record, **data)
         await self.flush()
         return record
 
     async def update(self, record: DataModel, updates: dict):
         resource = self.lookup_resource(record)
+        query = BackendQuery(identifier=identifier)
         return await self.connector.update_record(resource, record, **updates)
 
 
@@ -288,7 +289,9 @@ class DataAccessManager(DataAccessManagerBase):
     async def find_one(self, resource: str, q=None, **query) -> DataModel:
         """ Fetch exactly 1 item from the data store using either a query object or where statements
             Raises an error if there are 0 or multiple results """
-        q = BackendQuery.create(q, **query, limit=1)
+        q = BackendQuery.create(q, **query, limit=1, ofset=0)
+        if q.limit != 1 or q.offset != 0 or not q.identifier:
+            raise ValueError(f'Invalid find_one query: {q}')
 
         try:
             item = await self.connector.find_one(resource, q)
@@ -297,47 +300,46 @@ class DataAccessManager(DataAccessManagerBase):
             return None
 
     async def find_all(self, resource: str, q=None, **query) -> List[DataModel]:
-        """ Fetch multiple items from the data store using either a query object or where statements
-            Each entry will be wrapped using corresponding DataModel """
-        q = BackendQuery.create(query)
-        data = await self.connector.find_all(resource, q)
+        """ Find all matching items, always starts with offset = 0 and retrieve all items """
+        q = BackendQuery.create(query, offset=0, limit=BACKEND_QUERY_LIMIT)
+        data = await self.connector.query(resource, q)
         return self._wrap_list(resource, data)
 
-    async def invalidate(self, record: DataModel, updates=None):
+    async def query(self, resource: str, q=None, **query) -> List[DataModel]:
+        """ Query with offset and limits """
+        q = BackendQuery.create(query)
+        data = await self.connector.query(resource, q)
+        return self._wrap_list(resource, data)
+
+    async def invalidate_record(self, record: DataModel, **updates):
         resource = self.lookup_resource(record)
-        return await self.connector.invalidate_record(resource, record, updates)
+        query = BackendQuery.create(identifier=record._id, etag=record._etag)
+        return await self.connector.invalidate(resource, query, **updates)
 
     async def invalidate_one(self, resource: str, identifier: UUID_TYPE, updates=None, *, etag=None, where=None):
         scope = {ETAG_FIELD: etag} if etag else None
         q = BackendQuery.create(identifier=identifier, scope=scope, where=where)
         updates = updates or {}
         updates['_deleted'] = timestamp()
-        return await self.connector.update(resource, q, updates)
+        return await self.connector.update_one(resource, q, **updates)
 
     async def invalidate_many(self, resource: str, updates=None, q=None, **query):
         q = BackendQuery.create(query)
         return await self.connector.invalidate_many(resource, q, updates)
 
-    async def update(self, record: DataModel, updates: dict):
+    async def update_record(self, record: DataModel, updates: dict):
         resource = self.lookup_resource(record)
-        return await self.connector.update_record(resource, record, **updates)
+        query = BackendQuery.create(identifier=record._id, etag=record._etag)
+        return await self.connector.update_one(resource, query, **updates)
 
-    async def update_one(self, resource: str, identifier: UUID_TYPE, updates=None, *, etag=None, where=None):
-        scope = {ETAG_FIELD: etag} if etag else None
-        q = BackendQuery.create(identifier=identifier, scope=scope, where=where)
-        return await self.connector.update(resource, q, updates)
-
-    async def update_many(self, resource: str, updates: dict, q=None, **query):
-        q = BackendQuery.create(query)
-        return await self.connector.update_many(resource, q, updates)
+    async def update_one(self, resource: str, identifier: UUID_TYPE, etag=None, **updates):
+        query = BackendQuery.create(identifier=identifier, etag=etag)
+        return await self.connector.update_one(resource, query, **updates)
 
     async def remove(self, record):
         resource = self.lookup_resource(record)
-        return await self.connector.remove_record(resource, record)
-
-    async def remove_many(self, resource: str, q=None, **query):
-        q = BackendQuery.create(q, **query)
-        return await self.connector.remove_data(resource, q)
+        query = BackendQuery.create(identifier=record._id, etag=record._etag)
+        return await self.connector.remove_record(resource, query)
 
     async def insert(self, record: DataModel):
         resource = self.lookup_resource(record)

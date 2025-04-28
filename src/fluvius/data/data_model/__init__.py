@@ -23,6 +23,12 @@ class DataModel(BaseModel):
     model_config = {"frozen": True}
     create = classmethod(_create)
 
+    def set(self, **kwargs):
+        return self.model_copy(update=kwargs)
+
 
 class BlankModel(SimpleNamespace):
     create = classmethod(_create)
+
+    def set(self, **kwargs):
+        return object.replace(self, **kwargs)

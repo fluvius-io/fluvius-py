@@ -3,7 +3,6 @@ from pyrsistent import PClass, field
 from enum import Enum
 from fluvius.data.query import operator_statement
 
-API_INDEX = 10
 OPERATOR_FIELDS = ('index', 'field', 'op_key', 'label', 'desc', 'method', 'input_widget', 'input_params')
 OPERATOR_REGISTRY = {}
 
@@ -106,8 +105,7 @@ class UnaryQueryOperator(QueryOperator):
     field_key = ''
 
     def __init__(self, query_schema):
-        query_schema.API_INDEX += 1
-        self.index = query_schema.API_INDEX
+        self.index = query_schema.next_api_index()
         if self.key in query_schema.OPS_INDEX:
             raise ValueError(f'Operator is already registed [{query_schema}] [{self.key}]')
 
@@ -115,7 +113,6 @@ class UnaryQueryOperator(QueryOperator):
         self._schema = query_schema
 
     def processor(self, op_stmt, value):
-        # raise ValueError("TESTq! {%s}" % tuple(parse_list_stmt(value)))
         return tuple(parse_list_stmt(value))
 
 

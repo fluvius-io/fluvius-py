@@ -29,6 +29,7 @@ from .. import DataDriver
 
 DEBUG_CONNECTOR = True # config.DEBUG
 RAISE_NO_ITEM_MODIFIED_ERROR = True
+BACKEND_QUERY_LIMIT = config.BACKEND_QUERY_INTERNAL_LIMIT
 
 
 def list_unwrapper(cursor):
@@ -204,10 +205,13 @@ class SqlaDriver(DataDriver, QueryBuilder):
                 await async_session_transaction.rollback()
                 raise
 
-    # async def flush(self):
-    #     return await self._async_session.session.flush()
+    async def find_all(self, resource, query: BackendQuery):
+        if query.offset != 0 or query.limit != BACKEND_QUERY_LIMIT:
+            raise ValueError(f'Invalid find all query: {query}')
 
-    async def find_all(self, resource, q: BackendQuery=None, /, **query):
+        return await self.query(resource, query)
+
+    async def query(self, resource, query: BackendQuery):
         # @TODO: Clarify the use of this function
 
         '''
@@ -233,7 +237,6 @@ class SqlaDriver(DataDriver, QueryBuilder):
         Output: List(list of fields is selected)
         '''
         data_schema = self.schema_lookup(resource)
-        query = BackendQuery.create(q, **query)
         stmt = self.build_select(data_schema, query)
         async with self.session() as sess:
             cursor = await sess.execute(stmt)
@@ -250,10 +253,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
     def _unwrap_schema_list(self, item):
         return item.serialize()
 
-    async def find_one(self, resource, q: BackendQuery=None, /, **query):
-        query = BackendQuery.create(q, **query)
-        if query.limit != 1 or query.offset != 0 or not query.identifier:
-            raise ValueError(f'Invalid find_one query: {query}')
+    async def find_one(self, resource, query: BackendQuery):
 
         data_schema = self.schema_lookup(resource)
         stmt = self.build_select(data_schema, query)
@@ -270,9 +270,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
                 message=f"{str(e)}. Query: {query}"
             )
 
-    async def update_one(self, resource, updates, q=None, **query):
-        query = BackendQuery.create(q, **query)
-
+    async def update_one(self, resource, query, **updates):
         if not query.identifier:
             raise ValueError(f'Invalid update query: {query}')
 
@@ -283,9 +281,8 @@ class SqlaDriver(DataDriver, QueryBuilder):
         self._check_no_item_modified(cursor, 1, query)
         return self._unwrap_result(cursor)
 
-    async def remove_one(self, resource, q: BackendQuery=None, **query):
+    async def remove_one(self, resource, query: BackendQuery):
         data_schema = self.schema_lookup(resource)
-        query = BackendQuery.create(q, **query)
         if not query.identifier:
             raise ValueError(f'Invalid update query: {query}')
 
@@ -315,14 +312,14 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
         return self._unwrap_result(cursor)
 
-    async def upsert_data(self, resource, *values):
+    async def upsert_data(self, resource, *data):
         # Use dialect dependent (e.g. sqlite, postgres, mysql) version of the statement
         # See: connector.py [setup_sql_satemenet]
 
-        stmt = self._async_session.insert(self.data_model).values(values)
+        stmt = self._async_session.insert(self.data_model).values(data)
 
         # Here we assuming that all items have the same set of keys
-        set_fields = {k: getattr(stmt.excluded, k) for k in values[0].keys() if k != '_id'}
+        set_fields = {k: getattr(stmt.excluded, k) for k in data[0].keys() if k != '_id'}
 
         stmt = stmt.on_conflict_do_update(
             # Let's use the constraint name which was visible in the original posts error msg
@@ -333,17 +330,18 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
         async with self.session() as sess:
             cursor = await sess.execute(stmt)
-        DEBUG_CONNECTOR and logger.info("UPSERT %d items => %r", len(values), cursor.rowcount)
+        DEBUG_CONNECTOR and logger.info("UPSERT %d items => %r", len(data), cursor.rowcount)
         self._check_no_item_modified(cursor)
         return self._unwrap_result(cursor)
 
-    async def native_query(self, query, *params, unwrapper):
-        if isinstance(query, PikaQueryBuilder):
-            stmt = query.get_sql()
-        elif isinstance(query, str):
-            stmt = query
+
+    async def native_query(self, nquery, *params, unwrapper):
+        if isinstance(nquery, PikaQueryBuilder):
+            stmt = nquery.get_sql()
+        elif isinstance(nquery, str):
+            stmt = nquery
         else:
-            raise ValueError(f'[E92853] Invalid SQL query: {query}')
+            raise ValueError(f'[E92853] Invalid SQL query: {nquery}')
 
         # @TODO: validate whether this method is effective/efficient or not
         # It is working for now.
@@ -351,7 +349,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
         conn = await self.connection()
         cursor = await conn.exec_driver_sql(stmt, params)
 
-        DEBUG_CONNECTOR and logger.info("[SQL QUERY] %s\n   [QUERY PARAMS] %s", query, params)
+        DEBUG_CONNECTOR and logger.info("[SQL QUERY] %s\n   [QUERY PARAMS] %s", nquery, params)
         if unwrapper is None:
             return cursor
 

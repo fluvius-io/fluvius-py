@@ -16,6 +16,7 @@ from sample_data_model import SampleDataAccessManager, SampleSchemaModelBase
 sample_data_access_manager = SampleDataAccessManager()
 CompanyModel = sample_data_access_manager.lookup_model('company')
 
+
 async def fetch_id(dam, _id):
     record = await dam.fetch('company', _id)
     assert record._id == _id

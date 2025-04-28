@@ -1,8 +1,7 @@
 import re
-
+from typing import Optional, List, Dict, Any, Tuple
 from types import SimpleNamespace
-from pyrsistent import PClass, field
-from fluvius.data import nullable
+from fluvius.data import DataModel
 from fluvius.helper import _assert
 from fluvius.data.query import operator_statement
 
@@ -14,30 +13,46 @@ DEFAULT_DATASET_FIELD = "_dataset"
 DEFAULT_DELETED_FIELD = "_deleted"
 RX_PARAM_SPLIT = re.compile(r'(:|!)')
 
+class FrontendQuery(DataModel):
+    identifier: Optional[str] = None
 
-class QueryMeta(PClass):
-    dataset_support = field(bool, initial=lambda: False)
-    dataset_query = field(str, initial=lambda: DEFAULT_DATASET_FIELD)
+    limit: int = config.DEFAULT_QUERY_LIMIT
+    offset: int = 0
+    page: int = 1
 
-    disable_item_view = field(bool, initial=lambda: False)
-    disable_list_view = field(bool, initial=lambda: False)
-    disable_meta_view = field(bool, initial=lambda: False)
+    select: Optional[List[str]] = None
+    deselect: Optional[List[str]] = None
 
-    soft_delete_query = field(nullable(str), initial=lambda: DEFAULT_DELETED_FIELD)
+    sort: Optional[List[str]] = None
+    args: Optional[Dict[str, Any]] = None
+    stmt: Optional[Dict[tuple, Any]] = None
+    opts: Optional[Dict[str, str]] = None
 
-    ignored_params = field(tuple, initial=tuple)
-    sortable_fields = field(tuple, initial=lambda: False, factory=tuple)
-    default_order = field(tuple, initial=tuple, factory=tuple)
 
-    query_params = field(dict, initial=dict, factory=dict)
-    query_fieldmap = field(dict, mandatory=True)
-    query_fields = field(tuple, factory=tuple)
-    query_resource = field()
-    query_identifier = field(str, mandatory=True)
-    id_field = field(QueryField, mandatory=True)
-    backend_resource = field(str, mandatory=True)
-    title = field(str, mandatory=True)
-    note = field(nullable(str))
+class QueryMeta(DataModel):
+    id_field: Optional[str] = None
+    query_fieldmap: Dict
+    query_identifier: str
+    backend_resource: str
+    title: str
+
+    dataset_support: bool = False
+    dataset_query: str = DEFAULT_DATASET_FIELD
+
+    disable_item_view: bool = False
+    disable_list_view: bool = False
+    disable_meta_view: bool = False
+
+    soft_delete_query: Optional[str] = DEFAULT_DELETED_FIELD
+
+    ignored_params: List = tuple()
+    sortable_fields: List = tuple()
+    default_order: List = tuple()
+
+    query_params: Dict[tuple, Any]
+    query_fields: List = tuple()
+    query_resource: List = tuple()
+    note: Optional[str] = None
 
 
 def process_meta(meta, kwargs):
@@ -60,8 +75,14 @@ def process_meta(meta, kwargs):
 
 
 class QuerySchema(object):
-    API_INDEX = 0
-    OPS_INDEX = {}
+    def __init_subclass__(cls):
+        cls.API_INDEX = 0
+        cls.OPS_INDEX = {}
+
+    @classmethod
+    def next_api_index(cls):
+        cls.API_INDEX += 1
+        return cls.API_INDEX
 
     @property
     def meta(self):
@@ -70,19 +91,24 @@ class QuerySchema(object):
     def base_query(self, context):
         return None
 
-    def validate_query(self, parsed_params):
-        stmt = dict(self.validate_args(parsed_params.args))
-        return parsed_params.set(args=stmt)
+    def validate_frontend_query(self, fe_query: Optional[FrontendQuery]=None, **kwargs):
+        if fe_query is None:
+            fe_query = FrontendQuery(**kwargs)
+        elif kwargs:
+            fe_query = fe_query.set(**kwargs)
 
-    def validate_args(self, args):
+        return fe_query.set(stmt=self.validate_schema_args(fe_query.args))
+
+    def validate_schema_args(self, args):
         query_params = self.meta.query_params
+        def _run():
+            for k, v in args.items():
+                op_stmt = operator_statement(k)
+                param_schema = query_params[op_stmt.field_key, op_stmt.op_key]
+                value = param_schema.process_value(op_stmt, v)
+                yield op_stmt, value
 
-        for k, v in args.items():
-            op_stmt = operator_statement(k)
-            param_schema = query_params[op_stmt.field_key, op_stmt.op_key]
-            value = param_schema.process_value(op_stmt, v)
-            yield op_stmt, value
-
+        return dict(_run())
 
     def __init__(self, **kwargs):
         if not hasattr(self, 'Meta'):
@@ -98,7 +124,7 @@ class QuerySchema(object):
             if "_created" in fieldmap.keys():
                 return [("_created", "asc")]
 
-            _id = meta.id_field.key
+            _id = meta.id_field
             return [(_id, "asc")]
 
         def parse_soft_delete(fieldmap):
@@ -135,7 +161,7 @@ class QuerySchema(object):
                 if getattr(meta, 'id_field', None):
                     raise ValueError(f'Multiple identifier for query model: {self}')
 
-                meta.id_field = qfield
+                meta.id_field = qfield.key
 
         meta.query_fields = fields
         meta.query_params = {p.key: p for p in query_params()}
