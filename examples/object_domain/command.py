@@ -1,3 +1,4 @@
+from pydantic import BaseModel, ValidationError, Extra
 from typing import Optional
 from types import SimpleNamespace
 from fluvius.data import BlankModel, DataModel, serialize_mapping, UUID_TYPE
@@ -34,7 +35,6 @@ class UpdateObjectCmd(Command):
 
 
 class PersonModel(DataModel):
-    _id: UUID_TYPE
     name: PersonName
     birthdate: datetime
     job: str
@@ -53,21 +53,19 @@ class CreateObjectCmd(Command):
         return args
 
     @_processor
-    async def _process(self, aggregate, statemgr, payload, rootobj):
+    async def _process(self, aggregate, statemgr, payload):
         data = serialize_mapping(payload)
-        economist = statemgr.create('people-economist', data)
-        logger.info('/3rd/ Non-annotated processor (default) called: %s', rootobj)
-
-        # Use: create_typed_resp(cmd.payload, resp_type="object-response") if needed
-        yield aggregate.create_response(data)
-        yield aggregate.create_response(data, _type="object-response")
+        aggroot = aggregate.get_aggroot()
+        economist = statemgr.create('people-economist', data, _id=aggroot.identifier)
+        logger.info('/3rd/ Non-annotated processor (default) called: %s', aggroot)
+        yield aggregate.create_response(serialize_mapping(economist), _type="object-response")
 
     @_processor(priority=10)
-    def _testing_high_priority(self, agg, stm, dat, ref):
+    def _testing_high_priority(self, agg, stm, dat):
         logger.info('/1st/ HIGH PRIORITY [priority: 10] PROCESSOR CALLED. Kwargs: %s', self)
 
     @_processor
-    async def testing_normal(self, agg, stm, dat, ref):
+    async def testing_normal(self, agg, stm, dat):
         logger.info('/2nd/ SECOND PROCESSOR [priority: 0] CALLED: %s', dat)
         r = await stm.custom_query_echo(result='TEST VALUE')
         assert r['result'] == 'TEST VALUE'
@@ -82,7 +80,7 @@ class RemoveObjectCmd(Command):
 
 
 @_processor(RemoveObjectCmd)
-async def handle__remove_object(cmd, agg, sta, pay, root):
+async def handle__remove_object(cmd, agg, sta, pay):
     await agg.remove()
 
 

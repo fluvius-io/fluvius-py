@@ -8,6 +8,13 @@ app = setup_authentication(app)
 app = configure_domain_support(app, ObjectDomain)
 
 
+@app.get("/hello-world", tags=["Sample API"])
+async def protected(request: Request):
+    return {
+        "message": "Hello World!",
+    }
+
+
 @app.get("/protected", tags=["Sample API"])
 @auth_required()
 async def protected(request: Request):

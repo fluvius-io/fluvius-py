@@ -53,5 +53,17 @@ class Command(DomainEntity):
     __meta_schema__ = CommandMeta
     __abstract__ = True
 
+    def __init__(self, cmd_data):
+        self._data = cmd_data
+
+
+    @property
+    def domain(self):
+        return self._data.domain
+
+    @property
+    def revision(self):
+        return self._data.revision
+
 
 __all__ = ("Command",)

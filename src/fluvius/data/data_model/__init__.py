@@ -20,6 +20,7 @@ def _create(cls, data=None, defaults=None, **kwargs):
 
 
 class DataModel(BaseModel):
+    model_config = {"frozen": True}
     create = classmethod(_create)
 
 

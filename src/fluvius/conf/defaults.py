@@ -1,1 +1,1 @@
-LOG_LEVEL = "warning"
+LOG_LEVEL = "info"

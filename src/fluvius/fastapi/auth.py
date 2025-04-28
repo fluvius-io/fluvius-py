@@ -9,6 +9,8 @@ from authlib.jose.util import extract_header
 from fastapi import Request, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 
+from .setup import on_startup
+
 import httpx
 
 from . import config as base_conf, logger
@@ -89,8 +91,8 @@ def setup_authentication(app, config=base_conf):
         return claims
 
     # Async code at server startup
-    @app.on_event("startup")
-    async def fetch_jwks_on_startup():
+    @on_startup
+    async def fetch_jwks_on_startup(app):
         async with httpx.AsyncClient() as client:
             response = await client.get(KEYCLOAK_JWKS_URI)
             data = response.json()

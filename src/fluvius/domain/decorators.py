@@ -153,28 +153,25 @@ def _locate_handler(cls, name_match=None, domain_cls=None):
             yield name, func
 
 
-def _normalize_command_processor(cmd_cls, func):
+def _normalize_command_processor(cmd_def, func):
     if inspect.isasyncgenfunction(func):
         @functools.wraps(func)
         async def wrapped_func(agg, stm, cmd):
             ''' NOTE: we don't need to wrap the function in another
                 async generator, just returns the iterator directly. '''
-            command = cmd_cls()
-            rootobj = agg.get_aggroot()
-            payload = cmd.payload
-            it = func(command, agg, stm, payload, rootobj)
+            command = cmd_def(cmd)
+            it = func(command, agg, stm, cmd.payload)
 
             async for particle in it:
                 yield particle
+
         return wrapped_func
 
     if inspect.iscoroutinefunction(func):
         @functools.wraps(func)
         async def wrapped_func(agg, stm, cmd):
-            command = cmd_cls()
-            rootobj = agg.get_aggroot()
-            payload = cmd.payload
-            resp = await func(command, agg, stm, payload, rootobj)
+            command = cmd_def(cmd)
+            resp = await func(command, agg, stm, cmd.payload)
 
             if resp is None:
                 return
@@ -186,10 +183,8 @@ def _normalize_command_processor(cmd_cls, func):
     if inspect.isfunction(func):
         @functools.wraps(func)
         async def wrapped_func(agg, stm, cmd):
-            command = cmd_cls()
-            rootobj = agg.get_aggroot()
-            payload = cmd.payload
-            resp = func(command, agg, stm, payload, rootobj)
+            command = cmd_def(cmd)
+            resp = func(command, agg, stm, cmd.payload)
 
             if resp is None:
                 return
@@ -200,8 +195,9 @@ def _normalize_command_processor(cmd_cls, func):
 
     raise ValueError(f'Invalid command processor: {func}')
 
-def _normalize_message_dispatcher(msg_cls, func):
+def _normalize_message_dispatcher(cmd_def, func):
     return func
+
 
 class DomainEntityRegistry(object):
     @classmethod
@@ -326,10 +322,10 @@ class DomainEntityRegistry(object):
             _priority = getattr(func, HANDLER_PRIORITY_FIELD, priority)
             _priority = OrderCounter.priotize(_priority)
 
-            for cmd_cls in cmd_classes:
+            for cmd_def in cmd_classes:
                 # Use tuple arithmetic since modify the list in place may change parent class handlers
-                cmd_processor = _normalize_command_processor(cmd_cls, func)
-                cmd_key = getattr(cmd_cls, DOMAIN_ENTITY_KEY)
+                cmd_processor = _normalize_command_processor(cmd_def, func)
+                cmd_key = getattr(cmd_def, DOMAIN_ENTITY_KEY)
                 cls._cmd_processors += ((_priority, cmd_key, cmd_processor),)
 
             def _error(*args, **kwargs):

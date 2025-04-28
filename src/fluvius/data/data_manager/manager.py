@@ -143,23 +143,6 @@ class DataAccessManagerBase(object):
         model_cls = record.__class__
         return cls._RESOURCES[model_cls]
 
-    @classmethod
-    def _wrap(cls, resource, item):
-        model = cls.lookup_model(resource)
-        if isinstance(item, model):
-            return item
-
-        return model(**item)
-
-    @classmethod
-    def _wrap_list(cls, resource, item_list):
-        return [self._wrap_model(resource, item) for item in item_list]
-
-    @classmethod
-    def _serialize(cls, resource, item):
-        model = cls.lookup_model(resource)
-        return model.serialize(item)
-
     def validate_config(self, config):
         if isinstance(config, self.__config__):
             return config
@@ -208,7 +191,7 @@ class DataAccessManagerBase(object):
         """ Create a single resource instance in memory (not saved yet!) """
 
         defvals = cls.defaults(resource, data)
-        return cls._wrap_model(resource, dict(**defvals, **kwargs))
+        return cls._wrap_item(resource, dict(**defvals, **kwargs))
 
     @classmethod
     def defaults(cls, resource: str, data=None) -> dict:
@@ -217,7 +200,12 @@ class DataAccessManagerBase(object):
         return defvals
 
     @classmethod
-    def _wrap_model(cls, resource, data):
+    def _serialize(cls, resource, item):
+        model = cls.lookup_model(resource)
+        return model.serialize(item)
+
+    @classmethod
+    def _wrap_item(cls, resource, data):
         model_cls = cls.lookup_model(resource)
         if isinstance(data, model_cls):
             return data
@@ -225,8 +213,20 @@ class DataAccessManagerBase(object):
         return model_cls(**data)
 
     @classmethod
-    def _wrap_model_list(cls, resource, item_list):
-        return [cls._wrap_model(resource, data) for data in item_list]
+    def _wrap_model(cls, model_cls, data):
+        if isinstance(data, model_cls):
+            return data
+
+        return model_cls(**data)
+
+    @classmethod
+    def _wrap_many(cls, resource, *items):
+        return self._wrap_list(resource, items)
+
+    @classmethod
+    def _wrap_list(cls, resource, item_list):
+        model_cls = cls.lookup_model(resource)
+        return [cls._wrap_model(model_cls, data) for data in item_list]
 
     async def query(self, query, *params, unwrapper=list_unwrapper, **query_options):
         return await self.connector.query(query, *params, unwrapper=unwrapper, **query_options)
@@ -273,7 +273,7 @@ class DataAccessManager(DataAccessManagerBase):
         scope = {ETAG_FIELD: etag} if etag else None
         q = BackendQuery.create(identifier=identifier, limit=1, scope=scope, where=where)
         item = await self.connector.find_one(resource, q)
-        return self._wrap_model(resource, item)
+        return self._wrap_item(resource, item)
 
     async def fetch_by_intra_id(self, resource: str, intra_id, domain_id, / , etag=None, where=None) -> DataModel:
         """ Fetch exactly 1 items from the data store using its intra domain identifier """
@@ -283,7 +283,7 @@ class DataAccessManager(DataAccessManagerBase):
 
         q = BackendQuery.create(scope=scope, where=where, limit=1)
         data = await self.connector.find_one(resource, q)
-        return self._wrap_model(resource, data)
+        return self._wrap_item(resource, data)
 
     async def find_one(self, resource: str, q=None, **query) -> DataModel:
         """ Fetch exactly 1 item from the data store using either a query object or where statements
@@ -292,7 +292,7 @@ class DataAccessManager(DataAccessManagerBase):
 
         try:
             item = await self.connector.find_one(resource, q)
-            return self._wrap_model(resource, item)
+            return self._wrap_item(resource, item)
         except ItemNotFoundError:
             return None
 
@@ -301,7 +301,7 @@ class DataAccessManager(DataAccessManagerBase):
             Each entry will be wrapped using corresponding DataModel """
         q = BackendQuery.create(query)
         data = await self.connector.find_all(resource, q)
-        return self._wrap_model_list(resource, data)
+        return self._wrap_list(resource, data)
 
     async def invalidate(self, record: DataModel, updates=None):
         resource = self.lookup_resource(record)

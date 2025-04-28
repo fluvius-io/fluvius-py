@@ -1,9 +1,8 @@
 import re
-from fluvius.data import BackendQuery, nullable
+from typing import Optional
+from fluvius.data import BackendQuery, nullable, DataModel
 from .schema import QuerySchema
 from . import config
-
-from pyrsistent import PClass, field
 
 DESELECT = "deselect"
 LIMIT = "max_results"
@@ -23,19 +22,19 @@ RX_SELECT_SPLIT = re.compile(r"[,;\s]+")
 RX_TEXT_SPLIT = re.compile(r"[,]+")
 
 
-class ParsedParams(PClass):
-    identifier = field(nullable(str), initial=lambda: None)
+class ParsedParams(DataModel):
+    identifier: Optional[str] = None
 
-    limit = field(int,mandatory=True, initial=lambda: LIMIT_DEFAULT)
-    offset = field(int, mandatory=True, initial=lambda: 0)
-    page = field(int, mandatory=True, initial=lambda: 1)
+    limit: int = config.DEFAULT_QUERY_LIMIT
+    offset: int = 0
+    page: int = 1
 
-    select = field(nullable(tuple), initial=lambda: None)
-    deselect = field(nullable(tuple), initial=lambda: None)
+    select: Optional[List[str]] = None
+    deselect = Optional[List[str]] = None
 
-    sort = field(nullable(tuple), initial=lambda: None)
-    args = field(dict, initial=dict)
-    opts = field(dict)
+    sort = Optional[List[str]] = None
+    args = Optional[Dict[str, str]] = None
+    opts = Optional[Dict[str, str]] = None
 
 
 

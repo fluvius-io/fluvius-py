@@ -52,6 +52,7 @@ def action(evt_key, resource=None, emit_event=True):
         return wrapper
     return _decorator
 
+
 class Aggregate(object):
     def __init__(self, domain):
         ''' The aggregate should not be aware of command or domain, it should
@@ -81,20 +82,22 @@ class Aggregate(object):
         self._context = context
         self._command = command_bundle
         self._cmdmeta = command_meta
-        self._aggroot = (
-            await self.fetch_command_aggroot(command_bundle)
+        self._aggroot = AggregateRoot(
+            self._command.resource,
+            self._command.identifier,
+            self._command.domain_sid,
+            self._command.domain_iid,
+        )
+
+        self._rootobj = (
+            await self.fetch_command_rootobj(self._aggroot)
         )
 
         yield RestrictedAggregateProxy(self)
 
-    async def fetch_command_aggroot(self, cmd):
+    async def fetch_command_rootobj(self, aggroot):
         if self._cmdmeta.Meta.new_resource:
-            return AggregateRoot(
-                self._command.resource,
-                self._command.identifier,
-                self._command.domain_sid,
-                self._command.domain_iid,
-            )
+            return None
 
         def if_match():
             if self.context.source or (not IF_MATCH_VERIFY):
@@ -110,10 +113,10 @@ class Aggregate(object):
             return if_match_value
 
         if_match_value = if_match()
-        if cmd.domain_sid is None:
-            item = await self.statemgr.fetch(cmd.resource, cmd.identifier)
+        if aggroot.domain_sid is None:
+            item = await self.statemgr.fetch(aggroot.resource, aggroot.identifier)
         else:
-            item = await self.statemgr.fetch_by_intra_id(cmd.resource, cmd.identifier, cmd.domain_sid)
+            item = await self.statemgr.fetch_by_intra_id(aggroot.resource, aggroot.identifier, aggroot.domain_sid)
 
         if if_match_value and item._etag != if_match_value:
             raise PreconditionFailedError(
@@ -204,6 +207,10 @@ class Aggregate(object):
         return self._context
 
     @property
+    def rootobj(self):
+        return self._rootobj
+
+    @property
     def aggroot(self):
         if self._aggroot is None:
             raise RuntimeError('Aggregate context is not initialized.')
@@ -223,11 +230,11 @@ class Aggregate(object):
     def get_context(self):
         return self._context
 
-    def get_aggroot(self):
-        return self._aggroot
+    def get_rootobj(self):
+        return self.rootobj
 
-    def get_command_envelop(self):
-        return self._command
+    def get_aggroot(self):
+        return self.aggroot
 
 
 class RestrictedAggregateProxy(object):
@@ -242,5 +249,5 @@ class RestrictedAggregateProxy(object):
         self.create_activity = aggregate.create_activity
 
         self.get_context = aggregate.get_context
+        self.get_rootobj = aggregate.get_rootobj
         self.get_aggroot = aggregate.get_aggroot
-        self.get_command = aggregate.get_command_envelop

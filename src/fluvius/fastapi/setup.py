@@ -1,4 +1,5 @@
 import fluvius
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from starlette.middleware.sessions import SessionMiddleware
@@ -13,7 +14,7 @@ def create_app(config=config, **kwargs):
         description=config.APPLICATION_DESC
     )
     cfg.update(kwargs)
-    app = FastAPI(**cfg)
+    app = FastAPI(lifespan=lifespan, **cfg)
 
     app.add_middleware(
         SessionMiddleware,
@@ -36,4 +37,26 @@ def create_app(config=config, **kwargs):
 
     return app
 
+_on_startups = tuple()
+_on_shutdowns = tuple()
 
+def on_startup(*func):
+    global _on_startups
+    _on_startups += func
+    return func
+
+def on_shutdown(*func):
+    global _on_shutdowns
+    _on_shutdowns += func
+    return func
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    for func in _on_startups:
+        await func(app)
+
+    yield
+
+    for func in _on_shutdowns:
+        await func(app)

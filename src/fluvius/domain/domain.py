@@ -279,10 +279,10 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
         return cmd
 
-    async def _invoke_processors(self, ctx, statemgr, cmd_bundle, cmd_meta):
+    async def _invoke_processors(self, ctx, statemgr, cmd_bundle, cmd_def):
         no_handler = True
         aggregate = self.__aggregate__(self)
-        async with aggregate.command_aggregate(ctx, cmd_bundle, cmd_meta) as agg_proxy:
+        async with aggregate.command_aggregate(ctx, cmd_bundle, cmd_def) as agg_proxy:
             for processor in self.cmd_processors(cmd_bundle):
                 async for particle in processor(agg_proxy, statemgr, cmd_bundle):
                     if particle is None:
