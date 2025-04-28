@@ -30,10 +30,12 @@ def validate_query_schema(schema_cls):
 
 
 class QueryHandler(object):
-    _registry = {}
+    _registry  = {}
+    __prefix__ = None
 
     def __init_subclass__(cls):
         cls._registry = {}
+        cls.__prefix__ = cls.__dict__.get('__prefix__') or cls.__name__
 
     @classmethod
     def register_model(cls, query_identifier):

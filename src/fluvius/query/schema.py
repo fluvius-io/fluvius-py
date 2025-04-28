@@ -26,7 +26,7 @@ class FrontendQuery(DataModel):
     sort: Optional[List[str]] = None
     args: Optional[Dict[str, Any]] = None
     stmt: Optional[Dict[tuple, Any]] = None
-    opts: Optional[Dict[str, str]] = None
+    scope: Optional[Dict[str, str]] = None
 
 
 class QueryMeta(DataModel):

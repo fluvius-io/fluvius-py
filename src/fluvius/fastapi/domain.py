@@ -5,7 +5,7 @@ from fluvius.data import UUID_TYPE, DataModel, UUID_GENR
 from fluvius.domain.manager import DomainManager
 from fluvius.domain.context import DomainContext, DomainTransport
 from starlette.middleware.base import BaseHTTPMiddleware
-from fastapi import Request, Path, Body
+from fastapi import Request, Path, Body, Query
 from . import logger, config
 
 IDEMPOTENCY_KEY = config.RESP_HEADER_IDEMPOTENCY
@@ -194,9 +194,32 @@ class FluviusDomainMiddleware(BaseHTTPMiddleware):
         return response
 
 
-def configure_domain_support(app, *domains, **kwargs):
+def configure_domain_manager(app, *domains, **kwargs):
     FastAPIDomainManager.register_domain(*domains, **kwargs)
     app.add_middleware(FluviusDomainMiddleware, dm=FastAPIDomainManager(app))
     return app
 
 
+def configure_query_manager(app, *query_managers):
+    from fluvius.query.handler import FrontendQuery
+    for qm in query_managers:
+        for query_id, query_schema in qm._registry.items():
+            endpoint = f"/{qm.__prefix__}.{query_id}"
+            api_info = dict(tags=[qm.__prefix__])
+            @app.get(f"{endpoint}/~echo", **api_info)
+            def query_echo(fe_query: Annotated[FrontendQuery, Query()]):
+                return fe_query
+
+            @app.get(f"{endpoint}/~meta", **api_info)
+            def query_meta(fe_query: Annotated[FrontendQuery, Query()]):
+                return fe_query
+
+            @app.get(f"{endpoint}/", **api_info)
+            def query_resource(fe_query: Annotated[FrontendQuery, Query()]):
+                return fe_query
+
+            @app.get(f"{endpoint}/{{identifier}}", **api_info)
+            def query_item(identifier: str, fe_query: Annotated[FrontendQuery, Query()]):
+                return [identifier, fe_query]
+
+    return app

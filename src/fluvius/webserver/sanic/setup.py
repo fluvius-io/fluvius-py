@@ -21,7 +21,7 @@ def create_server(modcfg, configure_logging=False, **kwargs):
         expiry=3600, sessioncookie=True,
         httponly=True, cookie_name=app.name, prefix="session:"))
     configure_sanic_profiler(app)
-    configure_domain_support(app)
+    configure_domain_manager(app)
 
     @app.route("/~metadata")
     async def status_resp(request):
@@ -59,7 +59,7 @@ def configure_sanic_profiler(app):
     return app
 
 
-def configure_domain_support(app):
+def configure_domain_manager(app):
     initial_context = SanicContext(
         # Attach request object for later reference
         # TODO: Depreciate this line or define a proper interface for CQRS Request
