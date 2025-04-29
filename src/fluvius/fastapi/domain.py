@@ -1,11 +1,15 @@
+import os
 from typing import Annotated, Union, Any, Optional, Dict
 from types import SimpleNamespace
 from fluvius.domain import Domain
 from fluvius.data import UUID_TYPE, DataModel, UUID_GENR
 from fluvius.domain.manager import DomainManager
 from fluvius.domain.context import DomainContext, DomainTransport
+from fluvius.data.serializer import serialize_json
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi import Request, Path, Body, Query
+from fluvius.query.schema import QueryMeta
+import jsonurl_py
 from . import logger, config
 
 IDEMPOTENCY_KEY = config.RESP_HEADER_IDEMPOTENCY
@@ -13,7 +17,7 @@ URI_SEP = '/'
 SCOPING_SEP = '~'
 
 def uri(*elements):
-    return  URI_SEP.join(('',) + elements)
+    return os.path.join("/", *elements)
 
 
 def parse_scoping(scoping_stmt, scope_schema):
@@ -21,9 +25,18 @@ def parse_scoping(scoping_stmt, scope_schema):
         if not stmt:
             return
 
-        for part in scoping_stmt.split(URI_SEP):
-            key, _, value = part.partition(SCOPING_SEP)
-            key = key or 'domain_sid'
+        for part in scoping_stmt.split(SCOPING_SEP):
+            if not part:
+                continue
+
+            key, sep, value = part.partition(':')
+            if sep == '' and value == '':
+                value = key
+                key = 'domain_sid'
+
+            if key == '':
+                key = 'domain_sid'
+
             if key not in scope_schema:
                 yield (key, value)
             else:
@@ -37,7 +50,7 @@ class FastAPIDomainManager(DomainManager):
         self.initialize_domains(app)
         tags = []
         for domain in self._domains:
-            metadata_uri = f"/{domain.__domain__}~metadata/"
+            metadata_uri = f"/{domain.__domain__}.metadata/"
             tags.append({
                 "name": domain.Meta.name,
                 "description": domain.Meta.desc,
@@ -107,20 +120,20 @@ class FastAPIDomainManager(DomainManager):
                     identifier = UUID_GENR()
                     return await _command_handler(request, payload, resource, identifier, {})
 
-                app.post(uri(fq_name, "{resource}", "~new"), **endpoint_info)(command_handler)
+                app.post(uri(fq_name, "{resource}", ":new"), **endpoint_info)(command_handler)
 
             if scope_schema:
                 async def scoped_command_handler(
                     request: Request,
                     payload: PayloadType,
                     resource: Annotated[str, Path(description=cmd_cls.Meta.resource_desc)],
-                    scoping: Annotated[str, Path(description=f'Resource scoping: `{', '.join(scope_keys)}`. E.g. `domain_sid~H9cNmGXLEc8NWcZzSThA9S`')]
+                    scoping: Annotated[str, Path(description=f'Resource scoping: `{', '.join(scope_keys)}`. E.g. `~domain_sid:H9cNmGXLEc8NWcZzSThA9S`')]
                 ):
                     identifier = UUID_GENR()
                     scope = parse_scoping(scoping, scope_schema)
                     return await _command_handler(request, payload, resource, identifier, scope)
 
-                app.post(uri(fq_name, "{scoping:path}", "{resource}", "~new"), **endpoint_info)(scoped_command_handler)
+                app.post(uri(fq_name, "~{scoping}", "{resource}", ":new"), **endpoint_info)(scoped_command_handler)
         else:
             if default_path:
                 async def command_handler(
@@ -146,15 +159,7 @@ class FastAPIDomainManager(DomainManager):
                     scope = parse_scoping(scoping, scope_schema)
                     return await _command_handler(request, payload, resource, identifier, scope)
 
-                app.post(uri(fq_name, "{scoping:path}", "{resource}", "{identifier}"), **endpoint_info)(scoped_command_handler)
-
-
-    def query_handler(self, namespace, command, handler):
-        uri_resource_default = f'/{namespace}.{query}/{{resource}}/'
-        uri_resource_scoped  = f'/{namespace}.{query}/{{scoping:path}}/{{resource}}/'
-
-        uri_item_default = f'/{namespace}:{command}/{{resource}}/{{identifier}}'
-        uri_item_scoped  = f'/{namespace}:{command}/{{scoping:path}}/{{resource}}/{{identifier}}'
+                app.post(uri(fq_name, "~{scoping}", "{resource}", "{identifier}"), **endpoint_info)(scoped_command_handler)
 
 
 class FluviusDomainMiddleware(BaseHTTPMiddleware):
@@ -201,25 +206,53 @@ def configure_domain_manager(app, *domains, **kwargs):
 
 
 def configure_query_manager(app, *query_managers):
-    from fluvius.query.handler import FrontendQuery
-    for qm in query_managers:
-        for query_id, query_schema in qm._registry.items():
-            endpoint = f"/{qm.__prefix__}.{query_id}"
-            api_info = dict(tags=[qm.__prefix__])
-            @app.get(f"{endpoint}/~echo", **api_info)
-            def query_echo(fe_query: Annotated[FrontendQuery, Query()]):
-                return fe_query
+    from fluvius.query.schema import FrontendQueryParams
+    for qm_cls in query_managers:
+        for query_id, query_schema in qm_cls._registry.items():
+            base_uri = f"{qm_cls.Meta.prefix}.{query_id}/"
+            api_info = dict(tags=qm_cls.Meta.tags)
+            manager = qm_cls(app)
 
-            @app.get(f"{endpoint}/~meta", **api_info)
-            def query_meta(fe_query: Annotated[FrontendQuery, Query()]):
-                return fe_query
+            async def _query_echo(query_params: FrontendQueryParams, path_params: str=None, scope: str=None):
+                # data = jsonurl_py.loads(path_params) if path_params else None
+                data, meta = await manager.query(query_id, query_params)
+                return {
+                    'query': query_params,
+                    'data': data,
+                    'meta': meta
+                }
 
-            @app.get(f"{endpoint}/", **api_info)
-            def query_resource(fe_query: Annotated[FrontendQuery, Query()]):
-                return fe_query
+            @app.get(
+                uri(base_uri, '~{scoping}', '{path_params}/'), **api_info)
+            async def query_echo(query_params: Annotated[FrontendQueryParams, Query()], path_params: Annotated[Optional[str], Path()], scope: str):
+                return await _query_echo(query_params, path_params, scope)
 
-            @app.get(f"{endpoint}/{{identifier}}", **api_info)
-            def query_item(identifier: str, fe_query: Annotated[FrontendQuery, Query()]):
-                return [identifier, fe_query]
+            @app.get(uri(base_uri, '{path_params}/'), **api_info)
+            async def query_echo(query_params: Annotated[FrontendQueryParams, Query()], path_params: Annotated[Optional[str], Path()]):
+                return await _query_echo(query_params, path_params, None)
+
+            @app.get(uri(base_uri, '~{scoping}/'), **api_info)
+            async def query_echo(query_params: Annotated[FrontendQueryParams, Query()], scope: str):
+                return await _query_echo(query_params, None, scope)
+
+            @app.get(uri(base_uri), **api_info)
+            async def query_echo(query_params: Annotated[FrontendQueryParams, Query()]):
+                return await _query_echo(query_params, None, None)
+
+            @app.get(uri(base_uri, ":queryinfo"), **api_info)
+            def query_meta() -> QueryMeta:
+                return query_schema._meta
+
+            # @app.get(f"{endpoint}/", **api_info)
+            # def query_resource(q: Annotated[Optional[str], Query], query_params: Annotated[FrontendQuery, Query()]):
+            #     return {
+            #         'q': jsonurl_py.loads(q),
+            #         'query_params': query_params
+            #     }
+
+            @app.get(uri(base_uri, "{identifier}"), **api_info)
+            @app.get(uri(base_uri, "~{scoping}", "{identifier}"), **api_info)
+            def query_item(identifier: Annotated[str, Path()]):
+                return [identifier, query_params]
 
     return app

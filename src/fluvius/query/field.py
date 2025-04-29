@@ -1,4 +1,6 @@
 from .operator import FieldQueryOperator
+from typing import List, Tuple, Any, Optional, Callable
+from fluvius.data import DataModel
 
 
 RANGE_OPERATOR_KIND = "range"
@@ -55,20 +57,20 @@ def python_list_validator(self, op_stmt, value):
 
 
 # all available widget can be found in `doc/operator.md"
-class QueryField(object):
-    datatype = "string"
-    supported_ops = []
+class QueryField(DataModel):
+    label: str
+    sortable: bool = True
+    hidden: bool = False
+    identifier: bool = False
+    factory: Optional[Callable] = None
+    source: Optional[str] = None
 
-    _source = None
-    _key = None
+    _dtype: str = "string"
+    _ops: List[Tuple] = []
+    _key: str = None
 
-    def __init__(self, label, sortable=True, hidden=False, source=None, identifier=False, factory=None):
-        self.label = label
-        self.hidden = hidden
-        self.sortable = sortable
-        self.identifier = identifier
-        self.factory = factory
-        self.source = source
+    def __init__(self, label, **kwargs):
+        super().__init__(label=label, **kwargs)
 
     @property
     def key(self):
@@ -81,22 +83,21 @@ class QueryField(object):
 
     @property
     def schema(self):
-        return self._schema
+        return self._query_schema
 
-    def associate(self, schema, field_name):
+    def associate(self, query_schema, field_name):
         if self._key:
             raise ValueError(f'Field key is is already set [{self._key}]')
 
-        if self._source is None:
-            self._source = field_name
-
-        self._schema = schema
+        self._source = self.source or field_name
+        self._query_schema = query_schema
         self._key = field_name
 
+        return self
+
     def gen_params(self):
-        for params in self.supported_ops or []:
-            op_cls = FieldQueryOperator.create(self.key, *params)
-            yield op_cls(self.key, self.schema)
+        for params in self._ops:
+            yield FieldQueryOperator(self.schema, op_name=params[0], field_key=self.key)
 
     def meta(self):
         m = self.__dict__.copy()
@@ -106,7 +107,7 @@ class QueryField(object):
 
 
 class StringField(QueryField):
-    supported_ops = [
+    _ops = [
         ("eq", "Equal", None, "single-text"),
         ("ilike", "Like", None, "single-text"),
         ("is", "Is (null,true)", None, "single-text"),
@@ -115,15 +116,15 @@ class StringField(QueryField):
 
 
 class TextSearchField(QueryField):
-    supported_ops = [
+    _ops = [
         ("plfts", "Full-Text Search", None, "single-text"),
         ("fts", "Text Search", None, "single-text"),
     ]
 
 
 class IntegerField(QueryField):
-    datatype = "integer"
-    supported_ops = [
+    _dtype = "integer"
+    _ops = [
         ("gt", "Greater", None, "single-text"),
         ("lt", "Less than", None, "single-text"),
         ("gte", "Greater than or equal", None, "single-text"),
@@ -135,8 +136,8 @@ class IntegerField(QueryField):
 
 
 class DateField(QueryField):
-    datatype = "date"
-    supported_ops = [
+    _dtype = "date"
+    _ops = [
         ("gt", "Greater", None, "date"),
         ("lt", "Less than", None, "date"),
         ("gte", "Greater than or equal", None, "date"),
@@ -148,8 +149,8 @@ class DateField(QueryField):
 
 
 class DateTimeField(QueryField):
-    datatype = "datetime"
-    supported_ops = [
+    _dtype = "datetime"
+    _ops = [
         ("gt", "Greater", None, "datetime"),
         ("lt", "Less than", None, "datetime"),
         ("gte", "Greater than or equal", None, "datetime"),
@@ -161,18 +162,16 @@ class DateTimeField(QueryField):
 
 
 class EnumField(QueryField):
-    datatype = "enum"
-
-    supported_ops = [
+    _dtype = "enum"
+    _ops = [
         ("in", "In List", in_validator, "datetime"),
         ("eq", "Equal", None, "datetime"),
     ]
 
 
 class UUIDField(QueryField):
-    datatype = "uuid"
-
-    supported_ops = [
+    _dtype = "uuid"
+    _ops = [
         ("in", "In List", in_validator, "multiple-select"),
         ("eq", "Equal", None, "single-select"),
         ("is", "Is", None, "single-text"),
@@ -180,50 +179,20 @@ class UUIDField(QueryField):
 
 
 class ArrayField(QueryField):
-    datatype = "list"
-    supported_ops = [
+    _dtype = "list"
+    _ops = [
         ("ov", "match any", postgrest_list_validator, "multiple-select"),
         ("cs", "is superset of", postgrest_list_validator, "multiple-select"),
         ("cd", "is subset of", postgrest_list_validator, "multiple-select"),
         ("is", "Is", None, "single-text"),
     ]
 
-
-class ReferenceField(QueryField):
-    datatype = "ref"
-    supported_ops = []
-
-    def __init__(self, *args, resource=None, **kwargs):
-        kwargs["sortable"] = False
-        if resource:
-            self.datatype = f"ref:{resource}"
-        super(ReferenceField, self).__init__(*args, **kwargs)
-        if not self.source:
-            raise ValueError("ReferenceField must have a source.")
-
-
-class EmbedField(QueryField):
-    datatype = "embed"
-    supported_ops = [
-        ("eq", "Equal", None, "single-text"),
-        ("in", "In List", None, "single-text"),
-    ]
-
-    def __init__(self, *args, foreign_key=None, sort=None, **kwargs):
-        kwargs["sortable"] = True
-        self.datatype = f"embed:{kwargs['source']}"
-        self.foreign_key = foreign_key
-        self.sort = sort
-        super(EmbedField, self).__init__(*args, **kwargs)
-
-
 class BooleanField(QueryField):
-    datatype = "bool"
-
-    supported_ops = [
+    _dtype = "bool"
+    _ops = [
         ("is", "Is", None, "single-select"),
     ]
 
 
 class FloatField(IntegerField):
-    datatype = "decimal"
+    _dtype = "decimal"

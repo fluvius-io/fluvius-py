@@ -1,7 +1,8 @@
 import re
 from typing import Optional, List, Dict, Any
-from fluvius.data import BackendQuery, nullable, DataModel
-from .schema import QuerySchema, FrontendQuery
+from fluvius.data import BackendQuery, DataModel
+from fluvius.helper import camel_to_lower
+from .schema import QuerySchema, FrontendQuery, FrontendQueryParams
 from . import config
 
 DESELECT = "deselect"
@@ -29,13 +30,27 @@ def validate_query_schema(schema_cls):
     raise ValueError(f'Invalid query model: {schema_cls}')
 
 
-class QueryHandler(object):
+class QueryManagerMeta(DataModel):
+    prefix: str
+    tags: List[str]
+    name: str
+    desc: str
+
+class QueryManager(object):
     _registry  = {}
     __prefix__ = None
 
+    class Meta:
+        pass
+
     def __init_subclass__(cls):
         cls._registry = {}
-        cls.__prefix__ = cls.__dict__.get('__prefix__') or cls.__name__
+        cls.Meta = QueryManagerMeta.create(cls.Meta, defaults={
+            'name': cls.__name__,
+            'prefix': camel_to_lower(cls.__prefix__ or cls.__name__),
+            'desc': (cls.__doc__ or '').strip(),
+            'tags': [cls.__name__,]
+        })
 
     @classmethod
     def register_model(cls, query_identifier):
@@ -48,42 +63,42 @@ class QueryHandler(object):
 
         return _decorator
 
-    async def query(self, query_identifier, frontend_query=None, **kwargs):
+    async def query(self, query_identifier, query_params: Optional[FrontendQueryParams]=None, **kwargs):
         query_schema = self._registry[query_identifier]
-        fe_query = query_schema.validate_frontend_query(frontend_query, **kwargs)
-        backend_query = self.construct_backend_query(query_schema, fe_query)
+        query_params = query_params or FrontendQueryParams()
+        fe_query = query_params.build_query(query_schema)
+        backend_query = self.construct_backend_query(query_schema, fe_query, **kwargs)
+        backend_query = await self.validate_backend_query(query_schema, backend_query)
+        data, meta = await self.execute_query(query_schema, backend_query)
 
-        backend_query = await self.check_backend_query(query_schema, backend_query)
-        results, meta = await self.run_backend_query(query_schema, backend_query)
+        return self.process_result(data, meta)
 
-        return self.process_result(results, meta)
-
-    def construct_backend_query(self, query_schema, fe_query):
+    def construct_backend_query(self, query_schema, fe_query, **kwargs):
         """ Convert from the frontend query to the backend query """
 
-        query_scope = query_schema.base_query(fe_query)
+        composite_scope = query_schema.base_query(fe_query)
         return BackendQuery.create(
             identifier=fe_query.identifier,
-            scope=query_scope,
-            where=fe_query.stmt,
+            scope=composite_scope,
+            where=fe_query.query,
             limit=fe_query.limit,
             offset=fe_query.offset,
             select=fe_query.select,
             sort=fe_query.sort
         )
 
-    async def run_backend_query(self, query_schema, backend_query: BackendQuery):
+    async def execute_query(self, query_schema, backend_query: BackendQuery):
         """ Execute the backend query with the state manager and return """
-        return backend_query, None
+        raise NotImplementedError('QuerySchema.execute_query')
 
-    async def check_backend_query(self, query_schema, backend_query):
+    async def validate_backend_query(self, query_schema, backend_query):
         return backend_query
 
-    def process_result(self, results, metadata):
-        return results, metadata
+    def process_result(self, data, meta):
+        return data, meta
 
 
-class DomainQueryHandler(QueryHandler):
+class DomainQueryManager(QueryManager):
     def __init__(self, app=None):
         self._app = app
         self._manager = self.__data_manager__(app)
@@ -92,10 +107,10 @@ class DomainQueryHandler(QueryHandler):
     def manager(self):
         return self._manager
 
-    async def run_backend_query(self, query_schema, backend_query: BackendQuery):
+    async def execute_query(self, query_schema, backend_query: BackendQuery):
         """ Execute the backend query with the state manager and return """
         result = await self.manager.find_all(query_schema.meta.backend_resource, backend_query)
         return list(result), None
 
-    async def check_backend_query(self, query_schema, backend_query):
+    async def validate_backend_query(self, query_schema, backend_query):
         return backend_query

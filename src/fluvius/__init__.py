@@ -15,7 +15,7 @@ def setupModule(module_name, *upstreams):
         if isinstance(module, str):
             for suffix in ('._meta', '.conf', '._config', '.config', '.cfg'):
                 if module.endswith(suffix):
-                    return module.rstrip(suffix)
+                    return module.removesuffix(suffix)
 
         return module
 

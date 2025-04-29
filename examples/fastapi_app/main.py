@@ -6,18 +6,18 @@ from object_domain.domain import ObjectDomain
 import pytest
 from fluvius.query.base import BaseQueryModel
 from fluvius.query import QuerySchema, QueryMeta, StringField, logger, config
-from fluvius.query.handler import QueryHandler, FrontendQuery, DomainQueryHandler
+from fluvius.query.handler import QueryManager, FrontendQuery, DomainQueryManager
 from fluvius.data.serializer import serialize_json
 from sample_data_model import *
 
-from object_domain.query import ObjectDomainQueryHandler
+from object_domain.query import ObjectDomainQueryManager
 
 
-class SampleQueryHandler(DomainQueryHandler):
+class SampleQueryManager(DomainQueryManager):
     __data_manager__ = SampleDataAccessManager
 
 
-@SampleQueryHandler.register_model("company-query")
+@SampleQueryManager.register_model("company-query")
 class CompanyQuery(QuerySchema):
     business_name = StringField("Test Field", identifier=True)
 
@@ -25,7 +25,7 @@ class CompanyQuery(QuerySchema):
         query_identifier = 'company'
         backend_resource = 'company'
 
-@ObjectDomainQueryHandler.register_model("economist")
+@ObjectDomainQueryManager.register_model("economist")
 class EconomistQuery(QuerySchema):
     job = StringField("Job match", identifier=True)
 
@@ -37,19 +37,19 @@ class EconomistQuery(QuerySchema):
 # @pytest.mark.asyncio
 # async def test_query():
 
-#     hd = SampleQueryHandler()
+#     hd = SampleQueryManager()
 #     pp = FrontendQuery(args={"!or": [{"business_name!ne": "ABC1"},{"business_name": "DEF3"}]})
 #     r, m = await hd.query("company-query", pp)
 #     logger.info(serialize_json(r))
 
-#     query_handler_2 = ObjectDomainQueryHandler()
+#     query_handler_2 = ObjectDomainQueryManager()
 #     r, m = await query_handler_2.query('economist', args={"job": 'economist'})
 #     logger.info(serialize_json(r))
 
 app = create_app()
 app = setup_authentication(app)
 app = configure_domain_manager(app, ObjectDomain)
-app = configure_query_manager(app, SampleQueryHandler, ObjectDomainQueryHandler)
+app = configure_query_manager(app, SampleQueryManager, ObjectDomainQueryManager)
 
 
 @app.get("/hello-world", tags=["Sample API"])
@@ -70,7 +70,7 @@ async def protected(request: Request):
 
 # Item query ...
 @app.get("/protected/{identifier}", tags=["Sample API"])
-@app.get("/protected/{scoping:path}/{identifier}", tags=["Sample API"])
+@app.get("/protected/~{scoping}/{identifier}", tags=["Sample API"])
 @auth_required()
 async def protected_2(request: Request, identifier, scoping=None):
     return {
@@ -79,7 +79,7 @@ async def protected_2(request: Request, identifier, scoping=None):
 
 
 # Resources query ...
-@app.get("/protected/{scoping:path}/", tags=["Sample API"])
+@app.get("/protected/{scoping}/", tags=["Sample API"])
 @app.get("/protected/", tags=["Sample API"])
 @auth_required()
 async def protected_3(request: Request, scoping=None):

@@ -1,4 +1,5 @@
 import re
+import json
 from typing import Optional, List, Dict, Any, Tuple
 from types import SimpleNamespace
 from fluvius.data import DataModel
@@ -13,21 +14,42 @@ DEFAULT_DATASET_FIELD = "_dataset"
 DEFAULT_DELETED_FIELD = "_deleted"
 RX_PARAM_SPLIT = re.compile(r'(:|!)')
 
+
 class FrontendQuery(DataModel):
     identifier: Optional[str] = None
 
     limit: int = config.DEFAULT_QUERY_LIMIT
     offset: int = 0
+
+    select: Optional[List[str]] = None
+    deselect: Optional[List[str]] = None
+
+    sort: Optional[List[str]] = None
+    query: Optional[Dict[tuple, Any]] = None
+    scope: Optional[Dict[str, str]] = None
+
+
+class FrontendQueryParams(DataModel):
+    size: int = config.DEFAULT_QUERY_LIMIT
     page: int = 1
 
     select: Optional[List[str]] = None
     deselect: Optional[List[str]] = None
 
     sort: Optional[List[str]] = None
-    args: Optional[Dict[str, Any]] = None
-    stmt: Optional[Dict[tuple, Any]] = None
-    scope: Optional[Dict[str, str]] = None
+    args: Optional[str] = None
 
+    def build_query(self, query_schema, identifier=None, scope=None) -> FrontendQuery:
+        return FrontendQuery(
+            identifier = identifier,
+            scope = scope,
+            limit = self.size,
+            offset = (self.page - 1) * self.size,
+            select = self.select,
+            deselect = self.deselect,
+            sort = self.sort,
+            query = query_schema.validate_schema_args(self.args)
+        )
 
 class QueryMeta(DataModel):
     id_field: Optional[str] = None
@@ -80,32 +102,35 @@ class QuerySchema(object):
         cls.OPS_INDEX = {}
 
     @classmethod
-    def next_api_index(cls):
+    def register_operator(cls, op):
+        if op.operator in cls.OPS_INDEX:
+            raise ValueError(f'Operator is already registed [{op._name}] @ {cls} ')
+
+        cls.OPS_INDEX[op.operator] = op
         cls.API_INDEX += 1
+
+        logger.info('Registered operator: [{operator._name}] @ {cls}')
         return cls.API_INDEX
 
     @property
     def meta(self):
         return getattr(self, '_meta', None)
 
-    def base_query(self, context):
+    def base_query(self, fe_query, **scope):
         return None
 
-    def validate_frontend_query(self, fe_query: Optional[FrontendQuery]=None, **kwargs):
-        if fe_query is None:
-            fe_query = FrontendQuery(**kwargs)
-        elif kwargs:
-            fe_query = fe_query.set(**kwargs)
-
-        return fe_query.set(stmt=self.validate_schema_args(fe_query.args))
-
     def validate_schema_args(self, args):
+        if args is None:
+            return {}
+
         query_params = self.meta.query_params
+        args = json.loads(args)
+
         def _run():
             for k, v in args.items():
                 op_stmt = operator_statement(k)
                 param_schema = query_params[op_stmt.field_key, op_stmt.op_key]
-                value = param_schema.process_value(op_stmt, v)
+                value = param_schema.process_value(v)
                 yield op_stmt, value
 
         return dict(_run())
@@ -138,37 +163,34 @@ class QuerySchema(object):
             return bool(soft_delete)
 
 
-        def query_params():
+        def query_params(fields):
             for op in operator.BUILTIN_OPS:
                 yield op(self)
 
             for qfield in fields:
                 yield from qfield.gen_params()
 
+        def gen_fieldmap():
+            for fn in dir(self):
+                qfield = getattr(self, fn)
+                if not isinstance(qfield, QueryField):
+                    continue
 
-        fieldmap = {}
-        fields = []
+                yield fn, qfield.associate(self, fn)
 
-        for fn in dir(self):
-            qfield = getattr(self, fn)
-            if not isinstance(qfield, QueryField):
-                continue
+                if qfield.identifier:
+                    if getattr(meta, 'id_field', None):
+                        raise ValueError(f'Multiple identifier for query model: {self}')
 
-            qfield.associate(self, fn)
-            fieldmap[fn] = qfield
-            fields.append(qfield)
-            if qfield.identifier:
-                if getattr(meta, 'id_field', None):
-                    raise ValueError(f'Multiple identifier for query model: {self}')
+                    meta.id_field = qfield.key
 
-                meta.id_field = qfield.key
 
-        meta.query_fields = fields
-        meta.query_params = {p.key: p for p in query_params()}
-        meta.sortable_fields = (qfield.key for qfield in fields if qfield.sortable)
-        meta.query_fieldmap = fieldmap
-        meta.default_order = parse_default_order(fieldmap)
-        meta.soft_delete_query = parse_soft_delete(fieldmap)
+        meta.query_fieldmap = dict(gen_fieldmap())
+        meta.query_fields = tuple(meta.query_fieldmap.values())
+        meta.query_params = {p.selector: p for p in query_params(meta.query_fields)}
+        meta.sortable_fields = (qfield.key for qfield in meta.query_fields if qfield.sortable)
+        meta.default_order = parse_default_order(meta.query_fieldmap)
+        meta.soft_delete_query = parse_soft_delete(meta.query_fieldmap)
         meta.title = getattr(meta, "title", None) or self.__class__.__name__
 
         self._meta = QueryMeta(**meta.__dict__)

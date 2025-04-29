@@ -1,3 +1,4 @@
+import json
 from fluvius import logger
 from fluvius.data import identifier
 from fastapi.testclient import TestClient
@@ -12,7 +13,7 @@ def test_read_root():
 
 
 def test_domain_metadata():
-    response = client.get("/generic-object~metadata/")
+    response = client.get("/generic-object.metadata/")
     data = response.json()
     assert data["name"] == 'ObjectDomain'
 
@@ -25,8 +26,12 @@ def test_domain_create():
         'name': {'family': 'Keynes', 'given': 'John', 'middle': 'Maynard'}
     }
 
-    resp = client.post("/generic-object:create-object/people-economist/~new", json=create_payload)
+    resp = client.post("/generic-object:create-object/people-economist/:new", json=create_payload)
     assert resp.status_code == 200
     assert resp.json()
+    logger.info('JSON COMMAND OUTPUT: %s', resp.json())
 
-    logger.info('JSON OUTPUT: %s', resp.json())
+    resp = client.get("/domain-query-manager.company-query/", params=dict(args={"!or": json.dumps([{"business_name!ne": "ABC1"},{"business_name": "DEF3"}])}))
+    assert resp.status_code == 200
+    assert resp.json()
+    logger.info('JSON QUERY OUTPUT: %s', resp.json())
