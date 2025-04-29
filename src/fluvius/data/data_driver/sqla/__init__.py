@@ -27,7 +27,7 @@ from .query import QueryBuilder
 from .. import DataDriver
 
 
-DEBUG_CONNECTOR = True # config.DEBUG
+DEBUG_CONNECTOR = False # config.DEBUG
 RAISE_NO_ITEM_MODIFIED_ERROR = True
 BACKEND_QUERY_LIMIT = config.BACKEND_QUERY_INTERNAL_LIMIT
 
@@ -211,7 +211,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
         return await self.query(resource, query)
 
-    async def query(self, resource, query: BackendQuery):
+    async def query(self, resource, query: BackendQuery, meta=None):
         # @TODO: Clarify the use of this function
 
         '''
@@ -241,7 +241,14 @@ class SqlaDriver(DataDriver, QueryBuilder):
         async with self.session() as sess:
             cursor = await sess.execute(stmt)
         items = cursor.scalars().all()
-        DEBUG_CONNECTOR and logger.info("\n[FIND_ALL] %r\n=> [RESULT] %d items", query, len(items))
+        DEBUG_CONNECTOR and logger.info("\n[FIND_ALL] %r\n=> [RESULT] %d items", str(stmt), len(items))
+        if isinstance(meta, dict):
+            meta.update({
+                "count": len(items),
+                "total": len(items),
+                "limit": query.limit,
+                "offset": query.offset
+            })
         return items
 
     def _unwrap_schema_item(self, item):

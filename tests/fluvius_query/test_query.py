@@ -1,7 +1,6 @@
 import pytest
 import json
-from fluvius.query.base import BaseQueryModel
-from fluvius.query import QuerySchema, QueryMeta, StringField, logger, config, FrontendQueryParams
+from fluvius.query import QuerySchema, StringField, logger, config, FrontendQueryParams
 from fluvius.query.handler import QueryManager, FrontendQuery, DomainQueryManager
 from fluvius.data.serializer import serialize_json
 from sample_data_model import *
@@ -31,15 +30,21 @@ class EconomistQuery(QuerySchema):
 
 
 @pytest.mark.asyncio
-async def test_query():
-
+async def test_query_1():
     hd = SampleQueryManager()
-    pa = {"!or": [{"business_name!ne": "ABC1"},{"business_name": "DEF3"}]}
-    pp = FrontendQueryParams(args=json.dumps(pa))
-    r, m = await hd.query("company-query", pp)
-    assert len(r) == 2
+    pa = {"!or": [{"business_name!ne": "ABC1"}, {"business_name": "DEF3"}]}
+    r, m = await hd.query("company-query", args=json.dumps(pa))
+    assert len(r) == 0 and len(m) > 0
     logger.info(serialize_json(r))
 
+    pa = {":or": [{"business_name!ne": "ABC1"}, {"business_name": "DEF3"}]}
+    r, m = await hd.query("company-query", args=json.dumps(pa), size=1, page=2)
+    assert len(r) == 1 and len(m) > 0
+    logger.info(serialize_json(r))
+
+
+@pytest.mark.asyncio
+async def test_query_2():
     query_handler_2 = ObjectDomainQueryManager()
-    r, m = await query_handler_2.query('economist', args={"job": 'economist'})
+    r, m = await query_handler_2.query('economist', args=json.dumps({"job": 'economist'}))
     logger.info(serialize_json(r))

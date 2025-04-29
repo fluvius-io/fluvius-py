@@ -65,15 +65,20 @@ class QueryManager(object):
 
     async def query(self, query_identifier, query_params: Optional[FrontendQueryParams]=None, **kwargs):
         query_schema = self._registry[query_identifier]
-        query_params = query_params or FrontendQueryParams()
+
+        if query_params is None:
+            query_params = FrontendQueryParams(**kwargs)
+        elif kwargs:
+            query_params = query_params.set(**kwargs)
+
         fe_query = query_params.build_query(query_schema)
-        backend_query = self.construct_backend_query(query_schema, fe_query, **kwargs)
+        backend_query = self.construct_backend_query(query_schema, fe_query)
         backend_query = await self.validate_backend_query(query_schema, backend_query)
         data, meta = await self.execute_query(query_schema, backend_query)
 
         return self.process_result(data, meta)
 
-    def construct_backend_query(self, query_schema, fe_query, **kwargs):
+    def construct_backend_query(self, query_schema, fe_query):
         """ Convert from the frontend query to the backend query """
 
         composite_scope = query_schema.base_query(fe_query)
@@ -103,13 +108,15 @@ class DomainQueryManager(QueryManager):
 
     def __init__(self, app=None):
         self._app = app
-        self._manager = self.__data_manager__(app)
+        self._data = self.__data_manager__(app)
 
     @property
-    def manager(self):
-        return self._manager
+    def data(self):
+        return self._data
 
     async def execute_query(self, query_schema, backend_query: BackendQuery):
         """ Execute the backend query with the state manager and return """
-        result = await self.manager.find_all(query_schema.Meta.backend_resource, backend_query)
-        return list(result), None
+        meta = {}
+        resource = query_schema.Meta.backend_resource
+        data = await self.data.query(resource, backend_query, meta=meta)
+        return data, meta

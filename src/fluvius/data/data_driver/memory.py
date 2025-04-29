@@ -48,15 +48,23 @@ class InMemoryDriver(DataDriver):
             store[resource] = {}
         return store[resource]
 
-    async def find(self, resource, query):
+    async def find(self, resource, query, meta=None):
         store = self._get_memory(resource)
-        return list(query_resource(store, query))
+        items = list(query_resource(store, query))
+
+        if meta is not None:
+            meta.update({
+                "total": len(store),
+                "limit": query.limit,
+                "offset": query.offset,
+                "count": len(items)
+            })
+        return items
 
     find_all = find
     query = find
 
-    async def find_one(self, resource, q=None, **query):
-        query = BackendQuery.create(q, **query)
+    async def find_one(self, resource, query):
         store = self._get_memory(resource)
         result = query_resource(store, query)
 

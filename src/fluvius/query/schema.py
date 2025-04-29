@@ -4,7 +4,7 @@ from typing import Optional, List, Dict, Any, Tuple
 from types import SimpleNamespace
 from fluvius.data import DataModel
 from fluvius.helper import _assert
-from fluvius.data.query import operator_statement
+from fluvius.data.query import operator_statement, OperatorStatement
 
 from .field import QueryField
 
@@ -25,7 +25,7 @@ class FrontendQuery(DataModel):
     deselect: Optional[List[str]] = None
 
     sort: Optional[List[str]] = None
-    query: Optional[Dict[tuple, Any]] = None
+    query: Optional[Dict[OperatorStatement, Any]] = None
     scope: Optional[Dict[str, str]] = None
 
 
@@ -106,6 +106,7 @@ class QuerySchema(object):
 
         query_params = self.query_params
         args = json.loads(args)
+
 
         def _run():
             for k, v in args.items():

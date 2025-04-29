@@ -32,8 +32,21 @@ def test_domain_create():
     assert resp.json()
     logger.info('JSON COMMAND OUTPUT: %s', resp.json())
 
+
+def test_domain_query():
     para = dict(args=json.dumps({"!or":[{"business_name!ne": "ABC1"},{"business_name": "DEF3"}]}))
     resp = client.get("/sample-query-manager.company-query/", params=para)
     assert resp.status_code == 200
     assert resp.json()
     logger.info('JSON QUERY OUTPUT: %s', resp.json())
+
+    para = dict(
+        args=json.dumps({":or":[{"business_name!ne": "ABC1"},{"business_name": "DEF3"}]}),
+        size=1,
+        page=2)
+    resp = client.get("/sample-query-manager.company-query/", params=para)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data['data']) == 1
+    assert len(data['meta']) > 0
+    logger.info('JSON QUERY OUTPUT: %s', data)

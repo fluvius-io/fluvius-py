@@ -276,13 +276,10 @@ class DataAccessManager(DataAccessManagerBase):
         item = await self.connector.find_one(resource, q)
         return self._wrap_item(resource, item)
 
-    async def fetch_by_intra_id(self, resource: str, intra_id, domain_id, / , etag=None, where=None) -> DataModel:
+    async def fetch_by_intra_id(self, resource: str, identifier, domain_sid, / , etag=None, where=None) -> DataModel:
         """ Fetch exactly 1 items from the data store using its intra domain identifier """
-        scope = {INTRA_DOMAIN_SCOPE_FIELD: domain_id, INTRA_DOMAIN_ITEM_ID: intra_id}
-        if etag:
-            scope[ETAG_FIELD] = etag
-
-        q = BackendQuery.create(scope=scope, where=where, limit=1)
+        scope = {INTRA_DOMAIN_SCOPE_FIELD: domain_sid}
+        q = BackendQuery.create(identifier=identifier, scope=scope, where=where, limit=1, etag=etag)
         data = await self.connector.find_one(resource, q)
         return self._wrap_item(resource, data)
 
@@ -299,16 +296,16 @@ class DataAccessManager(DataAccessManagerBase):
         except ItemNotFoundError:
             return None
 
-    async def find_all(self, resource: str, q=None, **query) -> List[DataModel]:
+    async def find_all(self, resource: str, q=None, meta=None, **query) -> List[DataModel]:
         """ Find all matching items, always starts with offset = 0 and retrieve all items """
-        q = BackendQuery.create(query, offset=0, limit=BACKEND_QUERY_LIMIT)
-        data = await self.connector.query(resource, q)
+        q = BackendQuery.create(q, **query, offset=0, limit=BACKEND_QUERY_LIMIT)
+        data = await self.connector.query(resource, q, meta)
         return self._wrap_list(resource, data)
 
-    async def query(self, resource: str, q=None, **query) -> List[DataModel]:
+    async def query(self, resource: str, q=None, meta=None, **query) -> List[DataModel]:
         """ Query with offset and limits """
-        q = BackendQuery.create(query)
-        data = await self.connector.query(resource, q)
+        q = BackendQuery.create(q, **query)
+        data = await self.connector.query(resource, q, meta)
         return self._wrap_list(resource, data)
 
     async def invalidate_record(self, record: DataModel, **updates):

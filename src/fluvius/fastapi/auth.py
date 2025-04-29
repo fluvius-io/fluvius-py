@@ -141,7 +141,7 @@ def setup_authentication(app, config=base_conf):
         return {"message": "Logged out"}
 
 
-    @app.get("/auth/signoff", **openapi_info)
+    @app.post("/auth/signoff", **openapi_info)
     async def sign_off(request: Request):
         ''' Log out user globally (including Keycloak) '''
         # 2. Logout from Keycloak using the logout endpoint

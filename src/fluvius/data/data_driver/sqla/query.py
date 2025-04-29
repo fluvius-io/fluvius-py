@@ -111,13 +111,17 @@ class QueryBuilder(object):
                 subops = [_op for expr in value for _op in _iter_query(expr)]
                 return composites[op_stmt.op_key](*subops)
 
-            db_field = self._field(op_stmt.field_key)
+            db_field = self._field(data_schema, op_stmt.field_key)
 
             return FIELD_OPERATOR[op_stmt.mode][op_stmt.op_key](db_field, value)
 
         def _iter_query(q):
             for k, value in _iter_statement(q):
-                op_stmt = operator_statement(k)
+                if isinstance(k, str):
+                    op_stmt = operator_statement(k)
+                else:
+                    op_stmt = k
+
                 yield _gen_op(op_stmt, value)
 
         yield from _iter_query(expr)
