@@ -33,7 +33,7 @@ def test_domain_create():
     logger.info('JSON COMMAND OUTPUT: %s', resp.json())
 
     para = dict(args=json.dumps({"!or":[{"business_name!ne": "ABC1"},{"business_name": "DEF3"}]}))
-    resp = client.get("/domain-query-manager.company-query/", params=para)
+    resp = client.get("/sample-query-manager.company-query/", params=para)
     assert resp.status_code == 200
     assert resp.json()
     logger.info('JSON QUERY OUTPUT: %s', resp.json())

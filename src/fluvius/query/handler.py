@@ -38,16 +38,18 @@ class QueryManagerMeta(DataModel):
 
 class QueryManager(object):
     _registry  = {}
-    __prefix__ = None
 
     class Meta:
         pass
 
     def __init_subclass__(cls):
+        if cls.__dict__.get('__abstract__'):
+            return
+
         cls._registry = {}
         cls.Meta = QueryManagerMeta.create(cls.Meta, defaults={
             'name': cls.__name__,
-            'prefix': camel_to_lower(cls.__prefix__ or cls.__name__),
+            'prefix': camel_to_lower(cls.__name__),
             'desc': (cls.__doc__ or '').strip(),
             'tags': [cls.__name__,]
         })
@@ -97,6 +99,8 @@ class QueryManager(object):
 
 
 class DomainQueryManager(QueryManager):
+    __abstract__ = True
+
     def __init__(self, app=None):
         self._app = app
         self._manager = self.__data_manager__(app)
