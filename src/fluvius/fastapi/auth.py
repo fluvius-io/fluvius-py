@@ -8,12 +8,15 @@ from authlib.jose import jwt, JsonWebKey
 from authlib.jose.util import extract_header
 from fastapi import Request, Depends, HTTPException
 from fastapi.responses import RedirectResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from .setup import on_startup
 
 import httpx
 
 from . import config as base_conf, logger
+
+IDEMPOTENCY_KEY = base_conf.RESP_HEADER_IDEMPOTENCY
 
 
 def auth_required(inject_ctx=True):
@@ -27,6 +30,40 @@ def auth_required(inject_ctx=True):
 
         return wrapper
     return decorator
+
+
+class FluviusAuthMiddleware(BaseHTTPMiddleware):
+    def get_auth_context(self, request):
+        # You can optionally decode and validate the token here
+        if not (id_token := request.cookies.get("id_token")):
+            return None
+
+        try:
+            user = request.session.get("user")
+            if not user:
+                return None
+        except (KeyError, ValueError):
+            return None
+
+        return SimpleNamespace(
+            user = user,
+            token = id_token
+        )
+
+    async def dispatch(self, request: Request, call_next):
+        try:
+            request.state.auth_context = self.get_auth_context(request)
+        except Exception as e:
+            logger.exception(e)
+            raise
+
+        response = await call_next(request)
+
+        if idem_key := request.headers.get(IDEMPOTENCY_KEY):
+            response.headers[IDEMPOTENCY_KEY] = idem_key
+
+        return response
+
 
 def setup_authentication(app, config=base_conf):
     DEFAULT_REDIRECT_URI = config.DEFAULT_REDIRECT_URI
@@ -58,6 +95,8 @@ def setup_authentication(app, config=base_conf):
         client_kwargs={"scope": "openid profile email"},
         redirect_uri=DEFAULT_REDIRECT_URI,
     )
+
+    app.add_middleware(FluviusAuthMiddleware)
 
     def extract_jwt_kid(token: str) -> dict:
         header_segment = token.split('.')[0]
@@ -129,8 +168,7 @@ def setup_authentication(app, config=base_conf):
 
         return {
             "message": f"OK",
-            "auth_context": request.state.auth_context,
-            "domain_context": request.state.domain_context.serialize(),
+            "context": request.state.auth_context,
             "headers": dict(request.headers)
         }
 

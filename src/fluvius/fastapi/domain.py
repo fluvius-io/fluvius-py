@@ -78,42 +78,10 @@ class FastAPIDomainManager(DomainManager):
         for params in self.enumerate_commands():
             register_command_handler(app, *params)
 
-
-class FluviusDomainMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, dm):
-        super().__init__(app)
-        self._dm = dm
-
-    def get_auth_context(self, request):
-        # You can optionally decode and validate the token here
-        if not (id_token := request.cookies.get("id_token")):
-            return None
-
-        try:
-            user = request.session.get("user")
-            if not user:
-                return None
-        except (KeyError, ValueError):
-            return None
-
-        return SimpleNamespace(
-            user = user,
-            token = id_token
-        )
-
-    async def dispatch(self, request: Request, call_next):
-        try:
-            request.state.auth_context = self.get_auth_context(request)
-        except Exception as e:
-            logger.exception(e)
-            raise
-
-        response = await call_next(request)
-
-        if idem_key := request.headers.get(IDEMPOTENCY_KEY):
-            response.headers[IDEMPOTENCY_KEY] = idem_key
-
-        return response
+    @classmethod
+    def setup_app(cls, app, *domains, **kwargs):
+        cls.register_domain(*domains, **kwargs)
+        return cls(app)
 
 
 def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
@@ -272,8 +240,7 @@ def register_query_manager(app, qm_cls):
 
 
 def configure_domain_manager(app, *domains, **kwargs):
-    FastAPIDomainManager.register_domain(*domains, **kwargs)
-    app.add_middleware(FluviusDomainMiddleware, dm=FastAPIDomainManager(app))
+    FastAPIDomainManager.setup_app(app, *domains, **kwargs)
     return app
 
 
