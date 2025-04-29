@@ -73,7 +73,7 @@ class _AsyncSessionConnection(object):
         return self._session()
 
     async def connection(self):
-        if hasattr(self, "_connection"):
+        if hasattr(self, "_connection") and not self._connection.closed:
             return self._connection
 
         self._connection = await self._session.connection()

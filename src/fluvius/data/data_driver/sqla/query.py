@@ -35,7 +35,7 @@ def nor_(*args, **kwargs):
     return not_(or_(*args, **kwargs))
 
 
-NORMAL_MODE = ':'
+NORMAL_MODE = '.'
 NEGATE_MODE = '!'
 NEGATE_KEY = "!"
 OPERATOR_SEP = ":"

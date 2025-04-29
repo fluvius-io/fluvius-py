@@ -8,11 +8,11 @@ from fluvius.data import UUID_TYPE, identifier_factory, DataModel
 from . import config
 
 BACKEND_QUERY_LIMIT = config.BACKEND_QUERY_INTERNAL_LIMIT
-RX_PARAM_SPLIT = re.compile(r'(:|!)')
+RX_PARAM_SPLIT = re.compile(r'(\.|!)')
 OperatorStatement = namedtuple('OperatorStatement', 'field_key mode op_key')
 
 
-def operator_statement(op_stmt, default_op='eq', default_mode=':'):
+def operator_statement(op_stmt, default_op='eq', default_mode='.'):
     if isinstance(op_stmt, OperatorStatement):
         return op_stmt
 

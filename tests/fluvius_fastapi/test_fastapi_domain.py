@@ -41,7 +41,7 @@ def test_domain_query():
     logger.info('JSON QUERY OUTPUT: %s', resp.json())
 
     para = dict(
-        query=json.dumps({":or":[{"business_name!ne": "ABC1"},{"business_name": "DEF3"}]}),
+        query=json.dumps({".or":[{"business_name!ne": "ABC1"},{"business_name": "DEF3"}]}),
         size=1,
         page=2)
     resp = client.get("/sample-query-manager.company-query/", params=para)

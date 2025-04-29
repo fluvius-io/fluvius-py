@@ -37,7 +37,7 @@ async def test_query_1():
     assert len(r) == 0 and len(m) > 0
     logger.info(serialize_json(r))
 
-    pa = {":or": [{"business_name!ne": "ABC1"}, {"business_name": "DEF3"}]}
+    pa = {".or": [{"business_name!ne": "ABC1"}, {"business_name": "DEF3"}]}
     r, m = await hd.query("company-query", query=json.dumps(pa), size=1, page=2)
     assert len(r) == 1 and len(m) > 0
     logger.info(serialize_json(r))

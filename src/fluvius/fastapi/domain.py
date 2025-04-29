@@ -20,6 +20,13 @@ SCOPING_SEP = '~'
 def uri(*elements):
     return os.path.join("/", *elements)
 
+def jurl(data):
+    if not data:
+        return None
+
+
+    return jsonurl_py.loads("(" + data + ")")
+
 
 def parse_scopes(scoping_stmt, scope_schema={}):
     def _parse():
@@ -211,7 +218,7 @@ def register_query_manager(app, qm_cls):
 
         async def _query_handler(query_params: FrontendQueryParams, path_query: str=None, scopes: str=None):
             if path_query:
-                params = jsonurl_py.loads(path_query)
+                params = jurl(path_query)
                 query_params = FrontendQueryParams(**params)
 
             data, meta = await manager.query(query_id, query_params)
@@ -259,7 +266,7 @@ def register_query_manager(app, qm_cls):
                 return {
                     "query_params": query_params,
                     "scopes": parse_scopes(scopes),
-                    "path_query": jsonurl_py.loads(path_query)
+                    "path_query": jurl(path_query)
                 }
 
 
