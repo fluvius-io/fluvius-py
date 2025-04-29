@@ -4,8 +4,7 @@ from fluvius.fastapi.domain import configure_domain_manager, configure_query_man
 from object_domain.domain import ObjectDomain
 
 import pytest
-from fluvius.query.base import BaseQueryModel
-from fluvius.query import QuerySchema, QueryMeta, StringField, logger, config
+from fluvius.query import QuerySchema, StringField, logger, config
 from fluvius.query.handler import QueryManager, FrontendQuery, DomainQueryManager
 from fluvius.data.serializer import serialize_json
 from sample_data_model import *
@@ -17,15 +16,16 @@ class SampleQueryManager(DomainQueryManager):
     __data_manager__ = SampleDataAccessManager
 
 
-@SampleQueryManager.register_model("company-query")
+@SampleQueryManager.register_schema
 class CompanyQuery(QuerySchema):
     business_name = StringField("Test Field", identifier=True)
 
     class Meta:
-        query_identifier = 'company'
+        query_identifier = 'company-query'
         backend_resource = 'company'
 
-@ObjectDomainQueryManager.register_model("economist")
+
+@ObjectDomainQueryManager.register_schema
 class EconomistQuery(QuerySchema):
     job = StringField("Job match", identifier=True)
 

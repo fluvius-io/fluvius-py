@@ -1,4 +1,5 @@
 import json
+import jsonurl_py
 from fluvius import logger
 from fluvius.data import identifier
 from fastapi.testclient import TestClient
@@ -31,7 +32,8 @@ def test_domain_create():
     assert resp.json()
     logger.info('JSON COMMAND OUTPUT: %s', resp.json())
 
-    resp = client.get("/domain-query-manager.company-query/", params=dict(args={"!or": json.dumps([{"business_name!ne": "ABC1"},{"business_name": "DEF3"}])}))
+    para = dict(args=json.dumps({"!or":[{"business_name!ne": "ABC1"},{"business_name": "DEF3"}]}))
+    resp = client.get("/domain-query-manager.company-query/", params=para)
     assert resp.status_code == 200
     assert resp.json()
     logger.info('JSON QUERY OUTPUT: %s', resp.json())

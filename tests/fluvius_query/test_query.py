@@ -1,4 +1,5 @@
 import pytest
+import json
 from fluvius.query.base import BaseQueryModel
 from fluvius.query import QuerySchema, QueryMeta, StringField, logger, config, FrontendQueryParams
 from fluvius.query.handler import QueryManager, FrontendQuery, DomainQueryManager
@@ -12,15 +13,15 @@ class SampleQueryManager(DomainQueryManager):
     __data_manager__ = SampleDataAccessManager
 
 
-@SampleQueryManager.register_model("company-query")
+@SampleQueryManager.register_schema
 class CompanyQuery(QuerySchema):
     business_name = StringField("Test Field", identifier=True)
 
     class Meta:
-        query_identifier = 'company'
+        query_identifier = "company-query"
         backend_resource = 'company'
 
-@ObjectDomainQueryManager.register_model("economist")
+@ObjectDomainQueryManager.register_schema
 class EconomistQuery(QuerySchema):
     job = StringField("Job match", identifier=True)
 
@@ -33,8 +34,10 @@ class EconomistQuery(QuerySchema):
 async def test_query():
 
     hd = SampleQueryManager()
-    pp = FrontendQueryParams(args={"!or": [{"business_name!ne": "ABC1"},{"business_name": "DEF3"}]})
+    pa = {"!or": [{"business_name!ne": "ABC1"},{"business_name": "DEF3"}]}
+    pp = FrontendQueryParams(args=json.dumps(pa))
     r, m = await hd.query("company-query", pp)
+    assert len(r) == 2
     logger.info(serialize_json(r))
 
     query_handler_2 = ObjectDomainQueryManager()

@@ -3,7 +3,8 @@ from .schema import QuerySchema
 from . import field
 
 
-class BaseQueryModel(QuerySchema):
+class DomainResourceQuerySchema(QuerySchema):
+    __abstract__ = True
     _id = field.UUIDField(label="ID", identifier=True)
     _etag = field.StringField(label="ETag")
     _deleted = field.DateTimeField(label="Deleted")
@@ -13,16 +14,8 @@ class BaseQueryModel(QuerySchema):
     _updater = field.UUIDField(label="Updater")
 
 
-class SubQueryModel(BaseQueryModel):
+class SubResourceQuerySchema(DomainResourceQuerySchema):
+    __abstract__ = True
     _iid = field.UUIDField(label="Intra ID")
     _did = field.UUIDField(label="Domain ID")
 
-
-class AggrootQueryModel(BaseQueryModel):
-    @classmethod
-    def base_query(cls, parsed_query, user=None):
-        base_query_data = super().base_query(parsed_query, user)
-        if not getattr(user, "id", None):
-            raise UnauthorizedError(342113, "Login required")
-
-        return base_query_data

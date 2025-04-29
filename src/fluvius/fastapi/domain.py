@@ -8,7 +8,8 @@ from fluvius.domain.context import DomainContext, DomainTransport
 from fluvius.data.serializer import serialize_json
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi import Request, Path, Body, Query
-from fluvius.query.schema import QueryMeta
+from fluvius.query.schema import QuerySchemaMeta
+from fluvius.query.schema import FrontendQueryParams
 import jsonurl_py
 from . import logger, config
 
@@ -204,55 +205,48 @@ def configure_domain_manager(app, *domains, **kwargs):
     app.add_middleware(FluviusDomainMiddleware, dm=FastAPIDomainManager(app))
     return app
 
+def setup_query_manager(app, qm_cls):
+    manager = qm_cls(app)
+
+    for query_id, query_schema in qm_cls._registry.items():
+        base_uri = f"{qm_cls.Meta.prefix}.{query_id}/"
+        api_info = dict(tags=qm_cls.Meta.tags, description=query_schema.__doc__)
+
+        async def _query_handler(query_params: FrontendQueryParams, path_params: str=None, scope: str=None):
+            # data = jsonurl_py.loads(path_params) if path_params else None
+            data, meta = await manager.query(query_id, query_params)
+            return {
+                'query': query_params,
+                'data': data,
+                'meta': meta
+            }
+
+        @app.get(uri(base_uri, '~{scoping}', '{path_params}/'), **api_info)
+        async def query_scoped_resource(query_params: Annotated[FrontendQueryParams, Query()], path_params: Annotated[Optional[str], Path()], scope: str):
+            return await _query_handler(query_params, path_params, scope)
+
+        @app.get(uri(base_uri, '{path_params}/'), **api_info)
+        async def query_resource_json(query_params: Annotated[FrontendQueryParams, Query()], path_params: Annotated[Optional[str], Path()]):
+            return await _query_handler(query_params, path_params, None)
+
+        @app.get(uri(base_uri, '~{scoping}/'), **api_info)
+        async def query_scoped_resource_json(query_params: Annotated[FrontendQueryParams, Query()], scope: str):
+            return await _query_handler(query_params, None, scope)
+
+        @app.get(uri(base_uri), **api_info)
+        async def query_resource(query_params: Annotated[FrontendQueryParams, Query()]):
+            return await _query_handler(query_params, None, None)
+
+        @app.get(uri(base_uri, ":queryinfo"), **api_info)
+        def query_info() -> QuerySchemaMeta:
+            return query_schema._meta
+
+        @app.get(uri(base_uri, "{identifier}"), **api_info)
+        @app.get(uri(base_uri, "~{scoping}", "{identifier}"), **api_info)
+        def query_item(identifier: Annotated[str, Path()]):
+            return [identifier, query_params]
 
 def configure_query_manager(app, *query_managers):
-    from fluvius.query.schema import FrontendQueryParams
     for qm_cls in query_managers:
-        for query_id, query_schema in qm_cls._registry.items():
-            base_uri = f"{qm_cls.Meta.prefix}.{query_id}/"
-            api_info = dict(tags=qm_cls.Meta.tags)
-            manager = qm_cls(app)
-
-            async def _query_echo(query_params: FrontendQueryParams, path_params: str=None, scope: str=None):
-                # data = jsonurl_py.loads(path_params) if path_params else None
-                data, meta = await manager.query(query_id, query_params)
-                return {
-                    'query': query_params,
-                    'data': data,
-                    'meta': meta
-                }
-
-            @app.get(
-                uri(base_uri, '~{scoping}', '{path_params}/'), **api_info)
-            async def query_echo(query_params: Annotated[FrontendQueryParams, Query()], path_params: Annotated[Optional[str], Path()], scope: str):
-                return await _query_echo(query_params, path_params, scope)
-
-            @app.get(uri(base_uri, '{path_params}/'), **api_info)
-            async def query_echo(query_params: Annotated[FrontendQueryParams, Query()], path_params: Annotated[Optional[str], Path()]):
-                return await _query_echo(query_params, path_params, None)
-
-            @app.get(uri(base_uri, '~{scoping}/'), **api_info)
-            async def query_echo(query_params: Annotated[FrontendQueryParams, Query()], scope: str):
-                return await _query_echo(query_params, None, scope)
-
-            @app.get(uri(base_uri), **api_info)
-            async def query_echo(query_params: Annotated[FrontendQueryParams, Query()]):
-                return await _query_echo(query_params, None, None)
-
-            @app.get(uri(base_uri, ":queryinfo"), **api_info)
-            def query_meta() -> QueryMeta:
-                return query_schema._meta
-
-            # @app.get(f"{endpoint}/", **api_info)
-            # def query_resource(q: Annotated[Optional[str], Query], query_params: Annotated[FrontendQuery, Query()]):
-            #     return {
-            #         'q': jsonurl_py.loads(q),
-            #         'query_params': query_params
-            #     }
-
-            @app.get(uri(base_uri, "{identifier}"), **api_info)
-            @app.get(uri(base_uri, "~{scoping}", "{identifier}"), **api_info)
-            def query_item(identifier: Annotated[str, Path()]):
-                return [identifier, query_params]
-
+        setup_query_manager(app, qm_cls)
     return app

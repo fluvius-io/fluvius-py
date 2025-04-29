@@ -53,15 +53,13 @@ class QueryManager(object):
         })
 
     @classmethod
-    def register_model(cls, query_identifier):
-        def _decorator(model_cls):
-            if query_identifier in cls._registry:
-                raise ValueError(f'Resource identifier is already registered: {query_identifier} => {model_cls}')
+    def register_schema(cls, schema_cls):
+        query_identifier = schema_cls.Meta.query_identifier
+        if query_identifier in cls._registry:
+            raise ValueError(f'Resource identifier is already registered: {query_identifier} => {schema_cls}')
 
-            cls._registry[query_identifier] = validate_query_schema(model_cls)(query_identifier=query_identifier)
-            return model_cls
-
-        return _decorator
+        cls._registry[query_identifier] = validate_query_schema(schema_cls)()
+        return schema_cls
 
     async def query(self, query_identifier, query_params: Optional[FrontendQueryParams]=None, **kwargs):
         query_schema = self._registry[query_identifier]
@@ -109,8 +107,5 @@ class DomainQueryManager(QueryManager):
 
     async def execute_query(self, query_schema, backend_query: BackendQuery):
         """ Execute the backend query with the state manager and return """
-        result = await self.manager.find_all(query_schema.meta.backend_resource, backend_query)
+        result = await self.manager.find_all(query_schema.Meta.backend_resource, backend_query)
         return list(result), None
-
-    async def validate_backend_query(self, query_schema, backend_query):
-        return backend_query

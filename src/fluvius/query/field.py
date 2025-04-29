@@ -97,7 +97,11 @@ class QueryField(DataModel):
 
     def gen_params(self):
         for params in self._ops:
-            yield FieldQueryOperator(self.schema, op_name=params[0], field_key=self.key)
+            yield FieldQueryOperator(
+                self.schema,
+                op_name=params[0],
+                field_key=self.key
+            )
 
     def meta(self):
         m = self.__dict__.copy()
