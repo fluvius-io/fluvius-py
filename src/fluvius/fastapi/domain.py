@@ -21,9 +21,9 @@ def uri(*elements):
     return os.path.join("/", *elements)
 
 
-def parse_scoping(scoping_stmt, scope_schema):
+def parse_scopes(scoping_stmt, scope_schema={}):
     def _parse():
-        if not stmt:
+        if not scoping_stmt:
             return
 
         for part in scoping_stmt.split(SCOPING_SEP):
@@ -165,15 +165,15 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
                 return await _command_handler(request, payload, resource, identifier, {})
 
         if scope_schema:
-            @postapi(fq_name, "~{scoping}","{resource}", ":new")
+            @postapi(fq_name, "~{scopes}","{resource}", ":new")
             async def scoped_command_handler(
                 request: Request,
                 payload: PayloadType,
                 resource: Annotated[str, Path(description=cmd_cls.Meta.resource_desc)],
-                scoping: Annotated[str, Path(description=f'Resource scoping: `{', '.join(scope_keys)}`. E.g. `~domain_sid:H9cNmGXLEc8NWcZzSThA9S`')]
+                scoping: Annotated[str, Path(description=f"Resource scoping: `{', '.join(scope_keys)}`. E.g. `~domain_sid:H9cNmGXLEc8NWcZzSThA9S`")]
             ):
                 identifier = UUID_GENR()
-                scope = parse_scoping(scoping, scope_schema)
+                scope = parse_scopes(scoping, scope_schema)
                 return await _command_handler(request, payload, resource, identifier, scope)
 
         return
@@ -190,15 +190,15 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
 
 
     if scope_schema:
-        @postapi(fq_name, "~{scoping}", "{resource}", "{identifier}")
+        @postapi(fq_name, "~{scopes}", "{resource}", "{identifier}")
         async def scoped_command_handler(
             request: Request,
             payload: PayloadType,
             resource: Annotated[str, Path(description=cmd_cls.Meta.resource_desc)],
             identifier: Annotated[UUID_TYPE, Path(description="Resource identifier")],
-            scoping: Annotated[str, Path(description=f'Resource scoping: `{', '.join(scope_keys)}`. E.g. `domain_sid~H9cNmGXLEc8NWcZzSThA9S`')]
+            scoping: Annotated[str, Path(description=f"Resource scoping: `{', '.join(scope_keys)}`. E.g. `domain_sid~H9cNmGXLEc8NWcZzSThA9S`")]
         ):
-            scope = parse_scoping(scoping, scope_schema)
+            scope = parse_scopes(scoping, scope_schema)
             return await _command_handler(request, payload, resource, identifier, scope)
 
 
@@ -209,9 +209,9 @@ def register_query_manager(app, qm_cls):
         base_uri = f"{qm_cls.Meta.prefix}.{query_id}/"
         api_info = dict(tags=qm_cls.Meta.tags, description=query_schema.__doc__)
 
-        async def _query_handler(query_params: FrontendQueryParams, path_params: str=None, scope: str=None):
-            if path_params:
-                params = jsonurl_py.loads(path_params)
+        async def _query_handler(query_params: FrontendQueryParams, path_query: str=None, scopes: str=None):
+            if path_query:
+                params = jsonurl_py.loads(path_query)
                 query_params = FrontendQueryParams(**params)
 
             data, meta = await manager.query(query_id, query_params)
@@ -223,33 +223,45 @@ def register_query_manager(app, qm_cls):
         def getapi(*paths):
             return app.get(uri(*paths), **api_info)
 
-        @getapi(base_uri, '~{scoping}', '{path_params}/')
-        async def query_scoped_resource(path_params: Annotated[str, Path()], scope: str):
-            return await _query_handler(None, path_params, scope)
+        if query_schema.Meta.allow_list_view:
+            @getapi(base_uri, '~{scopes}', '{path_query}/')
+            async def query_scoped_resource(path_query: Annotated[str, Path()], scopes: str):
+                return await _query_handler(None, path_query, scopes)
 
-        @getapi(base_uri, '{path_params}/')
-        async def query_resource_json(path_params: Annotated[str, Path()]):
-            return await _query_handler(None, path_params, None)
+            @getapi(base_uri, '~{scopes}/')
+            async def query_scoped_resource_json(query_params: Annotated[FrontendQueryParams, Query()], scopes: str):
+                return await _query_handler(query_params, None, scopes)
 
-        @getapi(base_uri, '~{scoping}/')
-        async def query_scoped_resource_json(query_params: Annotated[FrontendQueryParams, Query()], scope: str):
-            return await _query_handler(query_params, None, scope)
+            @getapi(base_uri, '{path_query}/')
+            async def query_resource_json(path_query: Annotated[str, Path()]):
+                return await _query_handler(None, path_query, None)
 
-        @getapi(base_uri)
-        async def query_resource(query_params: Annotated[FrontendQueryParams, Query()]):
-            return await _query_handler(query_params, None, None)
+            @getapi(base_uri)
+            async def query_resource(query_params: Annotated[FrontendQueryParams, Query()]):
+                return await _query_handler(query_params, None, None)
 
-        @getapi(base_uri, "{identifier}")
-        def query_item(identifier: Annotated[str, Path()]):
-            return [identifier, query_params]
+        if query_schema.Meta.allow_item_view:
+            @getapi(base_uri, "{identifier}")
+            def query_item(identifier: Annotated[str, Path()]):
+                return [identifier, query_params]
 
-        @getapi(base_uri, "~{scoping}", "{identifier}")
-        def query_item(identifier: Annotated[str, Path()], scoping: Annotated[str, Path()]):
-            return [identifier, scoping]
+            @getapi(base_uri, "~{scopes}", "{identifier}")
+            def query_item(identifier: Annotated[str, Path()], scopes: Annotated[str, Path()]):
+                return [identifier, scopes]
 
-        @getapi(base_uri, ":queryinfo")
-        def query_info() -> QuerySchemaMeta:
-            return query_schema._meta
+        if query_schema.Meta.allow_meta_view:
+            @getapi(base_uri, ":queryinfo")
+            def query_info() -> QuerySchemaMeta:
+                return query_schema._meta
+
+            @getapi(base_uri, '~{scopes}', '{path_query}', ":echo")
+            def query_echo(query_params: Annotated[FrontendQueryParams, Query()], scopes, path_query):
+                return {
+                    "query_params": query_params,
+                    "scopes": parse_scopes(scopes),
+                    "path_query": jsonurl_py.loads(path_query)
+                }
+
 
 
 def configure_domain_manager(app, *domains, **kwargs):

@@ -37,7 +37,7 @@ class FrontendQueryParams(DataModel):
     deselect: Optional[List[str]] = None
 
     sort: Optional[List[str]] = None
-    args: Optional[str] = None
+    query: Optional[str] = None
 
     def build_query(self, query_schema, identifier=None, scope=None) -> FrontendQuery:
         return FrontendQuery(
@@ -48,7 +48,7 @@ class FrontendQueryParams(DataModel):
             select = self.select,
             deselect = self.deselect,
             sort = self.sort,
-            query = query_schema.validate_schema_args(self.args)
+            query = query_schema.validate_schema_args(self.query)
         )
 
 class QuerySchemaMeta(DataModel):
@@ -61,9 +61,12 @@ class QuerySchemaMeta(DataModel):
     dataset_support: bool = False
     dataset_query: str = DEFAULT_DATASET_FIELD
 
-    disable_item_view: bool = False
-    disable_list_view: bool = False
-    disable_meta_view: bool = False
+    allow_item_view: bool = True
+    allow_list_view: bool = True
+    allow_meta_view: bool = True
+
+    scope_required: Optional[Dict] = None
+    scope_optional: Optional[Dict] = None
 
     soft_delete_query: Optional[str] = DEFAULT_DELETED_FIELD
 

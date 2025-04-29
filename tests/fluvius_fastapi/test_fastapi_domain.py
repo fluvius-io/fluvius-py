@@ -34,14 +34,14 @@ def test_domain_create():
 
 
 def test_domain_query():
-    para = dict(args=json.dumps({"!or":[{"business_name!ne": "ABC1"},{"business_name": "DEF3"}]}))
+    para = dict(query=json.dumps({"!or":[{"business_name!ne": "ABC1"},{"business_name": "DEF3"}]}))
     resp = client.get("/sample-query-manager.company-query/", params=para)
     assert resp.status_code == 200
     assert resp.json()
     logger.info('JSON QUERY OUTPUT: %s', resp.json())
 
     para = dict(
-        args=json.dumps({":or":[{"business_name!ne": "ABC1"},{"business_name": "DEF3"}]}),
+        query=json.dumps({":or":[{"business_name!ne": "ABC1"},{"business_name": "DEF3"}]}),
         size=1,
         page=2)
     resp = client.get("/sample-query-manager.company-query/", params=para)
