@@ -2,7 +2,6 @@ import fluvius
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from starlette.middleware.sessions import SessionMiddleware
 from .profiler import configure_profiler
 
 from . import config, logger
@@ -15,14 +14,6 @@ def create_app(config=config, **kwargs):
     )
     cfg.update(kwargs)
     app = FastAPI(lifespan=lifespan, **cfg)
-
-    app.add_middleware(
-        SessionMiddleware,
-        secret_key=config.APPLICATION_SECRET_KEY,
-        session_cookie=config.SESSION_COOKIE,
-        https_only=config.COOKIE_HTTPS_ONLY,
-        same_site=config.COOKIE_SAME_SITE_POLICY
-    )
 
     @app.get("/~metadata", tags=["Metadata"])
     async def application_metadata(request: Request):

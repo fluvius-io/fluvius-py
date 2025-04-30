@@ -9,6 +9,7 @@ from authlib.jose.util import extract_header
 from fastapi import Request, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 from .setup import on_startup
 
@@ -97,6 +98,13 @@ def setup_authentication(app, config=base_conf):
     )
 
     app.add_middleware(FluviusAuthMiddleware)
+    app.add_middleware(
+        SessionMiddleware,
+        secret_key=config.APPLICATION_SECRET_KEY,
+        session_cookie=config.SESSION_COOKIE,
+        https_only=config.COOKIE_HTTPS_ONLY,
+        same_site=config.COOKIE_SAME_SITE_POLICY
+    )
 
     def extract_jwt_kid(token: str) -> dict:
         header_segment = token.split('.')[0]
