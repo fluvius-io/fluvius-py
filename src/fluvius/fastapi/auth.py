@@ -97,15 +97,6 @@ def setup_authentication(app, config=base_conf):
         redirect_uri=DEFAULT_REDIRECT_URI,
     )
 
-    app.add_middleware(FluviusAuthMiddleware)
-    app.add_middleware(
-        SessionMiddleware,
-        secret_key=config.APPLICATION_SECRET_KEY,
-        session_cookie=config.SESSION_COOKIE,
-        https_only=config.COOKIE_HTTPS_ONLY,
-        same_site=config.COOKIE_SAME_SITE_POLICY
-    )
-
     def extract_jwt_kid(token: str) -> dict:
         header_segment = token.split('.')[0]
         padded = header_segment + '=' * (-len(header_segment) % 4)
@@ -212,5 +203,14 @@ def setup_authentication(app, config=base_conf):
         response.delete_cookie("id_token")  # Clear the access_token cookie
 
         return response
+
+    app.add_middleware(FluviusAuthMiddleware)
+    app.add_middleware(
+        SessionMiddleware,
+        secret_key=config.APPLICATION_SECRET_KEY,
+        session_cookie=config.SESSION_COOKIE,
+        https_only=config.COOKIE_HTTPS_ONLY,
+        same_site=config.COOKIE_SAME_SITE_POLICY
+    )
 
     return app
