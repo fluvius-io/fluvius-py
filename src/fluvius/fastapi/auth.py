@@ -36,7 +36,7 @@ def auth_required(inject_ctx=True, **kwargs):
 class FluviusAuthMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, auth_provider=None):
         super().__init__(app)
-        self._auth_provider = AUTH_PROFILE_REGISTRY[auth_provider]
+        self._auth_provider = FluviusAuthProfileProvider.get(auth_provider)
 
     def get_auth_context(self, request):
         # You can optionally decode and validate the token here
@@ -76,12 +76,21 @@ class FluviusAuthMiddleware(BaseHTTPMiddleware):
 
 
 
-class FluviusAuthProvider(object):
-    def __init_subclass__(cls, key):
-        if key in AUTH_PROFILE_REGISTRY:
-            raise ValueError(f'Auth Profile Provider is already registered: {key} => {AUTH_PROFILE_REGISTRY[key]}')
+class FluviusAuthProfileProvider(object):
+    REGISTRY = {}
 
-        AUTH_PROFILE_REGISTRY[key] = cls
+    def __init_subclass__(cls, key):
+        if key in FluviusAuthProfileProvider.REGISTRY:
+            raise ValueError(f'Auth Profile Provider is already registered: {key} => {FluviusAuthProfileProvider.REGISTRY[key]}')
+
+        FluviusAuthProfileProvider.REGISTRY[key] = cls
+
+    @classmethod
+    def get(cls, key):
+        if key is None:
+            return FluviusAuthProfileProvider
+
+        return FluviusAuthProfileProvider.REGISTRY[key]
 
     """ Lookup services for user related info """
     def __init__(self, user):
@@ -110,7 +119,6 @@ class FluviusAuthProvider(object):
     def system_roles(self):
         return self._sysroles
 
-AUTH_PROFILE_REGISTRY = {None: FluviusAuthProvider}
 
 def setup_authentication(app, config=config, base_path="/auth"):
     def api(*paths, method=app.get):
