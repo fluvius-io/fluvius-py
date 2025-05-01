@@ -1,7 +1,6 @@
 import pytest
 import json
-from fluvius.query import QuerySchema, StringField, logger, config, FrontendQueryParams
-from fluvius.query.handler import QueryManager, FrontendQuery, DomainQueryManager
+from fluvius.query import QuerySchema, StringField, logger, config, QueryManager, FrontendQuery, DomainQueryManager
 from fluvius.data.serializer import serialize_json
 from sample_data_model import *
 

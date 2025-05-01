@@ -4,8 +4,7 @@ from fluvius.fastapi.domain import configure_domain_manager, configure_query_man
 from object_domain.domain import ObjectDomain
 
 import pytest
-from fluvius.query import QuerySchema, StringField, logger, config
-from fluvius.query.handler import QueryManager, FrontendQuery, DomainQueryManager
+from fluvius.query import QuerySchema, StringField, logger, config, QueryManager, FrontendQuery, DomainQueryManager
 from fluvius.data.serializer import serialize_json
 from sample_data_model import *
 

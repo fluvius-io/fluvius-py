@@ -1,22 +1,23 @@
-from pyrsistent import PClass, field
+from typing import Optional
+from fluvius.data import DataModel
 
 
 NARRATION_RULE_RETRACTED = 200
 NARRATION_RULE_FAIL_PRECOND = 100
 
 
-class RuleMeta(PClass):
-    key = field(type=str, mandatory=True)
-    statement = field(type=str, mandatory=True)
-    revision = field(type=int, mandatory=True)
-    priority = field(type=int, mandatory=True)
-    parent = field(type=str)
-    facts = field(type=tuple)
+class RuleMeta(DataModel):
+    key: str
+    statement: str
+    revision: int = 0
+    priority: int = -1
+    parent: Optional[str] = None
+    facts: list
 
 
-class RuleNarration(PClass):
-    code = field(type=int, mandatory=True)
-    rule = field(type=str)
-    ruleset = field(type=str)
-    revision = field(type=int)
-    message = field(type=str)
+class RuleNarration(DataModel):
+    code: int
+    rule: str
+    ruleset: str
+    revision: int = 0
+    message: Optional[str] = None

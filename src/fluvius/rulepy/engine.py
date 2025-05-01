@@ -1,6 +1,6 @@
 import queue
 from types import SimpleNamespace
-from typing import Callable, Iterable, List, Tuple, Optional, Any, Type, Union
+from typing import Callable, Iterable, List, Tuple, Optional, Any, Type, Union, Dict
 from fluvius.data import DataModel
 from .datadef import RuleNarration, RuleMeta, NARRATION_RULE_FAIL_PRECOND, NARRATION_RULE_RETRACTED
 from . import logger, config
@@ -8,7 +8,7 @@ from . import logger, config
 DEBUG_RULE_ENGINE = config.DEBUG_RULE_ENGINE
 CHECK_WORKING_MEMORY_ATTRS = config.CHECK_WORKING_MEMORY_ATTRS
 
-NO_CONDITIONS: List[Tuple[str, str]] = []
+NO_CONDITIONS: Tuple = tuple()
 
 
 class WorkingMemory(object):
@@ -117,11 +117,14 @@ class KnowledgeEngine(object):
     def retractable(self) -> bool:
         return self._retractable
 
-    def check_narration(self, nr):
-        assert isinstance(nr, RuleNarration)
-        return nr
+    def add_narration(self, narration):
+        if not isinstance(narration, RuleNarration):
+            raise ValueError(f'Invalid Narraton: {narration}')
 
-    def execute(self, fact: DataModel) -> WorkingMemory:
+        self.narration_queue.put(narration)
+        return narration
+
+    def execute(self, fact: Union[DataModel, Dict]) -> WorkingMemory:
         kb = self.KB
         ruleset = kb.kb_name
         mem = kb.WorkingMemorySchema(self)
@@ -137,7 +140,8 @@ class KnowledgeEngine(object):
             rule_func: Callable[[DataModel, WorkingMemory], Iterable[RuleNarration]],
             rule_meta: RuleMeta
         ) -> Iterable[RuleNarration]:
-            conditions = getattr(rule, '__cond__', NO_CONDITIONS)
+            conditions = getattr(rule, '__when__', NO_CONDITIONS)
+
             if self.retractable and (ruleset, rule_key) in mem.RetractedRules:
                 DEBUG_RULE_ENGINE and logger.debug(
                     'Rule [%s] skipped. Retraction [%s]' % (rule_key, mem.RetractedRules[rule_key]))
@@ -160,8 +164,8 @@ class KnowledgeEngine(object):
             yield from rule_func(fact, mem)
 
         for key, rule, meta in kb.rules:
-            for nr in _eval_rule(key, rule, meta):
-                self.narration_queue.put(self.check_narration(nr))
+            for narration in _eval_rule(key, rule, meta):
+                self.add_narration(narration)
 
         return mem
 

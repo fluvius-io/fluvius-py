@@ -59,8 +59,8 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
                 tags=[domain.Meta.name]
     )
 
-    def postapi(*paths, **kwargs):
-        api_decorator = app.post(uri(f"/{fq_name}", *paths), **endpoint_info)
+    def postapi(*paths, method=app.post, **kwargs):
+        api_decorator = method(uri(f"/{fq_name}", *paths), **endpoint_info)
         if not cmd_cls.Meta.auth_required:
             return api_decorator
 
@@ -156,7 +156,10 @@ def register_query_manager(app, qm_cls):
 
     for query_id, query_schema in qm_cls._registry.items():
         base_uri = f"/{qm_cls.Meta.prefix}.{query_id}/"
-        api_info = dict(tags=qm_cls.Meta.tags, description=query_schema.__doc__)
+        api_tags = query_schema.Meta.tags or qm_cls.Meta.tags
+        api_docs = query_schema.Meta.desc or qm_cls.Meta.desc
+        api_info = dict(tags=api_tags, description=api_docs)
+        scope_schema = (query_schema.Meta.scope_required or query_schema.Meta.scope_optional)
 
         async def _query_handler(query_params: FrontendQueryParams, path_query: str=None, scopes: str=None):
             if path_query:
@@ -169,8 +172,8 @@ def register_query_manager(app, qm_cls):
                 'meta': meta
             }
 
-        def getapi(*paths, **kwargs):
-            api_decorator = app.get(uri(base_uri,*paths), **api_info)
+        def api(*paths, method=app.get, **kwargs):
+            api_decorator = method(uri(base_uri, *paths), **api_info)
             if not query_schema.Meta.auth_required:
                 return api_decorator
 
@@ -181,43 +184,45 @@ def register_query_manager(app, qm_cls):
             return _api_def
 
         if query_schema.Meta.allow_list_view:
-            @getapi("~{scopes}", "{path_query}/")
-            async def query_scoped_resource(path_query: Annotated[str, Path()], scopes: str):
-                return await _query_handler(None, path_query, scopes)
+            if scope_schema:
+                @api("~{scopes}", "{path_query}/")
+                async def query_scoped_resource(path_query: Annotated[str, Path()], scopes: str):
+                    return await _query_handler(None, path_query, scopes)
 
-            @getapi("~{scopes}/")
-            async def query_scoped_resource_json(query_params: Annotated[FrontendQueryParams, Query()], scopes: str):
-                return await _query_handler(query_params, None, scopes)
+                @api("~{scopes}/")
+                async def query_scoped_resource_json(query_params: Annotated[FrontendQueryParams, Query()], scopes: str):
+                    return await _query_handler(query_params, None, scopes)
 
-            @getapi("{path_query}/")
+            @api("{path_query}/")
             async def query_resource_json(path_query: Annotated[str, Path()]):
                 return await _query_handler(None, path_query, None)
 
-            @getapi("")
+            @api("")
             async def query_resource(query_params: Annotated[FrontendQueryParams, Query()]):
                 return await _query_handler(query_params, None, None)
 
-        if query_schema.Meta.allow_item_view:
-            @getapi("{identifier}")
-            def query_item(identifier: Annotated[str, Path()]):
-                return [identifier, query_params]
-
-            @getapi("~{scopes}", "{identifier}")
-            def query_item(identifier: Annotated[str, Path()], scopes: Annotated[str, Path()]):
-                return [identifier, scopes]
-
         if query_schema.Meta.allow_meta_view:
-            @getapi(":queryinfo")
-            def query_info() -> QuerySchemaMeta:
-                return query_schema._meta
+            @api(":queryinfo")
+            async def query_info(request: Request) -> QuerySchemaMeta:
+                return query_schema.Meta
 
-            @getapi("~{scopes}", "{path_query}", ":echo")
-            def query_echo(query_params: Annotated[FrontendQueryParams, Query()], scopes, path_query):
+            @api("~{scopes}", "{path_query}", ":echo")
+            async def query_echo(query_params: Annotated[FrontendQueryParams, Query()], scopes, path_query):
                 return {
                     "query_params": query_params,
                     "scopes": parse_scopes(scopes),
                     "path_query": jurl_data(path_query)
                 }
+
+        if query_schema.Meta.allow_item_view:
+            @api("{identifier}")
+            async def query_item(identifier: Annotated[str, Path()]):
+                return [identifier, query_params]
+
+            if scope_schema:
+                @api("~{scopes}", "{identifier}")
+                async def query_scoped_item(identifier: Annotated[str, Path()], scopes: Annotated[str, Path()]):
+                    return [identifier, scopes]
 
 
 def configure_domain_manager(app, *domains, **kwargs):

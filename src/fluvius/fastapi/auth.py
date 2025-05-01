@@ -57,7 +57,7 @@ class FluviusAuthMiddleware(BaseHTTPMiddleware):
             user = auth.user,
             profile = auth.profile,
             organization = auth.organization,
-            sysroles = auth.system_roles
+            iamroles = auth.iamroles
         )
 
     async def dispatch(self, request: Request, call_next):
@@ -100,7 +100,7 @@ class FluviusAuthProfileProvider(object):
         self._user = user
         self._profile = SimpleNamespace()
         self._organization = SimpleNamespace()
-        self._sysroles = ('user', 'sysadmin', 'operator')
+        self._iamroles = ('user', 'sysadmin', 'operator')
 
 
     @property
@@ -116,8 +116,9 @@ class FluviusAuthProfileProvider(object):
         return self._organization
 
     @property
-    def system_roles(self):
-        return self._sysroles
+    def iamroles(self):
+        ''' Identity and Access Management Roles '''
+        return self._iamroles
 
 
 def setup_authentication(app, config=config, base_path="/auth"):
@@ -204,6 +205,7 @@ def setup_authentication(app, config=config, base_path="/auth"):
 
     @api("callback")
     async def oauth_callback(request: Request):
+        logger.warning('TOken: %s', request.query_params.get('state'))
         token = await oauth.keycloak.authorize_access_token(request)
         id_token = token.get("id_token")
         if not id_token:
@@ -211,7 +213,7 @@ def setup_authentication(app, config=config, base_path="/auth"):
 
         user = await decode_id_token(request.app.state.jwks_keyset, id_token)
         request.session["user"] = user
-        response = RedirectResponse(url="/auth/verify")
+        response = RedirectResponse(url=SIGNIN_REDIRECT_URI)
         response.set_cookie('id_token', id_token)
         return response
 
@@ -262,6 +264,7 @@ def setup_authentication(app, config=config, base_path="/auth"):
 
     # === Keycloak Configuration ===
     LOGOUT_REDIRECT_URI = "/auth/verify"
+    SIGNIN_REDIRECT_URI = "/auth/verify"
     KEYCLOAK_ISSUER = uri(config.KEYCLOAK_BASE_URL, "realms", config.KEYCLOAK_REALM)
     KEYCLOAK_JWKS_URI = uri(KEYCLOAK_ISSUER, "protocol/openid-connect/certs")
     KEYCLOAK_LOGOUT_URI = uri(KEYCLOAK_ISSUER, "protocol/openid-connect/logout")

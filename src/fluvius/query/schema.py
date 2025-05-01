@@ -10,7 +10,6 @@ from .field import QueryField
 
 from . import operator, logger, config
 
-DEFAULT_DATASET_FIELD = "_dataset"
 DEFAULT_DELETED_FIELD = "_deleted"
 RX_PARAM_SPLIT = re.compile(r'(:|!)')
 
@@ -54,6 +53,7 @@ class FrontendQueryParams(DataModel):
 class QuerySchemaMeta(DataModel):
     name: str
     desc: Optional[str] = None
+    tags: Optional[List] = None
 
     query_identifier: str
     backend_resource: str

@@ -1,4 +1,4 @@
-from fluvius.rulepy import KnowledgeBase, kb_rule, kb_cond, KnowledgeEngine
+from fluvius.rulepy import KnowledgeBase, rule, when, KnowledgeEngine
 from pyrsistent import PRecord, field
 
 
@@ -9,8 +9,8 @@ class SampleContext(PRecord):
 class SampleKnowlegeBase(KnowledgeBase):
     ContextSchema = SampleContext
 
-    @kb_rule("This is Sample Rule 01")
-    @kb_cond("C.ctx01 == 'test01'", key="ctx01_is_test01")
+    @rule("This is Sample Rule 01")
+    @when("C.ctx01 == 'test01'", key="ctx01_is_test01")
     def sample_rule(ctx, fact, mem):
         if fact.test01:
             mem.test01 = True
@@ -20,8 +20,8 @@ class SampleKnowlegeBase(KnowledgeBase):
 
         yield "sample_rule matched"
 
-    @kb_rule("This is Sample Rule 02")
-    @kb_cond("C.ctx01 == 'test02' and F.test01 == 'TRUE'", "ctx01_is_test01_and_other")
+    @rule("This is Sample Rule 02")
+    @when("C.ctx01 == 'test02' and F.test01 == 'TRUE'", "ctx01_is_test01_and_other")
     def sample_rule02(ctx, fact, mem):
         if fact.test01:
             mem.test01 = True
@@ -33,8 +33,8 @@ class SampleKnowlegeBase(KnowledgeBase):
 
         yield "sample_rule 02 matched"
 
-    @kb_rule("This is Sample Rule 03", priority=-1)
-    @kb_cond("C.ctx01 == 'test02' and F.test01 != 'TRUE' and M.ctx01 == 'test02'", "ctx01_is_test02_and_other")
+    @rule("This is Sample Rule 03", priority=-1)
+    @when("C.ctx01 == 'test02' and F.test01 != 'TRUE' and M.ctx01 == 'test02'", "ctx01_is_test02_and_other")
     def sample_rule03(ctx, fact, mem):
         if fact.test01:
             mem.test01 = True

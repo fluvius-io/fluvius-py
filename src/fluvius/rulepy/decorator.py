@@ -3,7 +3,7 @@ from functools import wraps
 from .datadef import RuleNarration, RuleMeta
 
 
-def kb_rule(statement: str, key: str=None, priority: int=0, facts: Optional[list]=None, revision=0) -> Callable:
+def rule(statement: str, key: str=None, priority: int=0, facts: Optional[list]=None, revision=0) -> Callable:
     def decorator(func: Callable) -> Callable:
         rule_key = key or func.__name__
 
@@ -37,13 +37,12 @@ def kb_rule(statement: str, key: str=None, priority: int=0, facts: Optional[list
     return decorator
 
 
-def kb_cond(statement, key=None):
+def when(statement, key=None):
     def decorator(func):
         stmt = compile(statement, func.__name__, 'eval')
-        if not hasattr(func, '__cond__'):
-            func.__cond__ = []
-
-        func.__cond__.append((key or statement, stmt))
+        func.__when__  = getattr(func, '__when__', None) or tuple()
+        when_stmt_id = key or f"{func.__name__}__{len(func.__when__)}"
+        func.__when__ += ((when_stmt_id, stmt), )
         return func
 
     return decorator

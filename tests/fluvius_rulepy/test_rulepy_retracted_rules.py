@@ -1,10 +1,12 @@
-from fluvius.rulepy import KnowledgeBase, kb_rule, kb_cond, KnowledgeEngine, WorkingMemory, config, datadef
-from pyrsistent import PRecord, field, pmap
+from types import SimpleNamespace
+from fluvius.rulepy import KnowledgeBase, rule, when, KnowledgeEngine, WorkingMemory, config, datadef
+from fluvius.data import DataModel
+
 import pytest
 
 
-class SampleContext(PRecord):
-    ctx01 = field(type=str)
+class SampleContext(DataModel):
+    ctx01: str
 
 
 class WorkingMemorySample(WorkingMemory):
@@ -14,8 +16,8 @@ class WorkingMemorySample(WorkingMemory):
 class SampleKnowlegeBase(KnowledgeBase):
     ContextSchema = SampleContext
 
-    @kb_rule("This is a Sample Rule")
-    @kb_cond("C.ctx01 == 'test01'", key="ctx01_is_test01")
+    @rule("This is a Sample Rule")
+    @when("C.ctx01 == 'test01'", key="ctx01_is_test01")
     def sample_rule(ctx, fact, mem):
         if fact.test01:
             mem.test01 = True
@@ -25,8 +27,8 @@ class SampleKnowlegeBase(KnowledgeBase):
 
         yield "sample_rule matched"
 
-    @kb_rule("This is a Sample Rule", priority=-100)
-    @kb_cond("C.ctx01 == 'test02' and F.test01 == 'TRUE'", "ctx01_is_test01_and_other")
+    @rule("This is a Sample Rule", priority=-100)
+    @when("C.ctx01 == 'test02' and F.test01 == 'TRUE'", "ctx01_is_test01_and_other")
     def sample_rule02(ctx, fact, mem):
         if fact.test01:
             mem.test01 = True
@@ -40,8 +42,8 @@ class SampleKnowlegeBase(KnowledgeBase):
 
         yield "sample_rule 02 matched"
 
-    @kb_rule("This is a Sample Rule", priority=100)
-    @kb_cond("C.ctx01 == 'test02' and F.test01 != 'TRUE'", "ctx01_is_test02_and_other")
+    @rule("This is a Sample Rule", priority=100)
+    @when("C.ctx01 == 'test02' and F.test01 != 'TRUE'", "ctx01_is_test02_and_other")
     def sample_rule03(ctx, fact, mem):
         if fact.test01:
             mem.test01 = True
@@ -49,20 +51,20 @@ class SampleKnowlegeBase(KnowledgeBase):
         mem.ctx01 = ctx.ctx01
         yield "sample_rule 03 matched"
 
-    @kb_rule("This rule for testing WorkingMemory setattr", priority=100)
-    @kb_cond("F.test_work_mem")
+    @rule("This rule for testing WorkingMemory setattr", priority=100)
+    @when("F.test_work_mem")
     def sample_rule04(ctx, fact, mem):
         mem.Retract = True
         yield "should not reach here"
 
 
 def test_rule_engine_02():
-    f01 = pmap({
+    f01 = {
         'test01': 'TRUE',
         "test_work_mem": False
-    })
+    }
 
-    ctx = SampleKnowlegeBase.ContextSchema(**{"ctx01": "test02"})
+    ctx = SampleKnowlegeBase.ContextSchema(ctx01="test02")
     kb = SampleKnowlegeBase(ctx)
     ke = KnowledgeEngine(kb)
     m01 = ke.execute(f01)
@@ -79,10 +81,10 @@ def test_rule_engine_02():
 
 
 def test_rule_engine_workmem():
-    f01 = pmap({
+    f01 = {
         'test01': 'TRUE',
         "test_work_mem": config.CHECK_WORKING_MEMORY_ATTRS
-    })
+    }
 
     kb = SampleKnowlegeBase({"ctx01": "test02"})
     ke = KnowledgeEngine(kb)
