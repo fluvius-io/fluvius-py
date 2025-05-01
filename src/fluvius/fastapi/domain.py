@@ -1,56 +1,20 @@
 import os
+
 from typing import Annotated, Union, Any, Optional, Dict
 from types import SimpleNamespace
-from fluvius.domain import Domain
-from fluvius.data import UUID_TYPE, DataModel, UUID_GENR
-from fluvius.domain.manager import DomainManager
-from fluvius.domain.context import DomainContext, DomainTransport
-from fluvius.data.serializer import serialize_json
-from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi import Request, Path, Body, Query
-from fluvius.query.schema import QuerySchemaMeta
+from fluvius.data import UUID_TYPE, DataModel, UUID_GENR
+from fluvius.data.serializer import serialize_json
+from fluvius.domain import Domain
+from fluvius.domain.context import DomainContext, DomainTransport
+from fluvius.domain.manager import DomainManager
 from fluvius.query.schema import FrontendQueryParams
-import jsonurl_py
+from fluvius.query.schema import QuerySchemaMeta
+from starlette.middleware.base import BaseHTTPMiddleware
+
 from . import logger, config
-
-IDEMPOTENCY_KEY = config.RESP_HEADER_IDEMPOTENCY
-URI_SEP = '/'
-SCOPING_SEP = '~'
-
-def uri(*elements):
-    return os.path.join("/", *elements)
-
-def jurl(data):
-    if not data:
-        return None
-
-
-    return jsonurl_py.loads("(" + data + ")")
-
-
-def parse_scopes(scoping_stmt, scope_schema={}):
-    def _parse():
-        if not scoping_stmt:
-            return
-
-        for part in scoping_stmt.split(SCOPING_SEP):
-            if not part:
-                continue
-
-            key, sep, value = part.partition(':')
-            if sep == '' and value == '':
-                value = key
-                key = 'domain_sid'
-
-            if key == '':
-                key = 'domain_sid'
-
-            if key not in scope_schema:
-                yield (key, value)
-            else:
-                yield (key, scope_schema[key](value))
-
-    return dict(_parse())
+from .auth import auth_required
+from .helper import uri, jurl_data, parse_scopes
 
 
 class FastAPIDomainManager(DomainManager):
@@ -95,8 +59,16 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
                 tags=[domain.Meta.name]
     )
 
-    def postapi(*paths):
-        return app.post(uri(*paths), **endpoint_info)
+    def postapi(*paths, **kwargs):
+        api_decorator = app.post(uri(f"/{fq_name}", *paths), **endpoint_info)
+        if not cmd_cls.Meta.auth_required:
+            return api_decorator
+
+        auth_decorator = auth_required(**kwargs)
+        def _api_def(func):
+            return api_decorator(auth_decorator(func))
+
+        return _api_def
 
     async def _command_handler(
         request: Request,
@@ -130,7 +102,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
 
     if cmd_cls.Meta.new_resource:
         if default_path:
-            @postapi(fq_name, "{resource}", ":new")
+            @postapi("{resource}", ":new")
             async def command_handler(
                 request: Request,
                 payload: PayloadType,
@@ -140,7 +112,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
                 return await _command_handler(request, payload, resource, identifier, {})
 
         if scope_schema:
-            @postapi(fq_name, "~{scopes}","{resource}", ":new")
+            @postapi("~{scopes}","{resource}", ":new")
             async def scoped_command_handler(
                 request: Request,
                 payload: PayloadType,
@@ -151,10 +123,10 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
                 scope = parse_scopes(scoping, scope_schema)
                 return await _command_handler(request, payload, resource, identifier, scope)
 
-        return
+        return app
 
     if default_path:
-        @postapi(fq_name, "{resource}", "{identifier}")
+        @postapi("{resource}", "{identifier}")
         async def command_handler(
             request: Request,
             payload: PayloadType,
@@ -165,7 +137,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
 
 
     if scope_schema:
-        @postapi(fq_name, "~{scopes}", "{resource}", "{identifier}")
+        @postapi("~{scopes}", "{resource}", "{identifier}")
         async def scoped_command_handler(
             request: Request,
             payload: PayloadType,
@@ -176,17 +148,19 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
             scope = parse_scopes(scoping, scope_schema)
             return await _command_handler(request, payload, resource, identifier, scope)
 
+    return app
+
 
 def register_query_manager(app, qm_cls):
     manager = qm_cls(app)
 
     for query_id, query_schema in qm_cls._registry.items():
-        base_uri = f"{qm_cls.Meta.prefix}.{query_id}/"
+        base_uri = f"/{qm_cls.Meta.prefix}.{query_id}/"
         api_info = dict(tags=qm_cls.Meta.tags, description=query_schema.__doc__)
 
         async def _query_handler(query_params: FrontendQueryParams, path_query: str=None, scopes: str=None):
             if path_query:
-                params = jurl(path_query)
+                params = jurl_data(path_query)
                 query_params = FrontendQueryParams(**params)
 
             data, meta = await manager.query(query_id, query_params)
@@ -195,48 +169,55 @@ def register_query_manager(app, qm_cls):
                 'meta': meta
             }
 
-        def getapi(*paths):
-            return app.get(uri(*paths), **api_info)
+        def getapi(*paths, **kwargs):
+            api_decorator = app.get(uri(base_uri,*paths), **api_info)
+            if not query_schema.Meta.auth_required:
+                return api_decorator
+
+            auth_decorator = auth_required(**kwargs)
+            def _api_def(func):
+                return api_decorator(auth_decorator(func))
+
+            return _api_def
 
         if query_schema.Meta.allow_list_view:
-            @getapi(base_uri, '~{scopes}', '{path_query}/')
+            @getapi("~{scopes}", "{path_query}/")
             async def query_scoped_resource(path_query: Annotated[str, Path()], scopes: str):
                 return await _query_handler(None, path_query, scopes)
 
-            @getapi(base_uri, '~{scopes}/')
+            @getapi("~{scopes}/")
             async def query_scoped_resource_json(query_params: Annotated[FrontendQueryParams, Query()], scopes: str):
                 return await _query_handler(query_params, None, scopes)
 
-            @getapi(base_uri, '{path_query}/')
+            @getapi("{path_query}/")
             async def query_resource_json(path_query: Annotated[str, Path()]):
                 return await _query_handler(None, path_query, None)
 
-            @getapi(base_uri)
+            @getapi("")
             async def query_resource(query_params: Annotated[FrontendQueryParams, Query()]):
                 return await _query_handler(query_params, None, None)
 
         if query_schema.Meta.allow_item_view:
-            @getapi(base_uri, "{identifier}")
+            @getapi("{identifier}")
             def query_item(identifier: Annotated[str, Path()]):
                 return [identifier, query_params]
 
-            @getapi(base_uri, "~{scopes}", "{identifier}")
+            @getapi("~{scopes}", "{identifier}")
             def query_item(identifier: Annotated[str, Path()], scopes: Annotated[str, Path()]):
                 return [identifier, scopes]
 
         if query_schema.Meta.allow_meta_view:
-            @getapi(base_uri, ":queryinfo")
+            @getapi(":queryinfo")
             def query_info() -> QuerySchemaMeta:
                 return query_schema._meta
 
-            @getapi(base_uri, '~{scopes}', '{path_query}', ":echo")
+            @getapi("~{scopes}", "{path_query}", ":echo")
             def query_echo(query_params: Annotated[FrontendQueryParams, Query()], scopes, path_query):
                 return {
                     "query_params": query_params,
                     "scopes": parse_scopes(scopes),
-                    "path_query": jurl(path_query)
+                    "path_query": jurl_data(path_query)
                 }
-
 
 
 def configure_domain_manager(app, *domains, **kwargs):

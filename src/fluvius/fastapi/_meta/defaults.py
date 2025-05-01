@@ -9,6 +9,7 @@ APPLICATION_BUILD_TIME = str(timestamp())
 APPLICATION_SECRET_KEY = "super-secret-session-key-IUUUCBhv4NRDVB4ONpe8lcNJJY"
 COOKIE_HTTPS_ONLY = False       # Set True in production
 COOKIE_SAME_SITE_POLICY = "strict" # or "strict" for tighter CSRF
+AUTH_PROFILE_PROVIDER = None
 KEYCLOAK_BASE_URL = "https://id.adaptive-bits.com/auth"
 KEYCLOAK_CLIENT_ID = "sample_app"
 KEYCLOAK_CLIENT_SECRET = "W2kAi1iqvVJhrAMVj1YnVQXx0GxNUDiV"  # Omit for public clients

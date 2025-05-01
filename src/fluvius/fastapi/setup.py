@@ -1,8 +1,6 @@
 import fluvius
 from contextlib import asynccontextmanager
-
 from fastapi import FastAPI, Request
-from .profiler import configure_profiler
 
 from . import config, logger
 
@@ -40,7 +38,6 @@ def on_shutdown(*func):
     global _on_shutdowns
     _on_shutdowns += func
     return func
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

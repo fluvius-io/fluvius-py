@@ -1,4 +1,5 @@
 import base64
+import httpx
 import json
 
 from types import SimpleNamespace
@@ -12,15 +13,14 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from .setup import on_startup
+from .helper import uri
 
-import httpx
+from . import config, logger
 
-from . import config as base_conf, logger
-
-IDEMPOTENCY_KEY = base_conf.RESP_HEADER_IDEMPOTENCY
+IDEMPOTENCY_KEY = config.RESP_HEADER_IDEMPOTENCY
 
 
-def auth_required(inject_ctx=True):
+def auth_required(inject_ctx=True, **kwargs):
     def decorator(endpoint):
         @wraps(endpoint)
         async def wrapper(request: Request, *args, **kwargs):
@@ -34,6 +34,10 @@ def auth_required(inject_ctx=True):
 
 
 class FluviusAuthMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, auth_provider=None):
+        super().__init__(app)
+        self._auth_provider = AUTH_PROFILE_REGISTRY[auth_provider]
+
     def get_auth_context(self, request):
         # You can optionally decode and validate the token here
         if not (id_token := request.cookies.get("id_token")):
@@ -46,9 +50,14 @@ class FluviusAuthMiddleware(BaseHTTPMiddleware):
         except (KeyError, ValueError):
             return None
 
+        auth = self._auth_provider(user)
+
         return SimpleNamespace(
-            user = user,
-            token = id_token
+            token = id_token,
+            user = auth.user,
+            profile = auth.profile,
+            organization = auth.organization,
+            sysroles = auth.system_roles
         )
 
     async def dispatch(self, request: Request, call_next):
@@ -66,36 +75,75 @@ class FluviusAuthMiddleware(BaseHTTPMiddleware):
         return response
 
 
-def setup_authentication(app, config=base_conf):
-    DEFAULT_REDIRECT_URI = config.DEFAULT_REDIRECT_URI
 
-    # === Keycloak Configuration ===
-    KEYCLOAK_BASE_URL = config.KEYCLOAK_BASE_URL
-    KEYCLOAK_REALM = config.KEYCLOAK_REALM
-    KEYCLOAK_CLIENT_ID = config.KEYCLOAK_CLIENT_ID
-    KEYCLOAK_CLIENT_SECRET = config.KEYCLOAK_CLIENT_SECRET
-    KEYCLOAK_ISSUER = f"{KEYCLOAK_BASE_URL}/realms/{KEYCLOAK_REALM}"
-    KEYCLOAK_JWKS_URI = f"{KEYCLOAK_ISSUER}/protocol/openid-connect/certs"
-    KEYCLOAK_LOGOUT_URI = f"{KEYCLOAK_BASE_URL}/realms/{KEYCLOAK_REALM}/protocol/openid-connect/logout"
+class FluviusAuthProvider(object):
+    def __init_subclass__(cls, key):
+        if key in AUTH_PROFILE_REGISTRY:
+            raise ValueError(f'Auth Profile Provider is already registered: {key} => {AUTH_PROFILE_REGISTRY[key]}')
 
-    app.openapi_tags = app.openapi_tags or []
-    app.openapi_tags.append({
-        "name": "Authentication",
-        "description": "OAuth/JWT authentication endpoints"
-    })
+        AUTH_PROFILE_REGISTRY[key] = cls
 
-    openapi_info = dict(tags=["Authentication"])
+    """ Lookup services for user related info """
+    def __init__(self, user):
+        if not user:
+            raise HTTPException(status_code=401, detail="Not authenticated.")
 
-    # === OAuth Setup ===
-    oauth = OAuth()
-    oauth.register(
-        name='keycloak',
-        server_metadata_url=f"{KEYCLOAK_ISSUER}/.well-known/openid-configuration",
-        client_id=KEYCLOAK_CLIENT_ID,
-        client_secret=KEYCLOAK_CLIENT_SECRET,
-        client_kwargs={"scope": "openid profile email"},
-        redirect_uri=DEFAULT_REDIRECT_URI,
-    )
+        self._user = user
+        self._profile = SimpleNamespace()
+        self._organization = SimpleNamespace()
+        self._sysroles = ('user', 'sysadmin', 'operator')
+
+
+    @property
+    def user(self):
+        return self._user
+
+    @property
+    def profile(self):
+        return self._profile
+
+    @property
+    def organization(self):
+        return self._organization
+
+    @property
+    def system_roles(self):
+        return self._sysroles
+
+AUTH_PROFILE_REGISTRY = {None: FluviusAuthProvider}
+
+def setup_authentication(app, config=config, base_path="/auth"):
+    def api(*paths, method=app.get):
+        return method(uri(base_path, *paths), tags=["Authentication"])
+
+    def _setup_oauth():
+        app.openapi_tags = app.openapi_tags or []
+        app.openapi_tags.append({
+            "name": "Authentication",
+            "description": "OAuth/JWT authentication endpoints"
+        })
+
+        # === OAuth Setup ===
+        oauth = OAuth()
+        oauth.register(
+            name='keycloak',
+            server_metadata_url=KEYCLOAK_METADATA_URI,
+            client_id=config.KEYCLOAK_CLIENT_ID,
+            client_secret=config.KEYCLOAK_CLIENT_SECRET,
+            client_kwargs={"scope": "openid profile email"},
+            redirect_uri=config.DEFAULT_REDIRECT_URI,
+        )
+
+        app.add_middleware(FluviusAuthMiddleware)
+        app.add_middleware(
+            SessionMiddleware,
+            secret_key=config.APPLICATION_SECRET_KEY,
+            session_cookie=config.SESSION_COOKIE,
+            https_only=config.COOKIE_HTTPS_ONLY,
+            same_site=config.COOKIE_SAME_SITE_POLICY
+        )
+
+        return oauth
 
     def extract_jwt_kid(token: str) -> dict:
         header_segment = token.split('.')[0]
@@ -119,7 +167,7 @@ def setup_authentication(app, config=base_conf):
             key=key,
             claims_options={
                 "iss": {"essential": True, "value": KEYCLOAK_ISSUER},
-                "aud": {"essential": True, "value": KEYCLOAK_CLIENT_ID},
+                "aud": {"essential": True, "value": config.KEYCLOAK_CLIENT_ID},
                 "exp": {"essential": True},
             }
         )
@@ -138,15 +186,15 @@ def setup_authentication(app, config=base_conf):
         app.state.jwks_keyset = JsonWebKey.import_key_set(data)  # Store JWKS in app state
 
     # === Routes ===
-    @app.get("/auth", **openapi_info)
+    @api()
     async def home():
         return {"message": "Go to /login to start OAuth2 login with Keycloak"}
 
-    @app.get("/auth/login", **openapi_info)
+    @api("login")
     async def login(request: Request):
-        return await oauth.keycloak.authorize_redirect(request, DEFAULT_REDIRECT_URI)
+        return await oauth.keycloak.authorize_redirect(request, config.DEFAULT_REDIRECT_URI)
 
-    @app.get("/auth/callback", **openapi_info)
+    @api("callback")
     async def oauth_callback(request: Request):
         token = await oauth.keycloak.authorize_access_token(request)
         id_token = token.get("id_token")
@@ -159,7 +207,7 @@ def setup_authentication(app, config=base_conf):
         response.set_cookie('id_token', id_token)
         return response
 
-    @app.get("/auth/verify", **openapi_info)
+    @api("verify")
     @auth_required()
     async def verify_auth(request: Request):
         if not (user := request.state.auth_context.user):
@@ -171,14 +219,14 @@ def setup_authentication(app, config=base_conf):
             "headers": dict(request.headers)
         }
 
-    @app.get("/auth/logout", **openapi_info)
+    @api("logout")
     async def logout(request: Request):
         ''' Log out user locally (only for this API) '''
         request.session.clear()
         return {"message": "Logged out"}
 
 
-    @app.post("/auth/signoff", **openapi_info)
+    @api("signoff", method=app.post)
     async def sign_off(request: Request):
         ''' Log out user globally (including Keycloak) '''
         # 2. Logout from Keycloak using the logout endpoint
@@ -199,18 +247,17 @@ def setup_authentication(app, config=base_conf):
 
         # 1. Clear FastAPI session/cookie
         # Assuming you're storing the JWT token in a secure cookie
-        response = RedirectResponse(url="/auth/verify")  # Redirect after logout
+        response = RedirectResponse(url=LOGOUT_REDIRECT_URI)  # Redirect after logout
         response.delete_cookie("id_token")  # Clear the access_token cookie
 
         return response
 
-    app.add_middleware(FluviusAuthMiddleware)
-    app.add_middleware(
-        SessionMiddleware,
-        secret_key=config.APPLICATION_SECRET_KEY,
-        session_cookie=config.SESSION_COOKIE,
-        https_only=config.COOKIE_HTTPS_ONLY,
-        same_site=config.COOKIE_SAME_SITE_POLICY
-    )
+    # === Keycloak Configuration ===
+    LOGOUT_REDIRECT_URI = "/auth/verify"
+    KEYCLOAK_ISSUER = uri(config.KEYCLOAK_BASE_URL, "realms", config.KEYCLOAK_REALM)
+    KEYCLOAK_JWKS_URI = uri(KEYCLOAK_ISSUER, "protocol/openid-connect/certs")
+    KEYCLOAK_LOGOUT_URI = uri(KEYCLOAK_ISSUER, "protocol/openid-connect/logout")
+    KEYCLOAK_METADATA_URI = uri(KEYCLOAK_ISSUER, ".well-known/openid-configuration")
 
+    oauth = _setup_oauth()
     return app

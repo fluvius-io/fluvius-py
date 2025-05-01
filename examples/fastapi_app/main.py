@@ -23,6 +23,7 @@ class CompanyQuery(QuerySchema):
     class Meta:
         query_identifier = 'company-query'
         backend_resource = 'company'
+        auth_required = True
 
 
 @ObjectDomainQueryManager.register_schema

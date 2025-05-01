@@ -58,12 +58,10 @@ class QuerySchemaMeta(DataModel):
     query_identifier: str
     backend_resource: str
 
-    dataset_support: bool = False
-    dataset_query: str = DEFAULT_DATASET_FIELD
-
     allow_item_view: bool = True
     allow_list_view: bool = True
     allow_meta_view: bool = True
+    auth_required: bool = True
 
     scope_required: Optional[Dict] = None
     scope_optional: Optional[Dict] = None
