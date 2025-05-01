@@ -1,6 +1,7 @@
 import queue
-from typing import Callable, Iterable, List, Tuple, Optional, Any, Type
-from pyrsistent import PClass, freeze
+from types import SimpleNamespace
+from typing import Callable, Iterable, List, Tuple, Optional, Any, Type, Union
+from fluvius.data import DataModel
 from .datadef import RuleNarration, RuleMeta, NARRATION_RULE_FAIL_PRECOND, NARRATION_RULE_RETRACTED
 from . import logger, config
 
@@ -54,11 +55,11 @@ def ReadonlyObjectProxy(wm):
 
 class KnowledgeBase(object):
     __revision__: int = 0
-    ContextSchema: Type[PClass] = PClass
-    FactSchema: Optional[Type[PClass]] = None
+    ContextSchema: Type[DataModel] = DataModel
+    FactSchema: Optional[Union[Type[DataModel], Type[SimpleNamespace]]] = SimpleNamespace
     WorkingMemorySchema: Type[WorkingMemory] = WorkingMemory
 
-    def __init__(self, context: PClass):
+    def __init__(self, context: DataModel):
         self._context: PClass = self.ContextSchema.create(context)
         self._rules: Tuple[Tuple[str, Callable, str], ...] = \
             tuple((key, rule, meta) for _, key, rule, meta in sorted(self.gen_rules()))
@@ -90,12 +91,12 @@ class KnowledgeBase(object):
     def kb_name(self):
         return self.__class__.__name__
 
-    def fact_check(self, fact):
+    def fact_check(self, data):
         ''' Ensure fact immutability during rule execution '''
-        if self.FactSchema:
-            return self.FactSchema(fact)
+        if isinstance(data, self.FactSchema):
+            return data
 
-        return freeze(fact)
+        return self.FactSchema(**data)
 
 
 class KnowledgeEngine(object):
@@ -120,7 +121,7 @@ class KnowledgeEngine(object):
         assert isinstance(nr, RuleNarration)
         return nr
 
-    def execute(self, fact: PClass) -> WorkingMemory:
+    def execute(self, fact: DataModel) -> WorkingMemory:
         kb = self.KB
         ruleset = kb.kb_name
         mem = kb.WorkingMemorySchema(self)
@@ -133,7 +134,7 @@ class KnowledgeEngine(object):
 
         def _eval_rule(
             rule_key: str,
-            rule_func: Callable[[PClass, WorkingMemory], Iterable[RuleNarration]],
+            rule_func: Callable[[DataModel, WorkingMemory], Iterable[RuleNarration]],
             rule_meta: RuleMeta
         ) -> Iterable[RuleNarration]:
             conditions = getattr(rule, '__cond__', NO_CONDITIONS)

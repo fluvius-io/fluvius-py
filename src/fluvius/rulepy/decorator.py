@@ -1,9 +1,9 @@
-from typing import Callable
+from typing import Callable, Optional
 from functools import wraps
 from .datadef import RuleNarration, RuleMeta
 
 
-def kb_rule(statement: str, key=None, priority: int = 0, facts: list = None, revision=0) -> Callable:
+def kb_rule(statement: str, key: str=None, priority: int=0, facts: Optional[list]=None, revision=0) -> Callable:
     def decorator(func: Callable) -> Callable:
         rule_key = key or func.__name__
 
