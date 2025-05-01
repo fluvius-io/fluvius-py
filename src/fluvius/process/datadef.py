@@ -2,7 +2,7 @@ import re
 from enum import Enum
 from fluvius.data import logger, config
 
-from fluvius.data.data_contract import DataContract, field
+from fluvius.data import PClass, field
 from fluvius.data import UUID_GENF, UUID_GENR, nullable, UUID_TYPE
 from fluvius.helper.registry import ClassRegistry
 from fluvius.helper import camel_to_lower
@@ -14,7 +14,7 @@ from .status import *
 RX_STATE = re.compile(r'^[A-Z][A-Z\d]*$')
 
 
-class WorkflowState(DataContract):
+class WorkflowState(PClass):
     _id = field(UUID_TYPE, initial=UUID_GENR)
     route_id = field(UUID_TYPE, initial=UUID_GENR)
     state = field(str)
@@ -31,22 +31,22 @@ class WorkflowState(DataContract):
     participants = field(list, initial=[])
 
 
-class WorkflowEvent(DataContract):
+class WorkflowEvent(PClass):
     workflow_id = field(mandatory=True)
     step_id = field(nullable(str), initial=None)
     event_name = field(str)
     event_data = field()
 
 
-class WorkflowTask(DataContract):
+class WorkflowTask(PClass):
     pass
 
 
-class WorkflowEvent(DataContract):
+class WorkflowEvent(PClass):
     pass
 
 
-class WorkflowRoles(DataContract):
+class WorkflowRoles(PClass):
     pass
 
 
@@ -64,7 +64,7 @@ def validate_labels(*values):
     return values
 
 
-class WorkflowStep(DataContract):
+class WorkflowStep(PClass):
     _id = field(UUID_TYPE, initial=UUID_GENR)
     selector = field(UUID_TYPE)
     workflow_id = field(UUID_TYPE)
@@ -81,17 +81,17 @@ WorkflowStep.EDITABLE_FIELDS = ('title', 'label', 'state', 'status', 'message', 
 
 
 
-class WorkflowStage(DataContract):
+class WorkflowStage(PClass):
     _id = field(str)
     name = field(str)
     desc = field(str)
 
 
-class WorkflowParticipant(DataContract):
+class WorkflowParticipant(PClass):
     pass
 
 
-class WorkflowParameter(DataContract):
+class WorkflowParameter(PClass):
     pass
 
 

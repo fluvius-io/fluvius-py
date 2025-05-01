@@ -2,8 +2,7 @@ from enum import Enum
 from types import SimpleNamespace
 from fluvius.data import logger, config
 
-from fluvius.data.data_contract import DataContract, field
-from fluvius.data import UUID_GENF, UUID_GENR,nullable
+from fluvius.data import UUID_GENF, UUID_GENR,nullable, DataModel
 from fluvius.helper.registry import ClassRegistry
 from fluvius.helper import camel_to_lower
 
