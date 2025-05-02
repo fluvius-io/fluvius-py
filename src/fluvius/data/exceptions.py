@@ -1,11 +1,10 @@
 from fluvius.error import (  # noqa
     NotFoundError,
-    InternalServerError,
     UnprocessableError
 )
 
 
-class StateCommittedError(InternalServerError):
+class StateCommittedError(UnprocessableError):
     pass
 
 

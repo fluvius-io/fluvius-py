@@ -4,85 +4,68 @@ from fluvius import config
 DEBUG_APP_EXCEPTION = config.DEBUG_APP_EXCEPTION
 
 
-class AppException(Exception):
+class FluviusException(Exception):
     status_code = 500
     label = "Internal Error"
+    errcode = "A00-000"
 
-    def __init__(self, errcode, message, data=None):
+    def __init__(self, errcode, message, payload=None):
         self.message = message
-        self.code = errcode
-        self.data = data
-
-    def __repr__(self):
-        # This exception is meant to be handled by the
-        # application error handler.
-        return "[!EXCEPTION!] " + self.__str__()
-
-    def __unicode__(self):
-        return self.__str__()
+        self.payload = payload
+        self.errcode = errcode
 
     def __str__(self):
-        if self.data is None:
-            return f"{self.code} [{self.status_code}] >> {self.message}"
+        if self.payload is None:
+            return f"{self.errcode} [{self.status_code}] >> {self.message}"
 
-        return f"{self.code} >> {self.message} >> {self.data}"
+        return f"{self.errcode} [{self.status_code}] >> {self.message} >> {self.payload}"
 
+    @property
+    def content(self):
+        if not exc.payload:
+            return {"errcode": exc.errcode, "message": exc.message}
 
-class ApiRequestException(AppException):
-    def __init__(self, resp):
-        code = resp.status_code
-        try:
-            data = resp.json()
-        except Exception:
-            data = resp.text
-
-        try:
-            msg = data["_error"]["message"]
-        except KeyError:
-            if isinstance(resp.text, str):
-                msg = resp.text[:250] + ("..." if len(resp.text) > 250 else "")
-            else:
-                msg = "[No response]"
-
-        super(ApiRequestException, self).__init__(code, msg, data)
+        return {"errcode": exc.errcode, "message": exc.message, "payload": exc.payload}
 
 
-class NotFoundError(AppException):
+class NotFoundError(FluviusException):
     label = "Not Found"
     status_code = 404
+    errcode = "A00404"
 
 
-class PreconditionFailedError(AppException):
+class PreconditionFailedError(FluviusException):
     label = "Precondition Failed"
     status_code = 412
+    errcode = "A00412"
 
 
-class BadRequestError(AppException):
+class BadRequestError(FluviusException):
     label = "Bad Request"
     status_code = 400
+    errcode = "A00400"
 
 
-class UnauthorizedError(AppException):
+class UnauthorizedError(FluviusException):
     label = "Unauthorized Request"
     status_code = 401
+    errcode = "A00401"
 
 
-class ForbiddenError(AppException):
+class ForbiddenError(FluviusException):
     label = "Forbidden"
     status_code = 403
+    errcode = "A00403"
 
 
-class UnprocessableError(AppException):
+class UnprocessableError(FluviusException):
     label = "Unprocessable Entity"
     status_code = 422
+    errcode = "A00422"
 
 
-class LockedError(AppException):
+class LockedError(FluviusException):
     label = "Resource Locked"
     status_code = 423
-
-
-class InternalServerError(AppException):
-    label = "Internal Server Error"
-    status_code = 500
+    errcode = "A00423"
 

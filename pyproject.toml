@@ -22,7 +22,7 @@ authors = [
 ]
 description = "Fluvius Framework (https://fluvius.io)"
 readme = "docs/README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 license = "MIT"
 dependencies = [
     "aiohttp>=3.11.11",
@@ -30,7 +30,9 @@ dependencies = [
     "asyncpg>=0.30.0",
     "blinker>=1.9.0",
     "click>=8.1.8",
+    "fastapi-mcp>=0.3.3",
     "jsonurl-py>=0.4.0",
+    "pydantic[email]>=2.11.4",
     "pyrsistent>=0.20.0",
     "ruff>=0.9.1",
     "sanic>=25.3.0",

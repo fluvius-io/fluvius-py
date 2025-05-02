@@ -172,7 +172,6 @@ class SqlaDataSchema(declarative_base()):
 
         return self._changes
 
-
     def serialize(self, show=None, hide=None, path=None, show_all=True, show_none=False):
         """ Return a dictionary representation of this model.
         """

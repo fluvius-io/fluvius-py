@@ -2,10 +2,11 @@ import traceback
 import asyncio
 import functools
 from types import SimpleNamespace
-from . import config, logger
 from fluvius.data import exceptions, UUID_GENF, UUID_TYPE
 from fluvius.helper.timeutil import timestamp
 from fluvius.tracker import SQLTrackerManager, JobStatus, WorkerStatus, config as tracker_config
+
+from . import config, logger
 
 COLLECT_TRACEBACK = config.COLLECT_TRACEBACK
 

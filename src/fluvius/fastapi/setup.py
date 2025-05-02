@@ -1,6 +1,8 @@
 import fluvius
+from fluvius.error import FluviusException
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, status
+from fastapi.responses import JSONResponse
 
 from . import config, logger
 
@@ -13,7 +15,7 @@ def create_app(config=config, **kwargs):
     cfg.update(kwargs)
     app = FastAPI(lifespan=lifespan, **cfg)
 
-    @app.get("/~metadata", tags=["Metadata"])
+    @app.get("/:metadata", tags=["Metadata"])
     async def application_metadata(request: Request):
         ''' Basic information of the API application '''
         return {
@@ -23,6 +25,23 @@ def create_app(config=config, **kwargs):
             "build_no": config.APPLICATION_SERIAL_NUMBER,
             "build_time": config.APPLICATION_BUILD_TIME,
         }
+
+    return setup_error_handler(app)
+
+def setup_error_handler(app):
+    @app.exception_handler(FluviusException)
+    async def app_exception_handler(request: Request, exc: FluviusException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=exc.content
+        )
+
+    @app.exception_handler(ValueError)
+    async def app_exception_handler(request: Request, exc: ValueError):
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content={"message": str(exc), "errcode": "A00422"}
+        )
 
     return app
 

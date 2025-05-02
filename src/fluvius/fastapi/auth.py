@@ -2,15 +2,21 @@ import base64
 import httpx
 import json
 
-from types import SimpleNamespace
-from functools import wraps
 from authlib.integrations.starlette_client import OAuth
 from authlib.jose import jwt, JsonWebKey
 from authlib.jose.util import extract_header
 from fastapi import Request, Depends, HTTPException
 from fastapi.responses import RedirectResponse
+from functools import wraps
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
+from types import SimpleNamespace
+
+from fluvius.error import BadRequestError
+from fluvius.data import DataModel
+from pydantic import AnyUrl, EmailStr
+from uuid import UUID
+from typing import Literal
 
 from .setup import on_startup
 from .helper import uri
@@ -31,6 +37,29 @@ def auth_required(inject_ctx=True, **kwargs):
 
         return wrapper
     return decorator
+
+
+class TokenPayload(DataModel):
+    exp: int
+    iat: int
+    auth_time: int
+    jti: UUID
+    iss: AnyUrl
+    aud: str
+    sub: UUID
+    typ: Literal["ID"]
+    azp: str
+    nonce: str
+    session_state: UUID
+    at_hash: str
+    acr: str
+    sid: UUID
+    email_verified: bool
+    name: str
+    preferred_username: str
+    given_name: str
+    family_name: str
+    email: EmailStr
 
 
 class FluviusAuthMiddleware(BaseHTTPMiddleware):
@@ -80,10 +109,11 @@ class FluviusAuthProfileProvider(object):
     REGISTRY = {}
 
     def __init_subclass__(cls, key):
-        if key in FluviusAuthProfileProvider.REGISTRY:
-            raise ValueError(f'Auth Profile Provider is already registered: {key} => {FluviusAuthProfileProvider.REGISTRY[key]}')
+        REG = FluviusAuthProfileProvider.REGISTRY
+        if key in REG:
+            raise ValueError(f'Auth Profile Provider is already registered: {key} => {REG[key]}')
 
-        FluviusAuthProfileProvider.REGISTRY[key] = cls
+        REG[key] = cls
 
     @classmethod
     def get(cls, key):
@@ -94,14 +124,17 @@ class FluviusAuthProfileProvider(object):
 
     """ Lookup services for user related info """
     def __init__(self, user):
-        if not user:
-            raise HTTPException(status_code=401, detail="Not authenticated.")
-
-        self._user = user
-        self._profile = SimpleNamespace()
-        self._organization = SimpleNamespace()
-        self._iamroles = ('user', 'sysadmin', 'operator')
-
+        self._user = TokenPayload(**user)
+        self._profile = SimpleNamespace(
+            _id=self._user.jti,
+            name=self._user.name,
+            roles=('user', 'staff', 'provider')
+        )
+        self._organization = SimpleNamespace(
+            _id=self._user.sub,
+            name=self._user.family_name
+        )
+        self._iamroles = ('sysadmin', 'operator')
 
     @property
     def user(self):
@@ -205,14 +238,12 @@ def setup_authentication(app, config=config, base_path="/auth"):
 
     @api("callback")
     async def oauth_callback(request: Request):
-        logger.warning('TOken: %s', request.query_params.get('state'))
         token = await oauth.keycloak.authorize_access_token(request)
         id_token = token.get("id_token")
         if not id_token:
             raise HTTPException(status_code=400, detail="Missing ID token")
 
-        user = await decode_id_token(request.app.state.jwks_keyset, id_token)
-        request.session["user"] = user
+        request.session["user"] = await decode_id_token(request.app.state.jwks_keyset, id_token)
         response = RedirectResponse(url=SIGNIN_REDIRECT_URI)
         response.set_cookie('id_token', id_token)
         return response
