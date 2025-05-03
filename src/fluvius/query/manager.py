@@ -70,8 +70,12 @@ class QueryManager(object):
 
         return _decorator
 
+    @classmethod
+    def lookup_query_schema(cls, identifier):
+        return cls._registry[identifier]
+
     async def query(self, query_identifier, query_params: Optional[FrontendQueryParams]=None, **kwargs):
-        query_schema = self._registry[query_identifier]
+        query_schema = self.lookup_query_schema(query_identifier)
 
         if query_params is None:
             query_params = FrontendQueryParams(**kwargs)
