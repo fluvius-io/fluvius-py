@@ -55,7 +55,6 @@ class QuerySchemaMeta(DataModel):
     desc: Optional[str] = None
     tags: Optional[List] = None
 
-    query_identifier: str
     backend_resource: Optional[str] = None
 
     allow_item_view: bool = True
@@ -70,9 +69,6 @@ class QuerySchemaMeta(DataModel):
 
     ignored_params: List = tuple()
     default_order: List = tuple()
-
-    def _backend_resource(self):
-        return self.backend_resource or self.query_identifier
 
 
 class QuerySchema(object):
@@ -100,6 +96,9 @@ class QuerySchema(object):
 
         logger.info('Registered operator: [{operator._name}] @ {cls}')
         return cls.API_INDEX
+
+    def backend_resource(self):
+        return self.Meta.backend_resource or self._identifier
 
     def base_query(self, fe_query, **scope):
         return None
