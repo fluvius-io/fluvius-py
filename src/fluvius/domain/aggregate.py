@@ -30,7 +30,7 @@ class AggregateRoot(NamedTuple):
     domain_iid: UUID_TYPE = None
 
 
-def action(evt_key, resources=None, emit_event=True):
+def action(evt_key, /, resources=None, emit_event=True):
     if resources is not None and isinstance(resources, str):
         resources = (resources,)
 
