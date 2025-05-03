@@ -14,7 +14,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from . import logger, config
 from .auth import auth_required
-from .helper import uri, jurl_data, parse_scopes
+from .helper import uri, jurl_data, parse_scopes, SCOPES_SELECTOR
 
 
 class FastAPIDomainManager(DomainManager):
@@ -22,7 +22,7 @@ class FastAPIDomainManager(DomainManager):
         self.initialize_domains(app)
         tags = []
         for domain in self._domains:
-            metadata_uri = f"/{domain.__namespace__}.metadata/"
+            metadata_uri = f"/_metadata/{domain.__namespace__}/"
             tags.append({
                 "name": domain.Meta.name,
                 "description": domain.Meta.api_docs,
@@ -32,7 +32,7 @@ class FastAPIDomainManager(DomainManager):
                 }
             })
 
-            @app.get(metadata_uri, summary="Domain Metadata", tags=[domain.Meta.name])
+            @app.get(metadata_uri, summary=f"Domain [{domain.Meta.name}] Metadata", tags=['Metadata'])
             async def domain_metadata(request: Request):
                 return domain.metadata()
 
@@ -116,7 +116,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
                 return await _command_handler(request, payload, resource, identifier, {})
 
         if scope_schema:
-            @endpoint("~{scopes}", "{resource}", ":new")
+            @endpoint(SCOPES_SELECTOR, "{resource}", ":new")
             async def scoped_command_handler(
                 request: Request,
                 payload: PayloadType,
@@ -141,7 +141,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
 
 
     if scope_schema:
-        @endpoint("~{scopes}", "{resource}", "{identifier}")
+        @endpoint(SCOPES_SELECTOR, "{resource}", "{identifier}")
         async def scoped_command_handler(
             request: Request,
             payload: PayloadType,
@@ -156,14 +156,6 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
 
 
 def configure_domain_manager(app, *domains, **kwargs):
-    @app.get(uri("/:echo", "~{scopes}", "{path_query}", "{identifier}"))
-    async def query_echo(query_params: Annotated[FrontendQueryParams, Query()], scopes, path_query, identifier):
-        return {
-            "identifier": identifier,
-            "query_params": query_params,
-            "scopes": parse_scopes(scopes),
-            "path_query": jurl_data(path_query)
-        }
     FastAPIDomainManager.setup_app(app, *domains, **kwargs)
     return app
 

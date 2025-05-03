@@ -1,7 +1,11 @@
 import os
 import jsonurl_py
 
-SCOPING_SEP = '~'
+SCOPING_SIGN = ':'
+SCOPING_SEP = '='
+PATH_QUERY_SIGN = "~"
+SCOPES_SELECTOR = f"{SCOPING_SIGN}{{scopes}}"
+PATH_QUERY_SELECTOR = f"{PATH_QUERY_SIGN}{{path_query}}"
 
 
 def uri(*elements):
@@ -24,11 +28,11 @@ def parse_scopes(scoping_stmt, scope_schema={}):
         if not scoping_stmt:
             return
 
-        for part in scoping_stmt.split(SCOPING_SEP):
+        for part in scoping_stmt.split(SCOPING_SIGN):
             if not part:
                 continue
 
-            key, sep, value = part.partition(':')
+            key, sep, value = part.partition(SCOPING_SEP)
             if sep == '' and value == '':
                 value = key
                 key = 'domain_sid'

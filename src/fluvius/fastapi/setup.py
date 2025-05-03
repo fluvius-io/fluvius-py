@@ -15,7 +15,7 @@ def create_app(config=config, **kwargs):
     cfg.update(kwargs)
     app = FastAPI(lifespan=lifespan, **cfg)
 
-    @app.get("/:metadata", tags=["Metadata"])
+    @app.get("/_metadata", tags=["Metadata"])
     async def application_metadata(request: Request):
         ''' Basic information of the API application '''
         return {

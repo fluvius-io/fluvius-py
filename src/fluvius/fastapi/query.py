@@ -7,7 +7,7 @@ from fluvius.query.schema import QuerySchemaMeta
 
 from . import logger, config
 from .auth import auth_required
-from .helper import uri, jurl_data, parse_scopes
+from .helper import uri, jurl_data, parse_scopes, SCOPES_SELECTOR, PATH_QUERY_SELECTOR
 
 
 def register_query_schema(app, qm_cls, query_schema):
@@ -27,8 +27,8 @@ def register_query_schema(app, qm_cls, query_schema):
             'meta': meta
         }
 
-    def endpoint(*paths, method=app.get, **kwargs):
-        api_decorator = method(uri(base_uri, *paths), tags=api_tags, description=api_docs)
+    def endpoint(*paths, method=app.get, base=None, tags=None, **kwargs):
+        api_decorator = method(uri(base or base_uri, *paths), tags=tags or api_tags, description=api_docs)
         if not query_schema.Meta.auth_required:
             return api_decorator
 
@@ -40,24 +40,24 @@ def register_query_schema(app, qm_cls, query_schema):
 
     if query_schema.Meta.allow_list_view:
         if scope_schema:
-            @endpoint("~{scopes}", "{path_query}/")
+            @endpoint(SCOPES_SELECTOR, PATH_QUERY_SELECTOR, "")  # Trailing slash
             async def query_scoped_resource(path_query: Annotated[str, Path()], scopes: str):
                 return await _query_handler(None, path_query, scopes)
 
-            @endpoint("~{scopes}/")
+            @endpoint(SCOPES_SELECTOR, "")
             async def query_scoped_resource_json(query_params: Annotated[FrontendQueryParams, Query()], scopes: str):
                 return await _query_handler(query_params, None, scopes)
 
-        @endpoint("{path_query}/")
+        @endpoint(PATH_QUERY_SELECTOR, "")
         async def query_resource_json(path_query: Annotated[str, Path()]):
             return await _query_handler(None, path_query, None)
 
-        @endpoint()
+        @endpoint("") # Trailing slash
         async def query_resource(query_params: Annotated[FrontendQueryParams, Query()]):
             return await _query_handler(query_params, None, None)
 
     if query_schema.Meta.allow_meta_view:
-        @endpoint(":queryinfo")
+        @endpoint(base=f"/_info{base_uri}", tags=["Introspection"])
         async def query_info(request: Request) -> QuerySchemaMeta:
             return query_schema.Meta
 
@@ -67,7 +67,7 @@ def register_query_schema(app, qm_cls, query_schema):
             return [identifier, query_params]
 
         if scope_schema:
-            @endpoint("~{scopes}", "{identifier}")
+            @endpoint(SCOPES_SELECTOR, "{identifier}")
             async def query_scoped_item(identifier: Annotated[str, Path()], scopes: Annotated[str, Path()]):
                 return [identifier, scopes]
 
@@ -80,6 +80,15 @@ def register_query_manager(app, qm_cls):
 
 
 def configure_query_manager(app, *query_managers):
+    @app.get(uri("/_echo", SCOPES_SELECTOR, PATH_QUERY_SELECTOR, "{identifier}"), tags=["Introspection"])
+    async def query_echo(query_params: Annotated[FrontendQueryParams, Query()], scopes, path_query, identifier):
+        return {
+            "identifier": identifier,
+            "query_params": query_params,
+            "scopes": parse_scopes(scopes),
+            "path_query": jurl_data(path_query)
+        }
+
     for qm_cls in query_managers:
         register_query_manager(app, qm_cls)
 
