@@ -31,10 +31,10 @@ def validate_query_schema(schema_cls):
 
 
 class QueryManagerMeta(DataModel):
-    prefix: str
-    tags: List[str]
     name: str
-    desc: str
+    api_prefix: str
+    api_tags: List[str]
+    api_docs: str
 
 class QueryManager(object):
     _registry  = {}
@@ -49,9 +49,9 @@ class QueryManager(object):
         cls._registry = {}
         cls.Meta = QueryManagerMeta.create(cls.Meta, defaults={
             'name': cls.__name__,
-            'prefix': camel_to_lower(cls.__name__),
-            'desc': (cls.__doc__ or '').strip(),
-            'tags': [cls.__name__,]
+            'api_prefix': camel_to_lower(cls.__name__),
+            'api_docs': (cls.__doc__ or '').strip(),
+            'api_tags': [cls.__name__,]
         })
 
     @classmethod

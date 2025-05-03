@@ -52,8 +52,8 @@ class FrontendQueryParams(DataModel):
 
 class QuerySchemaMeta(DataModel):
     name: str
-    desc: Optional[str] = None
-    tags: Optional[List] = None
+    api_docs: Optional[str] = None
+    api_tags: Optional[List] = None
 
     backend_resource: Optional[str] = None
 
@@ -83,7 +83,7 @@ class QuerySchema(object):
         cls.OPS_INDEX = {}
         cls.Meta = QuerySchemaMeta.create(cls.Meta, defaults={
             'name': cls.__name__,
-            'desc': (cls.__doc__ or '').strip()
+            'api_docs': (cls.__doc__ or '').strip()
         })
 
     @classmethod
