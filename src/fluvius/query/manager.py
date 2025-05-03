@@ -33,8 +33,9 @@ def validate_query_schema(schema_cls):
 class QueryManagerMeta(DataModel):
     name: str
     api_prefix: str
-    api_tags: List[str]
-    api_docs: str
+    api_tags: Optional[List[str]] = None
+    api_docs: Optional[str] = None
+
 
 class QueryManager(object):
     _registry  = {}
