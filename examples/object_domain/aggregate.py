@@ -1,5 +1,5 @@
 from fluvius.domain import logger
-from fluvius.domain.aggregate import action, Aggregate, ALL_RESOURCES
+from fluvius.domain.aggregate import action, Aggregate
 
 
 class ObjectAggregate(Aggregate):

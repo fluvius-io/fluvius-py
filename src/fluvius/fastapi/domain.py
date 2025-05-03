@@ -197,7 +197,7 @@ def register_query_manager(app, qm_cls):
             async def query_resource_json(path_query: Annotated[str, Path()]):
                 return await _query_handler(None, path_query, None)
 
-            @api("")
+            @api()
             async def query_resource(query_params: Annotated[FrontendQueryParams, Query()]):
                 return await _query_handler(query_params, None, None)
 

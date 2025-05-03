@@ -41,7 +41,7 @@ class CommandMeta(DataModel):
     key: Optional[str] = None
     name: Optional[str] = None
     desc: Optional[str] = None
-    resources: tuple[str] = ('_ALL', )
+    resources: Optional[tuple[str]] = None
     tags: list[str] = tuple()
     scope_required: Optional[Dict] = None
     scope_optional: Optional[Dict] = None

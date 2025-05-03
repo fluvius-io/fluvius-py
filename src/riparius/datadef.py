@@ -27,7 +27,7 @@ class WorkflowState(PClass):
     params = field(dict, initial={})
     memory = field(dict, initial={})
     status = field(WorkflowStatus, initial=lambda: WorkflowStatus.BLANK)
-    strans = field(list, initial=[])
+    strans = field(list, initial=[])  # Status transitions logs
     participants = field(list, initial=[])
 
 

@@ -38,8 +38,6 @@ class WorkflowStateProxy(object):
         self.recover_step = partial(wf_engine._recover_step, step_id)
 
 
-
-
 def blacklist(*statuses):
     assert all(isinstance(s, WorkflowStatus) for s in statuses), \
         f'Invalid workflow statuses: {statuses}'
@@ -87,12 +85,12 @@ def step_transition(transit_func):
             raise StepTransitionError('P01004', f'Step transition is not valid. A step can only transit itself or its direct children.')
 
         try:
-            kwargs = transit_func(self, step, *args)
-            return self._update_step(step, **kwargs)
+            updates = transit_func(self, step, *args)
+            return self._update_step(step, **updates)
         except Exception as e:
-            st_state = self._stmap[step.selector]
+            step_state = self._stmap[step.selector]
             logger.exception('Error handling state transition: %s', e)
-            step.__class__.on_error(st_state)
+            step.on_error(step_state)
             return self._update_step(step, status=StepStatus.ERROR, message=str(e))
 
     return wrapper
@@ -116,8 +114,8 @@ class WorkflowEngine(object):
         self._st_proxy = {}
         self._memory = {}
         self._params = self.__wf__.__params__(**wf_state.params)
-        self._stmap = {}
-        self._steps = {}
+        self._stmap = {}    # Step selector map
+        self._steps = {}    # Step id map
         self.set_status(wf_state.status)
 
 

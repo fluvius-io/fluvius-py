@@ -12,7 +12,7 @@ from .activity import ActivityType, ActivityLog
 from .event import Event, EventRecord
 from .message import MessageRecord
 from .response import DomainResponse, ResponseRecord
-from .helper import consume_queue, include_resource, prepare_resource_spec, _AGGROOT_RESOURCES
+from .helper import consume_queue
 
 from . import mutation
 
@@ -29,14 +29,13 @@ class AggregateRoot(NamedTuple):
     domain_iid: UUID_TYPE = None
 
 
-def action(evt_key, resource=None, emit_event=True):
+def action(evt_key, resources=None, emit_event=True):
     def _decorator(func):
         func.__domain_event__ = evt_key
-        resource_spec = prepare_resource_spec(resource)
 
         @wraps(func)
         async def wrapper(self, *args, **evt_args):
-            if not include_resource(self._aggroot.resource, resource_spec):
+            if resources is not None and self._aggroot.resource not in resources:
                 raise ValueError('Action is not allowed on resource.')
 
             evt_data = await func(self, self.statemgr, *args, **evt_args)

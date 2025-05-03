@@ -13,7 +13,7 @@ from . import response as cr
 from . import logger
 from .entity import DOMAIN_ENTITY_MARKER, DomainEntityType, DOMAIN_ENTITY_KEY
 from .exceptions import DomainEntityError
-from .helper import consume_queue, prepare_resource_spec, _AGGROOT_RESOURCES
+from .helper import consume_queue
 from .command import field as command_field
 
 NONE_TYPE = type(None)

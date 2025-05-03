@@ -34,18 +34,6 @@ class EconomistQuery(QuerySchema):
         backend_resource = 'people-economist'
 
 
-# @pytest.mark.asyncio
-# async def test_query():
-
-#     hd = SampleQueryManager()
-#     pp = FrontendQuery(args={"!or": [{"business_name!ne": "ABC1"},{"business_name": "DEF3"}]})
-#     r, m = await hd.query("company-query", pp)
-#     logger.info(serialize_json(r))
-
-#     query_handler_2 = ObjectDomainQueryManager()
-#     r, m = await query_handler_2.query('economist', args={"job": 'economist'})
-#     logger.info(serialize_json(r))
-
 app = create_app()
 app = setup_authentication(app)
 app = configure_domain_manager(app, ObjectDomain)
@@ -79,7 +67,16 @@ async def protected_2(request: Request, identifier, scoping=None):
 
 
 # Resources query ...
-@app.get("/protected/{scoping}/", tags=["Sample API"])
+@app.post("/protected/{scoping}/",
+    tags=["Sample API"],
+    responses={
+        200: {
+            "content": {
+                "application/json": {"example": {"message": "JSON format"}},
+                "text/plain": {"example": "Plain text format"},
+            }
+        }
+    })
 @app.get("/protected/", tags=["Sample API"])
 @auth_required()
 async def protected_3(request: Request, scoping=None):

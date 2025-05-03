@@ -1,5 +1,6 @@
-def setup_mcp(app):
-    from fastapi_mcp import FastApiMCP
+from fastapi_mcp import FastApiMCP
+
+def configure_mcp_server(app):
     mcp = FastApiMCP(app)
     mcp.mount()
     return mcp

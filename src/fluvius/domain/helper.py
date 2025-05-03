@@ -16,11 +16,6 @@ CQRS_AUTO_FIELDS = (
     "_updater"
 )
 
-class _AGGROOT_RESOURCES(enum.Enum):
-    ALL = 'ALL'
-    ANY = ALL
-    N_A = 'N_A'
-
 
 def consume_queue(q):
     while not q.empty():
@@ -58,45 +53,4 @@ def cleanup_auto_fields(data: dict, extra_fields=None):
     return dict(_process(data))
 
 
-def prepare_resource_spec(resource_spec):
-    ''' Prepare the spec for [include_aggroot] '''
-
-    if not resource_spec:
-        return _AGGROOT_RESOURCES.N_A
-
-    if isinstance(resource_spec, _AGGROOT_RESOURCES):
-        return resource_spec
-
-    if isinstance(resource_spec, str):
-        return (resource_spec,)
-
-    if isinstance(resource_spec, tuple):
-        return resource_spec
-
-    if isinstance(resource_spec, list):
-        return tuple(resource_spec)
-
-    raise ValueError(f'Invalid aggroot resources specification: {resource_spec}')
-
-
-def include_resource(resource, resource_spec):
-    ''' Determine if a certain aggroot should be included in an operation
-        - True: include the aggroot object
-        - False: do not include.
-        Otherwise, raise an exception.
-    '''
-
-    if not isinstance(resource_spec, tuple):
-        raise ValueError(f'Invalid resource specs: {resource_spec}')
-
-    if '_NONE' in resource_spec:
-        return False
-
-    if '_ALL' in resource_spec:
-        return True
-
-    if resource not in resource_spec:
-        raise BadRequestError("H10231", f'Unable to operate on resource: `{resource}`. Allows: {resource_spec}')
-
-    return True
 
