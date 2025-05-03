@@ -3,13 +3,13 @@ from fluvius.domain.aggregate import action, Aggregate
 
 
 class ObjectAggregate(Aggregate):
-    @action('object-updated', resource='people-economist')
+    @action('object-updated', resources='people-economist')
     async def update(self, stm, /, content):
         obj = self.get_rootobj()
         await stm.update_one('people-economist', obj._id, etag=obj._etag, **content)
         return {'_id': obj._id}
 
-    @action('object-replaced', resource='people-economist')
+    @action('object-replaced', resources='people-economist')
     async def replace(self, stm, / , content):
         obj = self.get_rootobj()
         if "_id" in content and content["_id"] != obj._id:
@@ -24,7 +24,7 @@ class ObjectAggregate(Aggregate):
         await stm.insert_one('people-economist', person)
         return {'_id': person._id}
 
-    @action('object-removed', resource='_ALL')
+    @action('object-removed')
     async def remove(self, stm, /):
         obj = self.get_rootobj()
         await stm.invalidate_one('people-economist', obj._id)

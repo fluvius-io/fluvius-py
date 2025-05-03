@@ -25,7 +25,7 @@ class FastAPIDomainManager(DomainManager):
             metadata_uri = f"/{domain.__domain__}.metadata/"
             tags.append({
                 "name": domain.Meta.name,
-                "description": domain.Meta.desc,
+                "description": domain.Meta.api_docs,
                 "externalDocs": {
                     "description": "Metadata",
                     "url": f"http://localhost:8000{metadata_uri}"

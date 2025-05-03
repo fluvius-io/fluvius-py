@@ -97,7 +97,7 @@ class QueryBuilder(object):
     def _field(self, data_schema, field_key):
         if FIELD_SEP in field_key:
             resource, _, field_key = field_key.partition(FIELD_SEP)
-            model = self.schema_lookup(resource)
+            model = self.lookup_data_schema(resource)
         else:
             resource = None
             model = data_schema
@@ -156,7 +156,7 @@ class QueryBuilder(object):
             return stmt
 
         for join_stmt in join:
-            ftable = self.schema_lookup(join_stmt.foreign_table)
+            ftable = self.lookup_data_schema(join_stmt.foreign_table)
             return stmt.join(
                 ftable, getattr(data_schema, join_stmt.local_field) == getattr(ftable, join_stmt.foreign_field)
             )

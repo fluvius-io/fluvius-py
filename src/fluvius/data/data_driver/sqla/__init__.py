@@ -236,7 +236,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
         }
         Output: List(list of fields is selected)
         '''
-        data_schema = self.schema_lookup(resource)
+        data_schema = self.lookup_data_schema(resource)
         stmt = self.build_select(data_schema, query)
         async with self.session() as sess:
             cursor = await sess.execute(stmt)
@@ -262,7 +262,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
     async def find_one(self, resource, query: BackendQuery):
 
-        data_schema = self.schema_lookup(resource)
+        data_schema = self.lookup_data_schema(resource)
         stmt = self.build_select(data_schema, query)
         async with self.session() as sess:
             cursor = await sess.execute(stmt)
@@ -281,7 +281,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
         if not query.identifier:
             raise ValueError(f'Invalid update query: {query}')
 
-        data_schema = self.schema_lookup(resource)
+        data_schema = self.lookup_data_schema(resource)
         stmt = self.build_update(data_schema, query, updates)
         async with self.session() as sess:
             cursor = await sess.execute(stmt)
@@ -289,7 +289,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
         return self._unwrap_result(cursor)
 
     async def remove_one(self, resource, query: BackendQuery):
-        data_schema = self.schema_lookup(resource)
+        data_schema = self.lookup_data_schema(resource)
         if not query.identifier:
             raise ValueError(f'Invalid update query: {query}')
 
@@ -302,7 +302,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
     async def insert(self, resource, values: dict):
         try:
-            data_schema = self.schema_lookup(resource)
+            data_schema = self.lookup_data_schema(resource)
             stmt = self.build_insert(data_schema, values)
             async with self.session() as sess:
                 cursor = await sess.execute(stmt)

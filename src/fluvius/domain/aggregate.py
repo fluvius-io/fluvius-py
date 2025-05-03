@@ -21,6 +21,7 @@ IF_MATCH_VERIFY = config.IF_MATCH_VERIFY
 DEFAULT_RESPONSE_TYPE = config.DEFAULT_RESPONSE_TYPE
 ALL_RESOURCES = '_ALL'
 
+NoneType = type(None)
 
 class AggregateRoot(NamedTuple):
     resource: str
@@ -30,6 +31,11 @@ class AggregateRoot(NamedTuple):
 
 
 def action(evt_key, resources=None, emit_event=True):
+    if resources is not None and isinstance(resources, str):
+        resources = (resources,)
+
+    assert resources is None or isinstance(resources, (tuple, list))
+
     def _decorator(func):
         func.__domain_event__ = evt_key
 

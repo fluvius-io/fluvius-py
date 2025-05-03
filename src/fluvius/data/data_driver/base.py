@@ -1,5 +1,4 @@
-from pyrsistent import PClass
-from contextlib import contextmanager, asynccontextmanager
+from contextlib import asynccontextmanager
 from datetime import datetime
 from dataclasses import is_dataclass, dataclass, field
 from fluvius.helper import camel_to_lower
@@ -8,6 +7,10 @@ from fluvius.data.constant import *
 
 _DEBUG = config.DEBUG
 _DRIVER_REGISTRY = {}
+
+
+class UnregisteredDataSchemaError(RuntimeError):
+    pass
 
 
 class DataDriver(object):
@@ -24,8 +27,11 @@ class DataDriver(object):
         raise NotImplementedError('DataDriver.connect is not implemented.')
     
     @classmethod
-    def schema_lookup(cls, resource):
-        return cls._schema_model[resource]
+    def lookup_data_schema(cls, resource):
+        try:
+            return cls._schema_model[resource]
+        except KeyError:
+            raise UnregisteredDataSchemaError(f'Data schema is not registered: {resource}')
 
     @classmethod
     def register_schema(cls, resource):

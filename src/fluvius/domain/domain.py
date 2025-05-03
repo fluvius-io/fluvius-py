@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from operator import itemgetter
 from pyrsistent import PClass, field
 from types import SimpleNamespace
-from typing import Iterator, Optional
+from typing import Iterator, Optional, List
 
 from fluvius.data import UUID_GENR, DataModel
 from fluvius.helper import camel_to_lower
@@ -404,7 +404,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
     def metadata(self):
         return {
             'name': self.Meta.name,
-            'desc': self.Meta.desc,
+            'desc': self.Meta.api_docs,
             'revision': self.Meta.revision,
             'commands': [name for _, name, _ in self.enumerate_command()]
         }
