@@ -203,7 +203,7 @@ class DomainEntityRegistry(object):
     @classmethod
     def _entity(domain_cls, cls_or_key, validate_kind=None):
         def decorator(cls):
-            domain_name = domain_cls.__domain__
+            domain_name = domain_cls.__namespace__
             kind, cls = _validate_domain_entity(cls)
             if validate_kind and validate_kind != kind:
                 raise ValueError(f'Invalid entity type: {validate_kind} != {kind}')
@@ -211,7 +211,7 @@ class DomainEntityRegistry(object):
             identifier = (key, kind)
             if identifier in domain_cls._entity_registry:
                 raise ValueError(
-                    '[E14007] Entity already registered [%s] within domain [%s]', identifier, cls.__domain__)
+                    '[E14007] Entity already registered [%s] within domain [%s]', identifier, cls.__namespace__)
 
             setattr(cls, DOMAIN_ENTITY_MARKER, (key, kind, domain_name))
             setattr(cls, DOMAIN_ENTITY_KEY, key)
@@ -246,7 +246,7 @@ class DomainEntityRegistry(object):
 
             domain_cls._register_entity(cls, key, DomainEntityType.MESSAGE)
 
-            DEBUG and logger.info("[REGISTERED MESSAGE] %s/%d [%s]", domain_cls.__domain__, DomainEntityType.MESSAGE, key)
+            DEBUG and logger.info("[REGISTERED MESSAGE] %s/%d [%s]", domain_cls.__namespace__, DomainEntityType.MESSAGE, key)
             return cls
 
         key = cls_or_key
@@ -283,7 +283,7 @@ class DomainEntityRegistry(object):
 
     @classmethod
     def _register_entity(domain_cls, entity_cls, key, kind):
-        domain_name = domain_cls.__domain__
+        domain_name = domain_cls.__namespace__
         identifier = (key, kind)
 
         if identifier in domain_cls._entity_registry:
@@ -394,7 +394,7 @@ class DomainEntityRegistry(object):
     def _enumerate_entity(cls, match_kind=None):
         for (key, kind), entity in cls._entity_registry.items():
             if match_kind is None or kind == match_kind:
-                fq_name = NAMESPACE_SEP.join((cls.__domain__, key))
+                fq_name = NAMESPACE_SEP.join((cls.__namespace__, key))
                 yield (entity, key, fq_name)
 
     @classmethod

@@ -22,7 +22,7 @@ class FastAPIDomainManager(DomainManager):
         self.initialize_domains(app)
         tags = []
         for domain in self._domains:
-            metadata_uri = f"/{domain.__domain__}.metadata/"
+            metadata_uri = f"/{domain.__namespace__}.metadata/"
             tags.append({
                 "name": domain.Meta.name,
                 "description": domain.Meta.api_docs,
@@ -55,7 +55,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
     default_path = bool(not cmd_cls.Meta.scope_required)
     endpoint_info = dict(
                 summary=cmd_cls.Meta.name,
-                description=domain.Meta.api_docs,
+                description=cmd_cls.Meta.api_docs,
                 tags=domain.Meta.api_tags
     )
 
@@ -106,7 +106,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
             async def command_handler(
                 request: Request,
                 payload: PayloadType,
-                resource: Annotated[str, Path(description=cmd_cls.Meta.resource_desc)]
+                resource: Annotated[str, Path(description=cmd_cls.Meta.resource_docs)]
             ):
                 identifier = UUID_GENR()
                 return await _command_handler(request, payload, resource, identifier, {})
@@ -116,7 +116,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
             async def scoped_command_handler(
                 request: Request,
                 payload: PayloadType,
-                resource: Annotated[str, Path(description=cmd_cls.Meta.resource_desc)],
+                resource: Annotated[str, Path(description=cmd_cls.Meta.resource_docs)],
                 scoping: Annotated[str, Path(description=f"Resource scoping: `{', '.join(scope_keys)}`. E.g. `~domain_sid:H9cNmGXLEc8NWcZzSThA9S`")]
             ):
                 identifier = UUID_GENR()
@@ -130,7 +130,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
         async def command_handler(
             request: Request,
             payload: PayloadType,
-            resource: Annotated[str, Path(description=cmd_cls.Meta.resource_desc)],
+            resource: Annotated[str, Path(description=cmd_cls.Meta.resource_docs)],
             identifier: Annotated[UUID_TYPE, Path(description="Resource identifier")],
         ):
             return await _command_handler(request, payload, resource, identifier, {})
@@ -141,7 +141,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
         async def scoped_command_handler(
             request: Request,
             payload: PayloadType,
-            resource: Annotated[str, Path(description=cmd_cls.Meta.resource_desc)],
+            resource: Annotated[str, Path(description=cmd_cls.Meta.resource_docs)],
             identifier: Annotated[UUID_TYPE, Path(description="Resource identifier")],
             scoping: Annotated[str, Path(description=f"Resource scoping: `{', '.join(scope_keys)}`. E.g. `domain_sid~H9cNmGXLEc8NWcZzSThA9S`")]
         ):

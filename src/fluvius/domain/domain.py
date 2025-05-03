@@ -84,7 +84,7 @@ class DomainMeta(DataModel):
 
 
 class Domain(DomainSignalManager, DomainEntityRegistry):
-    __domain__      = None
+    __namespace__      = None
     __aggregate__   = None
     __statemgr__    = StateManager
     __logstore__    = DomainLogStore
@@ -104,16 +104,16 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         revision = 0
 
     def __init_subclass__(cls):
-        if not hasattr(cls, '__domain__'):
-            setattr(cls, '__domain__', camel_to_lower(cls.__name__))
+        if not hasattr(cls, '__namespace__'):
+            setattr(cls, '__namespace__', camel_to_lower(cls.__name__))
 
-        if cls.__domain__ in Domain._REGISTRY:
-            raise ValueError(f'Domain already registered: {cls.__domain__}')
+        if cls.__namespace__ in Domain._REGISTRY:
+            raise ValueError(f'Domain already registered: {cls.__namespace__}')
 
         if not issubclass(cls.__aggregate__, Aggregate):
             raise ValueError(f'Invalid domain aggregate: {cls.__aggregate__}')
 
-        Domain._REGISTRY[cls.__domain__] = cls
+        Domain._REGISTRY[cls.__namespace__] = cls
 
         class ResponseBase(cres.DomainResponse):
             def __init_subclass__(rsp_cls):
@@ -141,7 +141,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         cls.Event = EventBase
         cls.Meta = DomainMeta.create(cls.Meta, defaults={
             'name': cls.__name__,
-            'api_prefix': cls.__domain__,
+            'api_prefix': cls.__namespace__,
             'api_docs': (cls.__doc__ or '').strip(),
             'api_tags': [cls.__name__, ]
         })
@@ -157,7 +157,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         self._logstore = self.__logstore__(app, **config)
         self._statemgr = self.__statemgr__(app, **config)
         self._context = self.__context__(
-            domain = self.__domain__,
+            domain = self.__namespace__,
             revision = self.__revision__
         )
 
@@ -186,8 +186,8 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         if not issubclass(self.__logstore__, DomainLogStore):
             raise ValueError(f'Domain has invalid log store [{self.__logstore__}]')
 
-        if not self.__domain__:
-            raise ValueError('Domain does not have a name [__domain__]')
+        if not self.__namespace__:
+            raise ValueError('Domain does not have a name [__namespace__]')
 
         return self.__config__(**config)
 
@@ -201,7 +201,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
     @property
     def domain_name(self):
         ''' @PITFALL: hasattr('__state') will always return False '''
-        return self.__domain__
+        return self.__namespace__
 
     @property
     def statemgr(self):
@@ -225,7 +225,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
     @classmethod
     def cmdpath(cls, command, resource, identifier="", dataset=None):
-        return os.path.join(cls.__domain__, f"@{command}", resource, str(identifier))
+        return os.path.join(cls.__namespace__, f"@{command}", resource, str(identifier))
 
     async def dispatch_messages(self, msg_queue):
         for msg_record in consume_queue(msg_queue):
@@ -266,7 +266,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         data = cmd_cls.Data.create(cmd_data)
 
         return cc.CommandBundle(
-            domain=self.__domain__,
+            domain=self.__namespace__,
             revision=self.__revision__,
             command=cmd_key,
             payload=data,
@@ -377,7 +377,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             for cmd in commands:
                 auth_cmd = await self.authorize_command(cmd.set(
                     context=context._id,
-                    domain=self.__domain__,
+                    domain=self.__namespace__,
                     revision=self.__revision__
                 ))
                 async for evt in self._process_command_internal(context, stm, auth_cmd):
