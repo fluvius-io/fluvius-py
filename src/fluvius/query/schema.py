@@ -56,7 +56,7 @@ class QuerySchemaMeta(DataModel):
     tags: Optional[List] = None
 
     query_identifier: str
-    backend_resource: str
+    backend_resource: Optional[str] = None
 
     allow_item_view: bool = True
     allow_list_view: bool = True
@@ -70,6 +70,9 @@ class QuerySchemaMeta(DataModel):
 
     ignored_params: List = tuple()
     default_order: List = tuple()
+
+    def _backend_resource(self):
+        return self.backend_resource or self.query_identifier
 
 
 class QuerySchema(object):

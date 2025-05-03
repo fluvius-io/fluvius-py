@@ -117,6 +117,6 @@ class DomainQueryManager(QueryManager):
     async def execute_query(self, query_schema, backend_query: BackendQuery):
         """ Execute the backend query with the state manager and return """
         meta = {}
-        resource = query_schema.Meta.backend_resource
+        resource = query_schema.Meta._backend_resource()
         data = await self.data.query(resource, backend_query, meta=meta)
         return data, meta
