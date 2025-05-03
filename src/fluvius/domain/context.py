@@ -34,6 +34,7 @@ class DomainTransport(enum.Enum):
     SANIC = 'SANIC'
     REDIS = 'REDIS'
     KAFKA = 'KAFKA'
+    FASTAPI = 'FASTAPI'
     RABITTMQ = 'RABITTMQ'
     COMMAND_LINE = 'CLI'
     UNKNOWN = 'UNKNOWN'

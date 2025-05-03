@@ -54,9 +54,9 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
     scope_schema = (cmd_cls.Meta.scope_required or cmd_cls.Meta.scope_optional)
     default_path = bool(not cmd_cls.Meta.scope_required)
     endpoint_info = dict(
-                summary=cmd_cls.Meta.name or cmd_cls.__name__,
-                description=cmd_cls.__doc__,
-                tags=[domain.Meta.name]
+                summary=cmd_cls.Meta.name,
+                description=domain.Meta.api_docs,
+                tags=domain.Meta.api_tags
     )
 
     def postapi(*paths, method=app.post, **kwargs):
@@ -79,7 +79,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
     ) -> Any:
         context = domain.setup_context(
             headers=dict(request.headers),
-            transport=DomainTransport.REDIS,
+            transport=DomainTransport.FASTAPI,
             source=request.client.host
         )
 
@@ -112,7 +112,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
                 return await _command_handler(request, payload, resource, identifier, {})
 
         if scope_schema:
-            @postapi("~{scopes}","{resource}", ":new")
+            @postapi("~{scopes}", "{resource}", ":new")
             async def scoped_command_handler(
                 request: Request,
                 payload: PayloadType,
@@ -155,9 +155,9 @@ def register_query_manager(app, qm_cls):
     manager = qm_cls(app)
 
     for query_id, query_schema in qm_cls._registry.items():
-        base_uri = f"/{qm_cls.Meta.prefix}.{query_id}/"
-        api_tags = query_schema.Meta.tags or qm_cls.Meta.tags
-        api_docs = query_schema.Meta.desc or qm_cls.Meta.desc
+        base_uri = f"/{qm_cls.Meta.api_prefix}.{query_id}/"
+        api_tags = query_schema.Meta.api_tags or qm_cls.Meta.api_tags
+        api_docs = query_schema.Meta.api_docs or qm_cls.Meta.api_docs
         api_info = dict(tags=api_tags, description=api_docs)
         scope_schema = (query_schema.Meta.scope_required or query_schema.Meta.scope_optional)
 

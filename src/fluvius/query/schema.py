@@ -52,11 +52,10 @@ class FrontendQueryParams(DataModel):
 
 class QuerySchemaMeta(DataModel):
     name: str
-    desc: Optional[str] = None
-    tags: Optional[List] = None
+    api_docs: Optional[str] = None
+    api_tags: Optional[List] = None
 
-    query_identifier: str
-    backend_resource: str
+    backend_resource: Optional[str] = None
 
     allow_item_view: bool = True
     allow_list_view: bool = True
@@ -84,7 +83,7 @@ class QuerySchema(object):
         cls.OPS_INDEX = {}
         cls.Meta = QuerySchemaMeta.create(cls.Meta, defaults={
             'name': cls.__name__,
-            'desc': (cls.__doc__ or '').strip()
+            'api_docs': (cls.__doc__ or '').strip()
         })
 
     @classmethod
@@ -97,6 +96,9 @@ class QuerySchema(object):
 
         logger.info('Registered operator: [{operator._name}] @ {cls}')
         return cls.API_INDEX
+
+    def backend_resource(self):
+        return self.Meta.backend_resource or self._identifier
 
     def base_query(self, fe_query, **scope):
         return None

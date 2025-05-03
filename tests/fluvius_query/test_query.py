@@ -11,20 +11,19 @@ class SampleQueryManager(DomainQueryManager):
     __data_manager__ = SampleDataAccessManager
 
 
-@SampleQueryManager.register_schema
+@SampleQueryManager.register_schema('company-query')
 class CompanyQuery(QuerySchema):
     business_name = StringField("Test Field", identifier=True)
 
     class Meta:
-        query_identifier = "company-query"
         backend_resource = 'company'
 
-@ObjectDomainQueryManager.register_schema
+
+@ObjectDomainQueryManager.register_schema('economist')
 class EconomistQuery(QuerySchema):
     job = StringField("Job match", identifier=True)
 
     class Meta:
-        query_identifier = 'economist'
         backend_resource = 'people-economist'
 
 

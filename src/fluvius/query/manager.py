@@ -31,10 +31,10 @@ def validate_query_schema(schema_cls):
 
 
 class QueryManagerMeta(DataModel):
-    prefix: str
-    tags: List[str]
     name: str
-    desc: str
+    api_prefix: str
+    api_tags: List[str]
+    api_docs: str
 
 class QueryManager(object):
     _registry  = {}
@@ -49,19 +49,25 @@ class QueryManager(object):
         cls._registry = {}
         cls.Meta = QueryManagerMeta.create(cls.Meta, defaults={
             'name': cls.__name__,
-            'prefix': camel_to_lower(cls.__name__),
-            'desc': (cls.__doc__ or '').strip(),
-            'tags': [cls.__name__,]
+            'api_prefix': camel_to_lower(cls.__name__),
+            'api_docs': (cls.__doc__ or '').strip(),
+            'api_tags': [cls.__name__,]
         })
 
     @classmethod
-    def register_schema(cls, schema_cls):
-        query_identifier = schema_cls.Meta.query_identifier
-        if query_identifier in cls._registry:
-            raise ValueError(f'Resource identifier is already registered: {query_identifier} => {schema_cls}')
+    def register_schema(cls, query_identifier):
+        def _decorator(schema_cls):
+            if getattr(schema_cls, '_identifier', None):
+                raise ValueError(f'QuerySchema already registered with identifier: {schema_cls._identifier}')
 
-        cls._registry[query_identifier] = validate_query_schema(schema_cls)()
-        return schema_cls
+            schema_cls._identifier = query_identifier
+            if query_identifier in cls._registry:
+                raise ValueError(f'Resource identifier is already registered: {query_identifier} => {schema_cls}')
+
+            cls._registry[query_identifier] = validate_query_schema(schema_cls)()
+            return schema_cls
+
+        return _decorator
 
     async def query(self, query_identifier, query_params: Optional[FrontendQueryParams]=None, **kwargs):
         query_schema = self._registry[query_identifier]
@@ -117,6 +123,6 @@ class DomainQueryManager(QueryManager):
     async def execute_query(self, query_schema, backend_query: BackendQuery):
         """ Execute the backend query with the state manager and return """
         meta = {}
-        resource = query_schema.Meta.backend_resource
+        resource = query_schema.backend_resource()
         data = await self.data.query(resource, backend_query, meta=meta)
         return data, meta
