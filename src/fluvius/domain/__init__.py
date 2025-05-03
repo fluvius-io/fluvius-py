@@ -12,6 +12,7 @@ from .record import DomainEntityRecord
 from .response import DomainResponse
 from .state import StateManager, data_query
 from .model import ImmutableDomainResource
+from .logstore import SQLDomainLogStore, DomainLogStore
 
 __all__ = (
     "Aggregate",

@@ -20,7 +20,7 @@ class CustomObjectStateManager(DataAccessManager):
 class ObjectDomain(Domain):
     ''' Generic Object Domain, mostly for testing '''
 
-    __domain__ = "generic-object"
+    __namespace__ = "generic-object"
     __aggregate__ = ObjectAggregate
     __statemgr__ = CustomObjectStateManager
     __logstore__ = SQLDomainLogStore

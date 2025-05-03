@@ -7,7 +7,7 @@ from object_domain.storage import PeopleEconomistResource, populate_fixture_data
 NS = 'cqrs-worker-sample'
 
 class OBJDM2(ObjectDomain):
-    __domain__ = 'object-domain-no-2'
+    __namespace__ = 'object-domain-no-2'
 
 
 class DomainWorkerSample(DomainWorker):

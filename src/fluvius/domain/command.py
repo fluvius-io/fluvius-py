@@ -47,7 +47,9 @@ class CommandMeta(DataModel):
     scope_optional: Optional[Dict] = None
     new_resource: bool = False
     auth_required: bool = True
-    resource_desc: str = 'Unique key of the resource to be created. E.g. `snake-case-resource`'
+    api_docs: Optional[str] = None
+    api_tags: Optional[List[str]] = None
+    resource_docs: Optional[str] = None
 
 
 class Command(DomainEntity):

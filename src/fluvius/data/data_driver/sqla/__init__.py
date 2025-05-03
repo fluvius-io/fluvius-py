@@ -131,6 +131,9 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
     def __init__(self, db_dsn=None, **kwargs):
         self._dsn = db_dsn if db_dsn else self.__db_dsn__
+        if self._dsn is None:
+            raise ValueError(f'No database DSN provided to: {self}')
+
         self._async_session = _AsyncSessionConnection(self.dsn)
 
         logger.info(f'Driver [{self.__class__.__name__}] setup with DSN: {self.dsn}')
