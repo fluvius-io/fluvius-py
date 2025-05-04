@@ -1,6 +1,5 @@
 from fastapi import Request
-from fluvius.fastapi import create_app, setup_authentication, auth_required
-from fluvius.fastapi.domain import configure_domain_manager, configure_query_manager
+from fluvius.fastapi import create_app, setup_authentication, auth_required, configure_domain_manager, configure_query_manager
 from object_domain.domain import ObjectDomain
 
 import pytest

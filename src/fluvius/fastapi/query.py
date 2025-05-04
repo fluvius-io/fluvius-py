@@ -10,10 +10,11 @@ from .auth import auth_required
 from .helper import uri, jurl_data, parse_scopes, SCOPES_SELECTOR, PATH_QUERY_SELECTOR
 
 
-def register_query_schema(app, qm_cls, query_schema):
-    base_uri = f"/{qm_cls.Meta.api_prefix}.{query_schema._identifier}/"
-    api_tags = query_schema.Meta.api_tags or qm_cls.Meta.api_tags
-    api_docs = query_schema.Meta.api_docs or qm_cls.Meta.api_docs
+def register_query_schema(app, manager, query_schema):
+    query_id = query_schema._identifier
+    base_uri = f"/{manager.Meta.api_prefix}.{query_id}/"
+    api_tags = query_schema.Meta.api_tags or manager.Meta.api_tags
+    api_docs = query_schema.Meta.api_docs or manager.Meta.api_docs
     scope_schema = (query_schema.Meta.scope_required or query_schema.Meta.scope_optional)
 
     async def _query_handler(query_params: FrontendQueryParams, path_query: str=None, scopes: str=None):
@@ -34,7 +35,7 @@ def register_query_schema(app, qm_cls, query_schema):
 
         auth_decorator = auth_required(**kwargs)
         def _api_def(func):
-            return api_decorator(auth_decorator(func))
+            return auth_decorator(api_decorator(func))
 
         return _api_def
 
@@ -49,7 +50,7 @@ def register_query_schema(app, qm_cls, query_schema):
                 return await _query_handler(query_params, None, scopes)
 
         @endpoint(PATH_QUERY_SELECTOR, "")
-        async def query_resource_json(path_query: Annotated[str, Path()]):
+        async def query_resource_json(path_query: Annotated[str, Path()], query_params: Annotated[FrontendQueryParams, Query()]):
             return await _query_handler(None, path_query, None)
 
         @endpoint("") # Trailing slash
@@ -76,7 +77,7 @@ def register_query_manager(app, qm_cls):
     manager = qm_cls(app)
 
     for _, query_schema in qm_cls._registry.items():
-        register_query_schema(app, qm_cls, query_schema)
+        register_query_schema(app, manager, query_schema)
 
 
 def configure_query_manager(app, *query_managers):
