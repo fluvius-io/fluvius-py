@@ -83,14 +83,14 @@ class QueryField(DataModel):
 
     @property
     def schema(self):
-        return self._query_schema
+        return self._schema
 
     def associate(self, query_schema, field_name):
         if self._key:
             raise ValueError(f'Field key is is already set [{self._key}]')
 
         self._source = self.source or field_name
-        self._query_schema = query_schema
+        self._schema = query_schema
         self._key = field_name
 
         return self

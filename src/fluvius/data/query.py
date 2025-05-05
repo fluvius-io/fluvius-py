@@ -33,7 +33,7 @@ def validate_list(sort_stmt):
     if isinstance(sort_stmt, tuple):
         return sort_stmt
 
-    if isinstance(sort_stmt, list):
+    if isinstance(sort_stmt, (list, set)):
         return tuple(sort_stmt)
 
     raise ValueError('Invalid list value.')
@@ -57,8 +57,18 @@ class BackendQuery(PClass):
     limit   = field(int, initial=lambda: config.BACKEND_QUERY_DEFAULT_LIMIT)
     offset  = field(int, initial=lambda: 0)
     sort    = field(tuple, factory=validate_list, initial=tuple)
-    where   = field(nullable(dict), initial=dict)
-    scope   = field(nullable(dict), initial=dict)
+    where   = field(nullable(dict), initial=None)
+    scope   = field(nullable(dict), initial=None)
+    mapping = field(dict, initial=dict)
+
+    def field_map(self, field_name):
+        if not self.mapping:
+            return field_name
+
+        if field_name in self.mapping:
+            return self.mapping[field_name]
+
+        return field_name
 
     @classmethod
     def create(cls, query_data=None, **kwargs):

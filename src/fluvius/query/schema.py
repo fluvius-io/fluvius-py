@@ -7,48 +7,12 @@ from fluvius.helper import _assert
 from fluvius.data.query import operator_statement, OperatorStatement
 
 from .field import QueryField
+from .model import FrontendQuery
 
 from . import operator, logger, config
 
 DEFAULT_DELETED_FIELD = "_deleted"
 RX_PARAM_SPLIT = re.compile(r'(:|!)')
-
-
-class FrontendQuery(DataModel):
-    identifier: Optional[str] = None
-
-    limit: int = config.DEFAULT_QUERY_LIMIT
-    offset: int = 0
-
-    select: Optional[List[str]] = None
-    deselect: Optional[List[str]] = None
-
-    sort: Optional[List[str]] = None
-    query: Optional[Dict[OperatorStatement, Any]] = None
-    scope: Optional[Dict[str, str]] = None
-
-
-class FrontendQueryParams(DataModel):
-    size: int = config.DEFAULT_QUERY_LIMIT
-    page: int = 1
-
-    select: Optional[List[str]] = None
-    deselect: Optional[List[str]] = None
-
-    sort: Optional[List[str]] = None
-    query: Optional[str] = None
-
-    def build_query(self, query_schema, identifier=None, scope=None) -> FrontendQuery:
-        return FrontendQuery(
-            identifier = identifier,
-            scope = scope,
-            limit = self.size,
-            offset = (self.page - 1) * self.size,
-            select = self.select,
-            deselect = self.deselect,
-            sort = self.sort,
-            query = query_schema.validate_schema_args(self.query)
-        )
 
 class QuerySchemaMeta(DataModel):
     name: str
@@ -69,6 +33,7 @@ class QuerySchemaMeta(DataModel):
 
     ignored_params: List = tuple()
     default_order: List = tuple()
+    select_all: bool = False
 
 
 class QuerySchema(object):
@@ -103,13 +68,14 @@ class QuerySchema(object):
     def base_query(self, fe_query, **scope):
         return None
 
-    def validate_schema_args(self, args):
+    def validate_schema_args(self, fe_query):
+        args = fe_query.query
+        query_params = self.query_params
+
         if args is None:
             return {}
 
-        query_params = self.query_params
         args = json.loads(args)
-
 
         def _run():
             for k, v in args.items():
@@ -123,18 +89,15 @@ class QuerySchema(object):
     def __init__(self):
         meta = self.Meta
 
-        def parse_default_order(fieldmap):
+        def parse_default_order():
             default_order = meta.default_order
             if meta.default_order:
                 return meta.default_order
 
-            if "_created" in fieldmap.keys():
-                return [("_created", "asc")]
-
-            _id = meta.id_field
+            _id = self.id_field
             return [(_id, "asc")]
 
-        def parse_soft_delete(fieldmap):
+        def parse_soft_delete():
             soft_delete = meta.soft_delete_query
             if isinstance(soft_delete, str):
                 return soft_delete
@@ -152,13 +115,13 @@ class QuerySchema(object):
             for qfield in fields:
                 yield from qfield.gen_params()
 
-        def gen_fieldmap():
+        def gen_fields():
             for fn in dir(self):
                 qfield = getattr(self, fn)
                 if not isinstance(qfield, QueryField):
                     continue
 
-                yield fn, qfield.associate(self, fn)
+                yield qfield.associate(self, fn)
 
                 if qfield.identifier:
                     if getattr(self, 'id_field', None):
@@ -167,11 +130,12 @@ class QuerySchema(object):
                     self.id_field = qfield.key
 
 
-        self.query_fieldmap = dict(gen_fieldmap())
-        self.query_fields = tuple(self.query_fieldmap.values())
-        self.query_params = {p.selector: p for p in query_params(self.query_fields)}
+        self.query_fields = tuple(gen_fields())
+        self.query_mapping = {f._key: f._source for f in self.query_fields if f._key != f._source}
+        self.query_params = {param.selector: param for param in query_params(self.query_fields)}
+        self.select_fields = set(qfield.key for qfield in self.query_fields if not qfield.hidden)
         self.sortable_fields = (qfield.key for qfield in self.query_fields if qfield.sortable)
-        self.default_order = meta.default_order
-        self.soft_delete_query = parse_soft_delete(self.query_fieldmap)
+        self.default_order = parse_default_order()
+        self.soft_delete_query = parse_soft_delete()
 
 

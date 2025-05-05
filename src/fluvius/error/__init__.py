@@ -22,10 +22,10 @@ class FluviusException(Exception):
 
     @property
     def content(self):
-        if not exc.payload:
-            return {"errcode": exc.errcode, "message": exc.message}
+        if not self.payload:
+            return {"errcode": self.errcode, "message": self.message}
 
-        return {"errcode": exc.errcode, "message": exc.message, "payload": exc.payload}
+        return {"errcode": self.errcode, "message": self.message, "payload": self.payload}
 
 
 class NotFoundError(FluviusException):
@@ -68,4 +68,10 @@ class LockedError(FluviusException):
     label = "Resource Locked"
     status_code = 423
     errcode = "A00423"
+
+
+class InternalServerError(FluviusException):
+    label = "Internal Server Error"
+    status_code = 500
+    errcode = "A00500"
 

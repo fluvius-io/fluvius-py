@@ -98,19 +98,19 @@ class DataAccessManagerBase(object):
         if not self.__auto_model__:
             return
 
-        for resource_name, schema_model in self.connector._schema_model.items():
-            model = self._gen_model(schema_model)
+        for resource_name, data_schema in self.connector._data_schema.items():
+            model = self._gen_model(data_schema)
             try:
                 self.register_model(resource_name, auto_model=True)(model)
             except ResourceAlreadyRegistered:
                 logger.warning(f'Model already registered: {resource_name}')
 
 
-    def _gen_model(self, schema_model):
-        if self.__auto_model__ == 'schema':
-            return schema_model
+    def _gen_model(self, data_schema):
+        if not isinstance(self.__auto_model__, bool):
+            raise ValueError(f'__auto_model__ only accept True / False: {self}')
 
-        return type(f"{schema_model.__name__}_Model", (BlankModel, ), {})
+        return type(f"{data_schema.__name__}_Model", (BlankModel, ), {})
 
     @classmethod
     def register_model(cls, resource: str, auto_model: bool=False):

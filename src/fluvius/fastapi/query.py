@@ -2,7 +2,7 @@ import os
 
 from typing import Annotated, Union, Any, Optional, Dict
 from fastapi import Request, Path, Body, Query
-from fluvius.query.schema import FrontendQueryParams
+from fluvius.query.schema import FrontendQuery
 from fluvius.query.schema import QuerySchemaMeta
 
 from . import logger, config
@@ -17,10 +17,10 @@ def register_query_schema(app, manager, query_schema):
     api_docs = query_schema.Meta.api_docs or manager.Meta.api_docs
     scope_schema = (query_schema.Meta.scope_required or query_schema.Meta.scope_optional)
 
-    async def _query_handler(query_params: FrontendQueryParams, path_query: str=None, scopes: str=None):
+    async def _query_handler(query_params: FrontendQuery, path_query: str=None, scopes: str=None):
         if path_query:
             params = jurl_data(path_query)
-            query_params = FrontendQueryParams(**params)
+            query_params = FrontendQuery(**params)
 
         data, meta = await manager.query(query_id, query_params)
         return {
@@ -46,15 +46,15 @@ def register_query_schema(app, manager, query_schema):
                 return await _query_handler(None, path_query, scopes)
 
             @endpoint(SCOPES_SELECTOR, "")
-            async def query_scoped_resource_json(query_params: Annotated[FrontendQueryParams, Query()], scopes: str):
+            async def query_scoped_resource_json(query_params: Annotated[FrontendQuery, Query()], scopes: str):
                 return await _query_handler(query_params, None, scopes)
 
         @endpoint(PATH_QUERY_SELECTOR, "")
-        async def query_resource_json(path_query: Annotated[str, Path()], query_params: Annotated[FrontendQueryParams, Query()]):
+        async def query_resource_json(path_query: Annotated[str, Path()], query_params: Annotated[FrontendQuery, Query()]):
             return await _query_handler(None, path_query, None)
 
         @endpoint("") # Trailing slash
-        async def query_resource(query_params: Annotated[FrontendQueryParams, Query()]):
+        async def query_resource(query_params: Annotated[FrontendQuery, Query()]):
             return await _query_handler(query_params, None, None)
 
     if query_schema.Meta.allow_meta_view:
@@ -82,7 +82,7 @@ def register_query_manager(app, qm_cls):
 
 def configure_query_manager(app, *query_managers):
     @app.get(uri("/_echo", SCOPES_SELECTOR, PATH_QUERY_SELECTOR, "{identifier}"), tags=["Introspection"])
-    async def query_echo(query_params: Annotated[FrontendQueryParams, Query()], scopes, path_query, identifier):
+    async def query_echo(query_params: Annotated[FrontendQuery, Query()], scopes, path_query, identifier):
         return {
             "identifier": identifier,
             "query_params": query_params,

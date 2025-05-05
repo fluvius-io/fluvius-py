@@ -1,8 +1,11 @@
 import re
+import sqlalchemy
+
 from typing import Optional, List, Dict, Any
 from fluvius.data import BackendQuery, DataModel
 from fluvius.helper import camel_to_lower
-from .schema import QuerySchema, FrontendQuery, FrontendQueryParams
+from fluvius.error import InternalServerError
+from .schema import QuerySchema, FrontendQuery
 from . import config
 
 DESELECT = "deselect"
@@ -18,6 +21,7 @@ TEXT = "txt"
 
 LIMIT_DEFAULT = config.DEFAULT_QUERY_LIMIT
 ALLOW_ESCAPE = config.ALLOW_SELECT_ESCAPE
+DEVELOPER_MODE = config.DEVELOPER_MODE
 
 RX_SELECT_SPLIT = re.compile(r"[,;\s]+")
 RX_TEXT_SPLIT = re.compile(r"[,]+")
@@ -74,33 +78,47 @@ class QueryManager(object):
     def lookup_query_schema(cls, identifier):
         return cls._registry[identifier]
 
-    async def query(self, query_identifier, query_params: Optional[FrontendQueryParams]=None, **kwargs):
+    async def query(self, query_identifier, fe_query: Optional[FrontendQuery]=None, **kwargs):
         query_schema = self.lookup_query_schema(query_identifier)
 
-        if query_params is None:
-            query_params = FrontendQueryParams(**kwargs)
+        if fe_query is None:
+            fe_query = FrontendQuery(**kwargs)
         elif kwargs:
-            query_params = query_params.set(**kwargs)
+            fe_query = fe_query.set(**kwargs)
 
-        fe_query = query_params.build_query(query_schema)
-        backend_query = self.construct_backend_query(query_schema, fe_query)
+        backend_query = self.construct_backend_query(fe_query, query_schema)
         backend_query = await self.validate_backend_query(query_schema, backend_query)
         data, meta = await self.execute_query(query_schema, backend_query)
 
         return self.process_result(data, meta)
 
-    def construct_backend_query(self, query_schema, fe_query):
-        """ Convert from the frontend query to the backend query """
+    def compute_select(self, fe_query, query_schema):
+        if query_schema.Meta.select_all:
+            return fe_query.select
 
-        composite_scope = query_schema.base_query(fe_query)
+        if not fe_query.select:
+            return query_schema.select_fields
+
+        return query_schema.select_fields & set(fe_query.select)
+
+
+    def construct_backend_query(self, fe_query, query_schema, identifier=None, scope=None):
+        """ Convert from the frontend query to the backend query """
+        scope  = query_schema.base_query(scope)
+        query = query_schema.validate_schema_args(fe_query)
+        limit = fe_query.size
+        offset = (fe_query.page - 1) * fe_query.size
+        select = self.compute_select(fe_query, query_schema)
+
         return BackendQuery.create(
-            identifier=fe_query.identifier,
-            scope=composite_scope,
-            where=fe_query.query,
-            limit=fe_query.limit,
-            offset=fe_query.offset,
-            select=fe_query.select,
-            sort=fe_query.sort
+            identifier=identifier,
+            limit=limit,
+            offset=offset,
+            scope=scope,
+            select=select,
+            sort=fe_query.sort,
+            where=query,
+            mapping=query_schema.query_mapping
         )
 
     async def execute_query(self, query_schema, backend_query: BackendQuery):
@@ -129,5 +147,14 @@ class DomainQueryManager(QueryManager):
         """ Execute the backend query with the state manager and return """
         meta = {}
         resource = query_schema.backend_resource()
-        data = await self.data.query(resource, backend_query, meta=meta)
+        try:
+            data = await self.data.query(resource, backend_query, meta=meta)
+        except sqlalchemy.exc.ProgrammingError as e:
+            details = {
+                "pgcode": e.orig.pgcode,
+                "statement": e.statement,
+                "params": e.params,
+            } if DEVELOPER_MODE else None
+            raise InternalServerError("Q101-501", f"Query Error [{e.orig.pgcode}]: {e.orig}", details)
+
         return data, meta

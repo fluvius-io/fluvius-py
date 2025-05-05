@@ -27,7 +27,7 @@ from .query import QueryBuilder
 from .. import DataDriver
 
 
-DEBUG_CONNECTOR = False # config.DEBUG
+DEBUG_CONNECTOR = True # config.DEBUG
 RAISE_NO_ITEM_MODIFIED_ERROR = True
 BACKEND_QUERY_LIMIT = config.BACKEND_QUERY_INTERNAL_LIMIT
 
@@ -130,16 +130,16 @@ class SqlaDriver(DataDriver, QueryBuilder):
     __db_dsn__ = None
 
     def __init__(self, db_dsn=None, **kwargs):
-        self._dsn = db_dsn if db_dsn else self.__db_dsn__
-        if self._dsn is None:
+        dsn = db_dsn if db_dsn else self.__db_dsn__
+        if dsn is None:
             raise ValueError(f'No database DSN provided to: {self}')
 
-        self._async_session = _AsyncSessionConnection(self.dsn)
+        self.set_dsn(dsn)
 
         logger.info(f'Driver [{self.__class__.__name__}] setup with DSN: {self.dsn}')
 
     def __init_subclass__(cls):
-        cls._schema_model = {}
+        cls._data_schema = {}
 
     def session(self):
         return self._async_session.session()
@@ -153,30 +153,16 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
     def set_dsn(self, db_dsn):
         self._dsn = db_dsn
+        self._async_session = _AsyncSessionConnection(db_dsn)
         return self._dsn
-
-    def connect(self, *args, **kwargs):
-        pass
-        # if not hasattr(self, '_async_session'):
-        #     self._async_session = _AsyncSessionConnection(self.dsn)
-
-        # async_session = self._async_session
-
-        # if not async_session.connected:
-        #     async_session.connect(*args, **kwargs)
-        # elif args or kwargs:
-        #     logger.warning('Reusing existing connection. Parameters ignored: ARGS = %s | KWARGS = %s', args, kwargs)
-
-        # return async_session.begin()
 
     async def disconnect(self):
         async_session = cls._async_session
-
         if async_session.connected:
             await async_session.dispose()
 
     @classmethod
-    def validate_schema_model(cls, schema_model):
+    def validate_data_schema(cls, schema_model):
         if not issubclass(schema_model, SqlaDataSchema):
             raise ValueError('SqlaDriver only support SqlaDataSchema')
 
@@ -196,7 +182,6 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
     @asynccontextmanager
     async def transaction(self, *args, **kwargs):
-        # _session = self._async_session.session
         async with self.session() as async_session_transaction:
             try:
                 yield async_session_transaction
@@ -243,12 +228,12 @@ class SqlaDriver(DataDriver, QueryBuilder):
         stmt = self.build_select(data_schema, query)
         async with self.session() as sess:
             cursor = await sess.execute(stmt)
-        items = cursor.scalars().all()
-        DEBUG_CONNECTOR and logger.info("\n[FIND_ALL] %r\n=> [RESULT] %d items", str(stmt), len(items))
+            items = cursor.mappings().all()
+
+        DEBUG_CONNECTOR and logger.warning("\n[QUERY] %r\n=> [RESULT] %s items", str(stmt), items)
         if isinstance(meta, dict):
             meta.update({
                 "count": len(items),
-                "total": len(items),
                 "limit": query.limit,
                 "offset": query.offset
             })

@@ -19,7 +19,7 @@ class DataDriver(object):
         if key in _DRIVER_REGISTRY:
             raise ValueError(f'Data storage driver already registered: {key}')
 
-        cls._schema_model = {}
+        cls._data_schema = {}
         _DRIVER_REGISTRY[key] = cls
         _DEBUG and logger.info('Registered data driver: %s => %s', key, cls)
 
@@ -29,23 +29,23 @@ class DataDriver(object):
     @classmethod
     def lookup_data_schema(cls, resource):
         try:
-            return cls._schema_model[resource]
+            return cls._data_schema[resource]
         except KeyError:
             raise UnregisteredDataSchemaError(f'Data schema is not registered: {resource}')
 
     @classmethod
     def register_schema(cls, resource):
         def _decorator(schema_model):
-            if resource in cls._schema_model:
+            if resource in cls._data_schema:
                 raise ValueError(f'Schema model already registered: {resource}')
 
-            cls._schema_model[resource] = cls.validate_schema_model(schema_model)
+            cls._data_schema[resource] = cls.validate_data_schema(schema_model)
             return schema_model
 
         return _decorator
 
     @classmethod
-    def validate_schema_model(cls, schema_model):
+    def validate_data_schema(cls, schema_model):
         return schema_model
 
     @asynccontextmanager

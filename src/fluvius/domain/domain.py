@@ -170,8 +170,6 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         self.cmd_processors = _setup_command_processor_selector(self._cmd_processors)
         self.msg_dispatchers = _setup_message_dispatcher_selector(self._msg_dispatchers)
         self.register_signals()
-        self.logstore.connect()
-        self.statemgr.connect()
 
     def validate_domain_config(self, config):
         if not issubclass(self.__aggregate__, Aggregate):
