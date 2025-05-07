@@ -63,11 +63,11 @@ class TokenPayload(DataModel):
 
 
 class FluviusAuthMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, auth_provider=None):
+    def __init__(self, app, auth_profile_provider):
         super().__init__(app)
-        self._auth_provider = FluviusAuthProfileProvider.get(auth_provider)
+        self._auth_provider = FluviusAuthProfileProvider.get(auth_profile_provider)
 
-    def get_auth_context(self, request):
+    async def get_auth_context(self, request):
         # You can optionally decode and validate the token here
         if not (id_token := request.cookies.get("id_token")):
             return None
@@ -79,19 +79,19 @@ class FluviusAuthMiddleware(BaseHTTPMiddleware):
         except (KeyError, ValueError):
             return None
 
-        auth = self._auth_provider(user)
+        auth_profile = self._auth_provider(user)
 
         return SimpleNamespace(
             token = id_token,
-            user = auth.user,
-            profile = auth.profile,
-            organization = auth.organization,
-            iamroles = auth.iamroles
+            user = await auth.get_user(),
+            profile = await auth.get_profile(),
+            organization = await auth.get_organization(),
+            iamroles = await auth.get_iamroles()
         )
 
     async def dispatch(self, request: Request, call_next):
         try:
-            request.state.auth_context = self.get_auth_context(request)
+            request.state.auth_context = await self.get_auth_context(request)
         except Exception as e:
             logger.exception(e)
             raise
@@ -123,8 +123,8 @@ class FluviusAuthProfileProvider(object):
         return FluviusAuthProfileProvider.REGISTRY[key]
 
     """ Lookup services for user related info """
-    def __init__(self, user):
-        self._user = TokenPayload(**user)
+    def __init__(self, user_claims):
+        self._user = TokenPayload(**user_claims)
         self._profile = SimpleNamespace(
             _id=self._user.jti,
             name=self._user.name,
@@ -136,20 +136,16 @@ class FluviusAuthProfileProvider(object):
         )
         self._iamroles = ('sysadmin', 'operator')
 
-    @property
-    def user(self):
+    async def get_user(self):
         return self._user
 
-    @property
-    def profile(self):
+    async def get_profile(self):
         return self._profile
 
-    @property
-    def organization(self):
+    async def get_organization(self):
         return self._organization
 
-    @property
-    def iamroles(self):
+    async def get_iamroles(self):
         ''' Identity and Access Management Roles '''
         return self._iamroles
 
@@ -176,7 +172,7 @@ def setup_authentication(app, config=config, base_path="/auth"):
             redirect_uri=config.DEFAULT_REDIRECT_URI,
         )
 
-        app.add_middleware(FluviusAuthMiddleware)
+        app.add_middleware(FluviusAuthMiddleware, auth_profile_provider=config.AUTH_PROFILE_PROVIDER)
         app.add_middleware(
             SessionMiddleware,
             secret_key=config.APPLICATION_SECRET_KEY,

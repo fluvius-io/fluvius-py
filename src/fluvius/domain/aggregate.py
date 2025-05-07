@@ -121,7 +121,7 @@ class Aggregate(object):
         if aggroot.domain_sid is None:
             item = await self.statemgr.fetch(aggroot.resource, aggroot.identifier)
         else:
-            item = await self.statemgr.fetch_by_intra_id(aggroot.resource, aggroot.identifier, aggroot.domain_sid)
+            item = await self.statemgr.fetch_with_domain_sid(aggroot.resource, aggroot.identifier, aggroot.domain_sid)
 
         if if_match_value and item._etag != if_match_value:
             raise PreconditionFailedError(

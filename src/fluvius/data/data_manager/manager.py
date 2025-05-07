@@ -269,17 +269,16 @@ class DataAccessManager(DataAccessManagerBase):
     def __init_subclass__(cls):
         super().__init_subclass__()
 
-    async def fetch(self, resource: str, identifier: UUID_TYPE, / , etag=None, where=None) -> DataModel:
+    async def fetch(self, resource: str, identifier: UUID_TYPE, / , etag=None, **kwargs) -> DataModel:
         """ Fetch exactly 1 items from the data store using its primary identifier """
-        scope = {ETAG_FIELD: etag} if etag else None
-        q = BackendQuery.create(identifier=identifier, limit=1, scope=scope, where=where)
+        q = BackendQuery.create(identifier=identifier, etag=etag, scope=scope, where=kwargs)
         item = await self.connector.find_one(resource, q)
         return self._wrap_item(resource, item)
 
-    async def fetch_by_intra_id(self, resource: str, identifier, domain_sid, / , etag=None, where=None) -> DataModel:
+    async def fetch_with_domain_sid(self, resource: str, identifier, domain_sid, / , etag=None, **kwargs) -> DataModel:
         """ Fetch exactly 1 items from the data store using its intra domain identifier """
         scope = {INTRA_DOMAIN_SCOPE_FIELD: domain_sid}
-        q = BackendQuery.create(identifier=identifier, scope=scope, where=where, limit=1, etag=etag)
+        q = BackendQuery.create(identifier=identifier, scope=scope, where=kwargs, etag=etag)
         data = await self.connector.find_one(resource, q)
         return self._wrap_item(resource, data)
 
@@ -314,8 +313,7 @@ class DataAccessManager(DataAccessManagerBase):
         return await self.connector.invalidate(resource, query, **updates)
 
     async def invalidate_one(self, resource: str, identifier: UUID_TYPE, updates=None, *, etag=None, where=None):
-        scope = {ETAG_FIELD: etag} if etag else None
-        q = BackendQuery.create(identifier=identifier, scope=scope, where=where)
+        q = BackendQuery.create(identifier=identifier, etag=etag, where=where)
         updates = updates or {}
         updates['_deleted'] = timestamp()
         return await self.connector.update_one(resource, q, **updates)
@@ -326,8 +324,8 @@ class DataAccessManager(DataAccessManagerBase):
 
     async def update_record(self, record: DataModel, updates: dict):
         resource = self.lookup_resource(record)
-        query = BackendQuery.create(identifier=record._id, etag=record._etag)
-        return await self.connector.update_one(resource, query, **updates)
+        q = BackendQuery.create(identifier=record._id, etag=record._etag)
+        return await self.connector.update_one(resource, q, **updates)
 
     async def update_one(self, resource: str, identifier: UUID_TYPE, etag=None, **updates):
         query = BackendQuery.create(identifier=identifier, etag=etag)
@@ -370,7 +368,7 @@ class ReadonlyDataManagerProxy(object):
     def __init__(self, statemgr):
         self.create = getattr(statemgr, 'create', None)
         self.fetch = getattr(statemgr, 'fetch', None)
-        self.fetch_by_intra_id = getattr(statemgr, 'fetch_by_intra_id', None)
+        self.fetch_with_domain_sid = getattr(statemgr, 'fetch_with_domain_sid', None)
         self.find_all = getattr(statemgr, 'find_all', None)
         self.find_one = getattr(statemgr, 'find_one', None)
 
