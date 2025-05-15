@@ -27,6 +27,7 @@ from sqlalchemy.sql.operators import contains_op, custom_op, ilike_op, in_op, eq
 
 from fluvius.data.query import BackendQuery, OperatorStatement, operator_statement
 from fluvius.data import logger, config
+from fluvius.error import InternalServerError
 
 def nand_(*args, **kwargs):
     return not_(and_(*args, **kwargs))
@@ -100,10 +101,13 @@ class QueryBuilder(object):
             resource, _, fieldspec = fieldspec.partition(FIELD_SEP)
             data_schema = self.lookup_data_schema(resource)
 
-        if db_source is not None:
-            return getattr(data_schema, fieldspec).label(field_name)
+        try:
+            if db_source is not None:
+                return getattr(data_schema, fieldspec).label(field_name)
 
-        return getattr(data_schema, fieldspec)
+            return getattr(data_schema, fieldspec)
+        except AttributeError:
+            raise InternalServerError("D100-501", f"type object {data_schema} has no attribute {fieldspec}", None)
 
     def _build_expression(self, data_schema, expr: dict, db_mapping=None):
         db_mapping = db_mapping or {}
