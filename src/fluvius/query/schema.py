@@ -2,7 +2,7 @@ import re
 import json
 from typing import Optional, List, Dict, Any, Tuple
 from types import SimpleNamespace
-from fluvius.data import DataModel
+from fluvius.data import DataModel, BlankModel
 from fluvius.helper import _assert
 from fluvius.data.query import operator_statement, OperatorStatement
 
@@ -13,6 +13,14 @@ from . import operator, logger, config
 
 DEFAULT_DELETED_FIELD = "_deleted"
 RX_PARAM_SPLIT = re.compile(r'(:|!)')
+
+def endpoint(url):
+    def decorator(func):
+        func.__custom_endpoint__ = (url, func)
+        return func
+
+    return decorator
+
 
 class QuerySchemaMeta(DataModel):
     name: str
@@ -37,7 +45,7 @@ class QuerySchemaMeta(DataModel):
 
 
 class QuerySchema(object):
-    class Meta:
+    class Meta(BlankModel):
         pass
 
     def __init_subclass__(cls):
@@ -119,6 +127,8 @@ class QuerySchema(object):
             for fn in dir(self):
                 qfield = getattr(self, fn)
                 if not isinstance(qfield, QueryField):
+                    if callable(qfield) and hasattr(qfield, '__custom_endpoint__'):
+                        self.functions.append(qfield.__custom_endpoint__)
                     continue
 
                 yield qfield.associate(self, fn)
@@ -129,7 +139,7 @@ class QuerySchema(object):
 
                     self.id_field = qfield.key
 
-
+        self.functions = []
         self.query_fields = tuple(gen_fields())
         self.query_mapping = {f._key: f._source for f in self.query_fields if f._key != f._source}
         self.query_params = {param.selector: param for param in query_params(self.query_fields)}

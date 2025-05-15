@@ -1,20 +1,21 @@
 from fluvius import __version__
 from fluvius.helper.timeutil import timestamp
 
-APPLICATION_SERIAL_NUMBER = 1001
-APPLICATION_NAME = 'Fluvius API'
-APPLICATION_DESC = 'Fluvius API Application (Update config to change this)'
-APPLICATION_VERSION = __version__
 APPLICATION_BUILD_TIME = str(timestamp())
+APPLICATION_DESC = 'Fluvius API Application (Update config to change this)'
+APPLICATION_NAME = 'Fluvius API'
 APPLICATION_SECRET_KEY = "super-secret-session-key-IUUUCBhv4NRDVB4ONpe8lcNJJY"
+APPLICATION_SERIAL_NUMBER = 1001
+APPLICATION_VERSION = __version__
+AUTH_PROFILE_PROVIDER = None
 COOKIE_HTTPS_ONLY = False       # Set True in production
 COOKIE_SAME_SITE_POLICY = "strict" # or "strict" for tighter CSRF
-AUTH_PROFILE_PROVIDER = None
+DEFAULT_REDIRECT_URI = "http://localhost:8000/auth/callback"
+DEVELOPER_MODE = True
 KEYCLOAK_BASE_URL = "https://id.adaptive-bits.com/auth"
 KEYCLOAK_CLIENT_ID = "sample_app"
 KEYCLOAK_CLIENT_SECRET = "W2kAi1iqvVJhrAMVj1YnVQXx0GxNUDiV"  # Omit for public clients
 KEYCLOAK_REALM = "dev-1.fluvius.io"
-DEFAULT_REDIRECT_URI = "http://localhost:8000/auth/callback"
 SESSION_COOKIE = "session"
 
 RESP_HEADER_IDEMPOTENCY = 'Idempotency-Key'

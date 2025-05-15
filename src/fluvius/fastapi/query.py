@@ -1,4 +1,5 @@
 import os
+from functools import wraps
 
 from typing import Annotated, Union, Any, Optional, Dict
 from fastapi import Request, Path, Body, Query
@@ -46,6 +47,16 @@ def register_query_schema(app, query_manager, query_schema):
             return auth_decorator(api_decorator(func))
 
         return _api_def
+
+    if query_schema.functions:
+        for url, func in query_schema.functions:
+            async def _func(request: Request):
+                return await func(request, query_manager)
+
+            _func.__name__ = func.__name__
+            _func.__doc__ = func.__doc__
+
+            endpoint(url)(_func)
 
     if query_schema.Meta.allow_list_view:
         if scope_schema:

@@ -7,7 +7,8 @@ from fastapi.responses import JSONResponse
 
 from . import config, logger
 
-def create_app(config=config, **kwargs):
+
+def create_app(config=config, **kwargs) -> FastAPI:
     cfg = dict(
         title=config.APPLICATION_NAME,
         version=config.APPLICATION_VERSION,
@@ -29,7 +30,8 @@ def create_app(config=config, **kwargs):
 
     return setup_error_handler(app)
 
-def setup_error_handler(app):
+
+def setup_error_handler(app: FastAPI) -> FastAPI:
     @app.exception_handler(FluviusException)
     async def app_exception_handler(request: Request, exc: FluviusException):
         return JSONResponse(
@@ -39,14 +41,17 @@ def setup_error_handler(app):
 
     @app.exception_handler(ValueError)
     async def app_exception_handler(request: Request, exc: ValueError):
+        content = {
+            "message": str(exc),
+            "errcode": "A00422",
+        }
+
+        if config.DEVELOPER_MODE:
+            content['traceback'] = traceback.format_exc()
 
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            content={
-                "message": str(exc),
-                "errcode": "A00422",
-                "traceback:": traceback.format_exc()
-            }
+            content=content
         )
 
     return app
