@@ -1,3 +1,4 @@
+import traceback
 import fluvius
 from fluvius.error import FluviusException
 from contextlib import asynccontextmanager
@@ -38,9 +39,14 @@ def setup_error_handler(app):
 
     @app.exception_handler(ValueError)
     async def app_exception_handler(request: Request, exc: ValueError):
+
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            content={"message": str(exc), "errcode": "A00422"}
+            content={
+                "message": str(exc),
+                "errcode": "A00422",
+                "traceback:": traceback.format_exc()
+            }
         )
 
     return app

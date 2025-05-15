@@ -10,23 +10,31 @@ from .auth import auth_required
 from .helper import uri, jurl_data, parse_scopes, SCOPES_SELECTOR, PATH_QUERY_SELECTOR
 
 
-def register_query_schema(app, manager, query_schema):
+def register_query_schema(app, query_manager, query_schema):
     query_id = query_schema._identifier
-    base_uri = f"/{manager.Meta.api_prefix}.{query_id}/"
-    api_tags = query_schema.Meta.api_tags or manager.Meta.api_tags
-    api_docs = query_schema.Meta.api_docs or manager.Meta.api_docs
+    base_uri = f"/{query_manager.Meta.api_prefix}.{query_id}/"
+    api_tags = query_schema.Meta.api_tags or query_manager.Meta.api_tags
+    api_docs = query_schema.Meta.api_docs or query_manager.Meta.api_docs
     scope_schema = (query_schema.Meta.scope_required or query_schema.Meta.scope_optional)
 
-    async def _query_handler(query_params: FrontendQuery, path_query: str=None, scopes: str=None):
+    async def _resource_query(query_params: FrontendQuery, path_query: str=None, scopes: str=None):
         if path_query:
             params = jurl_data(path_query)
             query_params = FrontendQuery(**params)
 
-        data, meta = await manager.query(query_id, query_params)
+        data, meta = await query_manager.query(query_id, query_params)
         return {
             'data': data,
             'meta': meta
         }
+
+    async def _item_query(item_identifier, path_query: str=None, scopes: str=None):
+        query_params = None
+        if path_query:
+            params = jurl_data(path_query)
+            query_params = FrontendQuery(**params)
+
+        return await query_manager.query_item(query_id, item_identifier, query_params)
 
     def endpoint(*paths, method=app.get, base=None, tags=None, **kwargs):
         api_decorator = method(uri(base or base_uri, *paths), tags=tags or api_tags, description=api_docs)
@@ -43,19 +51,19 @@ def register_query_schema(app, manager, query_schema):
         if scope_schema:
             @endpoint(SCOPES_SELECTOR, PATH_QUERY_SELECTOR, "")  # Trailing slash
             async def query_scoped_resource(path_query: Annotated[str, Path()], scopes: str):
-                return await _query_handler(None, path_query, scopes)
+                return await _resource_query(None, path_query, scopes)
 
             @endpoint(SCOPES_SELECTOR, "")
             async def query_scoped_resource_json(query_params: Annotated[FrontendQuery, Query()], scopes: str):
-                return await _query_handler(query_params, None, scopes)
+                return await _resource_query(query_params, None, scopes)
 
         @endpoint(PATH_QUERY_SELECTOR, "")
         async def query_resource_json(path_query: Annotated[str, Path()], query_params: Annotated[FrontendQuery, Query()]):
-            return await _query_handler(None, path_query, None)
+            return await _resource_query(None, path_query, None)
 
         @endpoint("") # Trailing slash
         async def query_resource(query_params: Annotated[FrontendQuery, Query()]):
-            return await _query_handler(query_params, None, None)
+            return await _resource_query(query_params, None, None)
 
     if query_schema.Meta.allow_meta_view:
         @endpoint(base=f"/_info{base_uri}", tags=["Introspection"])
@@ -65,19 +73,19 @@ def register_query_schema(app, manager, query_schema):
     if query_schema.Meta.allow_item_view:
         @endpoint("{identifier}")
         async def query_item(identifier: Annotated[str, Path()]):
-            return [identifier, query_params]
+            return await _item_query(identifier)
 
         if scope_schema:
             @endpoint(SCOPES_SELECTOR, "{identifier}")
-            async def query_scoped_item(identifier: Annotated[str, Path()], scopes: Annotated[str, Path()]):
-                return [identifier, scopes]
+            async def query_scoped_item(identifier: Annotated[str, Path()], scopes: str):
+                return await _item_query(identifier, path_query)
 
 
 def register_query_manager(app, qm_cls):
-    manager = qm_cls(app)
+    query_manager = qm_cls(app)
 
     for _, query_schema in qm_cls._registry.items():
-        register_query_schema(app, manager, query_schema)
+        register_query_schema(app, query_manager, query_schema)
 
 
 def configure_query_manager(app, *query_managers):

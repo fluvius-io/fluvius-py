@@ -7,18 +7,12 @@ asyncio_default_fixture_loop_scope = "function"
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
-
-[metadata]
-name = "fluvius"
-version = "0.1.3-post2"
-
-
 [project]
 name = "fluvius"
 version = "0.1.3-post2"
 authors = [
-  { name="Hung X. Le", email="hunglx@adaptive-bits.com" },
-  { name="Phu V. Nguyen", email="phunv@adaptive-bits.com" },
+    { name = "Hung X. Le", email = "hunglx@adaptive-bits.com" },
+    { name = "Phu V. Nguyen", email = "phunv@adaptive-bits.com" },
 ]
 description = "Fluvius Framework (https://fluvius.io)"
 readme = "docs/README.md"
@@ -61,3 +55,16 @@ where = ["src"]
 
 [tool.black]
 line-length = 119
+
+[tool.pyright]
+include = ["src", "tests"]
+exclude = []
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+reportImportCycles = false
+reportPrivateUsage = false
+
+# enable these for now as none of raise any
+# errors anyway
+reportCallInDefaultInitializer = true
+reportImplicitStringConcatenation = true

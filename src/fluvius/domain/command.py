@@ -1,20 +1,21 @@
-from typing import Optional, Dict, List, Annotated, Any
+from typing import Optional, Dict, List, Annotated, Any, Union
 from fluvius.data import UUID_TYPE, UUID_GENR, identifier_factory, nullable, field, DataModel, Field, BlankModel
 
 from .aggregate import AggregateRoot
 from .entity import CommandState, DOMAIN_ENTITY_MARKER, DomainEntity
 from .record import DomainEntityRecord
-from .context import DomainContext
 
-from pydantic import BeforeValidator
 
-from . import config
 
-def model_factory(data):
+def model_factory(data: Any) -> Union[BlankModel, DataModel]:
     if isinstance(data, dict):
         return BlankModel(**data)
 
-    return data
+    if isinstance(data, (BlankModel, DataModel)):
+        return data
+
+    raise ValueError('Invalid payload data')
+
 
 class CommandBundle(DomainEntityRecord):
     domain      = field(type=str, mandatory=True)
@@ -42,7 +43,7 @@ class CommandMeta(DataModel):
     name: Optional[str] = None
     desc: Optional[str] = None
     resources: Optional[tuple[str]] = None
-    tags: list[str] = tuple()
+    tags: List[str] = []
     scope_required: Optional[Dict] = None
     scope_optional: Optional[Dict] = None
     new_resource: bool = False
@@ -55,6 +56,9 @@ class CommandMeta(DataModel):
 class Command(DomainEntity):
     __meta_schema__ = CommandMeta
     __abstract__ = True
+
+    class Meta(DomainEntity.Meta):
+        pass
 
     def __init__(self, cmd_data):
         self._data = cmd_data

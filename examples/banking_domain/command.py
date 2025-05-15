@@ -1,5 +1,4 @@
-from account_transaction.domain import TransactionManagerDomain
-from fluvius.domain import logger
+from banking_domain.domain import TransactionManagerDomain
 from fluvius.domain.command import Command
 from fluvius.domain.record import field
 from .datadef import (
@@ -15,7 +14,7 @@ _command_processor = TransactionManagerDomain.command_processor
 class WithdrawMoney(Command):
     data = field(type=WithdrawMoneyData, mandatory=True)
 
-    class Meta:
+    class Meta(Command.Meta):
         tags = ["transaction"]
         resource = "bank-account"
         description = "Withdraw money"
@@ -25,7 +24,7 @@ class WithdrawMoney(Command):
 class DepositMoney(Command):
     data = field(type=DepositMoneyData, mandatory=True)
 
-    class Meta:
+    class Meta(Command.Meta):
         tags = ["transaction"]
         resource = "bank-account"
         description = "Deposit money"
@@ -35,7 +34,7 @@ class DepositMoney(Command):
 class TransferMoney(Command):
     data = field(type=TransferMoneyData, mandatory=True)
 
-    class Meta:
+    class Meta(Command.Meta):
         tags = ["transaction"]
         resource = "bank-account"
         description = "Transfer money"

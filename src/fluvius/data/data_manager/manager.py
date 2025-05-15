@@ -295,16 +295,16 @@ class DataAccessManager(DataAccessManagerBase):
         except ItemNotFoundError:
             return None
 
-    async def find_all(self, resource: str, q=None, meta=None, **query) -> List[DataModel]:
+    async def find_all(self, resource: str, q=None, return_meta=None, **query) -> List[DataModel]:
         """ Find all matching items, always starts with offset = 0 and retrieve all items """
         q = BackendQuery.create(q, **query, offset=0, limit=BACKEND_QUERY_LIMIT)
-        data = await self.connector.query(resource, q, meta)
+        data = await self.connector.query(resource, q, return_meta)
         return self._wrap_list(resource, data)
 
-    async def query(self, resource: str, q=None, meta=None, **query) -> List[DataModel]:
+    async def query(self, resource: str, q=None, return_meta=None, **query) -> List[DataModel]:
         """ Query with offset and limits """
         q = BackendQuery.create(q, **query)
-        data = await self.connector.query(resource, q, meta)
+        data = await self.connector.query(resource, q, return_meta)
         return self._wrap_list(resource, data)
 
     async def invalidate_record(self, record: DataModel, **updates):

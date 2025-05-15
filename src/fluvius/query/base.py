@@ -5,6 +5,7 @@ from . import field
 
 class DomainResourceQuerySchema(QuerySchema):
     __abstract__ = True
+
     _id = field.UUIDField(label="ID", identifier=True)
     _etag = field.StringField(label="ETag")
     _deleted = field.DateTimeField(label="Deleted")
@@ -16,6 +17,7 @@ class DomainResourceQuerySchema(QuerySchema):
 
 class SubResourceQuerySchema(DomainResourceQuerySchema):
     __abstract__ = True
+
     _iid = field.UUIDField(label="Intra ID")
     _did = field.UUIDField(label="Domain ID")
 

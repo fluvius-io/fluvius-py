@@ -3,10 +3,11 @@ import importlib
 import sqlalchemy as sa
 
 from asyncio import current_task
-from contextvars import ContextVar
-from types import SimpleNamespace
-from pypika.queries import QueryBuilder as PikaQueryBuilder
 from contextlib import asynccontextmanager
+from contextvars import ContextVar
+from pypika.queries import QueryBuilder as PikaQueryBuilder
+from types import SimpleNamespace
+from typing import cast
 
 from fluvius.data import logger, config
 from fluvius.data.exceptions import ItemNotFoundError, UnprocessableError, NoItemModifiedError
@@ -15,6 +16,7 @@ from fluvius.data.serializer import serialize_json
 from fluvius.data.data_schema import SqlaDataSchema
 
 from sqlalchemy import Column, Integer, String, DateTime, create_engine, exc, text
+from sqlalchemy.sql import func, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.engine.url import URL, make_url
 from sqlalchemy.ext.asyncio import (
@@ -128,6 +130,7 @@ class _AsyncSessionConnection(object):
 
 class SqlaDriver(DataDriver, QueryBuilder):
     __db_dsn__ = None
+    __schema_baseclass__ = SqlaDataSchema
 
     def __init__(self, db_dsn=None, **kwargs):
         dsn = db_dsn if db_dsn else self.__db_dsn__
@@ -199,6 +202,10 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
         return await self.query(resource, query)
 
+    async def query_count(self, session, statement):
+        result = await session.execute(select(func.count()).select_from(statement.subquery()))
+        return cast(int, result.scalar())
+
     async def query(self, resource, query: BackendQuery, meta=None):
         # @TODO: Clarify the use of this function
 
@@ -224,19 +231,30 @@ class SqlaDriver(DataDriver, QueryBuilder):
         }
         Output: List(list of fields is selected)
         '''
+        total_items = -1
         data_schema = self.lookup_data_schema(resource)
-        stmt = self.build_select(data_schema, query)
+        return_meta = isinstance(meta, dict)
+
         async with self.session() as sess:
+            stmt = self.build_select(data_schema, query)
+
+            if return_meta:
+                total_items = await self.query_count(sess, stmt)
+
             cursor = await sess.execute(stmt)
             items = cursor.mappings().all()
 
         DEBUG_CONNECTOR and logger.warning("\n[QUERY] %r\n=> [RESULT] %s items", str(stmt), items)
-        if isinstance(meta, dict):
+        if return_meta:
             meta.update({
-                "count": len(items),
+                "total_items": total_items,   # = -1 if total_items is not calculated
+                "items_count": len(items),
                 "limit": query.limit,
-                "offset": query.offset
+                "offset": query.offset,
+                "page_no": (query.offset // query.limit) + 1,
+                "total_pages": (total_items // query.limit) + 1   # = 0 if total_items = -1
             })
+
         return items
 
     def _unwrap_schema_item(self, item):
@@ -249,7 +267,6 @@ class SqlaDriver(DataDriver, QueryBuilder):
         return item.serialize()
 
     async def find_one(self, resource, query: BackendQuery):
-
         data_schema = self.lookup_data_schema(resource)
         stmt = self.build_select(data_schema, query)
         async with self.session() as sess:

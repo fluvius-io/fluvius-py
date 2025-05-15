@@ -2,18 +2,20 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from dataclasses import is_dataclass, dataclass, field
 from fluvius.helper import camel_to_lower
-from fluvius.data import logger, config
+from fluvius.data import logger, config, DataModel
 from fluvius.data.constant import *
 
 _DEBUG = config.DEBUG
 _DRIVER_REGISTRY = {}
 
 
-class UnregisteredDataSchemaError(RuntimeError):
+class DataSchemaError(ValueError):
     pass
 
 
 class DataDriver(object):
+    __schema_baseclass__ = DataModel
+
     def __init_subclass__(cls):
         key = cls.__name__
         if key in _DRIVER_REGISTRY:
@@ -29,17 +31,31 @@ class DataDriver(object):
     @classmethod
     def lookup_data_schema(cls, resource):
         try:
-            return cls._data_schema[resource]
+            if isinstance(resource, str):
+                return cls._data_schema[resource]
+
+            if issubclass(resource, cls.__schema_baseclass__):
+                return resource
+
+            raise DataSchemaError(f'Invalid resource specification: {resource}')
         except KeyError:
-            raise UnregisteredDataSchemaError(f'Data schema is not registered: {resource}')
+            raise DataSchemaError(f'Data schema is not registered: {resource}')
 
     @classmethod
     def register_schema(cls, resource):
         def _decorator(schema_model):
             if resource in cls._data_schema:
-                raise ValueError(f'Schema model already registered: {resource}')
+                raise DataSchemaError(f'Schema model already registered: {resource}')
 
-            cls._data_schema[resource] = cls.validate_data_schema(schema_model)
+            model = cls.validate_data_schema(schema_model)
+            if hasattr(model, '__resource_name__'):
+                raise DataSchemaError(f'Model already registered else where [{model}]')
+
+            if not issubclass(model, cls.__schema_baseclass__):
+                raise DataSchemaError(f'Invalid data schema [{schema_model}] for data driver [{cls}]')
+
+            model.__resource_name__ = resource
+            cls._data_schema[resource] = model
             return schema_model
 
         return _decorator
