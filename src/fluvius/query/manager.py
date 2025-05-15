@@ -113,6 +113,10 @@ class QueryManager(object):
         data, meta = await self.execute_query(query_schema, be_query, None)
 
         result, _ = self.process_result(data, meta)
+
+        if len(result) == 0:
+            raise InternalServerError("Q102-501", f"Item not found!", None)
+
         return result[0]
 
 
@@ -163,7 +167,10 @@ class DomainQueryManager(QueryManager):
         resource = query_schema.backend_resource()
         try:
             data = await self.data_manager.query(resource, backend_query, return_meta=meta)
-        except sqlalchemy.exc.ProgrammingError as e:
+        except (
+            sqlalchemy.exc.ProgrammingError,
+            sqlalchemy.exc.DBAPIError
+        ) as e:
             details = None if not DEVELOPER_MODE else {
                 "pgcode": e.orig.pgcode,
                 "statement": e.statement,
