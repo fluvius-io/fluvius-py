@@ -83,10 +83,10 @@ class FluviusAuthMiddleware(BaseHTTPMiddleware):
 
         return SimpleNamespace(
             token = id_token,
-            user = await auth.get_user(),
-            profile = await auth.get_profile(),
-            organization = await auth.get_organization(),
-            iamroles = await auth.get_iamroles()
+            user = await auth_profile.get_user(),
+            profile = await auth_profile.get_profile(),
+            organization = await auth_profile.get_organization(),
+            iamroles = await auth_profile.get_iamroles()
         )
 
     async def dispatch(self, request: Request, call_next):
