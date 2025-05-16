@@ -274,8 +274,9 @@ class SqlaDriver(DataDriver, QueryBuilder):
         DEBUG_CONNECTOR and logger.info("\n[FIND_ONE] %r\n=> [QUERY] %s items", query, cursor)
 
         try:
-            item = cursor.scalars().one()
-            return self._unwrap_schema_item(item)
+            # NOTE: build_select now always includes columns in select(), 
+            # which makes cursor.scalars() return only the first column.
+            return cursor.mappings().one()
         except exc.NoResultFound as e:
             raise ItemNotFoundError(
                 errcode="E1207",

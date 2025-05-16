@@ -271,7 +271,7 @@ class DataAccessManager(DataAccessManagerBase):
 
     async def fetch(self, resource: str, identifier: UUID_TYPE, / , etag=None, **kwargs) -> DataModel:
         """ Fetch exactly 1 items from the data store using its primary identifier """
-        q = BackendQuery.create(identifier=identifier, etag=etag, scope=scope, where=kwargs)
+        q = BackendQuery.create(identifier=identifier, etag=etag, where=kwargs)
         item = await self.connector.find_one(resource, q)
         return self._wrap_item(resource, item)
 
@@ -285,7 +285,7 @@ class DataAccessManager(DataAccessManagerBase):
     async def find_one(self, resource: str, q=None, **query) -> DataModel:
         """ Fetch exactly 1 item from the data store using either a query object or where statements
             Raises an error if there are 0 or multiple results """
-        q = BackendQuery.create(q, **query, limit=1, ofset=0)
+        q = BackendQuery.create(q, **query, limit=1, offset=0)
         if q.limit != 1 or q.offset != 0 or not q.identifier:
             raise ValueError(f'Invalid find_one query: {q}')
 

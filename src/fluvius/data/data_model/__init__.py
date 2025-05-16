@@ -32,3 +32,6 @@ class BlankModel(SimpleNamespace):
 
     def set(self, **kwargs):
         return object.replace(self, **kwargs)
+
+    def serialize(self):
+        return self.__dict__
