@@ -4,6 +4,7 @@ import os
 import re
 import shutil
 import tempfile
+import importlib
 
 from contextlib import contextmanager
 from itertools import chain
@@ -15,6 +16,36 @@ from fluvius import logger
 
 
 RX_DELIMITER_SPLITTER = re.compile(r"[\.#]")
+
+
+def load_string(module_path):
+    """
+    Import a dotted module path and return the attribute/class designated by the
+    last name in the path. Raise ImportError if the import failed.
+    """
+    try:
+        module_path, class_name = module_path.rsplit('.', 1)
+        module = importlib.import_module(module_path)
+    except ValueError:
+        raise ImportError("%s doesn't look like a module path" % module_path)
+
+    try:
+        return getattr(module, class_name)
+    except AttributeError:
+        raise ImportError('Module "%s" does not define a "%s" attribute/class' % (
+            module_path, class_name))
+
+
+def load_class(class_or_path, /, base_class=None):
+    if isinstance(class_or_path, str):
+        cls = load_string(class_or_path)
+    else:
+        cls = class_or_path
+
+    if base_class and not issubclass(cls, base_class):
+        raise ImportError(f'Class [{cls}] is not a subclass of [{base_class}]')
+
+    return cls
 
 
 async def when(val):

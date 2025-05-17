@@ -1,4 +1,3 @@
-from fluvius.error import UnauthorizedError
 from .schema import QuerySchema
 from . import field
 
@@ -20,4 +19,3 @@ class SubResourceQuerySchema(DomainResourceQuerySchema):
 
     _iid = field.UUIDField(label="Intra ID")
     _did = field.UUIDField(label="Domain ID")
-

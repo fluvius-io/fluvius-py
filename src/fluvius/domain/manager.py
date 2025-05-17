@@ -1,3 +1,5 @@
+from fluvius.helper import load_class
+
 from .domain import Domain
 from . import config, logger
 
@@ -9,27 +11,23 @@ class DomainManager(object):
 
     @classmethod
     def register_domain(cls, *domain_classes, whitelist=tuple(), blacklist=tuple()):
-        for domain_cls in domain_classes:
-            if not issubclass(domain_cls, Domain):
-                raise RuntimeError(f'Invalid domain: {domain_cls}')
+        for domain_spec in domain_classes:
+            domain_cls = load_class(domain_spec, base_class=Domain)
+            if domain_spec in cls.__domains__:
+                raise RuntimeError(f'Domain already registered with domain manager: {domain_spec}')
 
-            if domain_cls in cls.__domains__:
-                raise RuntimeError(f'Domain already registered with domain manager: {domain_cls}')
+            cls.__domains__ += (domain_cls,)
 
-        cls.__domains__ += domain_classes
         cls.__blacklisted_commands__ += blacklist
         cls.__whitelisted_commands__ += whitelist
 
 
     def initialize_domains(self, app):
         if hasattr(self, '_domains'):
-            raise ValueError(f'Domains manager initialized')
+            raise RuntimeError(f'Domains manager already initialized.')
 
         def _validate():
             for domain_cls in self.__domains__:
-                if not issubclass(domain_cls, Domain):
-                    raise ValueError(f'Invalid CQRS Domain: {domain_cls}')
-
                 logger.info(f"Initializing domain: {domain_cls}")
                 yield domain_cls(app)
 

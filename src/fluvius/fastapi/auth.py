@@ -11,6 +11,7 @@ from functools import wraps
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from types import SimpleNamespace
+from pipe import Pipe
 
 from fluvius.error import BadRequestError
 from fluvius.data import DataModel
@@ -24,6 +25,7 @@ from .helper import uri
 from . import config, logger
 
 IDEMPOTENCY_KEY = config.RESP_HEADER_IDEMPOTENCY
+DEVELOPER_MODE = config.DEVELOPER_MODE
 
 
 def auth_required(inject_ctx=True, **kwargs):
@@ -108,12 +110,14 @@ class FluviusAuthMiddleware(BaseHTTPMiddleware):
 class FluviusAuthProfileProvider(object):
     REGISTRY = {}
 
-    def __init_subclass__(cls, key):
+    def __init_subclass__(cls):
+        key = cls.__name__
         REG = FluviusAuthProfileProvider.REGISTRY
         if key in REG:
             raise ValueError(f'Auth Profile Provider is already registered: {key} => {REG[key]}')
 
         REG[key] = cls
+        DEVELOPER_MODE and logger.info('Registered Auth Profile Provider: %s', cls.__name__)
 
     @classmethod
     def get(cls, key):
@@ -150,7 +154,8 @@ class FluviusAuthProfileProvider(object):
         return self._iamroles
 
 
-def setup_authentication(app, config=config, base_path="/auth"):
+@Pipe
+def configure_authentication(app, config=config, base_path="/auth"):
     def api(*paths, method=app.get):
         return method(uri(base_path, *paths), tags=["Authentication"])
 

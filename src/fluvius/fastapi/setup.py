@@ -8,6 +8,10 @@ from fastapi.responses import JSONResponse
 from . import config, logger
 
 
+_on_startups = tuple()
+_on_shutdowns = tuple()
+
+
 def create_app(config=config, **kwargs) -> FastAPI:
     cfg = dict(
         title=config.APPLICATION_NAME,
@@ -54,10 +58,23 @@ def setup_error_handler(app: FastAPI) -> FastAPI:
             content=content
         )
 
+    @app.exception_handler(RuntimeError)
+    async def app_exception_handler(request: Request, exc: RuntimeError):
+        content = {
+            "message": str(exc),
+            "errcode": "A00500",
+        }
+
+        if config.DEVELOPER_MODE:
+            content['traceback'] = traceback.format_exc()
+
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content=content
+        )
+
     return app
 
-_on_startups = tuple()
-_on_shutdowns = tuple()
 
 def on_startup(*func):
     global _on_startups

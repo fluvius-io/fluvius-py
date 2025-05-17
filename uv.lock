@@ -395,6 +395,7 @@ dependencies = [
     { name = "click" },
     { name = "fastapi-mcp" },
     { name = "jsonurl-py" },
+    { name = "pipe" },
     { name = "pydantic", extra = ["email"] },
     { name = "pyrsistent" },
     { name = "ruff" },
@@ -426,6 +427,7 @@ requires-dist = [
     { name = "click", specifier = ">=8.1.8" },
     { name = "fastapi-mcp", specifier = ">=0.3.3" },
     { name = "jsonurl-py", specifier = ">=0.4.0" },
+    { name = "pipe", specifier = ">=2.2" },
     { name = "pydantic", extras = ["email"], specifier = ">=2.11.4" },
     { name = "pyrsistent", specifier = ">=0.20.0" },
     { name = "ruff", specifier = ">=0.9.1" },
@@ -869,6 +871,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/b3/92/1ca0c3f09233bd7decf8f7105a1c4e3162fb9142128c74adad0fb361b7eb/pillow-11.2.1-cp313-cp313t-win32.whl", hash = "sha256:e0b55f27f584ed623221cfe995c912c61606be8513bfa0e07d2c674b4516d9dd", size = 2335774 },
     { url = "https://files.pythonhosted.org/packages/a5/ac/77525347cb43b83ae905ffe257bbe2cc6fd23acb9796639a1f56aa59d191/pillow-11.2.1-cp313-cp313t-win_amd64.whl", hash = "sha256:36d6b82164c39ce5482f649b437382c0fb2395eabc1e2b1702a6deb8ad647d6e", size = 2681895 },
     { url = "https://files.pythonhosted.org/packages/67/32/32dc030cfa91ca0fc52baebbba2e009bb001122a1daa8b6a79ad830b38d3/pillow-11.2.1-cp313-cp313t-win_arm64.whl", hash = "sha256:225c832a13326e34f212d2072982bb1adb210e0cc0b153e688743018c94a2681", size = 2417234 },
+]
+
+[[package]]
+name = "pipe"
+version = "2.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/53/37/aef2cba01787ad8bd266705a95c23db0e9d0b7cd0e01582c969143892655/pipe-2.2.tar.gz", hash = "sha256:6a253198e3bc542ffaf0a4222376586bce8583b27a9ddbc2cfbaa554c049230d", size = 10456 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1f/21/96f1508f67fadb4ab7e5df7c3389e4a2f03cba92f62846f99f6301cf0735/pipe-2.2-py3-none-any.whl", hash = "sha256:0a5c3202ff35122f69a34ccbd40c9658646f033cc941055304fe8bfa7e13376e", size = 9655 },
 ]
 
 [[package]]

@@ -1,5 +1,6 @@
 import os
 
+
 from typing import Annotated, Union, Any, Optional, Dict
 from types import SimpleNamespace
 from fastapi import Request, Path, Body, Query
@@ -10,7 +11,9 @@ from fluvius.domain.context import DomainContext, DomainTransport
 from fluvius.domain.manager import DomainManager
 from fluvius.query.schema import FrontendQuery
 from fluvius.query.schema import QuerySchemaMeta
+from fluvius.helper import load_class
 from starlette.middleware.base import BaseHTTPMiddleware
+from pipe import Pipe
 
 from . import logger, config
 from .auth import auth_required
@@ -154,7 +157,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
 
     return app
 
-
+@Pipe
 def configure_domain_manager(app, *domains, **kwargs):
     FastAPIDomainManager.setup_app(app, *domains, **kwargs)
     return app

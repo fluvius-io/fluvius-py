@@ -1,10 +1,11 @@
 import os
 from functools import wraps
 
+from pipe import Pipe
 from typing import Annotated, Union, Any, Optional, Dict
 from fastapi import Request, Path, Body, Query
-from fluvius.query.schema import FrontendQuery
-from fluvius.query.schema import QuerySchemaMeta
+from fluvius.query import FrontendQuery, QuerySchemaMeta, QueryManager
+from fluvius.helper import load_class
 
 from . import logger, config
 from .auth import auth_required
@@ -98,7 +99,7 @@ def register_query_manager(app, qm_cls):
     for _, query_schema in qm_cls._registry.items():
         register_query_schema(app, query_manager, query_schema)
 
-
+@Pipe
 def configure_query_manager(app, *query_managers):
     @app.get(uri("/_echo", SCOPES_SELECTOR, PATH_QUERY_SELECTOR, "{identifier}"), tags=["Introspection"])
     async def query_echo(query_params: Annotated[FrontendQuery, Query()], scopes, path_query, identifier):
@@ -109,7 +110,8 @@ def configure_query_manager(app, *query_managers):
             "path_query": jurl_data(path_query)
         }
 
-    for qm_cls in query_managers:
+    for qm_spec in query_managers:
+        qm_cls = load_class(qm_spec, base_class=QueryManager)
         register_query_manager(app, qm_cls)
 
     return app
