@@ -90,7 +90,7 @@ def register_query_schema(app, query_manager, query_schema):
         if scope_schema:
             @endpoint(SCOPES_SELECTOR, "{identifier}")
             async def query_scoped_item(identifier: Annotated[str, Path()], scopes: str):
-                return await _item_query(identifier, path_query)
+                return await _item_query(identifier)
 
 
 def register_query_manager(app, qm_cls):

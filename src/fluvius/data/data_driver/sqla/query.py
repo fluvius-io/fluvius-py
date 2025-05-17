@@ -186,7 +186,11 @@ class QueryBuilder(object):
         if not values:
             return stmt
 
-        return stmt.values(**values)
+        if isinstance(values, dict):
+            return stmt.values(**values)
+
+        if isinstance(values, (list, tuple)):
+            return stmt.values(values)
 
     def build_delete(self, data_schema, query: BackendQuery):
         stmt = delete(data_schema)

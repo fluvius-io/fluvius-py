@@ -62,6 +62,8 @@ class TokenPayload(DataModel):
     given_name: str
     family_name: str
     email: EmailStr
+    realm_access: dict
+    resource_access: dict
 
 
 class FluviusAuthMiddleware(BaseHTTPMiddleware):
@@ -194,15 +196,23 @@ def configure_authentication(app, config=config, base_path="/auth"):
         decoded = base64.urlsafe_b64decode(padded)
         return json.loads(decoded)['kid']
 
-    async def decode_id_token(jwks_keyset, id_token: str):
+    def extract_jwt_key(jwks_keyset, token):
         # This will parse the JWT and extract both the header and payload
-        kid = extract_jwt_kid(id_token)
+        kid = extract_jwt_kid(token)
 
         # 🔍 Find the correct key by kid
         try:
-            key = next(k for k in jwks_keyset.keys if k.kid == kid)
+            return next(k for k in jwks_keyset.keys if k.kid == kid)
         except StopIteration:
             raise HTTPException(status_code=401, detail="Public key not found for kid")
+
+    async def decode_ac_token(jwks_keyset, ac_token: str):
+        # This will parse the JWT and extract both the header and payload
+        key = extract_jwt_key(jwks_keyset, ac_token)
+        return jwt.decode(ac_token, key)
+
+    async def decode_id_token(jwks_keyset, id_token: str):
+        key = extract_jwt_key(jwks_keyset, id_token)
 
         # Decode and validate
         claims = jwt.decode(
@@ -241,10 +251,17 @@ def configure_authentication(app, config=config, base_path="/auth"):
     async def oauth_callback(request: Request):
         token = await oauth.keycloak.authorize_access_token(request)
         id_token = token.get("id_token")
+        ac_token = token.get("access_token")
+
         if not id_token:
             raise HTTPException(status_code=400, detail="Missing ID token")
 
-        request.session["user"] = await decode_id_token(request.app.state.jwks_keyset, id_token)
+        id_data = await decode_id_token(request.app.state.jwks_keyset, id_token)
+        ac_data = await decode_ac_token(request.app.state.jwks_keyset, ac_token)
+
+        id_data.update(realm_access=ac_data.get("realm_access"), resource_access=ac_data.get("resource_access"))
+
+        request.session["user"] = id_data
         response = RedirectResponse(url=SIGNIN_REDIRECT_URI)
         response.set_cookie('id_token', id_token)
         return response
