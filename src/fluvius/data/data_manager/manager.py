@@ -348,17 +348,16 @@ class DataAccessManager(DataAccessManagerBase):
 
     async def insert_many(self, resource: str, *records: list[DataModel]):
         data = [self._serialize(resource, rec) for rec in records]
-        return await self.connector.insert(resource, *data)
+        return await self.connector.insert(resource, data)
 
-    async def upsert(self, record: DataModel):
+    async def upsert(self, record: DataModel, values: dict):
         resource = self.lookup_resource(record)
-        return await self.connector.upsert(resource, values)
+        values.update(_id=record._id)
+        return await self.connector.upsert(resource, *[values])
 
-    async def upsert_many(self, resource, *records):
-        result = []
-        for record in records:
-            result.append(await self.connector.upsert_record(resource, record))
-        return result
+    async def upsert_many(self, resource: str, *records: list[DataModel]):
+        data = [self._serialize(resource, rec) for rec in records]
+        return await self.connector.upsert(resource, *data)
 
     async def native_query(self, *args, **kwargs):
         return await self.connector.native_query(*args, **kwargs)

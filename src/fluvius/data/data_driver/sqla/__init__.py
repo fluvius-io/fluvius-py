@@ -306,7 +306,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
         self._check_no_item_modified(cursor, 1, query)
         return self._unwrap_result(cursor)
 
-    async def insert(self, resource, values: dict):
+    async def insert(self, resource, values: (dict, list)):
         try:
             data_schema = self.lookup_data_schema(resource)
             stmt = self.build_insert(data_schema, values)
@@ -318,25 +318,27 @@ class SqlaDriver(DataDriver, QueryBuilder):
                 message="Unable to insert data due to integrity violation [%s]" % e,
             )
 
-        self._check_no_item_modified(cursor, 1)
+        expect = len(values) if isinstance(values, (list, tuple)) else 1
+        self._check_no_item_modified(cursor, expect)
 
         if DEBUG_CONNECTOR:
             logger.info("\n- DATA INSERTED: %s \n- RESULTS: %r", values, cursor)
 
         return self._unwrap_result(cursor)
 
-    async def upsert_data(self, resource, *data):
+    async def upsert(self, resource, *data):
         # Use dialect dependent (e.g. sqlite, postgres, mysql) version of the statement
         # See: connector.py [setup_sql_satemenet]
 
-        stmt = self._async_session.insert(self.data_model).values(data)
+        data_schema = self.lookup_data_schema(resource)
+        stmt = self._async_session.insert(data_schema).values(data)
 
         # Here we assuming that all items have the same set of keys
         set_fields = {k: getattr(stmt.excluded, k) for k in data[0].keys() if k != '_id'}
 
         stmt = stmt.on_conflict_do_update(
             # Let's use the constraint name which was visible in the original posts error msg
-            index_elements=[self.data_model._id],
+            index_elements=[data_schema._id],
             # The columns that should be updated on conflict
             set_=set_fields
         )
@@ -344,9 +346,8 @@ class SqlaDriver(DataDriver, QueryBuilder):
         async with self.session() as sess:
             cursor = await sess.execute(stmt)
         DEBUG_CONNECTOR and logger.info("UPSERT %d items => %r", len(data), cursor.rowcount)
-        self._check_no_item_modified(cursor)
+        self._check_no_item_modified(cursor, len(data))
         return self._unwrap_result(cursor)
-
 
     async def native_query(self, nquery, *params, unwrapper):
         if isinstance(nquery, PikaQueryBuilder):

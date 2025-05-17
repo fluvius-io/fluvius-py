@@ -25,7 +25,7 @@ async def fetch_id(dam, _id):
 
 @pytest.mark.asyncio
 async def test_sql_insert():
-    sample_data_access_manager.connect()
+    # sample_data_access_manager.connect()
     db = sample_data_access_manager.connector._async_session._async_engine
     async with db.begin() as conn:
         await conn.execute(text("ATTACH DATABASE 'temp/domain-audit.db' AS 'domain-audit'"))
