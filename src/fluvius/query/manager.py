@@ -1,6 +1,7 @@
 import re
 import sqlalchemy
 
+from types import MethodType
 from typing import Optional, List, Dict, Any
 from fluvius.data import BackendQuery, DataModel
 from fluvius.helper import camel_to_lower
@@ -44,7 +45,7 @@ class QueryManagerMeta(DataModel):
 
 
 class QueryManager(object):
-    _registry  = {}
+    _SCHEMA_REGISTRY  = {}
 
     class Meta:
         pass
@@ -53,13 +54,39 @@ class QueryManager(object):
         if cls.__dict__.get('__abstract__'):
             return
 
-        cls._registry = {}
+        cls._SCHEMA_REGISTRY = {}
+        cls._ENDPOINT_REGISTRY = {}
+
         cls.Meta = QueryManagerMeta.create(cls.Meta, defaults={
             'name': cls.__name__,
             'api_prefix': camel_to_lower(cls.__name__),
             'api_docs': (cls.__doc__ or '').strip(),
             'api_tags': [cls.__name__,]
         })
+
+    @property
+    def schema_registry(self):
+        return self._SCHEMA_REGISTRY
+
+    @property
+    def endpoint_registry(self):
+        return self._ENDPOINT_REGISTRY
+
+    @classmethod
+    def lookup_query_schema(cls, identifier):
+        return cls._SCHEMA_REGISTRY[identifier]
+
+    @classmethod
+    def lookup_query_endpoint(self, identifier):
+        return cls._ENDPOINT_REGISTRY[identifier]
+
+    @classmethod
+    def register_endpoint(cls, uri, **kwargs):
+        def _decorator(func):
+            cls._ENDPOINT_REGISTRY[uri] = (func, kwargs)
+            return func
+
+        return _decorator
 
     @classmethod
     def validate_query_schema(cls, schema_cls):
@@ -75,18 +102,14 @@ class QueryManager(object):
                 raise ValueError(f'QuerySchema already registered with identifier: {schema_cls._identifier}')
 
             schema_cls._identifier = query_identifier
-            if query_identifier in cls._registry:
+            if query_identifier in cls._SCHEMA_REGISTRY:
                 raise ValueError(f'Resource identifier is already registered: {query_identifier} => {schema_cls}')
 
             query_schema = cls.validate_query_schema(schema_cls)
-            cls._registry[query_identifier] = query_schema()
+            cls._SCHEMA_REGISTRY[query_identifier] = query_schema()
             return query_schema
 
         return _decorator
-
-    @classmethod
-    def lookup_query_schema(cls, identifier):
-        return cls._registry[identifier]
 
     def validate_fe_query(self, query_schema, fe_query, kwargs):
         if fe_query is None:
@@ -97,7 +120,7 @@ class QueryManager(object):
 
         return fe_query
 
-    async def query(self, query_identifier, fe_query: Optional[FrontendQuery]=None, **kwargs):
+    async def query_resource(self, query_identifier, fe_query: Optional[FrontendQuery]=None, **kwargs):
         query_schema = self.lookup_query_schema(query_identifier)
 
         fe_query = self.validate_fe_query(query_schema, fe_query, kwargs)
@@ -119,6 +142,10 @@ class QueryManager(object):
 
         return result[0]
 
+    async def query_endpoint(self, endpoint_identifier, **kwargs):
+        func, _params = self.lookup_query_endpoint(endpoint_identifier)
+        handler = MethodType(func, self)
+        return handler(**kwargs)
 
     def construct_backend_query(self, query_schema, fe_query, identifier=None, scope=None):
         """ Convert from the frontend query to the backend query """
