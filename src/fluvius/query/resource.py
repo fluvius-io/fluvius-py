@@ -22,7 +22,7 @@ def endpoint(url):
     return decorator
 
 
-class QuerySchemaMeta(DataModel):
+class QueryResourceMeta(DataModel):
     name: str
     api_docs: Optional[str] = None
     api_tags: Optional[List] = None
@@ -44,7 +44,7 @@ class QuerySchemaMeta(DataModel):
     select_all: bool = False
 
 
-class QuerySchema(object):
+class QueryResource(object):
     class Meta(BlankModel):
         pass
 
@@ -54,7 +54,7 @@ class QuerySchema(object):
 
         cls.API_INDEX = 0
         cls.OPS_INDEX = {}
-        cls.Meta = QuerySchemaMeta.create(cls.Meta, defaults={
+        cls.Meta = QueryResourceMeta.create(cls.Meta, defaults={
             'name': cls.__name__,
             'api_docs': (cls.__doc__ or '').strip()
         })

@@ -9,8 +9,7 @@ from fluvius.data.serializer import serialize_json
 from fluvius.domain import Domain
 from fluvius.domain.context import DomainContext, DomainTransport
 from fluvius.domain.manager import DomainManager
-from fluvius.query.schema import FrontendQuery
-from fluvius.query.schema import QuerySchemaMeta
+from fluvius.query.resource import FrontendQuery, QueryResourceMeta
 from fluvius.helper import load_class
 from starlette.middleware.base import BaseHTTPMiddleware
 from pipe import Pipe

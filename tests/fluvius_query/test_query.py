@@ -1,6 +1,6 @@
 import pytest
 import json
-from fluvius.query import QuerySchema, logger, config, QueryManager, FrontendQuery, DomainQueryManager
+from fluvius.query import QueryResource, logger, config, QueryManager, FrontendQuery, DomainQueryManager
 from fluvius.query.field import StringField
 from fluvius.data.serializer import serialize_json
 from sample_data_model import *
@@ -11,17 +11,18 @@ from object_domain.query import ObjectDomainQueryManager
 class SampleQueryManager(DomainQueryManager):
     __data_manager__ = SampleDataAccessManager
 
+resource = SampleQueryManager.register_resource
 
-@SampleQueryManager.register_schema('company-query')
-class CompanyQuery(QuerySchema):
+@resource('company-query')
+class CompanyQuery(QueryResource):
     business_name = StringField("Test Field", identifier=True)
 
     class Meta:
         backend_resource = 'company'
 
 
-@ObjectDomainQueryManager.register_schema('economist')
-class EconomistQuery(QuerySchema):
+@ObjectDomainQueryManager.register_resource('economist')
+class EconomistQuery(QueryResource):
     job = StringField("Job match", identifier=True)
 
     class Meta:

@@ -6,7 +6,7 @@ from typing import Optional, List, Dict, Any
 from fluvius.data import BackendQuery, DataModel
 from fluvius.helper import camel_to_lower
 from fluvius.error import InternalServerError
-from .schema import QuerySchema, FrontendQuery
+from .resource import QueryResource, FrontendQuery
 from . import config
 
 DESELECT = "deselect"
@@ -28,14 +28,14 @@ RX_SELECT_SPLIT = re.compile(r"[,;\s]+")
 RX_TEXT_SPLIT = re.compile(r"[,]+")
 
 
-def _compute_select(fe_query, query_schema):
-    if query_schema.Meta.select_all:
+def _compute_select(fe_query, query_resource):
+    if query_resource.Meta.select_all:
         return fe_query.select
 
     if not fe_query.select:
-        return query_schema.select_fields
+        return query_resource.select_fields
 
-    return query_schema.select_fields & set(fe_query.select)
+    return query_resource.select_fields & set(fe_query.select)
 
 class QueryManagerMeta(DataModel):
     name: str
@@ -45,7 +45,7 @@ class QueryManagerMeta(DataModel):
 
 
 class QueryManager(object):
-    _SCHEMA_REGISTRY  = {}
+    _RESOURCE_REGISTRY  = {}
 
     class Meta:
         pass
@@ -54,7 +54,7 @@ class QueryManager(object):
         if cls.__dict__.get('__abstract__'):
             return
 
-        cls._SCHEMA_REGISTRY = {}
+        cls._RESOURCE_REGISTRY = {}
         cls._ENDPOINT_REGISTRY = {}
 
         cls.Meta = QueryManagerMeta.create(cls.Meta, defaults={
@@ -65,16 +65,16 @@ class QueryManager(object):
         })
 
     @property
-    def schema_registry(self):
-        return self._SCHEMA_REGISTRY
+    def resource_registry(self):
+        return self._RESOURCE_REGISTRY
 
     @property
     def endpoint_registry(self):
         return self._ENDPOINT_REGISTRY
 
     @classmethod
-    def lookup_query_schema(cls, identifier):
-        return cls._SCHEMA_REGISTRY[identifier]
+    def lookup_query_resource(cls, identifier):
+        return cls._RESOURCE_REGISTRY[identifier]
 
     @classmethod
     def lookup_query_endpoint(self, identifier):
@@ -89,29 +89,29 @@ class QueryManager(object):
         return _decorator
 
     @classmethod
-    def validate_query_schema(cls, schema_cls):
-        if issubclass(schema_cls, QuerySchema):
+    def validate_query_resource(cls, schema_cls):
+        if issubclass(schema_cls, QueryResource):
             return schema_cls
 
         raise ValueError(f'Invalid query model: {schema_cls}')
 
     @classmethod
-    def register_schema(cls, query_identifier):
+    def register_resource(cls, query_identifier):
         def _decorator(schema_cls):
             if getattr(schema_cls, '_identifier', None):
-                raise ValueError(f'QuerySchema already registered with identifier: {schema_cls._identifier}')
+                raise ValueError(f'QueryResource already registered with identifier: {schema_cls._identifier}')
 
             schema_cls._identifier = query_identifier
-            if query_identifier in cls._SCHEMA_REGISTRY:
+            if query_identifier in cls._RESOURCE_REGISTRY:
                 raise ValueError(f'Resource identifier is already registered: {query_identifier} => {schema_cls}')
 
-            query_schema = cls.validate_query_schema(schema_cls)
-            cls._SCHEMA_REGISTRY[query_identifier] = query_schema()
-            return query_schema
+            query_resource = cls.validate_query_resource(schema_cls)
+            cls._RESOURCE_REGISTRY[query_identifier] = query_resource()
+            return query_resource
 
         return _decorator
 
-    def validate_fe_query(self, query_schema, fe_query, kwargs):
+    def validate_fe_query(self, query_resource, fe_query, kwargs):
         if fe_query is None:
             return FrontendQuery(**kwargs)
 
@@ -121,19 +121,19 @@ class QueryManager(object):
         return fe_query
 
     async def query_resource(self, query_identifier, fe_query: Optional[FrontendQuery]=None, **kwargs):
-        query_schema = self.lookup_query_schema(query_identifier)
+        query_resource = self.lookup_query_resource(query_identifier)
 
-        fe_query = self.validate_fe_query(query_schema, fe_query, kwargs)
-        be_query = self.construct_backend_query(query_schema, fe_query)
-        data, meta = await self.execute_query(query_schema, be_query, {})
+        fe_query = self.validate_fe_query(query_resource, fe_query, kwargs)
+        be_query = self.construct_backend_query(query_resource, fe_query)
+        data, meta = await self.execute_query(query_resource, be_query, {})
 
         return self.process_result(data, meta)
 
     async def query_item(self, query_identifier, item_identifier, fe_query: Optional[FrontendQuery]=None, **kwargs):
-        query_schema = self.lookup_query_schema(query_identifier)
-        fe_query = self.validate_fe_query(query_schema, fe_query, kwargs)
-        be_query = self.construct_backend_query(query_schema, fe_query, identifier=item_identifier)
-        data, meta = await self.execute_query(query_schema, be_query, None)
+        query_resource = self.lookup_query_resource(query_identifier)
+        fe_query = self.validate_fe_query(query_resource, fe_query, kwargs)
+        be_query = self.construct_backend_query(query_resource, fe_query, identifier=item_identifier)
+        data, meta = await self.execute_query(query_resource, be_query, None)
 
         result, _ = self.process_result(data, meta)
 
@@ -147,13 +147,13 @@ class QueryManager(object):
         handler = MethodType(func, self)
         return handler(**kwargs)
 
-    def construct_backend_query(self, query_schema, fe_query, identifier=None, scope=None):
+    def construct_backend_query(self, query_resource, fe_query, identifier=None, scope=None):
         """ Convert from the frontend query to the backend query """
-        scope   = query_schema.base_query(scope)
-        query   = query_schema.validate_schema_args(fe_query)
+        scope   = query_resource.base_query(scope)
+        query   = query_resource.validate_schema_args(fe_query)
         limit   = fe_query.size
         offset  = (fe_query.page - 1) * fe_query.size
-        select  = _compute_select(fe_query, query_schema)
+        select  = _compute_select(fe_query, query_resource)
 
         backend_query = BackendQuery.create(
             identifier=identifier,
@@ -163,15 +163,15 @@ class QueryManager(object):
             select=select,
             sort=fe_query.sort,
             where=query,
-            mapping=query_schema.query_mapping
+            mapping=query_resource.query_mapping
         )
-        return self.validate_backend_query(query_schema, backend_query)
+        return self.validate_backend_query(query_resource, backend_query)
 
-    async def execute_query(self, query_schema, backend_query: BackendQuery, meta: Optional[Dict] = None):
+    async def execute_query(self, query_resource, backend_query: BackendQuery, meta: Optional[Dict] = None):
         """ Execute the backend query with the state manager and return """
-        raise NotImplementedError('QuerySchema.execute_query')
+        raise NotImplementedError('QueryResource.execute_query')
 
-    def validate_backend_query(self, query_schema, backend_query):
+    def validate_backend_query(self, query_resource, backend_query):
         return backend_query
 
     def process_result(self, data, meta):
@@ -189,9 +189,9 @@ class DomainQueryManager(QueryManager):
     def data_manager(self):
         return self._data_manager
 
-    async def execute_query(self, query_schema, backend_query: BackendQuery, meta: Optional[Dict] = None):
+    async def execute_query(self, query_resource, backend_query: BackendQuery, meta: Optional[Dict] = None):
         """ Execute the backend query with the state manager and return """
-        resource = query_schema.backend_resource()
+        resource = query_resource.backend_resource()
         try:
             data = await self.data_manager.query(resource, backend_query, return_meta=meta)
         except (

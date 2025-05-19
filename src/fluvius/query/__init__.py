@@ -4,15 +4,15 @@ See: https://github.com/dialoguemd/fastapi-sqla/
 '''
 
 from ._meta import config, logger
-from .schema import QuerySchema, QuerySchemaMeta, FrontendQuery, endpoint
+from .resource import QueryResource, QueryResourceMeta, FrontendQuery, endpoint
 from .manager import QueryManager, DomainQueryManager
 
 __all__ = (
     "DomainQueryManager",
     "FrontendQuery",
     "QueryManager",
-    "QuerySchema",
-    "QuerySchemaMeta",
+    "QueryResource",
+    "QueryResourceMeta",
     "config",
     "endpoint",
     "logger",

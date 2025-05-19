@@ -1,8 +1,8 @@
-from .schema import QuerySchema
+from .schema import QueryResource
 from . import field
 
 
-class DomainResourceQuerySchema(QuerySchema):
+class DomainResourceQueryResource(QueryResource):
     __abstract__ = True
 
     _id = field.UUIDField(label="ID", identifier=True)
@@ -14,7 +14,7 @@ class DomainResourceQuerySchema(QuerySchema):
     _updater = field.UUIDField(label="Updater")
 
 
-class SubResourceQuerySchema(DomainResourceQuerySchema):
+class SubResourceQueryResource(DomainResourceQueryResource):
     __abstract__ = True
 
     _iid = field.UUIDField(label="Intra ID")

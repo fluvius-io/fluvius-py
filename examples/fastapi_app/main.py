@@ -3,7 +3,7 @@ from fluvius.fastapi import create_app, setup_authentication, auth_required, con
 from object_domain.domain import ObjectDomain
 
 import pytest
-from fluvius.query import QuerySchema, logger, config, QueryManager, FrontendQuery, DomainQueryManager
+from fluvius.query import QueryResource, logger, config, QueryManager, FrontendQuery, DomainQueryManager
 from fluvius.query.field import StringField
 from fluvius.data.serializer import serialize_json
 from sample_data_model import *
@@ -15,8 +15,8 @@ class SampleQueryManager(DomainQueryManager):
     __data_manager__ = SampleDataAccessManager
 
 
-@SampleQueryManager.register_schema('company-query')
-class CompanyQuery(QuerySchema):
+@SampleQueryManager.register_resource('company-query')
+class CompanyQuery(QueryResource):
     business_name = StringField("Test Field", identifier=True)
 
     class Meta:
@@ -24,8 +24,8 @@ class CompanyQuery(QuerySchema):
         auth_required = True
 
 
-@ObjectDomainQueryManager.register_schema('economist')
-class EconomistQuery(QuerySchema):
+@ObjectDomainQueryManager.register_resource('economist')
+class EconomistQuery(QueryResource):
     job = StringField("Job match", identifier=True)
 
     class Meta:

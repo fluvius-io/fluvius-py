@@ -5,7 +5,7 @@ from pipe import Pipe
 from typing import Annotated, Union, Any, Optional, Dict
 from types import MethodType
 from fastapi import Request, Path, Body, Query
-from fluvius.query import FrontendQuery, QuerySchemaMeta, QueryManager
+from fluvius.query import FrontendQuery, QueryResourceMeta, QueryManager
 from fluvius.helper import load_class
 
 from . import logger, config
@@ -13,12 +13,12 @@ from .auth import auth_required
 from .helper import uri, jurl_data, parse_scopes, SCOPES_SELECTOR, PATH_QUERY_SELECTOR
 
 
-def register_schema_endpoints(app, query_manager, query_schema):
-    query_id = query_schema._identifier
+def register_resource_endpoints(app, query_manager, query_resource):
+    query_id = query_resource._identifier
     base_uri = f"/{query_manager.Meta.api_prefix}.{query_id}/"
-    api_tags = query_schema.Meta.api_tags or query_manager.Meta.api_tags
-    api_docs = query_schema.Meta.api_docs or query_manager.Meta.api_docs
-    scope_schema = (query_schema.Meta.scope_required or query_schema.Meta.scope_optional)
+    api_tags = query_resource.Meta.api_tags or query_manager.Meta.api_tags
+    api_docs = query_resource.Meta.api_docs or query_manager.Meta.api_docs
+    scope_schema = (query_resource.Meta.scope_required or query_resource.Meta.scope_optional)
 
     async def _resource_query(query_params: FrontendQuery, path_query: str=None, scopes: str=None):
         if path_query:
@@ -41,7 +41,7 @@ def register_schema_endpoints(app, query_manager, query_schema):
 
     def endpoint(*paths, method=app.get, base=None, tags=None, **kwargs):
         api_decorator = method(uri(base or base_uri, *paths), tags=tags or api_tags, description=api_docs)
-        if not query_schema.Meta.auth_required:
+        if not query_resource.Meta.auth_required:
             return api_decorator
 
         auth_decorator = auth_required(**kwargs)
@@ -50,8 +50,8 @@ def register_schema_endpoints(app, query_manager, query_schema):
 
         return _api_def
 
-    if query_schema.functions:
-        for url, func in query_schema.functions:
+    if query_resource.functions:
+        for url, func in query_resource.functions:
             async def _func(request: Request):
                 return await func(request, query_manager)
 
@@ -60,7 +60,7 @@ def register_schema_endpoints(app, query_manager, query_schema):
 
             endpoint(url)(_func)
 
-    if query_schema.Meta.allow_list_view:
+    if query_resource.Meta.allow_list_view:
         if scope_schema:
             @endpoint(SCOPES_SELECTOR, PATH_QUERY_SELECTOR, "")  # Trailing slash
             async def query_resource_scoped(path_query: Annotated[str, Path()], scopes: str):
@@ -78,12 +78,12 @@ def register_schema_endpoints(app, query_manager, query_schema):
         async def query_resource_default(query_params: Annotated[FrontendQuery, Query()]):
             return await _resource_query(query_params, None, None)
 
-    if query_schema.Meta.allow_meta_view:
+    if query_resource.Meta.allow_meta_view:
         @endpoint(base=f"/_info{base_uri}", tags=["Introspection"])
-        async def query_info(request: Request) -> QuerySchemaMeta:
-            return query_schema.Meta
+        async def query_info(request: Request) -> QueryResourceMeta:
+            return query_resource.Meta
 
-    if query_schema.Meta.allow_item_view:
+    if query_resource.Meta.allow_item_view:
         @endpoint("{identifier}")
         async def query_item_default(identifier: Annotated[str, Path()]):
             return await _item_query(identifier)
@@ -125,8 +125,8 @@ def register_query_manager(app, qm_cls):
     query_manager = qm_cls(app)
 
     regsitery_manager_endpoints(app, query_manager)
-    for _, query_schema in query_manager.schema_registry.items():
-        register_schema_endpoints(app, query_manager, query_schema)
+    for _, query_resource in query_manager.resource_registry.items():
+        register_resource_endpoints(app, query_manager, query_resource)
 
 @Pipe
 def configure_query_manager(app, *query_managers):
