@@ -12,6 +12,7 @@ from .model import FrontendQuery
 from . import operator, logger, config
 
 DEFAULT_DELETED_FIELD = "_deleted"
+DEVELOPER_MODE = config.DEVELOPER_MODE
 RX_PARAM_SPLIT = re.compile(r'(:|!)')
 
 def endpoint(url):
@@ -67,7 +68,7 @@ class QueryResource(object):
         cls.OPS_INDEX[op.operator] = op
         cls.API_INDEX += 1
 
-        logger.info('Registered operator: [{operator._name}] @ {cls}')
+        DEVELOPER_MODE and logger.info('Registered operator: [{operator._name}] @ {cls}')
         return cls.API_INDEX
 
     def backend_model(self):
@@ -127,8 +128,6 @@ class QueryResource(object):
             for fn in dir(self):
                 qfield = getattr(self, fn)
                 if not isinstance(qfield, QueryField):
-                    if callable(qfield) and hasattr(qfield, '__custom_endpoint__'):
-                        self.functions.append(qfield.__custom_endpoint__)
                     continue
 
                 yield qfield.associate(self, fn)
@@ -139,7 +138,6 @@ class QueryResource(object):
 
                     self.id_field = qfield.key
 
-        self.functions = []
         self.query_fields = tuple(gen_fields())
         self.query_mapping = {f._key: f._source for f in self.query_fields if f._key != f._source}
         self.query_params = {param.selector: param for param in query_params(self.query_fields)}

@@ -26,6 +26,7 @@ dependencies = [
     "casbin>=1.41.0",
     "click>=8.1.8",
     "fastapi-mcp>=0.3.3",
+    "fsspec>=2025.3.2",
     "jsonurl-py>=0.4.0",
     "pipe>=2.2",
     "pydantic[email]>=2.11.4",
