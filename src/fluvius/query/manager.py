@@ -191,7 +191,7 @@ class DomainQueryManager(QueryManager):
 
     async def execute_query(self, query_resource, backend_query: BackendQuery, meta: Optional[Dict] = None):
         """ Execute the backend query with the state manager and return """
-        resource = query_resource.backend_resource()
+        resource = query_resource.backend_model()
         try:
             data = await self.data_manager.query(resource, backend_query, return_meta=meta)
         except (

@@ -27,7 +27,7 @@ class QueryResourceMeta(DataModel):
     api_docs: Optional[str] = None
     api_tags: Optional[List] = None
 
-    backend_resource: Optional[str] = None
+    backend_model: Optional[str] = None
 
     allow_item_view: bool = True
     allow_list_view: bool = True
@@ -70,8 +70,8 @@ class QueryResource(object):
         logger.info('Registered operator: [{operator._name}] @ {cls}')
         return cls.API_INDEX
 
-    def backend_resource(self):
-        return self.Meta.backend_resource or self._identifier
+    def backend_model(self):
+        return self.Meta.backend_model or self._identifier
 
     def base_query(self, fe_query, **scope):
         return None

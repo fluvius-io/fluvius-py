@@ -26,6 +26,13 @@ class DataModel(BaseModel):
     def set(self, **kwargs):
         return self.model_copy(update=kwargs)
 
+    def model_dump(
+        self,
+        by_alias: bool = True,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        return super().model_dump(by_alias=by_alias, **kwargs)
+
 
 class BlankModel(SimpleNamespace):
     create = classmethod(_create)

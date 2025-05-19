@@ -50,7 +50,7 @@ class CommandMeta(DataModel):
     auth_required: bool = True
     api_docs: Optional[str] = None
     api_tags: Optional[List[str]] = None
-    resource_docs: Optional[str] = None
+    resource_desc: Optional[str] = None
 
 
 class Command(DomainEntity):

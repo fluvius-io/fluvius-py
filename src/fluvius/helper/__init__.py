@@ -59,17 +59,6 @@ def load_yaml(filepath):
         return data
 
 
-def hvalue(item):
-    try:
-        return hash(item)
-    except TypeError:
-        if isinstance(item, dict):
-            return hvalue(sorted(item.items(), key=itemgetter(0)))
-
-        if isinstance(item, (list, tuple)):
-            return hash(hvalue(x) for x in item)
-
-
 def listify(lst, obj=None, prefix=None):
     ''' Make sure we have a list with optional object attributes lookup
     '''
