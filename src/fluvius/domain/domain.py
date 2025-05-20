@@ -52,7 +52,7 @@ def _setup_command_processor_selector(handler_list):
         try:
             return _hmap[bundle.command]
         except KeyError:
-            raise RuntimeError(f'No command handler provided for [{command_bundle.command}]')
+            raise RuntimeError(f'No command handler provided for [{bundle.command}]')
 
     return _select
 

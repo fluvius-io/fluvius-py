@@ -114,6 +114,7 @@ class FluviusAuthProfileProvider(object):
 
     def __init_subclass__(cls):
         key = cls.__name__
+        logger.info("register key %s" % key)
         REG = FluviusAuthProfileProvider.REGISTRY
         if key in REG:
             raise ValueError(f'Auth Profile Provider is already registered: {key} => {REG[key]}')
