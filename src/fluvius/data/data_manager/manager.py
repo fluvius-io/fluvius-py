@@ -190,7 +190,8 @@ class DataAccessManagerBase(object):
         """ Create a single resource instance in memory (not saved yet!) """
 
         defvals = cls.defaults(resource, data)
-        return cls._wrap_item(resource, dict(**defvals, **kwargs))
+        defvals.update(**kwargs)
+        return cls._wrap_item(resource, defvals)
 
     @classmethod
     def defaults(cls, resource: str, data=None) -> dict:

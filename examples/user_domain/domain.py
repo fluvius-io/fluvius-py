@@ -1,13 +1,18 @@
-from object_domain.domain import ObjectDomain
-from . import context, aggregate
+from fluvius.domain import Domain, SQLDomainLogStore
+
+from .aggregate import UserAggregate
+from .state import UserStateManager
+
+class UserDomain(Domain):
+    __namespace__   = 'user-profile'
+    __aggregate__   = UserAggregate
+    __statemgr__    = UserStateManager
+    __logstore__    = SQLDomainLogStore
 
 
-class UserDomain(ObjectDomain):
-    __namespace__ = 'user-domain'
-    __aggregate__ = aggregate.UserAggregate
+class UserResponse(UserDomain.Response):
+    pass
 
-    def __init__(self, ctx: context.SanicContext, **kwargs):
-        if not isinstance(ctx, context.SanicContext):
-            raise ValueError('UserDomain only works on SanicContext')
 
-        super(UserDomain, self).__init__(ctx, **kwargs)
+class UserMessage(UserDomain.Message):
+    pass

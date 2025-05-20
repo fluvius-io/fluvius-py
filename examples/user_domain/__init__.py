@@ -1,4 +1,2 @@
-from fluvius import setupModule
-config, logger = setupModule(__name__)
+from . import domain, aggregate, command, model, state
 
-from . import aggregate, command, event

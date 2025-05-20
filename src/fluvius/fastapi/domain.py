@@ -56,17 +56,13 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
     scope_schema = (cmd_cls.Meta.scope_required or cmd_cls.Meta.scope_optional)
     default_path = bool(not cmd_cls.Meta.scope_required)
     endpoint_info = dict(
-                summary=cmd_cls.Meta.name,
-                description=cmd_cls.Meta.api_docs,
-                tags=domain.Meta.api_tags
+        summary=cmd_cls.Meta.name,
+        description=cmd_cls.Meta.api_docs,
+        tags=domain.Meta.api_tags
     )
 
     def endpoint(*paths, method=app.post, **kwargs):
-        api_decorator = method(uri(f"/{fq_name}", *paths),
-            summary=cmd_cls.Meta.name,
-            description=cmd_cls.Meta.api_docs,
-            tags=domain.Meta.api_tags
-        )
+        api_decorator = method(uri(f"/{fq_name}", *paths), **endpoint_info)
         if not cmd_cls.Meta.auth_required:
             return api_decorator
 
