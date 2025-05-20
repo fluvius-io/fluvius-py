@@ -47,12 +47,10 @@ class DataDriver(object):
             if custom_name is not None:
                 return validate_lower_dash(custom_name)
 
-            name = camel_to_lower(data_schema.__name__)
-
             if not hasattr(data_schema, '__tablename__'):
-                data_schema.__tablename__ = name
+                data_schema.__tablename__ = camel_to_lower(data_schema.__name__)
 
-            return name
+            return data_schema.__tablename__
 
         def _decorator(schema_cls):
             schema_name = gen_schema_name(schema_model, name)
