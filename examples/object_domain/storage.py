@@ -10,7 +10,7 @@ class ObjectExampleConnector(InMemoryDriver):
     pass
 
 
-@ObjectExampleConnector.register_schema('people-economist')
+@ObjectExampleConnector.register_schema(name='people-economist')
 class PeopleEconomistResource(ImmutableDomainResource):
     job = field()
     name = field(type=dict)

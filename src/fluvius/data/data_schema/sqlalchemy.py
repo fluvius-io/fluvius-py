@@ -1,4 +1,5 @@
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql as pg
 
 from fluvius.data.constant import ITEM_ID_FIELD
 from sqlalchemy.orm import declarative_base
@@ -42,23 +43,6 @@ class SqlaDataSchema(declarative_base()):
         >>> {u'email': u'john@localhost', u'posts': [{u'id': 1, u'title': u'My First Post'}], u'name': u'John', u'id': 1}
     """
     __abstract__ = True
-
-    @classmethod
-    def _resource_from_tablename(cls):
-        if not hasattr(cls, '__tablename__'):
-            cls.__tablename__ = camel_to_lower(cls.__name__)
-
-        cls.__resource__ = cls.__tablename__
-        return cls.__resource__
-
-    @classmethod
-    def _register_with_driver(cls, data_driver):
-        from fluvius.data.data_driver import DataDriver
-        if not (data_driver and issubclass(data_driver, DataDriver)):
-            raise ValueError(f'Invalid data driver: {data_driver}')
-
-        resource_name = cls._resource_from_tablename()
-        data_driver.register_schema(resource_name)(cls)
 
     @classmethod
     def _primary_key(cls):
@@ -254,3 +238,16 @@ class SqlaDataSchema(declarative_base()):
                 except:
                     pass
         return ret_data
+
+
+class DomainDataSchema(SqlaDataSchema):
+    __abstract__ = True
+
+    _id = sa.Column(pg.UUID, primary_key=True, nullable=False, default=UUID_GENR, server_default=sa.text("uuid_generate_v4()"))
+    _created = sa.Column(sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()"))
+    _updated = sa.Column(sa.DateTime(timezone=True), nullable=True)
+    _creator = sa.Column(pg.UUID, default=UUID_GENR)
+    _updater = sa.Column(pg.UUID, nullable=True)
+    _deleted = sa.Column(sa.DateTime(timezone=True))
+    _etag = sa.Column(sa.String(64), server_default=sa.text("uuid_generate_v4()::varchar"))
+

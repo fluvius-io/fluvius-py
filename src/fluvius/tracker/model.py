@@ -55,7 +55,7 @@ class SQLTrackerDataModel(SqlaDataSchema):
     _etag = sa.Column(sa.String)
 
     def __init_subclass__(cls):
-        cls._register_with_driver(SQLTrackerConnector)
+        SQLTrackerConnector.register_schema(cls)
 
 
 class Worker(SQLTrackerDataModel):

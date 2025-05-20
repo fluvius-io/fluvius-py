@@ -11,7 +11,6 @@ from fluvius.domain.context import DomainContext, DomainTransport
 from fluvius.domain.manager import DomainManager
 from fluvius.query.resource import FrontendQuery, QueryResourceMeta
 from fluvius.helper import load_class
-from starlette.middleware.base import BaseHTTPMiddleware
 from pipe import Pipe
 
 from . import logger, config

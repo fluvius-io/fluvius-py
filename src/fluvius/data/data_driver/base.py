@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from datetime import datetime
 from dataclasses import is_dataclass, dataclass, field
-from fluvius.helper import camel_to_lower
+from fluvius.helper import camel_to_lower, validate_lower_dash
 from fluvius.data import logger, config, DataModel
 from fluvius.data.constant import *
 
@@ -42,23 +42,38 @@ class DataDriver(object):
             raise DataSchemaError(f'Data schema is not registered: {resource}')
 
     @classmethod
-    def register_schema(cls, resource):
-        def _decorator(schema_model):
-            if resource in cls._data_schema:
-                raise DataSchemaError(f'Schema model already registered: {resource}')
+    def register_schema(cls, data_schema=None, /, name=None):
+        def gen_schema_name(data_schema, custom_name):
+            if custom_name is not None:
+                return validate_lower_dash(custom_name)
 
-            model = cls.validate_data_schema(schema_model)
-            if hasattr(model, '__resource_name__'):
-                raise DataSchemaError(f'Model already registered else where [{model}]')
+            name = camel_to_lower(data_schema.__name__)
 
-            if not issubclass(model, cls.__schema_baseclass__):
-                raise DataSchemaError(f'Invalid data schema [{schema_model}] for data driver [{cls}]')
+            if not hasattr(data_schema, '__tablename__'):
+                data_schema.__tablename__ = name
 
-            model.__resource_name__ = resource
-            cls._data_schema[resource] = model
-            return schema_model
+            return name
 
-        return _decorator
+        def _decorator(schema_cls):
+            schema_name = gen_schema_name(schema_model, name)
+            if schema_name in cls._data_schema:
+                raise DataSchemaError(f'Schema model already registered: {schema_name}')
+
+            schema = cls.validate_data_schema(schema_cls)
+            if hasattr(schema, '__data_schema__'):
+                raise DataSchemaError(f'Model already registered else where [{schema}]')
+
+            if not issubclass(schema, cls.__schema_baseclass__):
+                raise DataSchemaError(f'Invalid data schema [{schema_cls}] for data driver [{cls}]')
+
+            schema.__data_schema__ = schema_name
+            cls._data_schema[schema_name] = schema
+            return schema_cls
+
+        if data_schema is None:
+            return _decorator
+
+        return _decorator(data_schema)
 
     @classmethod
     def validate_data_schema(cls, schema_model):

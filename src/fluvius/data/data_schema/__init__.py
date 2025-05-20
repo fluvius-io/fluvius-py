@@ -1,1 +1,1 @@
-from .sqlalchemy import SqlaDataSchema
+from .sqlalchemy import SqlaDataSchema, DomainDataSchema

@@ -1,25 +1,29 @@
+from pipe import Pipe
+
+
+@Pipe
 def configure_profiler(app):
-    if not config.ENABLE_PROFILER:
-        return app
-
     from pyinstrument import Profiler
-    from sanic.response import html
+    from starlette.middleware.base import BaseHTTPMiddleware
 
-    @app.on_request
-    async def start_profiler(request):
-        if "_profile" in request.args:
-            request.ctx.profiler = Profiler()
-            request.ctx.profiler.start()
+    # @TODO: Should we create the profiler right here?
+    # profiler = Profiler()
 
-    @app.on_response
-    async def stop_profiler(request, response):
-        if not hasattr(request.ctx, "profiler"):
-            return
+    class FluviusProfilerMiddleware(BaseHTTPMiddleware):
+        """ Collect performance information by passing
+            _profiler=True as a http request parameter """
 
-        request.ctx.profiler.stop()
-        output_html = request.ctx.profiler.output_html()
-        return html(output_html)
+        async def dispatch(self, request: Request, call_next):
+            if "_profiler" not in request.args:
+                return await call_next(request)
 
+            profiler = Profiler()
+            profiler.start()
+            response = await call_next(request)
+            profiler.stop()
+            return profiler.output_html()
+
+    app.add_middleware(FluviusProfilerMiddleware)
     return app
 
 

@@ -25,7 +25,7 @@ class SampleSchemaModelBase(SqlaDataSchema):
     __abstract__ = True
 
     def __init_subclass__(cls):
-        cls._register_with_driver(SQLiteConnector)
+        SQLiteConnector.register_schema(cls)
 
 
 class CompanyStatus(Enum):

@@ -16,6 +16,14 @@ from fluvius import logger
 
 
 RX_DELIMITER_SPLITTER = re.compile(r"[\.#]")
+RX_LOWERCASE_DASH = re.compile(r'^[a-z][a-z_\-\d]*[a-z\d]$')
+
+
+def validate_lower_dash(value):
+    if RX_LOWERCASE_DASH.match(value):
+        return value
+
+    raise ValueError(f'Invalid lower-dash identifier: {value}')
 
 
 def load_string(module_path):

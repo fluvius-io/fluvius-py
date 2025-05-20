@@ -10,7 +10,7 @@ class UserSchemaBase(SqlaDataSchema):
     __abstract__ = True
 
     def __init_subclass__(cls):
-        cls._register_with_driver(UserConnector)
+        UserConnector.register_schema(cls)
 
 
 class User(UserSchemaBase):

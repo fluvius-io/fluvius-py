@@ -7,7 +7,6 @@ from fastapi.responses import JSONResponse
 
 from . import config, logger
 
-
 _on_startups = tuple()
 _on_shutdowns = tuple()
 
@@ -36,11 +35,19 @@ def create_app(config=config, **kwargs) -> FastAPI:
 
 
 def setup_error_handler(app: FastAPI) -> FastAPI:
+    DEVELOPER_MODE = config.DEVELOPER_MODE
+
     @app.exception_handler(FluviusException)
     async def app_exception_handler(request: Request, exc: FluviusException):
+        content = exc.content
+
+        if DEVELOPER_MODE:
+            content = exc.content or {}
+            content['traceback'] = traceback.format_exc()
+
         return JSONResponse(
             status_code=exc.status_code,
-            content=exc.content
+            content=content
         )
 
     @app.exception_handler(ValueError)
@@ -50,7 +57,7 @@ def setup_error_handler(app: FastAPI) -> FastAPI:
             "errcode": "A00422",
         }
 
-        if config.DEVELOPER_MODE:
+        if DEVELOPER_MODE:
             content['traceback'] = traceback.format_exc()
 
         return JSONResponse(
@@ -65,7 +72,7 @@ def setup_error_handler(app: FastAPI) -> FastAPI:
             "errcode": "A00500",
         }
 
-        if config.DEVELOPER_MODE:
+        if DEVELOPER_MODE:
             content['traceback'] = traceback.format_exc()
 
         return JSONResponse(

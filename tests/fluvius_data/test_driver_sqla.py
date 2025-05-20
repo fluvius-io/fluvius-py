@@ -11,7 +11,7 @@ class FluviusSchemaBase(SqlaDataSchema):
     __abstract__ = True
 
     def __init_subclass__(cls):
-        cls._register_with_driver(FluviusConnector)
+        FluviusConnector.register_schema(cls)
 
 
 class User(FluviusSchemaBase):

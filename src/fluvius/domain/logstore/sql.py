@@ -36,7 +36,7 @@ class DomainLogBaseModel(SqlaDataSchema):
     _creator = sa.Column(pg.UUID, default=UUID_GENR)
 
     def __init_subclass__(cls):
-        cls._register_with_driver(DomainLogConnector)
+        DomainLogConnector.register_schema(cls)
 
 
 class ContextLog(DomainLogBaseModel):
