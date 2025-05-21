@@ -29,17 +29,17 @@ class DataDriver(object):
         raise NotImplementedError('DataDriver.connect is not implemented.')
     
     @classmethod
-    def lookup_data_schema(cls, resource):
+    def lookup_data_schema(cls, schema):
         try:
-            if isinstance(resource, str):
-                return cls._data_schema[resource]
+            if isinstance(schema, str):
+                return cls._data_schema[schema]
 
-            if issubclass(resource, cls.__schema_baseclass__):
-                return resource
+            if cls.__schema_baseclass__ and issubclass(schema, cls.__schema_baseclass__):
+                return schema
 
-            raise DataSchemaError(f'Invalid resource specification: {resource}')
+            raise DataSchemaError(f'Invalid resource specification: {schema}')
         except KeyError:
-            raise DataSchemaError(f'Data schema is not registered: {resource}')
+            raise DataSchemaError(f'Data schema is not registered: {schema}')
 
     @classmethod
     def register_schema(cls, data_schema=None, /, name=None):

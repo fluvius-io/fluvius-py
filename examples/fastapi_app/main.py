@@ -21,8 +21,8 @@ class CompanyQuery(QueryResource):
     business_name = StringField("Test Field", identifier=True)
 
     class Meta:
-        backend_resource = 'company'
-        auth_required = True
+        backend_model = 'company'
+        auth_required = False
 
 
 @ObjectDomainQueryManager.register_resource('economist')
@@ -30,7 +30,7 @@ class EconomistQuery(QueryResource):
     job = StringField("Job match", identifier=True)
 
     class Meta:
-        backend_resource = 'people-economist'
+        backend_model = 'people-economist'
 
 @Pipe
 def configure_sample_app(app):

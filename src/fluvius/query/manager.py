@@ -199,11 +199,11 @@ class DomainQueryManager(QueryManager):
             sqlalchemy.exc.DBAPIError
         ) as e:
             details = None if not DEVELOPER_MODE else {
-                "pgcode": e.orig.pgcode,
+                "pgcode": getattr(e.orig, 'pgcode', None),
                 "statement": e.statement,
                 "params": e.params,
             }
 
-            raise InternalServerError("Q101-501", f"Query Error [{e.orig.pgcode}]: {e.orig}", details)
+            raise InternalServerError("Q101-501", f"Query Error [{getattr(e.orig, 'pgcode', None)}]: {e.orig}", details)
 
         return data, meta

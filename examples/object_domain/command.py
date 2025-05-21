@@ -23,7 +23,6 @@ class UpdateObjectCmd(Command):
         tags = ("transaction",)
         resources = ("people-economist", )
         description = "Withdraw money"
-        normal = False
         scope_required = {'domain_sid': UUID_TYPE}
 
     async def _process(self, aggregate, statemgr, payload):
@@ -38,6 +37,7 @@ class PersonModel(DataModel):
     name: PersonName
     birthdate: datetime
     job: str
+
 
 class CreateObjectCmd(Command):
     ''' CreateObject Command ...'''
@@ -72,7 +72,6 @@ class CreateObjectCmd(Command):
         assert self.command_method_echo(1, 2, 3) == (1, 2, 3)
 
 
-# @_command("remove-object")
 class RemoveObjectCmd(Command):
     class Meta:
         key = 'remove-object'
