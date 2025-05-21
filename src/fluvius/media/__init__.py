@@ -10,12 +10,12 @@
 
 import fsspec
 
-from .model import MediaEntry
+from .model import MediaManager
 
 
 class MediaInterface(object):
-    def __init__(self, media_manager):
-        self._manager = media_manager
+    def __init__(self, app, media_manager=MediaManager):
+        self._manager = media_manager(app)
         self._filesystem = {}
 
 
@@ -40,3 +40,6 @@ class MediaInterface(object):
     async def get_metadata(self, file_id):
         metadata = await self._manager.fetch('media-metadata', identifier=file_id)
         return metadata
+
+    async def save_file(self, fileobj, **kwargs):
+        pass
