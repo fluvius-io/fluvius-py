@@ -308,10 +308,10 @@ class DataAccessManager(DataAccessManagerBase):
         data = await self.connector.query(resource, q, return_meta)
         return self._wrap_list(resource, data)
 
-    async def invalidate_record(self, record: DataModel, **updates):
+    async def invalidate(self, record: DataModel):
         resource = self.lookup_resource(record)
         query = BackendQuery.create(identifier=record._id, etag=record._etag)
-        return await self.connector.invalidate(resource, query, **updates)
+        return await self.connector.update_one(resource, query, _deleted=timestamp())
 
     async def invalidate_one(self, resource: str, identifier: UUID_TYPE, updates=None, *, etag=None, where=None):
         q = BackendQuery.create(identifier=identifier, etag=etag, where=where)
@@ -323,7 +323,7 @@ class DataAccessManager(DataAccessManagerBase):
         q = BackendQuery.create(query)
         return await self.connector.invalidate_many(resource, q, updates)
 
-    async def update_record(self, record: DataModel, updates: dict):
+    async def update(self, record: DataModel, updates: dict):
         resource = self.lookup_resource(record)
         q = BackendQuery.create(identifier=record._id, etag=record._etag)
         return await self.connector.update_one(resource, q, **updates)

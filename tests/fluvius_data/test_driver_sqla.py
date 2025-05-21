@@ -62,7 +62,7 @@ async def test_manager():
     # ============== Test Update Record ============
     async with manager.transaction():
         record = item
-        await manager.update_record(record, dict(name="user-record"))
+        await manager.update(record, dict(name="user-record"))
     item = await manager.fetch('user', user_id1)
     assert item.name == 'user-record'
 
