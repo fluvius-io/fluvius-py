@@ -1,7 +1,9 @@
+import json
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pg
 
 from fluvius.data.constant import ITEM_ID_FIELD
+from fluvius.data import UUID_GENR
 from sqlalchemy.orm import declarative_base
 from fluvius.helper import camel_to_lower
 

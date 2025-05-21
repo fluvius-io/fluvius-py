@@ -53,7 +53,7 @@ class DataDriver(object):
             return data_schema.__tablename__
 
         def _decorator(schema_cls):
-            schema_name = gen_schema_name(schema_model, name)
+            schema_name = gen_schema_name(data_schema, name)
             if schema_name in cls._data_schema:
                 raise DataSchemaError(f'Schema model already registered: {schema_name}')
 
