@@ -20,7 +20,7 @@ def register_resource_endpoints(app, query_manager, query_resource):
     api_docs = query_resource.Meta.api_docs or query_manager.Meta.api_docs
     scope_schema = (query_resource.Meta.scope_required or query_resource.Meta.scope_optional)
 
-    async def _resource_query(query_params: FrontendQuery, path_query: str=None, scopes: str=None):
+    async def resource_query(query_params: FrontendQuery, path_query: str=None, scopes: str=None):
         if path_query:
             params = jurl_data(path_query)
             query_params = FrontendQuery(**params)
@@ -31,7 +31,7 @@ def register_resource_endpoints(app, query_manager, query_resource):
             'meta': meta
         }
 
-    async def _item_query(item_identifier, path_query: str=None, scopes: str=None):
+    async def item_query(item_identifier, path_query: str=None, scopes: str=None):
         query_params = None
         if path_query:
             params = jurl_data(path_query)
@@ -50,33 +50,23 @@ def register_resource_endpoints(app, query_manager, query_resource):
 
         return _api_def
 
-    if query_resource.functions:
-        for url, func in query_resource.functions:
-            async def _func(request: Request):
-                return await func(request, query_manager)
-
-            _func.__name__ = func.__name__
-            _func.__doc__ = func.__doc__
-
-            endpoint(url)(_func)
-
     if query_resource.Meta.allow_list_view:
         if scope_schema:
             @endpoint(SCOPES_SELECTOR, PATH_QUERY_SELECTOR, "")  # Trailing slash
             async def query_resource_scoped(path_query: Annotated[str, Path()], scopes: str):
-                return await _resource_query(None, path_query, scopes)
+                return await resource_query(None, path_query, scopes)
 
             @endpoint(SCOPES_SELECTOR, "")
             async def query_resource_scoped_json(query_params: Annotated[FrontendQuery, Query()], scopes: str):
-                return await _resource_query(query_params, None, scopes)
+                return await resource_query(query_params, None, scopes)
 
         @endpoint(PATH_QUERY_SELECTOR, "")
         async def query_resource_json(path_query: Annotated[str, Path()], query_params: Annotated[FrontendQuery, Query()]):
-            return await _resource_query(None, path_query, None)
+            return await resource_query(None, path_query, None)
 
         @endpoint("") # Trailing slash
         async def query_resource_default(query_params: Annotated[FrontendQuery, Query()]):
-            return await _resource_query(query_params, None, None)
+            return await resource_query(query_params, None, None)
 
     if query_resource.Meta.allow_meta_view:
         @endpoint(base=f"/_info{base_uri}", tags=["Introspection"])
@@ -86,12 +76,12 @@ def register_resource_endpoints(app, query_manager, query_resource):
     if query_resource.Meta.allow_item_view:
         @endpoint("{identifier}")
         async def query_item_default(identifier: Annotated[str, Path()]):
-            return await _item_query(identifier)
+            return await item_query(identifier)
 
         if scope_schema:
             @endpoint(SCOPES_SELECTOR, "{identifier}")
             async def query_item_scoped(identifier: Annotated[str, Path()], scopes: str):
-                return await _item_query(identifier)
+                return await item_query(identifier)
 
 
 def regsitery_manager_endpoints(app, query_manager):

@@ -14,7 +14,7 @@ class DataSchemaError(ValueError):
 
 
 class DataDriver(object):
-    __schema_baseclass__ = DataModel
+    __schema_baseclass__ = None
 
     def __init_subclass__(cls):
         key = cls.__name__
@@ -61,8 +61,8 @@ class DataDriver(object):
             if hasattr(schema, '__data_schema__'):
                 raise DataSchemaError(f'Model already registered else where [{schema}]')
 
-            if not issubclass(schema, cls.__schema_baseclass__):
-                raise DataSchemaError(f'Invalid data schema [{schema_cls}] for data driver [{cls}]')
+            if cls.__schema_baseclass__ and not issubclass(schema, cls.__schema_baseclass__):
+                raise DataSchemaError(f'Invalid data schema [{schema_cls}] for data driver [{cls}]. Must be subclass of {cls.__schema_baseclass__}')
 
             schema.__data_schema__ = schema_name
             cls._data_schema[schema_name] = schema

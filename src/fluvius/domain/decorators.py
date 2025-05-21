@@ -270,7 +270,7 @@ class DomainEntityRegistry(object):
                 _decorator = domain_cls.command_processor(cls)
                 setattr(cls, COMMAND_PROCESSOR_FUNC, _decorator(cmd_handler))
 
-            DEBUG and logger.info("[REGISTERED COMMAND] %s/%d [%s]", domain_cls, cls, key)
+            DEBUG and logger.info("[REGISTERED COMMAND] %s/%s [%s]", domain_cls.__namespace__, cls.__name__, key)
             return cls
 
         key = cls_or_key

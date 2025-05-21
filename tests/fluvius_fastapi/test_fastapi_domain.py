@@ -3,7 +3,7 @@ import jsonurl_py
 from fluvius import logger
 from fluvius.data import identifier
 from fastapi.testclient import TestClient
-from fastapi_app.main import app
+from fastapi_app import app
 
 client = TestClient(app)
 

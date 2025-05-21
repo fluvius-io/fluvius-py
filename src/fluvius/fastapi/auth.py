@@ -109,17 +109,15 @@ class FluviusAuthMiddleware(BaseHTTPMiddleware):
 
 
 
-class FluviusAuthProfileProvider(object):
-    REGISTRY = {}
+_REGISTRY = {}
 
+class FluviusAuthProfileProvider(object):
     def __init_subclass__(cls):
         key = cls.__name__
-        logger.info("register key %s" % key)
-        REG = FluviusAuthProfileProvider.REGISTRY
-        if key in REG:
-            raise ValueError(f'Auth Profile Provider is already registered: {key} => {REG[key]}')
+        if key in _REGISTRY:
+            raise ValueError(f'Auth Profile Provider is already registered: {key} => {_REGISTRY[key]}')
 
-        REG[key] = cls
+        _REGISTRY[key] = cls
         DEVELOPER_MODE and logger.info('Registered Auth Profile Provider: %s', cls.__name__)
 
     @classmethod
@@ -127,7 +125,10 @@ class FluviusAuthProfileProvider(object):
         if key is None:
             return FluviusAuthProfileProvider
 
-        return FluviusAuthProfileProvider.REGISTRY[key]
+        try:
+            return _REGISTRY[key]
+        except KeyError:
+            raise ValueError(f'Auth Profile Provider is not valid: {key}. Available: {list(_REGISTRY.keys())}')
 
     """ Lookup services for user related info """
     def __init__(self, user_claims):

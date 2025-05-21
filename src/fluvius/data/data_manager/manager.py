@@ -108,7 +108,7 @@ class DataAccessManagerBase(object):
 
     def _gen_model(self, data_schema):
         if not isinstance(self.__auto_model__, bool):
-            raise ValueError(f'__auto_model__ only accept True / False: {self}')
+            raise ValueError(f'__auto_model__ only accept True / False: {self.__auto_model__}')
 
         return type(f"{data_schema.__name__}_Model", (BlankModel, ), {})
 
