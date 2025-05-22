@@ -4,7 +4,7 @@ import sqlalchemy
 from types import MethodType
 from typing import Optional, List, Dict, Any
 from fluvius.data import BackendQuery, DataModel
-from fluvius.helper import camel_to_lower
+from fluvius.helper import camel_to_lower, select_value
 from fluvius.error import InternalServerError
 from .resource import QueryResource, FrontendQuery
 from . import config
@@ -45,17 +45,22 @@ class QueryManagerMeta(DataModel):
 
 
 class QueryManager(object):
-    _RESOURCE_REGISTRY  = {}
+    __resources__    = None
+    __endpoints__    = None
+    __data_manager__ = None
 
     class Meta:
         pass
 
-    def __init_subclass__(cls):
+    def __init_subclass__(cls, data_manager=None):
+        super().__init_subclass__()
+
         if cls.__dict__.get('__abstract__'):
             return
 
-        cls._RESOURCE_REGISTRY = {}
-        cls._ENDPOINT_REGISTRY = {}
+        cls.__data_manager__ = select_value(data_manager, cls.__data_manager__)
+        cls.__resources__ = {}
+        cls.__endpoints__ = {}
 
         cls.Meta = QueryManagerMeta.create(cls.Meta, defaults={
             'name': cls.__name__,
@@ -66,24 +71,24 @@ class QueryManager(object):
 
     @property
     def resource_registry(self):
-        return self._RESOURCE_REGISTRY
+        return self.__resources__
 
     @property
     def endpoint_registry(self):
-        return self._ENDPOINT_REGISTRY
+        return self.__endpoints__
 
     @classmethod
     def lookup_query_resource(cls, identifier):
-        return cls._RESOURCE_REGISTRY[identifier]
+        return cls.__resources__[identifier]
 
     @classmethod
     def lookup_query_endpoint(self, identifier):
-        return cls._ENDPOINT_REGISTRY[identifier]
+        return cls.__endpoints__[identifier]
 
     @classmethod
     def register_endpoint(cls, uri, **kwargs):
         def _decorator(func):
-            cls._ENDPOINT_REGISTRY[uri] = (func, kwargs)
+            cls.__endpoints__[uri] = (func, kwargs)
             return func
 
         return _decorator
@@ -102,11 +107,11 @@ class QueryManager(object):
                 raise ValueError(f'QueryResource already registered with identifier: {schema_cls._identifier}')
 
             schema_cls._identifier = query_identifier
-            if query_identifier in cls._RESOURCE_REGISTRY:
+            if query_identifier in cls.__resources__:
                 raise ValueError(f'Resource identifier is already registered: {query_identifier} => {schema_cls}')
 
             query_resource = cls.validate_query_resource(schema_cls)
-            cls._RESOURCE_REGISTRY[query_identifier] = query_resource()
+            cls.__resources__[query_identifier] = query_resource()
             return query_resource
 
         return _decorator

@@ -85,7 +85,7 @@ class DomainMeta(DataModel):
 
 
 class Domain(DomainSignalManager, DomainEntityRegistry):
-    __namespace__      = None
+    __namespace__   = None
     __aggregate__   = None
     __statemgr__    = StateManager
     __logstore__    = DomainLogStore
@@ -287,7 +287,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
         return command
 
-    async def _invoke_processors(self, ctx, statemgr, cmd_bundle, cmd_def):
+    async def invoke_processors(self, ctx, statemgr, cmd_bundle, cmd_def):
         no_handler = True
         aggregate = self.__aggregate__(self)
         async with aggregate.command_aggregate(ctx, cmd_bundle, cmd_def) as agg_proxy:
@@ -306,11 +306,11 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         if no_handler:
             raise RuntimeError(f'Command has no handler: {cmd}')
 
-    async def _process_command_internal(self, ctx, stm, cmd) -> Iterator[ce.Event]:
+    async def process_command_internal(self, ctx, stm, cmd) -> Iterator[ce.Event]:
         await self.logstore.add_command(cmd)
         await self.publish(sig.COMMAND_READY, cmd)
         meta = self.lookup_command(cmd.command)
-        async for particle in self._invoke_processors(ctx, stm, cmd, meta):
+        async for particle in self.invoke_processors(ctx, stm, cmd, meta):
             if not isinstance(particle, (ce.EventRecord, cm.MessageRecord, cres.ResponseRecord, act.ActivityLog)):
                 raise RuntimeError(
                     'Items returned from command processor must be a domain entity (event, messages, etc.). '
@@ -349,10 +349,8 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         yield self._active_context
         self._active_context = None
 
-
     def validate_context(self, ctx):
         return ctx
-
 
     async def process_command(self, *commands, context: Optional[DomainContext]=None, authorization: Optional[AuthorizationContext]=None):
         # Ensure saving of context before processing command
@@ -367,7 +365,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
                    self.logstore.transaction(context) as log:
 
             await self.logstore.add_context(context)
-            ''' Run all command within a single transaction context, 
+            ''' Run all command within a single transaction context,
                 expose a readonly state manager '''
 
             for cmd in commands:
@@ -377,7 +375,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
                     revision=self.__revision__
                 )
                 auth_cmd = await self.authorize_command(context, authorization, preauth_cmd)
-                async for evt in self._process_command_internal(context, stm, auth_cmd):
+                async for evt in self.process_command_internal(context, stm, auth_cmd):
                     await self.logstore.add_event(evt)
             
             # Before exiting transaction manager context                    

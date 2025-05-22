@@ -55,5 +55,5 @@ class DomainContext(DomainEntityRecord):
     iam_roles = field(type=nullable(list), initial=None)
     organization_id = field(type=nullable(UUID_TYPE), factory=identifier_factory, initial=None)
     profile_id = field(type=nullable(UUID_TYPE), factory=identifier_factory, initial=None)
-    realm = field(type=nullable(str), initial=None)
     user_id = field(type=nullable(UUID_TYPE), factory=identifier_factory, initial=None)
+    realm = field(type=nullable(str), initial=None)
