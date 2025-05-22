@@ -2,7 +2,7 @@ import queue
 
 from functools import wraps
 from contextlib import asynccontextmanager
-from fluvius.error import BadRequestError, PreconditionFailedError
+from fluvius.error import BadRequestError, PreconditionFailedError, ForbiddenError
 from fluvius.data import UUID_TYPE, generate_etag, field, timestamp
 from typing import NamedTuple
 
@@ -31,6 +31,13 @@ class AggregateRoot(NamedTuple):
 
 
 def action(evt_key, /, resources=None, emit_event=True):
+    """
+    Define the aggregate action and event to be generated from the action
+    - evt_key: the identifier of the event to be generated
+    - resources: either a str or list of str of models' names that is allowed to perform the
+    - emit_event: whether the event should be emitted and collected into the log
+    """
+
     if resources is not None and isinstance(resources, str):
         resources = (resources,)
 
@@ -42,7 +49,7 @@ def action(evt_key, /, resources=None, emit_event=True):
         @wraps(func)
         async def wrapper(self, *args, **evt_args):
             if resources is not None and self._aggroot.resource not in resources:
-                raise ValueError('Action is not allowed on resource.')
+                raise ForbiddenError("D100-001", f'Action is not allowed on resource: {self._aggroot.resource}')
 
             evt_data = await func(self, self.statemgr, *args, **evt_args)
 
