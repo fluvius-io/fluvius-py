@@ -128,7 +128,7 @@ class DataAccessManagerBase(object):
             cls._MODELS[resource] = model_cls
             cls._AUTO[resource] = auto_model
 
-            logger.info(f'Register {"auto-generated" if auto_model else ""} model: {resource} => {model_cls}')
+            logger.info(f'{"Auto-generated" if auto_model else "Register"} model: {resource} => {model_cls}')
             return model_cls
 
         return _decorator

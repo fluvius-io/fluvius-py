@@ -63,12 +63,12 @@ class QueryResource(object):
     @classmethod
     def register_operator(cls, op):
         if op.operator in cls.OPS_INDEX:
-            raise ValueError(f'Operator is already registed [{op._name}] @ {cls} ')
+            raise ValueError(f'Operator is already registed [{op.operator} @ {cls}] ')
 
         cls.OPS_INDEX[op.operator] = op
         cls.API_INDEX += 1
 
-        DEVELOPER_MODE and logger.info('Registered operator: [{operator._name}] @ {cls}')
+        DEVELOPER_MODE and logger.info(f'Added operator: [{op.operator} @ {cls}]')
         return cls.API_INDEX
 
     def backend_model(self):
