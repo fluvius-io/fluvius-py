@@ -15,6 +15,7 @@ from pipe import Pipe
 
 from fluvius.error import BadRequestError
 from fluvius.data import DataModel
+from fluvius.auth import AuthorizationContext
 from pydantic import AnyUrl, EmailStr
 from uuid import UUID
 from typing import Literal
@@ -69,7 +70,8 @@ class TokenPayload(DataModel):
 class FluviusAuthMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, auth_profile_provider):
         super().__init__(app)
-        self._auth_provider = FluviusAuthProfileProvider.get(auth_profile_provider)
+        provider_cls = FluviusAuthProfileProvider.get(auth_profile_provider)
+        self._auth_provider = provider_cls(app)
 
     async def get_auth_context(self, request):
         # You can optionally decode and validate the token here
@@ -77,21 +79,14 @@ class FluviusAuthMiddleware(BaseHTTPMiddleware):
             return None
 
         try:
-            user = request.session.get("user")
-            if not user:
+            user_claims = request.session.get("user")
+            if not user_claims:
                 return None
         except (KeyError, ValueError):
             return None
 
-        auth_profile = self._auth_provider(user)
+        return self._auth_provider.get_auth_context(user_claims)
 
-        return SimpleNamespace(
-            token = id_token,
-            user = await auth_profile.get_user(),
-            profile = await auth_profile.get_profile(),
-            organization = await auth_profile.get_organization(),
-            iamroles = await auth_profile.get_iamroles()
-        )
 
     async def dispatch(self, request: Request, call_next):
         try:
@@ -131,32 +126,32 @@ class FluviusAuthProfileProvider(object):
             raise ValueError(f'Auth Profile Provider is not valid: {key}. Available: {list(_REGISTRY.keys())}')
 
     """ Lookup services for user related info """
-    def __init__(self, user_claims):
-        self._user = TokenPayload(**user_claims)
-        self._profile = SimpleNamespace(
+    def __init__(self, app):
+        self._app = app
+
+    async def get_auth_context(self, user_claims):
+        user = TokenPayload(**user_claims)
+        profile = SimpleNamespace(
             _id=self._user.jti,
             name=self._user.name,
             roles=('user', 'staff', 'provider')
         )
-        self._organization = SimpleNamespace(
+
+        organization = SimpleNamespace(
             _id=self._user.sub,
             name=self._user.family_name
         )
-        self._iamroles = ('sysadmin', 'operator')
+        iamroles = ('sysadmin', 'operator')
+        realm = 'default'
 
-    async def get_user(self):
-        return self._user
-
-    async def get_profile(self):
-        return self._profile
-
-    async def get_organization(self):
-        return self._organization
-
-    async def get_iamroles(self):
-        ''' Identity and Access Management Roles '''
-        return self._iamroles
-
+        return AuthorizationContext(
+            token = id_token,
+            realm = realm,
+            user = user,
+            profile = profile,
+            organization = organization,
+            iamroles = iamroles
+        )
 
 @Pipe
 def configure_authentication(app, config=config, base_path="/auth"):

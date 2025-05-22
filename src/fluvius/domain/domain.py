@@ -274,11 +274,13 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             domain_iid=aggroot.domain_iid,
         )
 
-    async def authorize_command(self, cmd):
-        ''' Override this method to authorize the command
-            and set the selector scope in order to fetch the aggroot '''
+    async def authorize_command(self, context, authorization, command):
+        '''
+        Override this method to authorize the command
+        and set the selector scope in order to fetch the aggroot
+        '''
 
-        return cmd
+        return command
 
     async def _invoke_processors(self, ctx, statemgr, cmd_bundle, cmd_def):
         no_handler = True
@@ -357,7 +359,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         return ctx
 
 
-    async def process_command(self, *commands, context=None):
+    async def process_command(self, *commands, context=None, authorization=None):
         # Ensure saving of context before processing command
         if not commands:
             logger.warning('No commands provided to process.')
@@ -373,11 +375,12 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
                 expose a readonly state manager '''
 
             for cmd in commands:
-                auth_cmd = await self.authorize_command(cmd.set(
+                preauth_cmd = cmd.set(
                     context=context._id,
                     domain=self.__namespace__,
                     revision=self.__revision__
-                ))
+                )
+                auth_cmd = await self.authorize_command(context, authorization, preauth_cmd)
                 async for evt in self._process_command_internal(context, stm, auth_cmd):
                     await self.logstore.add_event(evt)
             
@@ -395,8 +398,17 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         for cmd in consume_queue(cmd_queue):
             await self.publish(sig.TRIGGER_RECONCILIATION, cmd, statemgr=self.statemgr)
 
-    def setup_context(self, **kwargs):
-        return self._context.set(_id=UUID_GENR(), **kwargs)
+    def setup_context(self, authorization=None, **kwargs):
+        audit = {}
+        if authorization:
+            audit = dict(
+                user_id=authorization.user._id,
+                profile_id=authorization.profile._id,
+                organization_id=authorization.organization._id,
+                iam_roles=authorization.iam_roles,
+                realm=authorization.realm
+            )
+        return self._context.set(_id=UUID_GENR(), **kwargs, **audit)
 
 
     def metadata(self):

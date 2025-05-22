@@ -81,7 +81,9 @@ class DataAccessManagerBase(object):
     __automodel__ = None
 
     """ Domain data access manager """
-    def __init_subclass__(cls, connector=None, automodel=None):
+    def __init_subclass__(cls, connector=None, automodel=None, **kwargs):
+        super().__init_subclass__(**kwargs)  # See: NOTES.md @ Init subclass
+
         if cls.__dict__.get('__abstract__'):
             return
 

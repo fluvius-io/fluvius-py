@@ -2,6 +2,7 @@ import enum
 import warnings
 from datetime import datetime
 from fluvius.data.helper import timestamp
+from fluvius.auth import AuthorizationContext
 
 from fluvius.data import nullable, identifier_factory, UUID_TYPE, field
 from .record import DomainEntityRecord
@@ -51,6 +52,8 @@ class DomainContext(DomainEntityRecord):
     source = field(type=(str, type(None)), initial=lambda: None)
     timestamp = field(type=datetime, initial=timestamp)
     headers = field(type=dict, initial=dict)
-    # profile_id = field(type=nullable(UUID_TYPE), factory=identifier_factory, initial=None)
-    realm_id = field(type=nullable(UUID_TYPE), factory=identifier_factory, initial=None)
+    iam_roles = field(type=nullable(list), initial=None)
+    organization_id = field(type=nullable(UUID_TYPE), factory=identifier_factory, initial=None)
+    profile_id = field(type=nullable(UUID_TYPE), factory=identifier_factory, initial=None)
+    realm = field(type=nullable(str), initial=None)
     user_id = field(type=nullable(UUID_TYPE), factory=identifier_factory, initial=None)

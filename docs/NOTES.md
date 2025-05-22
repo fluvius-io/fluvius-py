@@ -38,3 +38,26 @@ Default (NoID): `/<domain_namespace>:<command_id>/<resource>/`
 Default:        `/<domain_namespace>:<command_id>/<resource>/<identifier>`
 Scoped (NoID):  `/<domain_namespace>:<command_id>/sid=39129912/<resource>/`
 Scoped:         `/<domain_namespace>:<command_id>/sid=39129912/<resource>/<identifier>`
+
+
+### Init Subclass
+
+```
+>>> class A:
+...     def __init_subclass__(cls, **kwargs):
+...         super().__init_subclass__(**kwargs)
+...         print("A init_subclass")
+...
+... class B:
+...     def __init_subclass__(cls, **kwargs):
+...         super().__init_subclass__(**kwargs)
+...         print("B init_subclass")
+...
+... class D(B):
+...     pass
+...
+... class C(A, D):
+...     pass
+A init_subclass
+B init_subclass
+```

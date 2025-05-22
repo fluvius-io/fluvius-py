@@ -79,6 +79,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
         scope: dict
     ) -> Any:
         context = domain.setup_context(
+            authorization=getattr(request.state, 'auth_context', None),
             headers=dict(request.headers),
             transport=DomainTransport.FASTAPI,
             source=request.client.host
