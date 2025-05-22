@@ -5,10 +5,11 @@ from contextlib import contextmanager
 from operator import itemgetter
 from pyrsistent import PClass, field
 from types import SimpleNamespace
-from typing import Iterator, Optional, List
+from typing import Iterator, Optional, List, Type
 
+from fluvius.auth import AuthorizationContext
 from fluvius.data import UUID_GENR, DataModel
-from fluvius.helper import camel_to_lower
+from fluvius.helper import camel_to_lower, select_value
 from fluvius.helper.timeutil import timestamp
 from fluvius.helper.registry import ClassRegistry
 from fluvius.error import ForbiddenError
@@ -239,7 +240,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         yield self._active_aggroot
         self._active_aggroot = None
 
-    def _validate_aggroot(self, aggroot):
+    def select_aggroot(self, aggroot):
         if aggroot is None:
             aggroot = self._active_aggroot
         else:
@@ -255,7 +256,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         return aggroot
 
     def create_command(self, cmd_key, cmd_data=None, aggroot=None):
-        aggroot = self._validate_aggroot(aggroot)
+        aggroot = self.select_aggroot(aggroot)
         cmd_cls = self.lookup_command(cmd_key)
 
         if cmd_cls.Meta.resources and aggroot.resource not in cmd_cls.Meta.resources:
@@ -274,7 +275,11 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             domain_iid=aggroot.domain_iid,
         )
 
-    async def authorize_command(self, context, authorization, command):
+    async def authorize_command(self,
+        context: DomainContext,
+        authorization: Optional[AuthorizationContext],
+        command: Type[cc.CommandBundle]
+    ):
         '''
         Override this method to authorize the command
         and set the selector scope in order to fetch the aggroot
@@ -338,34 +343,25 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
     @contextmanager
     def context(self, ctx):
-        if self._active_context is not None:
-            raise RuntimeError('Multiple concurrent context is not allowed (#1).')
+        assert self._active_context is not None, 'Context is already set for domain.'
 
         self._active_context = ctx
         yield self._active_context
         self._active_context = None
 
 
-    def _validate_context(self, ctx):
-        if ctx is None:
-            ctx = self._active_context
-        else:
-            if self._active_context is not None:
-                raise RuntimeError('Multiple concurrent context is not allowed (#2)')
-
-        if not isinstance(ctx, self.__context__):
-            raise RuntimeError(f'Invalid domain context: {ctx}. Must be a subclass of {self.__context__}')
-
+    def validate_context(self, ctx):
         return ctx
 
 
-    async def process_command(self, *commands, context=None, authorization=None):
+    async def process_command(self, *commands, context: Optional[DomainContext]=None, authorization: Optional[AuthorizationContext]=None):
         # Ensure saving of context before processing command
         if not commands:
             logger.warning('No commands provided to process.')
             return
 
-        context = self._validate_context(context)
+        context = self.validate_context(select_value(ctx, self._active_context))
+        assert isinstance(ctx, self.__context__), f'Invalid domain context: {ctx}. Must be a subclass of {self.__context__}'
 
         async with self.statemgr.transaction(context) as stm, \
                    self.logstore.transaction(context) as log:
@@ -398,7 +394,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         for cmd in consume_queue(cmd_queue):
             await self.publish(sig.TRIGGER_RECONCILIATION, cmd, statemgr=self.statemgr)
 
-    def setup_context(self, authorization=None, **kwargs):
+    def setup_context(self, authorization: Optional[AuthorizationContext]=None, **kwargs):
         audit = {}
         if authorization:
             audit = dict(
