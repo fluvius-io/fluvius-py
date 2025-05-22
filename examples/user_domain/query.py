@@ -16,7 +16,9 @@ resource = UserQueryManager.register_resource
 
 @resource('user')
 class UserQuery(QueryResource):
-    """ List current user accounts """
+    """
+    List current user accounts
+    """
 
     class Meta(QueryResource.Meta):
         select_all = True
