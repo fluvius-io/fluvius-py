@@ -34,7 +34,7 @@ class NullTracker(TrackerInterface):
 
 class SQLTrackerManager(DataAccessManagerBase):
     __connector__ = SQLTrackerConnector
-    __auto_model__ = True
+    __automodel__ = True
 
     def __init_subclass__(cls):
         super().__init_subclass__()

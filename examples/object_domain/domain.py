@@ -9,7 +9,7 @@ from .storage import ObjectExampleConnector
 
 class CustomObjectStateManager(DataAccessManager):
     __connector__ = ObjectExampleConnector
-    __auto_model__ = True
+    __automodel__ = True
 
     @data_query
     def custom_query_echo(self, **kwargs):

@@ -16,16 +16,17 @@ class FluviusSchemaBase(SqlaDataSchema):
 
 class User(FluviusSchemaBase):
     _id = sa.Column(sa.String, primary_key=True)
-    name = sa.Column(sa.String)
     _created = sa.Column(sa.DateTime(timezone=True))
     _updated = sa.Column(sa.DateTime(timezone=True))
     _deleted = sa.Column(sa.DateTime(timezone=True))
     _etag = sa.Column(sa.String)
 
+    name = sa.Column(sa.String)
+
 
 class FluviusAccessManager(DataAccessManager):
     __connector__ = FluviusConnector
-    __auto_model__ = True
+    __automodel__ = True
 
 
 @pytest.mark.asyncio

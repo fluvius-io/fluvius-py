@@ -3,7 +3,7 @@ import json
 from typing import Optional, List, Dict, Any, Tuple
 from types import SimpleNamespace
 from fluvius.data import DataModel, BlankModel
-from fluvius.helper import _assert
+from fluvius.helper import assert_
 from fluvius.data.query import operator_statement, OperatorStatement
 
 from .field import QueryField

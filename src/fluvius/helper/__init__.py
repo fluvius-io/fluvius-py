@@ -11,7 +11,7 @@ from itertools import chain
 from operator import itemgetter
 from typing import Dict, List, Optional, Pattern, Tuple, Union
 
-from fluvius.error import BadRequestError
+from fluvius.error import AssertionFailed
 from fluvius import logger
 
 
@@ -241,12 +241,30 @@ def consume_queue(q):
         q.task_done()
 
 
-class AssertionFailed(BadRequestError):
-    pass
-
-
-def _assert(stmt: bool, message: str, *params, code = 400001):
+def assert_(stmt: bool, message: str, *params, code = 400001):
     if stmt:
         return
 
     raise AssertionFailed(code, message.format(*params))
+
+
+VALUE_REQUIRED = object()
+def select_value(usr_value, cls_value=None, default=VALUE_REQUIRED):
+    """
+        Select a proper value from mutual exclusive values provided.
+        I.e. either usr_value or cls_value should be provided (is not None), not both
+    """
+
+    if usr_value is not None:
+        if cls_value is not None:
+            raise ValueError('Both user value and class value provided.')
+
+        return usr_value
+
+    if cls_value is not None:
+        return cls_value
+
+    if default is VALUE_REQUIRED:
+        raise ValueError('Value is required')
+
+    return default

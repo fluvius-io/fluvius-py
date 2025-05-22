@@ -19,7 +19,7 @@ class DomainLogConnector(SqlaDriver):
 
 class SQLDomainLogManager(DataFeedManager):
     __connector__ = DomainLogConnector
-    __auto_model__ = True
+    __automodel__ = True
 
 
 class SQLDomainLogStore(SQLDomainLogManager, DomainLogStore):

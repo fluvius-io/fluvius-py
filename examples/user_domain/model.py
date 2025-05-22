@@ -24,4 +24,4 @@ class User(UserSchemaBase):
 
 class FluviusAccessManager(DataAccessManager):
     __connector__ = UserConnector
-    __auto_model__ = True
+    __automodel__ = True

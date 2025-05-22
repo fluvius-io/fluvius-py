@@ -27,7 +27,7 @@ class MediaDataConnector(SqlaDriver):
 
 class MediaManager(DataAccessManager):
     __connector__ = MediaDataConnector
-    __auto_model__ = True
+    __automodel__ = True
 
 
 class MediaSchema(DomainDataSchema):

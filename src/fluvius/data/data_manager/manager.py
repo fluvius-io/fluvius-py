@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import List, Optional, Type, Union
 
+from fluvius.helper import select_value
 from fluvius.data import UUID_TYPE, UUID_GENR, logger, timestamp, config
 from fluvius.data.data_driver import DataDriver
 from fluvius.data.data_model import DataModel, BlankModel
@@ -75,11 +76,15 @@ class ResourceAlreadyRegistered(Exception):
 
 
 class DataAccessManagerBase(object):
+    # Instance of database driver that provides data to the manager
     __connector__ = None
-    __auto_model__ = False
+    __automodel__ = None
 
     """ Domain data access manager """
-    def __init_subclass__(cls):
+    def __init_subclass__(cls, connector=None, automodel=None):
+        if cls.__dict__.get('__abstract__'):
+            return
+
         cls._MODELS = {}
         cls._RESOURCES =  {}
         cls._AUTO = {}
@@ -88,6 +93,9 @@ class DataAccessManagerBase(object):
             if hasattr(method, ATTR_QUERY_MARKER)
         )
 
+        cls.__connector__ = select_value(connector, cls.__connector__)
+        cls.__automodel__ = select_value(automodel, cls.__automodel__, default=True)
+
     def __init__(self, app, **config):
         self._app = app
         self._proxy = ReadonlyDataManagerProxy(self)
@@ -95,50 +103,50 @@ class DataAccessManagerBase(object):
         self.setup_model()
 
     def setup_model(self):
-        if not self.__auto_model__:
+        if not self.__automodel__:
             return
 
-        for resource_name, data_schema in self.connector._data_schema.items():
-            model = self._gen_model(data_schema)
+        for model_name, data_schema in self.connector._data_schema.items():
+            model = self.generate_model(data_schema)
             try:
-                self.register_model(resource_name, auto_model=True)(model)
+                self.register_model(model_name)(model, is_generated=True)
             except ResourceAlreadyRegistered:
-                logger.warning(f'Model already registered: {resource_name}')
+                logger.warning(f'Model already registered: {model_name}')
 
 
-    def _gen_model(self, data_schema):
-        if not isinstance(self.__auto_model__, bool):
-            raise ValueError(f'__auto_model__ only accept True / False: {self.__auto_model__}')
+    def generate_model(self, data_schema):
+        if not isinstance(self.__automodel__, bool):
+            raise ValueError(f'__automodel__ only accept True / False: {self.__automodel__}')
 
         return type(f"{data_schema.__name__}_Model", (BlankModel, ), {})
 
     @classmethod
-    def register_model(cls, resource: str, auto_model: bool=False):
-        def _decorator(model_cls: DataModel):
+    def register_model(cls, model_name: str):
+        def _decorator(model_cls: Type[DataModel], is_generated: bool=False):
             # if not issubclass(model_cls, DataModel):
             #     logger.warning(f'Data model is not a subclass of DataModel: {model_cls}')
 
             if model_cls in cls._RESOURCES:
                 raise ResourceAlreadyRegistered(f'Model already registered: {model_cls} => {cls._RESOURCES[model_cls]}')
 
-            if resource in cls._MODELS and not cls._AUTO.get(resource):
-                raise ResourceAlreadyRegistered(f'Resource already registered: {resource} => {cls._MODELS[resource]}')
+            if model_name in cls._MODELS and not cls._AUTO.get(model_name):
+                raise ResourceAlreadyRegistered(f'Resource already registered: {model_name} => {cls._MODELS[model_name]}')
 
-            cls._RESOURCES[model_cls] = resource
-            cls._MODELS[resource] = model_cls
-            cls._AUTO[resource] = auto_model
+            cls._RESOURCES[model_cls] = model_name
+            cls._MODELS[model_name] = model_cls
+            cls._AUTO[model_name] = is_generated
 
-            logger.info(f'{"Auto-generated" if auto_model else "Register"} model: {resource} => {model_cls}')
+            logger.info(f'{"Generated" if is_generated else "Registered"} model: {model_name} => {model_cls}')
             return model_cls
 
         return _decorator
 
     @classmethod
-    def lookup_model(cls, resource):
-        return cls._MODELS[resource]
+    def lookup_model(cls, model_name):
+        return cls._MODELS[model_name]
 
     @classmethod
-    def lookup_resource(cls, record):
+    def lookup_record_model(cls, record):
         model_cls = record.__class__
         return cls._RESOURCES[model_cls]
 
@@ -186,27 +194,27 @@ class DataAccessManagerBase(object):
         self._connector = con_cls(**config)
 
     @classmethod
-    def create(cls, resource: str, data: dict = None, / , **kwargs) -> DataModel:
+    def create(cls, model_name: str, data: dict = None, / , **kwargs) -> DataModel:
         """ Create a single resource instance in memory (not saved yet!) """
 
-        defvals = cls.defaults(resource, data)
+        defvals = cls.defaults(model_name, data)
         defvals.update(**kwargs)
-        return cls._wrap_item(resource, defvals)
+        return cls._wrap_item(model_name, defvals)
 
     @classmethod
-    def defaults(cls, resource: str, data=None) -> dict:
+    def defaults(cls, model_name: str, data=None) -> dict:
         defvals = data or {}
         defvals.update(_created=timestamp(), _updated=timestamp())
         return defvals
 
     @classmethod
-    def _serialize(cls, resource, item):
-        model = cls.lookup_model(resource)
+    def _serialize(cls, model_name, item):
+        model = cls.lookup_model(model_name)
         return model.serialize(item)
 
     @classmethod
-    def _wrap_item(cls, resource, data):
-        model_cls = cls.lookup_model(resource)
+    def _wrap_item(cls, model_name, data):
+        model_cls = cls.lookup_model(model_name)
         if isinstance(data, model_cls):
             return data
 
@@ -220,12 +228,12 @@ class DataAccessManagerBase(object):
         return model_cls(**data)
 
     @classmethod
-    def _wrap_many(cls, resource, *items):
-        return self._wrap_list(resource, items)
+    def _wrap_many(cls, model_name, *items):
+        return self._wrap_list(model_name, items)
 
     @classmethod
-    def _wrap_list(cls, resource, item_list):
-        model_cls = cls.lookup_model(resource)
+    def _wrap_list(cls, model_name, item_list):
+        model_cls = cls.lookup_model(model_name)
         return [cls._wrap_model(model_cls, data) for data in item_list]
 
     async def native_query(self, query, *params, unwrapper=list_unwrapper, **query_options):
@@ -237,53 +245,56 @@ class DataAccessManagerBase(object):
 
 
 class DataFeedManager(DataAccessManagerBase):
-    """ Thin wrapper around data feed class that allow access to resources (multiple) registered with that data feed.
     """
-    def __init_subclass__(cls):
-        super().__init_subclass__()
+    Thin wrapper around data feed class that allow access to models (multiple) registered with that data feed.
+    """
+    __abstract__ = True
 
     async def insert(self, record: DataModel):
-        resource = self.lookup_resource(record)
-        data = self._serialize(resource, record)
+        model_cls = self.lookup_record_model(record)
+        data = self._serialize(model_cls, record)
         result = await self.connector.insert(resource, data)
         return result
 
-    async def insert_data(self, resource, data):
-        return await self.connector.insert(resource, data)
+    async def insert_data(self, model_name, data):
+        return await self.connector.insert(model_name, data)
 
-    async def update_data(self, resource, identifier, **data):
+    async def update_data(self, model_name, identifier, **data):
         query = BackendQuery(identifier=identifier)
-        record = await self.connector.find_one(resource, query)
+        record = await self.connector.find_one(model_name, query)
         record = await self.connector.update_record(record, **data)
         await self.flush()
         return record
 
     async def update(self, record: DataModel, updates: dict):
-        resource = self.lookup_resource(record)
+        model_cls = self.lookup_record_model(record)
         query = BackendQuery(identifier=identifier)
-        return await self.connector.update_record(resource, record, **updates)
+        return await self.connector.update_record(model_cls, record, **updates)
 
 
 class DataAccessManager(DataAccessManagerBase):
-    """ Domain data access manager """
+    """
+    General data access manager. A data access manager abstract map each schema (i.e. database driver's data model)
+    to application data model which is database agnostic, that way application code can be used across
+    all database backend.
+    """
 
-    def __init_subclass__(cls):
-        super().__init_subclass__()
+    __abstract__ = True
 
-    async def fetch(self, resource: str, identifier: UUID_TYPE, / , etag=None, **kwargs) -> DataModel:
+    async def fetch(self, model_name: str, identifier: UUID_TYPE, / , etag=None, **kwargs) -> DataModel:
         """ Fetch exactly 1 items from the data store using its primary identifier """
         q = BackendQuery.create(identifier=identifier, etag=etag, where=kwargs)
-        item = await self.connector.find_one(resource, q)
-        return self._wrap_item(resource, item)
+        item = await self.connector.find_one(model_name, q)
+        return self._wrap_item(model_name, item)
 
-    async def fetch_with_domain_sid(self, resource: str, identifier, domain_sid, / , etag=None, **kwargs) -> DataModel:
+    async def fetch_with_domain_sid(self, model_name: str, identifier, domain_sid, / , etag=None, **kwargs) -> DataModel:
         """ Fetch exactly 1 items from the data store using its intra domain identifier """
         scope = {INTRA_DOMAIN_SCOPE_FIELD: domain_sid}
         q = BackendQuery.create(identifier=identifier, scope=scope, where=kwargs, etag=etag)
-        data = await self.connector.find_one(resource, q)
-        return self._wrap_item(resource, data)
+        data = await self.connector.find_one(model_name, q)
+        return self._wrap_item(model_name, data)
 
-    async def find_one(self, resource: str, q=None, **query) -> DataModel:
+    async def find_one(self, model_name: str, q=None, /, **query) -> DataModel:
         """ Fetch exactly 1 item from the data store using either a query object or where statements
             Raises an error if there are 0 or multiple results """
         q = BackendQuery.create(q, **query, limit=1, offset=0)
@@ -291,74 +302,74 @@ class DataAccessManager(DataAccessManagerBase):
             raise ValueError(f'Invalid find_one query: {q}')
 
         try:
-            item = await self.connector.find_one(resource, q)
-            return self._wrap_item(resource, item)
+            item = await self.connector.find_one(model_name, q)
+            return self._wrap_item(model_name, item)
         except ItemNotFoundError:
             return None
 
-    async def find_all(self, resource: str, q=None, return_meta=None, **query) -> List[DataModel]:
+    async def find_all(self, model_name: str, q=None, return_meta=None, **query) -> List[DataModel]:
         """ Find all matching items, always starts with offset = 0 and retrieve all items """
         q = BackendQuery.create(q, **query, offset=0, limit=BACKEND_QUERY_LIMIT)
-        data = await self.connector.query(resource, q, return_meta)
-        return self._wrap_list(resource, data)
+        data = await self.connector.query(model_name, q, return_meta)
+        return self._wrap_list(model_name, data)
 
-    async def query(self, resource: str, q=None, return_meta=None, **query) -> List[DataModel]:
+    async def query(self, model_name: str, q=None, return_meta=None, **query) -> List[DataModel]:
         """ Query with offset and limits """
         q = BackendQuery.create(q, **query)
-        data = await self.connector.query(resource, q, return_meta)
-        return self._wrap_list(resource, data)
+        data = await self.connector.query(model_name, q, return_meta)
+        return self._wrap_list(model_name, data)
 
     async def invalidate(self, record: DataModel):
-        resource = self.lookup_resource(record)
+        model_name = self.lookup_record_model(record)
         query = BackendQuery.create(identifier=record._id, etag=record._etag)
-        return await self.connector.update_one(resource, query, _deleted=timestamp())
+        return await self.connector.update_one(model_name, query, _deleted=timestamp())
 
-    async def invalidate_one(self, resource: str, identifier: UUID_TYPE, updates=None, *, etag=None, where=None):
+    async def invalidate_one(self, model_name: str, identifier: UUID_TYPE, updates=None, *, etag=None, where=None):
         q = BackendQuery.create(identifier=identifier, etag=etag, where=where)
         updates = updates or {}
         updates['_deleted'] = timestamp()
-        return await self.connector.update_one(resource, q, **updates)
+        return await self.connector.update_one(model_name, q, **updates)
 
-    async def invalidate_many(self, resource: str, updates=None, q=None, **query):
+    async def invalidate_many(self, model_name: str, updates=None, q=None, **query):
         q = BackendQuery.create(query)
-        return await self.connector.invalidate_many(resource, q, updates)
+        return await self.connector.invalidate_many(model_name, q, updates)
 
     async def update(self, record: DataModel, updates: dict):
-        resource = self.lookup_resource(record)
+        model_name = self.lookup_record_model(record)
         q = BackendQuery.create(identifier=record._id, etag=record._etag)
-        return await self.connector.update_one(resource, q, **updates)
+        return await self.connector.update_one(model_name, q, **updates)
 
-    async def update_one(self, resource: str, identifier: UUID_TYPE, etag=None, **updates):
+    async def update_one(self, model_name: str, identifier: UUID_TYPE, etag=None, **updates):
         query = BackendQuery.create(identifier=identifier, etag=etag)
-        return await self.connector.update_one(resource, query, **updates)
+        return await self.connector.update_one(model_name, query, **updates)
 
     async def remove(self, record):
-        resource = self.lookup_resource(record)
+        model_name = self.lookup_record_model(record)
         query = BackendQuery.create(identifier=record._id, etag=record._etag)
-        return await self.connector.remove_record(resource, query)
+        return await self.connector.remove_record(model_name, query)
 
     async def insert(self, record: DataModel):
-        resource = self.lookup_resource(record)
-        data = self._serialize(resource, record)
-        result = await self.connector.insert(resource, data)
+        model_name = self.lookup_record_model(record)
+        data = self._serialize(model_name, record)
+        result = await self.connector.insert(model_name, data)
         return result
 
-    async def insert_data(self, resource, data):
-        result = await self.connector.insert(resource, data)
+    async def insert_data(self, model_name, data):
+        result = await self.connector.insert(model_name, data)
         return result
 
-    async def insert_many(self, resource: str, *records: list[DataModel]):
-        data = [self._serialize(resource, rec) for rec in records]
-        return await self.connector.insert(resource, data)
+    async def insert_many(self, model_name: str, *records: list[DataModel]):
+        data = [self._serialize(model_name, rec) for rec in records]
+        return await self.connector.insert(model_name, data)
 
     async def upsert(self, record: DataModel, values: dict):
-        resource = self.lookup_resource(record)
+        model_name = self.lookup_record_model(record)
         values.update(_id=record._id)
-        return await self.connector.upsert(resource, *[values])
+        return await self.connector.upsert(model_name, *[values])
 
-    async def upsert_many(self, resource: str, *records: list[DataModel]):
-        data = [self._serialize(resource, rec) for rec in records]
-        return await self.connector.upsert(resource, *data)
+    async def upsert_many(self, model_name: str, *records: list[DataModel]):
+        data = [self._serialize(model_name, rec) for rec in records]
+        return await self.connector.upsert(model_name, *data)
 
     async def native_query(self, *args, **kwargs):
         return await self.connector.native_query(*args, **kwargs)

@@ -75,3 +75,7 @@ class InternalServerError(FluviusException):
     status_code = 500
     errcode = "A00500"
 
+
+class AssertionFailed(BadRequestError):
+    label = "Assertion Failed"
+    errcode = "A00401"
