@@ -42,7 +42,7 @@ def auth_required(inject_ctx=True, **kwargs):
     return decorator
 
 
-class TokenPayload(DataModel):
+class KeycloakTokenPayload(DataModel):
     exp: int
     iat: int
     auth_time: int
@@ -108,6 +108,8 @@ _REGISTRY = {}
 
 class FluviusAuthProfileProvider(object):
     def __init_subclass__(cls):
+        super().__init_subclass__()
+
         key = cls.__name__
         if key in _REGISTRY:
             raise ValueError(f'Auth Profile Provider is already registered: {key} => {_REGISTRY[key]}')
@@ -129,24 +131,30 @@ class FluviusAuthProfileProvider(object):
     def __init__(self, app):
         self._app = app
 
-    async def get_auth_context(self, user_claims):
-        user = TokenPayload(**user_claims)
+    def authorize_claims(self, claims_token: dict) -> KeycloakTokenPayload:
+        return KeycloakTokenPayload(**claims_token)
+
+    async def get_auth_context(self, claims_token):
+        auth_user = self.authorize_claims(claims_token)
+        return await self.setup_context(auth_user)
+
+    async def setup_context(self, auth_user: KeycloakTokenPayload) -> AuthorizationContext:
         profile = SimpleNamespace(
-            _id=self._user.jti,
-            name=self._user.name,
+            _id=auth_user.jti,
+            name=auth_user.name,
             roles=('user', 'staff', 'provider')
         )
 
         organization = SimpleNamespace(
-            _id=self._user.sub,
-            name=self._user.family_name
+            _id=auth_user.sub,
+            name=auth_user.family_name
         )
         iamroles = ('sysadmin', 'operator')
         realm = 'default'
 
         return AuthorizationContext(
             realm = realm,
-            user = user,
+            user = auth_user,
             profile = profile,
             organization = organization,
             iamroles = iamroles

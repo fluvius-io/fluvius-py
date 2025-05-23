@@ -257,7 +257,7 @@ def select_value(usr_value, cls_value=None, default=VALUE_REQUIRED):
 
     if usr_value is not None:
         if cls_value is not None:
-            raise ValueError('Both user value and class value provided.')
+            raise RuntimeError(f'Both user value and class value provided: {usr_value} & {cls_value}.')
 
         return usr_value
 
@@ -265,6 +265,6 @@ def select_value(usr_value, cls_value=None, default=VALUE_REQUIRED):
         return cls_value
 
     if default is VALUE_REQUIRED:
-        raise ValueError('Value is required')
+        raise RuntimeError('Value is required')
 
     return default

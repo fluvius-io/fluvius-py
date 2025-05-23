@@ -81,8 +81,8 @@ class DataAccessManagerBase(object):
     __automodel__ = None
 
     """ Domain data access manager """
-    def __init_subclass__(cls, connector=None, automodel=None, **kwargs):
-        super().__init_subclass__(**kwargs)  # See: NOTES.md @ Init subclass
+    def __init_subclass__(cls, connector=None, automodel=None):
+        super().__init_subclass__()  # See: NOTES.md @ Init subclass
 
         if cls.__dict__.get('__abstract__'):
             return
@@ -345,7 +345,7 @@ class DataAccessManager(DataAccessManagerBase):
         query = BackendQuery.create(identifier=identifier, etag=etag)
         return await self.connector.update_one(model_name, query, **updates)
 
-    async def remove(self, record):
+    async def remove(self, record: DataModel):
         model_name = self.lookup_record_model(record)
         query = BackendQuery.create(identifier=record._id, etag=record._etag)
         return await self.connector.remove_record(model_name, query)
@@ -356,7 +356,7 @@ class DataAccessManager(DataAccessManagerBase):
         result = await self.connector.insert(model_name, data)
         return result
 
-    async def insert_data(self, model_name, data):
+    async def insert_one(self, model_name: str, data):
         result = await self.connector.insert(model_name, data)
         return result
 
@@ -378,14 +378,14 @@ class DataAccessManager(DataAccessManagerBase):
 
 
 class ReadonlyDataManagerProxy(object):
-    def __init__(self, statemgr):
-        self.create = getattr(statemgr, 'create', None)
-        self.fetch = getattr(statemgr, 'fetch', None)
-        self.fetch_with_domain_sid = getattr(statemgr, 'fetch_with_domain_sid', None)
-        self.find_all = getattr(statemgr, 'find_all', None)
-        self.find_one = getattr(statemgr, 'find_one', None)
+    def __init__(self, data_manager):
+        self.create = getattr(data_manager, 'create', None)
+        self.fetch = getattr(data_manager, 'fetch', None)
+        self.fetch_with_domain_sid = getattr(data_manager, 'fetch_with_domain_sid', None)
+        self.find_all = getattr(data_manager, 'find_all', None)
+        self.find_one = getattr(data_manager, 'find_one', None)
 
-        for query_name in statemgr._QUERIES:
-            query_method = getattr(statemgr, query_name)
+        for query_name in data_manager._QUERIES:
+            query_method = getattr(data_manager, query_name)
             setattr(self, query_name, query_method)
 
