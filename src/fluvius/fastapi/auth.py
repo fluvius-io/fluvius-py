@@ -85,7 +85,7 @@ class FluviusAuthMiddleware(BaseHTTPMiddleware):
         except (KeyError, ValueError):
             return None
 
-        return self._auth_provider.get_auth_context(user_claims)
+        return await self._auth_provider.get_auth_context(user_claims)
 
 
     async def dispatch(self, request: Request, call_next):
@@ -145,7 +145,6 @@ class FluviusAuthProfileProvider(object):
         realm = 'default'
 
         return AuthorizationContext(
-            token = id_token,
             realm = realm,
             user = user,
             profile = profile,

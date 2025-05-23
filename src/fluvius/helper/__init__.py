@@ -34,8 +34,8 @@ def load_string(module_path):
     try:
         module_path, class_name = module_path.rsplit('.', 1)
         module = importlib.import_module(module_path)
-    except ValueError:
-        raise ImportError("%s doesn't look like a module path" % module_path)
+    except ValueError as e:
+        raise ImportError("%s doesn't look like a module path: [%s]" % (module_path, e))
 
     try:
         return getattr(module, class_name)
