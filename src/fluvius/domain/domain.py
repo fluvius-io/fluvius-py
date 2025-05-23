@@ -358,6 +358,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             logger.warning('No commands provided to process.')
             return
 
+        ctx = context
         context = self.validate_context(select_value(ctx, self._active_context))
         assert isinstance(ctx, self.__context__), f'Invalid domain context: {ctx}. Must be a subclass of {self.__context__}'
 

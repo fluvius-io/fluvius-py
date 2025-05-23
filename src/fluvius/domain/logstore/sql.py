@@ -43,10 +43,13 @@ class ContextLog(DomainLogBaseModel):
     domain = sa.Column(sa.String)
     revision = sa.Column(sa.Integer())
 
-    realm_id = sa.Column(pg.UUID)
+    realm = sa.Column(sa.String)
     dataset_id = sa.Column(pg.UUID)
     request_id = sa.Column(pg.UUID)
     user_id = sa.Column(pg.UUID)
+    profile_id = sa.Column(pg.UUID)
+    organization_id = sa.Column(pg.UUID)
+    iam_roles = sa.Column(sa.ARRAY(sa.String))
 
     session = sa.Column(sa.String())
     timestamp = sa.Column(sa.DateTime(timezone=True))

@@ -205,7 +205,7 @@ class Aggregate(object):
 
     def audit_created(self):
         return dict(
-            _realm=self.context.realm_id,
+            _realm=self.context.realm,
             _created=self.context.timestamp,
             _creator=self.context.user_id,
             _etag=generate_etag(self.context)
