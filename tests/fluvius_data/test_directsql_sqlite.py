@@ -40,14 +40,15 @@ async def test_sql_insert():
         insert_result = await sample_data_access_manager.insert(company)
         logger.info('\n- INSERT RESULT: %s', insert_result)
         with pytest.raises(UnprocessableError):
-            item = dict(_id=_id_1, business_name="ABC1", name="XYZ", system_entity=True)
-            await sample_data_access_manager.insert_data('company', item)
+
+            item = CompanyModel(_id=_id_1, business_name="ABC1", name="XYZ", system_entity=True)
+            await sample_data_access_manager.insert(item)
 
         # await CompanyModel.__driver__.insert_data(dict(_id="2", business_name="ABC2", name="XYZ", system_entity=True))
         # com2 = CompanyModel(_id="3", business_name="DEF3", name="XYZ", system_entity=True)
         # await sample_data_access_manager.insert_record(com2)
-        item = dict(_id=_id_2, business_name="ABC1", name="XYZ", system_entity=True)
-        insert_result = await sample_data_access_manager.insert_data('company', item)
+        item = CompanyModel(_id=_id_2, business_name="ABC1", name="XYZ", system_entity=True)
+        insert_result = await sample_data_access_manager.insert(item)
 
     logger.info("COMPANY RECORD: %s", await fetch_id(sample_data_access_manager, _id_1))
     record = await fetch_id(sample_data_access_manager, _id_2)

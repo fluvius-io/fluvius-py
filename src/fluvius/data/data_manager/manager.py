@@ -342,19 +342,19 @@ class DataAccessManager(DataAccessManagerBase):
         result = await self.connector.insert(model_name, data)
         return result
 
+    async def upsert(self, model_name, values: dict):
+        return await self.connector.upsert(model_name, [values])
+    
     async def insert_many(self, model_name: str, *records: list[dict]):
         data = [self._serialize(model_name, rec) for rec in records]
-        return await self.connector.insert(model_name, *data)
-
-    async def upsert(self, model_name, values: dict):
-        return await self.connector.upsert(model_name, values)
+        return await self.connector.insert(model_name, data)
 
     async def upsert_many(self, model_name: str, *records: list[dict]):
         data = [self._serialize(model_name, rec) for rec in records]
-        return await self.connector.upsert(model_name, *data)
+        return await self.connector.upsert(model_name, data)
 
     async def invalidate_one(self, model_name: str, identifier: UUID_TYPE, etag=None, /, **updates):
-        q = BackendQuery.create(identifier=identifier, etag=etag, where=where)
+        q = BackendQuery.create(identifier=identifier, etag=etag)
         updates['_deleted'] = timestamp()
         return await self.connector.update_one(model_name, q, **updates)
 

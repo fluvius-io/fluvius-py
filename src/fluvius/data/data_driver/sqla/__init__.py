@@ -326,7 +326,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
         return self._unwrap_result(cursor)
 
-    async def upsert(self, resource, *data):
+    async def upsert(self, resource, data: list):
         # Use dialect dependent (e.g. sqlite, postgres, mysql) version of the statement
         # See: connector.py [setup_sql_satemenet]
 

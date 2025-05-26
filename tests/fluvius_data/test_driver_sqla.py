@@ -4,7 +4,8 @@ from fluvius.data import SqlaDataSchema, SqlaDriver, DataAccessManager
 
 
 class FluviusConnector(SqlaDriver):
-    __db_dsn__ = "sqlite+aiosqlite:////tmp/fluvius_data_test.sqlite"
+    __db_dsn__ = "sqlite+aiosqlite:////tmp/fluvius_data_test2.sqlite"
+    # __db_dsn__ = "sqlite+aiosqlite:////tmp/fluvius_data_test.sqlite"
 
 
 class FluviusSchemaBase(SqlaDataSchema):
@@ -63,20 +64,14 @@ async def test_manager():
     # ============== Test Update Record ============
     async with manager.transaction():
         record = item
-        await manager.update(record, dict(name="user-record"))
+        await manager.update(record, name="user-record")
     item = await manager.fetch('user', user_id1)
     assert item.name == 'user-record'
-
-    # # ============== Test Update many ==============
-    # async with manager.transaction():
-    #     await manager.update_many('user', dict(name="user-many"), where={"_id:gte": "0"})
-    # item = await manager.fetch('user', user_id1)
-    # assert item.name == "user-many"
 
     # =============== Test Upsert ==================
     async with manager.transaction():
         record = item
-        await manager.upsert(record, dict(name="user-upsert"))
+        await manager.upsert('user', dict(_id=record._id, name="user-upsert"))
     item = await manager.fetch('user', user_id1)
     assert item.name == "user-upsert"
 

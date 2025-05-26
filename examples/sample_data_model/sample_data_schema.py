@@ -23,7 +23,7 @@ class SQLiteConnector(SqlaDriver):
 
 class SampleSchemaModelBase(SqlaDataSchema):
     __abstract__ = True
-
+    
     def __init_subclass__(cls):
         SQLiteConnector.register_schema(cls)
 
