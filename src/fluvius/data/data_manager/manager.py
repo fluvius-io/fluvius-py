@@ -283,13 +283,13 @@ class DataAccessManager(DataAccessManagerBase):
 
     __abstract__ = True
 
-    async def fetch(self, model_name: str, identifier: UUID_TYPE, / , etag=None, **kwargs) -> DataModel:
+    async def fetch(self, model_name: str, identifier: UUID_TYPE , etag: str=None, /, **kwargs) -> DataModel:
         """ Fetch exactly 1 items from the data store using its primary identifier """
         q = BackendQuery.create(identifier=identifier, etag=etag, where=kwargs)
         item = await self.connector.find_one(model_name, q)
         return self._wrap_item(model_name, item)
 
-    async def fetch_with_domain_sid(self, model_name: str, identifier, domain_sid, / , etag=None, **kwargs) -> DataModel:
+    async def fetch_with_domain_sid(self, model_name: str, identifier, domain_sid, etag=None, / , **kwargs) -> DataModel:
         """ Fetch exactly 1 items from the data store using its intra domain identifier """
         scope = {INTRA_DOMAIN_SCOPE_FIELD: domain_sid}
         q = BackendQuery.create(identifier=identifier, scope=scope, where=kwargs, etag=etag)
@@ -326,24 +326,10 @@ class DataAccessManager(DataAccessManagerBase):
         query = BackendQuery.create(identifier=record._id, etag=record._etag)
         return await self.connector.update_one(model_name, query, _deleted=timestamp())
 
-    async def invalidate_one(self, model_name: str, identifier: UUID_TYPE, updates=None, *, etag=None, where=None):
-        q = BackendQuery.create(identifier=identifier, etag=etag, where=where)
-        updates = updates or {}
-        updates['_deleted'] = timestamp()
-        return await self.connector.update_one(model_name, q, **updates)
-
-    async def invalidate_many(self, model_name: str, updates=None, q=None, **query):
-        q = BackendQuery.create(query)
-        return await self.connector.invalidate_many(model_name, q, updates)
-
-    async def update(self, record: DataModel, updates: dict):
+    async def update(self, record: DataModel, /, **updates):
         model_name = self.lookup_record_model(record)
         q = BackendQuery.create(identifier=record._id, etag=record._etag)
         return await self.connector.update_one(model_name, q, **updates)
-
-    async def update_one(self, model_name: str, identifier: UUID_TYPE, etag=None, **updates):
-        query = BackendQuery.create(identifier=identifier, etag=etag)
-        return await self.connector.update_one(model_name, query, **updates)
 
     async def remove(self, record: DataModel):
         model_name = self.lookup_record_model(record)
@@ -356,22 +342,25 @@ class DataAccessManager(DataAccessManagerBase):
         result = await self.connector.insert(model_name, data)
         return result
 
-    async def insert_one(self, model_name: str, data):
-        result = await self.connector.insert(model_name, data)
-        return result
-
-    async def insert_many(self, model_name: str, *records: list[DataModel]):
+    async def insert_many(self, model_name: str, *records: list[dict]):
         data = [self._serialize(model_name, rec) for rec in records]
-        return await self.connector.insert(model_name, data)
+        return await self.connector.insert(model_name, *data)
 
-    async def upsert(self, record: DataModel, values: dict):
-        model_name = self.lookup_record_model(record)
-        values.update(_id=record._id)
-        return await self.connector.upsert(model_name, *[values])
+    async def upsert(self, model_name, values: dict):
+        return await self.connector.upsert(model_name, values)
 
-    async def upsert_many(self, model_name: str, *records: list[DataModel]):
+    async def upsert_many(self, model_name: str, *records: list[dict]):
         data = [self._serialize(model_name, rec) for rec in records]
         return await self.connector.upsert(model_name, *data)
+
+    async def invalidate_one(self, model_name: str, identifier: UUID_TYPE, etag=None, /, **updates):
+        q = BackendQuery.create(identifier=identifier, etag=etag, where=where)
+        updates['_deleted'] = timestamp()
+        return await self.connector.update_one(model_name, q, **updates)
+
+    async def update_one(self, model_name: str, identifier: UUID_TYPE, etag=None, /, **updates):
+        query = BackendQuery.create(identifier=identifier, etag=etag)
+        return await self.connector.update_one(model_name, query, **updates)
 
     async def native_query(self, *args, **kwargs):
         return await self.connector.native_query(*args, **kwargs)
