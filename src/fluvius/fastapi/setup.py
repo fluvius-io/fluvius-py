@@ -82,6 +82,17 @@ def setup_error_handler(app: FastAPI) -> FastAPI:
 
     return app
 
+def setup_kcadmin(app):
+    from .kcadmin import KCAdmin
+    KCAdmin(
+        app=app,
+        server_url=config.KEYCLOAK_BASE_URL,
+        client_id=config.KEYCLOAK_CLIENT_ID,
+        client_secret=config.KEYCLOAK_CLIENT_SECRET,
+        realm_name=config.KEYCLOAK_REALM
+    )
+
+    return app
 
 def on_startup(*func):
     global _on_startups
