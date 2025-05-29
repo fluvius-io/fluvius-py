@@ -81,8 +81,8 @@ class _AsyncSessionConnection(object):
         self._connection = await self._session.connection()
         return self._connection
 
-    def _setup_sql_statement(self, sqla_dialect):
-        # sqla_dialect = importlib.import_module(f'sqlalchemy.dialects.{dialect}')
+    def _setup_sql_statement(self, dialect):
+        sqla_dialect = importlib.import_module(f'sqlalchemy.dialects.{dialect}')
         self.insert = getattr(sqla_dialect, 'insert', sa.insert)
         self.update = getattr(sqla_dialect, 'update', sa.update)
         self.select = getattr(sqla_dialect, 'select', sa.select)
@@ -107,7 +107,7 @@ class _AsyncSessionConnection(object):
             **kwargs
         )
 
-        self._setup_sql_statement(engine.dialect)
+        self._setup_sql_statement(engine.dialect.name)
         session = async_scoped_session(
             session_factory=async_sessionmaker(
                 bind=engine ,
