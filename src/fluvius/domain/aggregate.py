@@ -38,10 +38,10 @@ def action(evt_key, /, resources=None, emit_event=True):
     - emit_event: whether the event should be emitted and collected into the log
     """
 
-    if resources is not None and isinstance(resources, str):
+    if isinstance(resources, str):
         resources = (resources,)
 
-    assert resources is None or isinstance(resources, (tuple, list))
+    assert resources is None or isinstance(resources, (tuple, list)), "Invalid resources specification."
 
     def _decorator(func):
         func.__domain_event__ = evt_key
@@ -158,7 +158,7 @@ class Aggregate(object):
     def create_response(self, data, _type=None, **kwargs):
         type_ = _type or DEFAULT_RESPONSE_TYPE
         rsp_cls = self.lookup_response(type_)
-        data = rsp_cls.Data.create(data)
+        data = rsp_cls.Data.create(data, **kwargs)
         return ResponseRecord(data=data, response=type_)
 
     def create_message(self, msg_key, data=None, **kwargs):
@@ -168,7 +168,7 @@ class Aggregate(object):
             message=msg_key,
             aggroot=self.aggroot,
             domain=self.domain_name,
-            data=msg_cls.Data(**data),
+            data=msg_cls.Data.create(**data),
             **kwargs
         )
 

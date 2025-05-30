@@ -39,8 +39,9 @@ def register_resource_endpoints(app, query_manager, query_resource):
 
         return await query_manager.query_item(query_id, item_identifier, query_params)
 
-    def endpoint(*paths, method=app.get, base=None, tags=None, **kwargs):
-        api_decorator = method(uri(base or base_uri, *paths), tags=tags or api_tags, description=api_docs)
+    def endpoint(*paths, method=app.get, base=base_uri, tags=None, **kwargs):
+        api_path = uri(base, *paths)
+        api_decorator = method(api_path, tags=tags or api_tags, description=api_docs)
         if not query_resource.Meta.auth_required:
             return api_decorator
 
@@ -85,27 +86,26 @@ def register_resource_endpoints(app, query_manager, query_resource):
 
 
 def regsitery_manager_endpoints(app, query_manager):
-    base_uri = f"/{query_manager.Meta.api_prefix}"
 
-    def endpoint(*paths, method=app.get, authorization=True, **kwargs):
-        api_decorator = method(
-            uri(base_uri, *paths),
-            **kwargs
-        )
+    def endpoint(path, method=app.get, authorization=True, **kwargs):
+        api_path = f"/{query_manager.Meta.api_prefix}{path}"
+        api_decorator = method(api_path, **kwargs)
+
         if not authorization:
             return api_decorator
 
         auth_params = authorization if isinstance(authorization, dict) else {}
         auth_decorator = auth_required(**auth_params)
-        def api_def(func):
+
+        def _decorator(func):
             return auth_decorator(api_decorator(func))
 
-        return api_def
+        return _decorator
 
-    for url, (func, kwargs) in query_manager.endpoint_registry.items():
+    for api_url, (func, kwargs) in query_manager.endpoint_registry.items():
         handler = MethodType(func, query_manager)
         endpoint(
-            url,
+            api_url,
             tags=query_manager.Meta.api_tags,
             description=func.__doc__,
             **kwargs
