@@ -1,0 +1,26 @@
+{
+    "python.interpreter.path": "/Users/lexhung/.virtualenvs/pydarts/bin/python3",
+    "python.defaultInterpreterPath": "/Users/lexhung/.virtualenvs/pydarts/bin/python3",
+    "python.terminal.activateEnvironment": true,
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": false,
+    "python.linting.flake8Enabled": false,
+    "python.linting.pycodestyleEnabled": false,
+    "python.linting.mypyEnabled": true,
+    "python.linting.mypyPath": "/Users/lexhung/.virtualenvs/pydarts/bin/mypy",
+    "python.formatting.provider": "black",
+    "python.formatting.blackPath": "/Users/lexhung/.virtualenvs/pydarts/bin/black",
+    "python.languageServer": "None",
+    "python.analysis.extraPaths": [
+        "./src",
+        "./tests/_lib"
+    ],
+    "python.analysis.autoSearchPaths": true,
+    "python.analysis.useImportHeuristic": true,
+    "python.analysis.diagnosticMode": "workspace",
+    "python.envFile": "${workspaceFolder}/.env",
+    "terminal.integrated.env.osx": {
+        "PYTHONPATH": "./src:./tests/_lib",
+        "FLUVIUS_CONFIG_FILE": "config.ini"
+    }
+} 
