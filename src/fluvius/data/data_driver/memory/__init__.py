@@ -2,9 +2,9 @@ import os
 import pickle
 
 from contextlib import asynccontextmanager
-from fluvius.data import identifier, logger
-from fluvius.data.exceptions import ItemNotFoundError
-from fluvius.data.query import BackendQuery
+from fluvius.data import identifier, logger, timestamp
+from fluvius.data.exceptions import ItemNotFoundError, NoItemModifiedError
+from fluvius.data.query import BackendQuery, OperatorStatement
 
 from ..base import DataDriver
 
@@ -21,13 +21,98 @@ def query_resource(store, q: BackendQuery):
     if q.identifier:
         match_attrs['_id'] = q.identifier
 
+    def _apply_operator(item_value, expected_value, operator, mode):
+        """Apply operator logic for memory driver queries"""
+        # Handle negation mode
+        negate = mode == '!'
+        
+        # Apply the operator
+        if operator == 'eq':
+            result = item_value == expected_value
+        elif operator == 'ne':
+            result = item_value != expected_value
+        elif operator == 'gt':
+            result = item_value is not None and item_value > expected_value
+        elif operator == 'gte':
+            result = item_value is not None and item_value >= expected_value
+        elif operator == 'lt':
+            result = item_value is not None and item_value < expected_value
+        elif operator == 'lte':
+            result = item_value is not None and item_value <= expected_value
+        elif operator == 'in':
+            result = item_value in expected_value if expected_value else False
+        elif operator == 'notin':
+            result = item_value not in expected_value if expected_value else True
+        elif operator == 'cs':  # contains
+            result = expected_value in str(item_value) if item_value is not None else False
+        elif operator == 'ilike':  # case insensitive like
+            result = expected_value.lower() in str(item_value).lower() if item_value is not None else False
+        else:
+            # Default to equality for unknown operators
+            result = item_value == expected_value
+        
+        # Apply negation if needed
+        return not result if negate else result
+
     def _match(item):
         try:
-            return all(getattr(item, k, None) == v for k, v in match_attrs.items())
-        except AttributeError:
+            # Handle both dict and object items
+            for k, v in match_attrs.items():
+                # Handle OperatorStatement objects
+                if hasattr(k, 'field_key'):  # Check if it's an OperatorStatement
+                    field_name = k.field_key
+                    operator = k.op_key
+                    mode = k.mode
+                    
+                    # Get the item value
+                    if isinstance(item, dict):
+                        item_value = item.get(field_name)
+                    else:
+                        item_value = getattr(item, field_name, None)
+                    
+                    # Apply operator logic
+                    if not _apply_operator(item_value, v, operator, mode):
+                        return False
+                else:
+                    # Handle simple string keys (backward compatibility)
+                    if isinstance(item, dict):
+                        item_value = item.get(k)
+                    else:
+                        item_value = getattr(item, k, None)
+
+                    if item_value != v:
+                        return False
+            return True
+        except (AttributeError, KeyError):
             return False
 
-    return filter(_match, store.values())
+    results = list(filter(_match, store.values()))
+
+    # Apply sorting if specified
+    if q.sort:
+        for sort_expr in reversed(q.sort):  # Apply in reverse order for stable sorting
+            field_key, _, sort_type = sort_expr.rpartition(':')
+            if not field_key:
+                field_key = sort_type
+                sort_type = 'asc'
+
+            reverse = sort_type == 'desc'
+            try:
+                def get_sort_key(x):
+                    if isinstance(x, dict):
+                        return x.get(field_key)
+                    else:
+                        return getattr(x, field_key, None)
+
+                results.sort(key=get_sort_key, reverse=reverse)
+            except (AttributeError, TypeError):
+                # Handle cases where field doesn't exist or isn't sortable
+                pass
+
+    # Apply offset and limit
+    start = q.offset or 0
+    end = start + (q.limit or len(results))
+    return results[start:end]
 
 
 class InMemoryDriver(DataDriver):
@@ -38,19 +123,31 @@ class InMemoryDriver(DataDriver):
 
     @asynccontextmanager
     async def transaction(self, transaction_id=None):
-        yield self
-        self.commit()
+        # Create a transaction backup for rollback capability
+        backup = {}
+        for resource, store in self._MEMORY_STORE.items():
+            backup[resource] = store.copy()
+
+        try:
+            yield self
+            self.commit()
+        except Exception:
+            # Rollback on any exception
+            logger.warning("Rolling back memory transaction")
+            self._MEMORY_STORE.clear()
+            self._MEMORY_STORE.update(backup)
+            raise
 
     @classmethod
-    def _get_memory(self, resource):
-        store = self._MEMORY_STORE
+    def _get_memory(cls, resource):
+        store = cls._MEMORY_STORE
         if resource not in store:
             store[resource] = {}
         return store[resource]
 
     async def find(self, resource, query, meta=None):
         store = self._get_memory(resource)
-        items = list(query_resource(store, query))
+        items = query_resource(store, query)
 
         if meta is not None:
             meta.update({
@@ -66,18 +163,15 @@ class InMemoryDriver(DataDriver):
 
     async def find_one(self, resource, query):
         store = self._get_memory(resource)
-        result = query_resource(store, query)
+        results = query_resource(store, query)
 
-        try:
-            item = next(result)
-        except StopIteration:
-            logger.info('STORAGE: %s', store)
+        if not results:
             raise ItemNotFoundError(
                 errcode="L3207",
                 message=f"Query item not found.\n\t[RESOURCE] {resource}\n\t[QUERY   ] {query}"
             )
 
-        return item
+        return results[0]
 
     @classmethod
     def commit(cls):
@@ -110,28 +204,168 @@ class InMemoryDriver(DataDriver):
 
         return cls._MEMORY_STORE
 
+    async def disconnect(self):
+        """Disconnect and optionally save to file"""
+        self.commit()
+
+    async def flush(self):
+        """Flush any pending operations (for memory driver, this is a no-op)"""
+        pass
+
     async def update(self, resource, query, **changes):
         store = self._get_memory(resource)
-        for item in await self.find(resource, query):
-            store[item._id] = item.set(**changes)
+        items = query_resource(store, query)
+
+        if not items:
+            raise NoItemModifiedError(
+                errcode="L1206",
+                message=f"No items found to update with query: {query}"
+            )
+
+        for item in items:
+            # Update the item with timestamp
+            if hasattr(item, 'set'):
+                # Handle object items (like DataModel instances)
+                updated_item = item.set(_updated=timestamp(), **changes)
+                item_id = getattr(updated_item, '_id', None) or getattr(updated_item, 'id', None)
+            else:
+                # Handle dict items
+                updated_item = item.copy()
+                updated_item.update(changes)
+                updated_item['_updated'] = timestamp()
+                item_id = updated_item.get('_id')
+
+            if item_id:
+                store[item_id] = updated_item
+            else:
+                # Fallback - try to get ID from original item
+                original_id = item.get('_id') if isinstance(item, dict) else getattr(item, '_id', None)
+                if original_id:
+                    store[original_id] = updated_item
 
     update_one = update
 
-    async def insert(self, resource, record):
+    async def update_record(self, record, **changes):
+        """Update a specific record object"""
+        resource = getattr(record, '__data_schema__', 'default')
         store = self._get_memory(resource)
 
-        if record._id in store:
-            raise ValueError('Item already exists.')
+        if record._id not in store:
+            raise ItemNotFoundError(
+                errcode="L3207",
+                message=f"Record not found for update: {record._id}"
+            )
 
-        store[record._id] = record
-        return record
+        updated_record = record.set(_updated=timestamp(), **changes) if hasattr(record, 'set') else record
+        store[record._id] = updated_record
+        return updated_record
 
-    async def invalidate_one(self, resource, *args, **kwargs):
-        pass
+    async def remove_one(self, resource, query):
+        """Remove a single item based on query"""
+        store = self._get_memory(resource)
+        items = query_resource(store, query)
+
+        if not items:
+            raise ItemNotFoundError(
+                errcode="L3207",
+                message=f"No item found to remove with query: {query}"
+            )
+
+        item = items[0]
+        if hasattr(item, '_id'):
+            del store[item._id]
+        return item
+
+    async def remove_record(self, resource, query):
+        """Alias for remove_one for compatibility"""
+        return await self.remove_one(resource, query)
+
+    async def insert(self, resource, record_or_data):
+        store = self._get_memory(resource)
+
+        # Handle both single records and lists
+        if isinstance(record_or_data, (list, tuple)):
+            results = []
+            for item in record_or_data:
+                if hasattr(item, '_id'):
+                    if item._id in store:
+                        raise ValueError(f'Item already exists: {item._id}')
+                    store[item._id] = item
+                    results.append(item)
+                else:
+                    # Handle dict data
+                    item_id = item.get('_id') if isinstance(item, dict) else getattr(item, '_id', None)
+                    if item_id in store:
+                        raise ValueError(f'Item already exists: {item_id}')
+                    store[item_id] = item
+                    results.append(item)
+            return results
+        else:
+            # Single record
+            record = record_or_data
+            if hasattr(record, '_id'):
+                if record._id in store:
+                    raise ValueError(f'Item already exists: {record._id}')
+                store[record._id] = record
+                return record  # Return the original record, not the data
+            else:
+                # Handle dict data
+                record_id = record.get('_id') if isinstance(record, dict) else getattr(record, '_id', None)
+                if record_id in store:
+                    raise ValueError(f'Item already exists: {record_id}')
+                store[record_id] = record
+                return record
+
+    async def upsert(self, resource, data_list):
+        """Insert or update multiple records"""
+        store = self._get_memory(resource)
+        results = []
+
+        for item_data in data_list:
+            if isinstance(item_data, dict):
+                item_id = item_data.get('_id')
+                if item_id in store:
+                    # Update existing
+                    existing = store[item_id]
+                    if hasattr(existing, 'set'):
+                        updated = existing.set(_updated=timestamp(), **item_data)
+                    else:
+                        updated = item_data
+                    store[item_id] = updated
+                    results.append(updated)
+                else:
+                    # Insert new
+                    store[item_id] = item_data
+                    results.append(item_data)
+            else:
+                # Handle record objects
+                item_id = getattr(item_data, '_id', None)
+                if item_id in store:
+                    # Update existing
+                    if hasattr(item_data, 'set'):
+                        updated = item_data.set(_updated=timestamp())
+                    else:
+                        updated = item_data
+                    store[item_id] = updated
+                    results.append(updated)
+                else:
+                    # Insert new
+                    store[item_id] = item_data
+                    results.append(item_data)
+
+        return results
+
+    async def invalidate_one(self, resource, query, **updates):
+        """Mark a record as deleted by setting _deleted timestamp"""
+        await self.update_one(resource, query, _deleted=timestamp(), **updates)
 
     @classmethod
-    async def native_query(cls, query, *params, **options):
+    async def native_query(cls, query, *params, unwrapper=None, **options):
+        """Execute native queries (for memory driver, this is limited)"""
+        # For memory driver, native queries are limited
+        # This could be extended to support more complex operations
+        logger.warning("Native query support is limited in memory driver: %s", query)
         return query
 
     def defaults(self):
-        return {"_etag": identifier.UUID_GENR_BASE64()}
+        return {"_etag": identifier.UUID_GENR_BASE64(), "_created": timestamp(), "_updated": timestamp()}

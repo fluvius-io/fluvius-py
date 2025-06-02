@@ -29,18 +29,12 @@ from fluvius.data.query import BackendQuery, OperatorStatement, operator_stateme
 from fluvius.data import logger, config
 from fluvius.error import InternalServerError
 
-def nand_(*args, **kwargs):
-    return not_(and_(*args, **kwargs))
+DEBUG_CONNECTOR = config.DEBUG
 
-def nor_(*args, **kwargs):
-    return not_(or_(*args, **kwargs))
-
-
-NORMAL_MODE = '.'
+NORMAL_MODE = ':'
 NEGATE_MODE = '!'
-NEGATE_KEY = "!"
-OPERATOR_SEP = ":"
 FIELD_SEP = "."
+OPERATOR_SEP = ":"
 DEFAULT_SORT_ORDER = 'asc'
 
 COMPOSITE_OPERATOR = {
@@ -49,8 +43,8 @@ COMPOSITE_OPERATOR = {
         "or": or_
     },
     NEGATE_MODE: {
-        "and": nand_,
-        "or": nor_
+        "and": lambda *ag, **kw: not_(and_(*ag, **kw)),
+        "or": lambda *ag, **kw: not_(or_(*ag, **kw))
     }
 }
 FIELD_OPERATOR = {
@@ -81,8 +75,6 @@ FIELD_OPERATOR = {
         "ilike": ilike_op,
     }
 }
-
-DEBUG_CONNECTOR = True
 
 def _iter_statement(statement):
     if isinstance(statement, dict):
@@ -136,11 +128,10 @@ class QueryBuilder(object):
     def _sort_clauses(self, data_schema, sort_query, db_mapping=None):
         db_mapping = db_mapping or {}
         for sort_expr in sort_query:
-            field_key, _, sort_type = sort_expr.rpartition(FIELD_SEP)
-            # Handle case where there's no field separator (e.g., 'name' instead of 'name.asc')
+            field_key, _, sort_type = sort_expr.rpartition(OPERATOR_SEP)
             if not field_key:
-                field_key = sort_type  # The entire string is the field name
-                sort_type = DEFAULT_SORT_ORDER  # Use default sort order
+                field_key = sort_type
+                sort_type = DEFAULT_SORT_ORDER
             db_field = self._field(data_schema, field_key, db_mapping.get(field_key))
             sort_type = sort_type or DEFAULT_SORT_ORDER
             yield getattr(db_field, sort_type)()
@@ -230,5 +221,5 @@ class QueryBuilder(object):
         stmt = self._build_limit(data_schema, stmt, query)
         stmt = self._build_sort(data_schema, stmt, query)
 
-        DEBUG_CONNECTOR and logger.warning("[SELECT STMT] %s", stmt)
+        DEBUG_CONNECTOR and logger.info("[SELECT STMT] %s", stmt)
         return stmt

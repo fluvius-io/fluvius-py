@@ -27,7 +27,7 @@ class SQLDomainLogStore(SQLDomainLogManager, DomainLogStore):
         return self.insert_data(resource, data.serialize())
 
 
-class DomainLogBaseModel(SqlaDataSchema):
+class DomainLogBaseModel(DomainLogConnector.__data_schema_base__):
     __abstract__ = True
     __table_args__ = dict(schema=LOG_STORE_SCHEMA, extend_existing=True)
 

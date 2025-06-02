@@ -39,7 +39,6 @@ async def test_sql_insert():
     company = CompanyModel(_id=_id_1, business_name="ABC1", name="XYZ", system_entity=True)
     async with sample_data_access_manager.transaction():
         insert_result = await sample_data_access_manager.insert(company)
-        logger.info('\n- INSERT RESULT: %s', insert_result)
         with pytest.raises(UnprocessableError):
 
             item = CompanyModel(_id=_id_1, business_name="ABC1", name="XYZ", system_entity=True)
@@ -51,7 +50,6 @@ async def test_sql_insert():
         item = CompanyModel(_id=_id_2, business_name="ABC1", name="XYZ", system_entity=True)
         insert_result = await sample_data_access_manager.insert(item)
 
-    logger.info("COMPANY RECORD: %s", await fetch_id(sample_data_access_manager, _id_1))
     record = await fetch_id(sample_data_access_manager, _id_2)
     assert isinstance(record, CompanyModel)
 

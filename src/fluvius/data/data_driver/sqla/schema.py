@@ -66,6 +66,10 @@ def create_data_schema_base(driver_cls=None):
         _changes = {}
         def __init_subclass__(cls):
             super().__init_subclass__()
+
+            if cls.__dict__.get('__abstract__', False):
+                return
+
             if driver_cls is not None:
                 driver_cls.register_schema(cls)
 

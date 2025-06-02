@@ -23,10 +23,24 @@ from sample_data_model import *
 
 from object_domain.query import ObjectDomainQueryManager
 
+# Global fixtures for database state
+_sqlite_db_initialized = False
+_inmemory_db_initialized = False
+_sample_data_manager = None
+
 # Database setup for tests
-async def setup_database():
-    """Setup database tables and sample data for testing"""
-    sample_data_access_manager = SampleDataAccessManager(None)
+async def setup_sqlite_database():
+    """Setup SQLite database tables and sample data for testing"""
+    global _sqlite_db_initialized, _sample_data_manager
+    
+    if _sqlite_db_initialized:
+        return
+    
+    # Create a single instance that will be reused
+    if _sample_data_manager is None:
+        _sample_data_manager = SampleDataAccessManager(None)
+    
+    sample_data_access_manager = _sample_data_manager
     CompanyModel = sample_data_access_manager.lookup_model('company')
     
     # Create only the specific tables we need for testing
@@ -53,9 +67,49 @@ async def setup_database():
         await sample_data_access_manager.insert(company1)
         await sample_data_access_manager.insert(company2)
         await sample_data_access_manager.insert(company3)
+    
+    _sqlite_db_initialized = True
+    logger.info("✅ SQLite database initialized with 3 companies: ABC1, DEF3, XYZ Corp")
+
+async def setup_inmemory_database():
+    """Setup in-memory database for ObjectDomain tests"""
+    global _inmemory_db_initialized
+    
+    if _inmemory_db_initialized:
+        return
+        
+    # Import and setup the object domain fixture data
+    from object_domain.storage import populate_fixture_data
+    await populate_fixture_data()
+    
+    _inmemory_db_initialized = True
+    logger.info("✅ In-memory database initialized with economist data")
+
+async def setup_all_databases():
+    """Setup all databases needed for the test suite"""
+    await setup_sqlite_database()
+    await setup_inmemory_database()
+
+async def ensure_databases_ready():
+    """Ensure databases are initialized - can be called from any test"""
+    await setup_all_databases()
+
+def get_sample_data_manager():
+    """Get the global sample data manager instance"""
+    global _sample_data_manager
+    if _sample_data_manager is None:
+        _sample_data_manager = SampleDataAccessManager(None)
+    return _sample_data_manager
 
 class SampleQueryManager(DomainQueryManager):
     __data_manager__ = SampleDataAccessManager
+    
+    def __init__(self):
+        super().__init__()
+        # Override the data manager instance with our global one
+        global _sample_data_manager
+        if _sample_data_manager is not None:
+            self._data_manager = _sample_data_manager
 
 resource = SampleQueryManager.register_resource
 
@@ -77,8 +131,8 @@ class EconomistQuery(QueryResource):
 
 @pytest.mark.asyncio
 async def test_query_1():
-    # Setup database first
-    await setup_database()
+    # Ensure databases are ready
+    await ensure_databases_ready()
     
     hd = SampleQueryManager()
     # Query: {"!or": [{"business_name!ne": "ABC1"}, {"business_name": "DEF3"}]}
@@ -96,31 +150,63 @@ async def test_query_1():
     # So it returns records that are neither "ABC1" nor "DEF3"
     assert len(r) == 1 and len(m) > 0  # Should return 1 record (XYZ Corp)
     assert r[0].business_name == "XYZ Corp"
-    logger.info(serialize_json(r))
+    logger.info("✅ Test query 1 result: %s", serialize_json(r))
 
-    # Query: {".or": [{"business_name!ne": "ABC1"}, {"business_name": "DEF3"}]}
+    # Query: {":or": [{"business_name!ne": "ABC1"}, {"business_name": "DEF3"}]}
     # This means: business_name != "ABC1" OR business_name = "DEF3"
     # Expected result: DEF3, XYZ Corp (all records except ABC1, plus DEF3 explicitly)
-    pa = {".or": [{"business_name!ne": "ABC1"}, {"business_name": "DEF3"}]}
+    pa = {":or": [{"business_name!ne": "ABC1"}, {"business_name": "DEF3"}]}
     r, m = await hd.query_resource("company-query", query=json.dumps(pa), size=1, page=2)
     assert len(r) == 1 and len(m) > 0  # Should return 1 record (since size=1, page=2)
-    logger.info(serialize_json(r))
+    logger.info("✅ Test query 1 pagination result: %s", serialize_json(r))
 
 
 @pytest.mark.asyncio
 async def test_query_2():
+    # Ensure databases are ready
+    await ensure_databases_ready()
+    
     query_handler_2 = ObjectDomainQueryManager()
     r, m = await query_handler_2.query_resource('economist', query=json.dumps({"job": 'economist'}))
-    logger.info(serialize_json(r))
+    logger.info("✅ Test query 2 result: %s", serialize_json(r))
 
 
 @pytest.mark.asyncio
 async def test_query_items():
-    # @TODO: implement test query items
-    pass
+    """Test querying items with various filters and pagination"""
+    await ensure_databases_ready()
+    
+    hd = SampleQueryManager()
+    
+    # Test basic query with pagination
+    r, m = await hd.query_resource("company-query", size=2, page=1)
+    assert len(r) <= 2, "Should respect page size limit"
+    logger.info("✅ Test query items pagination: returned %d items", len(r))
+    
+    # Test query with system_entity filter (if we add that field to our query resource)
+    # For now, test with business_name filters
+    r, m = await hd.query_resource("company-query", query=json.dumps({"business_name": "ABC1"}))
+    assert len(r) == 1, "Should find exactly one ABC1 company"
+    assert r[0].business_name == "ABC1"
+    logger.info("✅ Test query items filter: %s", serialize_json(r))
 
 
 @pytest.mark.asyncio
 async def test_query_endpoints():
-    # @TODO: implement test query endpoints
-    pass
+    """Test query endpoints with different query patterns"""
+    await ensure_databases_ready()
+    
+    # Test SampleQueryManager endpoint
+    hd = SampleQueryManager()
+    
+    # Test complex AND query
+    query = {":and": [{"business_name!eq": "XYZ Corp"}, {"business_name!eq": "DEF3"}]}
+    r, m = await hd.query_resource("company-query", query=json.dumps(query))
+    assert len(r) == 1, "Should find only ABC1 (not XYZ Corp and not DEF3)"
+    assert r[0].business_name == "ABC1"
+    logger.info("✅ Test query endpoints complex AND: %s", serialize_json(r))
+    
+    # Test ObjectDomainQueryManager endpoint
+    query_handler_2 = ObjectDomainQueryManager()
+    r, m = await query_handler_2.query_resource('economist', query=json.dumps({}))  # Get all economists
+    logger.info("✅ Test query endpoints ObjectDomain: %s", serialize_json(r))

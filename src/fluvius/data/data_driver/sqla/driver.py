@@ -29,7 +29,7 @@ from .schema import create_data_schema_base, SqlaDataSchema
 from .query import QueryBuilder
 
 
-DEBUG_CONNECTOR = True # config.DEBUG
+DEBUG_CONNECTOR = config.DEBUG
 RAISE_NO_ITEM_MODIFIED_ERROR = True
 BACKEND_QUERY_LIMIT = config.BACKEND_QUERY_INTERNAL_LIMIT
 
@@ -139,7 +139,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
         self.set_dsn(dsn)
 
-        logger.info(f'Driver [{self.__class__.__name__}] setup with DSN: {self.dsn}')
+        DEBUG_CONNECTOR and logger.info(f'[{self.__class__.__name__}] setup with DSN: {self.dsn}')
 
     def __init_subclass__(cls):
         cls.__data_schema_registry__ = {}

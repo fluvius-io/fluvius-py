@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import List, Optional, Type, Union
 
 from fluvius.helper import select_value
-from fluvius.data import UUID_TYPE, UUID_GENR, logger, timestamp, config
+from fluvius.data import UUID_TYPE, UUID_GENR, logger, timestamp, config, serialize_mapping
 from fluvius.data.data_driver import DataDriver
 from fluvius.data.data_model import DataModel, BlankModel
 from fluvius.data.query import BackendQuery
@@ -226,6 +226,9 @@ class DataAccessManagerBase(object):
     def _wrap_model(cls, model_cls, data):
         if isinstance(data, model_cls):
             return data
+        
+        if not isinstance(data, dict):
+            data = serialize_mapping(data)
 
         return model_cls(**data)
 
