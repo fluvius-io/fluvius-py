@@ -1,3 +1,3 @@
 from .base import DataDriver
 from .memory import InMemoryDriver
-from .sqla import SqlaDriver
+from .sqla.driver import SqlaDriver

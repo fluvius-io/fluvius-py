@@ -137,6 +137,10 @@ class QueryBuilder(object):
         db_mapping = db_mapping or {}
         for sort_expr in sort_query:
             field_key, _, sort_type = sort_expr.rpartition(FIELD_SEP)
+            # Handle case where there's no field separator (e.g., 'name' instead of 'name.asc')
+            if not field_key:
+                field_key = sort_type  # The entire string is the field name
+                sort_type = DEFAULT_SORT_ORDER  # Use default sort order
             db_field = self._field(data_schema, field_key, db_mapping.get(field_key))
             sort_type = sort_type or DEFAULT_SORT_ORDER
             yield getattr(db_field, sort_type)()

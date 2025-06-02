@@ -1,14 +1,13 @@
 from ._meta import config, logger
 from .helper import nullable, generate_etag, timestamp
 from .identifier import UUID_TYPE, UUID_GENF, UUID_GENR, identifier_factory
-from .serializer import FluviusJSONEncoder as JSONEncoder, serialize_mapping, serialize_json, deserialize_json
-
 from .data_model import DataModel, Field, BlankModel
 from .data_schema import SqlaDataSchema, DomainDataSchema
 from .data_driver import DataDriver, SqlaDriver
 from .data_manager import DataAccessManager, DataFeedManager, ReadonlyDataManagerProxy, data_query, item_query, value_query, list_query
 from .data_manager.manager import DataAccessManagerBase
 from .query import BackendQuery
+from .serializer import FluviusJSONEncoder as JSONEncoder, serialize_mapping, serialize_json, deserialize_json
 
 from pyrsistent import PClass, field
 

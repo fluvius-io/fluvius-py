@@ -3,7 +3,7 @@ from collections import namedtuple
 from fluvius.data.helper import nullable
 from contextlib import contextmanager
 from pyrsistent import PClass, field, pvector_field
-from fluvius.data import UUID_TYPE, identifier_factory, DataModel
+from fluvius.data import UUID_TYPE, identifier_factory
 
 from . import config
 

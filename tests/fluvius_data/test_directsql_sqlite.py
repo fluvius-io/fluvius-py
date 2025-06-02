@@ -2,14 +2,15 @@ import asyncpg
 import pytest
 
 from enum import Enum
-from sqlalchemy.dialects.postgresql import UUID
+import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql as pg
 from sqlalchemy import create_engine, text
 
 from fluvius.error import UnprocessableError
 from fluvius.data import logger
 from fluvius.data.data_driver import SqlaDriver
 from fluvius.data.data_manager import DataAccessManager
-from fluvius.data.data_schema.sqlalchemy import SqlaDataSchema, sa
+from fluvius.data.data_schema import SqlaDataSchema
 from fluvius.data.identifier import identifier_factory
 from sample_data_model import SampleDataAccessManager, SampleSchemaModelBase
 

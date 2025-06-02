@@ -6,7 +6,7 @@ from fluvius.data import identifier, logger
 from fluvius.data.exceptions import ItemNotFoundError
 from fluvius.data.query import BackendQuery
 
-from .base import DataDriver
+from ..base import DataDriver
 
 
 def query_resource(store, q: BackendQuery):

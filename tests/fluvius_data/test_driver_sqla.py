@@ -5,17 +5,9 @@ from fluvius.data import SqlaDataSchema, SqlaDriver, DataAccessManager
 
 class FluviusConnector(SqlaDriver):
     __db_dsn__ = "sqlite+aiosqlite:////tmp/fluvius_data_test2.sqlite"
-    # __db_dsn__ = "sqlite+aiosqlite:////tmp/fluvius_data_test.sqlite"
 
 
-class FluviusSchemaBase(SqlaDataSchema):
-    __abstract__ = True
-
-    def __init_subclass__(cls):
-        FluviusConnector.register_schema(cls)
-
-
-class User(FluviusSchemaBase):
+class User(FluviusConnector.__data_schema_base__):
     _id = sa.Column(sa.String, primary_key=True)
     _created = sa.Column(sa.DateTime(timezone=True))
     _updated = sa.Column(sa.DateTime(timezone=True))
@@ -36,8 +28,8 @@ async def test_manager():
 
     db = manager.connector._async_session._async_engine
     async with db.begin() as conn:
-        await conn.run_sync(SqlaDataSchema.metadata.drop_all)
-        await conn.run_sync(SqlaDataSchema.metadata.create_all)
+        await conn.run_sync(FluviusConnector.__data_schema_base__.metadata.drop_all)
+        await conn.run_sync(FluviusConnector.__data_schema_base__.metadata.create_all)
 
     # ============= Test Insert One ================
     user_id1 = "1"

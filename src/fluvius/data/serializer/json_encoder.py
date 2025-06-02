@@ -6,8 +6,8 @@ from datetime import datetime, date
 from enum import Enum, IntEnum
 from json.encoder import JSONEncoder
 from pyrsistent import PClass, PRecord
-from fluvius.data.data_schema.sqlalchemy import SqlaDataSchema
 from fluvius.data import logger
+from fluvius.data.data_driver.sqla.schema import SqlaDataSchema
 from fluvius.data.data_model import DataModel, BlankModel
 
 from fluvius.helper.timeutil import datetime_to_str
@@ -30,7 +30,7 @@ class FluviusJSONEncoder(JSONEncoder):
         if isinstance(obj, uuid.UUID):
             return str(obj)
 
-        if isinstance(obj, (PClass, PRecord, SqlaDataSchema)):
+        if isinstance(obj, (PClass, PRecord)):
             return obj.serialize()
 
         if isinstance(obj, SqlaDataSchema):

@@ -2,12 +2,13 @@ import pytest
 
 from enum import Enum
 import asyncpg
+import sqlalchemy as sa
 
 from fluvius.error import UnprocessableError
 from fluvius.helper import camel_to_lower
 from fluvius.data.data_driver import SqlaDriver
 from fluvius.data.data_manager import DataAccessManager
-from fluvius.data.data_schema.sqlalchemy import SqlaDataSchema, sa
+from fluvius.data.data_schema import SqlaDataSchema
 from fluvius.data import logger
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -18,14 +19,10 @@ GRANT ALL PRIVILEGES ON DATABASE fluvius_test TO  fluvius_test;
 '''
 
 class SQLiteConnector(SqlaDriver):
-    __db_dsn__ = "sqlite+aiosqlite:////tmp/fluvius.data.sqlite"
+    __db_dsn__ = "sqlite+aiosqlite:///:memory:"
 
 
-class SampleSchemaModelBase(SqlaDataSchema):
-    __abstract__ = True
-
-    def __init_subclass__(cls):
-        SQLiteConnector.register_schema(cls)
+SampleSchemaModelBase = SQLiteConnector.__data_schema_base__
 
 
 class CompanyStatus(Enum):

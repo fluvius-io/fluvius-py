@@ -108,7 +108,7 @@ class DataAccessManagerBase(object):
         if not self.__automodel__:
             return
 
-        for model_name, data_schema in self.connector._data_schema.items():
+        for model_name, data_schema in self.connector.__data_schema_registry__.items():
             model = self.generate_model(data_schema)
             try:
                 self.register_model(model_name)(model, is_generated=True)

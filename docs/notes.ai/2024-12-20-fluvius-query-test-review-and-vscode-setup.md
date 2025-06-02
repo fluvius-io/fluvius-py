@@ -49,6 +49,21 @@ Reviewed and fixed the fluvius.query test in `tests/fluvius_query/test_query.py`
   - Import confusion due to scattered test utilities
 - **Impact:** Makes tests harder to maintain and understand
 
+### 6. Fluvius Data Test Issues ✅ FIXED
+- **Problem:** `just test fluvius_data` failing with integrity constraint violations
+- **Root Cause:** Database metadata mismatch - using wrong metadata for table creation
+- **Original Error:** `UNIQUE constraint failed: user._id` and `no such table: user`
+- **Solution:** Fixed metadata reference in `test_driver_sqla.py`:
+  ```python
+  # Changed from:
+  await conn.run_sync(SqlaDataSchema.metadata.drop_all)
+  await conn.run_sync(SqlaDataSchema.metadata.create_all)
+  
+  # To:
+  await conn.run_sync(FluviusConnector.__data_schema_base__.metadata.drop_all)
+  await conn.run_sync(FluviusConnector.__data_schema_base__.metadata.create_all)
+  ```
+
 ## Files Modified
 
 1. **`tests/fluvius_query/test_query.py`**
@@ -62,13 +77,21 @@ Reviewed and fixed the fluvius.query test in `tests/fluvius_query/test_query.py`
    - Added environment variables
    - Configured linting and formatting tools
 
+3. **`tests/fluvius_data/test_driver_sqla.py`** ✅ FIXED
+   - Fixed metadata reference for proper table creation
+   - Now uses correct `FluviusConnector.__data_schema_base__.metadata`
+
 ## Test Results
 
-All tests now pass successfully:
-- `test_query_1`: ✅ Complex query operations with negation and OR logic
-- `test_query_2`: ✅ ObjectDomainQueryManager (empty result as expected)
-- `test_query_items`: ✅ Placeholder test (TODO)
-- `test_query_endpoints`: ✅ Placeholder test (TODO)
+### ✅ Working Tests:
+- `test_query_1`: Complex query operations with negation and OR logic
+- `test_query_2`: ObjectDomainQueryManager (empty result as expected)  
+- `test_query_items`: Placeholder test (TODO)
+- `test_query_endpoints`: Placeholder test (TODO)
+- **NEW** `test_driver_sqla.py::test_manager`: Database operations (insert, update, upsert, invalidate)
+
+### ⚠️ Known Issues:
+- `test_sqla_query_translation.py::test_build_select_simple`: Missing `compile_statement` method
 
 ## Commands Used
 
@@ -76,8 +99,14 @@ All tests now pass successfully:
 # Run fluvius_query tests
 just test fluvius_query
 
+# Run fluvius_data tests  
+just test fluvius_data
+
 # Run all tests
 just test "*"
+
+# Clean up database files (when needed)
+rm /tmp/fluvius*.sqlite
 ```
 
 ## Technical Notes
@@ -99,29 +128,34 @@ Other tests use similar patterns:
 ```
 Current Structure (Problematic):
 tests/
-├── _lib/
-│   ├── sample_data_model.py    # Test utilities
+├── _lib/                    # 🎯 Single source of truth for test utilities
+│   ├── sample_data_model.py
 │   ├── sample_data_schema.py   # 🔄 DUPLICATE
+│   ├── object_domain/       # 🔄 Moved from examples
 │   ├── cqrs_fixtures.py
 │   └── datamap_helper.py
 ├── fluvius_*/                  # Individual test modules
 └── ...
 
-examples/
-├── sample_data_model/
-│   ├── sample_data_schema.py   # 🔄 DUPLICATE
-│   └── __init__.py
-├── object_domain/              # Used by tests
+examples/                    # 🔄 Now cleaner, imports from tests/_lib
+├── sample_data_model/       # References tests/_lib
+├── fastapi_app/
 └── ...
 ```
+
+### Database Issues Resolution
+- **Root Cause:** SQLAlchemy metadata confusion between different schema bases
+- **Pattern:** Always use the same metadata for drop/create that contains your table definitions
+- **Prevention:** Consider using in-memory databases (`:memory:`) for tests when possible
 
 ## Next Steps / TODOs
 
 1. **🚨 PRIORITY: Reorganize test structure** (see detailed plan below)
-2. Implement `test_query_items()` function
-3. Implement `test_query_endpoints()` function  
-4. Consider adding more complex query test cases
-5. Verify VS Code configuration resolves all linter errors
+2. Fix `test_sqla_query_translation.py` missing `compile_statement` method
+3. Implement `test_query_items()` function
+4. Implement `test_query_endpoints()` function  
+5. Consider adding more complex query test cases
+6. Verify VS Code configuration resolves all linter errors
 
 ## Environment Details
 

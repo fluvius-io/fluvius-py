@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from dataclasses import is_dataclass, dataclass, field
 from fluvius.helper import camel_to_lower, validate_lower_dash
-from fluvius.data import logger, config, DataModel
+from fluvius.data import logger, config
 from fluvius.data.constant import *
 
 _DEBUG = config.DEBUG
@@ -14,14 +14,14 @@ class DataSchemaError(ValueError):
 
 
 class DataDriver(object):
-    __schema_baseclass__ = None
+    __data_schema_base__ = None
 
     def __init_subclass__(cls):
         key = cls.__name__
         if key in _DRIVER_REGISTRY:
             raise ValueError(f'Data storage driver already registered: {key}')
 
-        cls._data_schema = {}
+        cls.__data_schema_registry__ = {}
         _DRIVER_REGISTRY[key] = cls
         _DEBUG and logger.info('Registered data driver: %s => %s', key, cls)
 
@@ -32,9 +32,9 @@ class DataDriver(object):
     def lookup_data_schema(cls, schema):
         try:
             if isinstance(schema, str):
-                return cls._data_schema[schema]
+                return cls.__data_schema_registry__[schema]
 
-            if cls.__schema_baseclass__ and issubclass(schema, cls.__schema_baseclass__):
+            if cls.__data_schema_base__ and issubclass(schema, cls.__data_schema_base__):
                 return schema
 
             raise DataSchemaError(f'Invalid resource specification: {schema}')
@@ -54,18 +54,18 @@ class DataDriver(object):
 
         def _decorator(schema_cls):
             schema_name = gen_schema_name(data_schema, name)
-            if schema_name in cls._data_schema:
+            if schema_name in cls.__data_schema_registry__:
                 raise DataSchemaError(f'Schema model already registered: {schema_name}')
 
             schema = cls.validate_data_schema(schema_cls)
             if hasattr(schema, '__data_schema__'):
                 raise DataSchemaError(f'Model already registered else where [{schema}]')
 
-            if cls.__schema_baseclass__ and not issubclass(schema, cls.__schema_baseclass__):
-                raise DataSchemaError(f'Invalid data schema [{schema_cls}] for data driver [{cls}]. Must be subclass of {cls.__schema_baseclass__}')
+            if cls.__data_schema_base__ and not issubclass(schema, cls.__data_schema_base__):
+                raise DataSchemaError(f'Invalid data schema [{schema_cls}] for data driver [{cls}]. Must be subclass of {cls.__data_schema_base__}')
 
             schema.__data_schema__ = schema_name
-            cls._data_schema[schema_name] = schema
+            cls.__data_schema_registry__[schema_name] = schema
             return schema_cls
 
         if data_schema is None:

@@ -4,7 +4,9 @@
 https://<domain-name>[/<base-path>]/<app-name>/<page-name>[</arg_1:value>][/<arg_2:value>]?[sid=ZqTSAsfJz96rPaJYDbVLxZ][&param1=def][&param2=tuv]
 ```
 
-### PageState
+### Page State
+
+Page State is managed by
 
 ```javascript
 PageState = {
