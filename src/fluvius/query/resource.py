@@ -61,14 +61,18 @@ class QueryResource(object):
         })
 
     @classmethod
-    def register_operator(cls, op):
-        if op.operator in cls.OPS_INDEX:
-            raise ValueError(f'Operator is already registed [{op.operator} @ {cls}] ')
-
-        cls.OPS_INDEX[op.operator] = op
+    def next_index(cls):
         cls.API_INDEX += 1
+        return cls.API_INDEX
 
-        DEVELOPER_MODE and logger.info(f'Added operator: [{op.operator} @ {cls}]')
+    @classmethod
+    def register_operator(cls, op):
+        if op.selector in cls.OPS_INDEX:
+            raise ValueError(f'Operator is already registed [{op.selector} @ {cls}] ')
+
+        cls.OPS_INDEX[op.selector] = op
+
+        DEVELOPER_MODE and logger.info(f'Added operator: [{op.selector} @ {cls}]')
         return cls.API_INDEX
 
     def backend_model(self):
@@ -89,7 +93,7 @@ class QueryResource(object):
         def _run():
             for k, v in args.items():
                 op_stmt = operator_statement(k)
-                param_schema = query_params[op_stmt.field_key, op_stmt.op_key]
+                param_schema = query_params[op_stmt.field_name, op_stmt.op_key]
                 value = param_schema.process_value(v)
                 yield op_stmt, value
 
@@ -104,7 +108,7 @@ class QueryResource(object):
                 return meta.default_order
 
             _id = self.id_field
-            return [(_id, "asc")]
+            return ["_id:asc"]
 
         def parse_soft_delete():
             soft_delete = meta.soft_delete_query
@@ -140,10 +144,17 @@ class QueryResource(object):
 
         self.query_fields = tuple(gen_fields())
         self.query_mapping = {f._key: f._source for f in self.query_fields if f._key != f._source}
-        self.query_params = {param.selector: param for param in query_params(self.query_fields)}
+        self.query_params = {op.selector: op for op in query_params(self.query_fields)}
         self.select_fields = set(qfield.key for qfield in self.query_fields if not qfield.hidden)
         self.sortable_fields = (qfield.key for qfield in self.query_fields if qfield.sortable)
         self.default_order = parse_default_order()
         self.soft_delete_query = parse_soft_delete()
 
 
+    def specs(self):
+        return {
+            'fields': {f._key: f for f in self.query_fields},
+            'params': self.query_params,
+            'sortables': self.sortable_fields,
+            'default_order': self.default_order
+        }

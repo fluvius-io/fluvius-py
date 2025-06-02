@@ -5,7 +5,7 @@ from . import config
 
 
 class FrontendQuery(DataModel):
-    size: int = config.DEFAULT_QUERY_LIMIT
+    limit: int = config.DEFAULT_QUERY_LIMIT
     page: int = 1
 
     select: Optional[List[str]] = None

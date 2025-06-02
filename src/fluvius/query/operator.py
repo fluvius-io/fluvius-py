@@ -1,36 +1,34 @@
 import re
-from typing import Optional, Dict
+from typing import Optional, Dict, NamedTuple
 from enum import Enum
 from fluvius.data.query import operator_statement
-from fluvius.data import DataModel
+from fluvius.data import DataModel, Field, PrivateAttr
 
 OPERATOR_FIELDS = ('index', 'field', 'op_key', 'label', 'desc', 'method', 'input_widget', 'input_params')
 OPERATOR_REGISTRY = {}
 
 
-class OperatorInputHint(DataModel):
-    widget: str
-    label: str
-    note: Optional[str] = None
-    negateable: bool = True
-    data_uri: Optional[str] = None
+class OperatorWidget(DataModel):
+    name: str
+    desc: Optional[str] = None
+    inversible: bool = True
+    data_query: Optional[str] = None
 
 
 class QueryOperator(DataModel):
-    field_key: Optional[str] = None
-    operator: str = ''
-    input_hint: Optional[OperatorInputHint] = None
+    index: int = 0
+    field_name: str = ''
+    operator: str
+    widget: Optional[OperatorWidget] = None
 
-    def __init__(self, query_resource, op_name, field_key: str='', input_hint=None):
-        super().__init__(field_key=field_key, input_hint=input_hint, operator=f"{field_key or ''}:{op_name}")
-
-        self._schema = query_resource
-        self._index  = query_resource.register_operator(self)
-        self._op_name = op_name
+    def __init__(self, query_resource, operator, field_name: str='', widget=None):
+        super().__init__(index=query_resource.next_index(), field_name=field_name, widget=widget, operator=operator)
+        self._selector = f"{field_name}:{operator}"
+        query_resource.register_operator(self)
 
     @property
     def selector(self):
-        return (self.field_key, self._op_name)
+        return self._selector
 
     def process_value(self, value):
         return self.validator(self.processor(value))
@@ -52,9 +50,6 @@ class FieldQueryOperator(QueryOperator):
         return value
 
 class UnaryQueryOperator(QueryOperator):
-    def __init__(self, query_resource, **kwargs):
-        super().__init__(query_resource, **kwargs)
-
     def processor(self, value):
         return tuple(parse_list_stmt(value))
 
@@ -62,12 +57,12 @@ class AndOperator(UnaryQueryOperator):
     '''AND operator'''
 
     def __init__(self, query_resource):
-        super().__init__(query_resource, op_name='and', input_hint=dict(label="AND", widget="AND"))
+        super().__init__(query_resource, operator='and', widget=dict(label="AND", name="AND"))
 
 class OrOperator(UnaryQueryOperator):
     '''OR operator'''
     def __init__(self, query_resource):
-        super().__init__(query_resource, op_name='or', input_hint=dict(label="OR", widget="OR"))
+        super().__init__(query_resource, operator='or', widget=dict(label="OR", name="OR"))
 
 
 def parse_list_stmt(stmt):

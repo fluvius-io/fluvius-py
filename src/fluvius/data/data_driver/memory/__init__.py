@@ -59,8 +59,8 @@ def query_resource(store, q: BackendQuery):
             # Handle both dict and object items
             for k, v in match_attrs.items():
                 # Handle OperatorStatement objects
-                if hasattr(k, 'field_key'):  # Check if it's an OperatorStatement
-                    field_name = k.field_key
+                if hasattr(k, 'field_name'):  # Check if it's an OperatorStatement
+                    field_name = k.field_name
                     operator = k.op_key
                     mode = k.mode
                     
@@ -91,18 +91,18 @@ def query_resource(store, q: BackendQuery):
     # Apply sorting if specified
     if q.sort:
         for sort_expr in reversed(q.sort):  # Apply in reverse order for stable sorting
-            field_key, _, sort_type = sort_expr.rpartition(':')
-            if not field_key:
-                field_key = sort_type
+            field_name, _, sort_type = sort_expr.rpartition(':')
+            if not field_name:
+                field_name = sort_type
                 sort_type = 'asc'
 
             reverse = sort_type == 'desc'
             try:
                 def get_sort_key(x):
                     if isinstance(x, dict):
-                        return x.get(field_key)
+                        return x.get(field_name)
                     else:
-                        return getattr(x, field_key, None)
+                        return getattr(x, field_name, None)
 
                 results.sort(key=get_sort_key, reverse=reverse)
             except (AttributeError, TypeError):

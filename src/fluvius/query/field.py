@@ -5,6 +5,65 @@ from fluvius.data import DataModel
 
 RANGE_OPERATOR_KIND = "range"
 
+# all available widget can be found in `doc/operator.md"
+class QueryField(DataModel):
+    label: str
+    sortable: bool = True
+    hidden: bool = False
+    identifier: bool = False
+    factory: Optional[Callable] = None
+    source: Optional[str] = None
+
+    _dtype: str = "string"
+    _ops: List[Tuple] = []
+    _key: str = None
+
+    def __init__(self, label, **kwargs):
+        super().__init__(label=label, **kwargs)
+
+    @property
+    def key(self):
+        if self._key is None:
+            raise ValueError(
+                "Query Field is not correctly initialized. <field.key> must be set."
+            )
+
+        return self._key
+
+    @property
+    def schema(self):
+        return self._schema
+
+    def associate(self, query_resource, field_name):
+        if self._key:
+            raise ValueError(f'Field key is is already set [{self._key}]')
+
+        self._source = self.source or field_name
+        self._schema = query_resource
+        self._key = field_name
+
+        return self
+
+    def gen_params(self):
+        for params in self._ops:
+            yield FieldQueryOperator(
+                self.schema,
+                operator=params[0],
+                field_name=self.key
+            )
+
+    def meta(self):
+        m = self.__dict__.copy()
+        m["key"] = self._key
+        m["datatype"] = self.datatype
+        return m
+
+    def model_dump(self, *args, **kwargs):
+        data = super().model_dump(*args, **kwargs)
+        data["name"] = self._key
+        return data
+
+
 def in_validator(self, op_stmt, value):
     if not (isinstance(value, list) and len(value) > 0):
         raise ValueError(
@@ -56,58 +115,6 @@ def python_list_validator(self, op_stmt, value):
     return value
 
 
-# all available widget can be found in `doc/operator.md"
-class QueryField(DataModel):
-    label: str
-    sortable: bool = True
-    hidden: bool = False
-    identifier: bool = False
-    factory: Optional[Callable] = None
-    source: Optional[str] = None
-
-    _dtype: str = "string"
-    _ops: List[Tuple] = []
-    _key: str = None
-
-    def __init__(self, label, **kwargs):
-        super().__init__(label=label, **kwargs)
-
-    @property
-    def key(self):
-        if self._key is None:
-            raise ValueError(
-                "Query Field is not correctly initialized. <field.key> must be set."
-            )
-
-        return self._key
-
-    @property
-    def schema(self):
-        return self._schema
-
-    def associate(self, query_resource, field_name):
-        if self._key:
-            raise ValueError(f'Field key is is already set [{self._key}]')
-
-        self._source = self.source or field_name
-        self._schema = query_resource
-        self._key = field_name
-
-        return self
-
-    def gen_params(self):
-        for params in self._ops:
-            yield FieldQueryOperator(
-                self.schema,
-                op_name=params[0],
-                field_key=self.key
-            )
-
-    def meta(self):
-        m = self.__dict__.copy()
-        m["key"] = self._key
-        m["datatype"] = self.datatype
-        return m
 
 
 class StringField(QueryField):

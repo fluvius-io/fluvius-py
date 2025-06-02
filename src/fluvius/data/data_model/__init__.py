@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 from typing import Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 
 
 def _create(cls, data=None, defaults=None, **kwargs):

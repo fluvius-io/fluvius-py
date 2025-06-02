@@ -73,7 +73,7 @@ Learned key operator syntax:
 
 ### 3. Sort Parsing Bug
 - **Problem:** Field parsing failed for sort expressions without explicit direction
-- **Root Cause:** `rpartition('.')` on `'name'` returned `('', '', 'name')` causing empty field_key
+- **Root Cause:** `rpartition('.')` on `'name'` returned `('', '', 'name')` causing empty field_name
 - **Solution:** Added logic to handle missing field separator in `_sort_clauses` method
 
 ### 4. Boolean Logic Clarification

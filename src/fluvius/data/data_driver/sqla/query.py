@@ -110,7 +110,7 @@ class QueryBuilder(object):
                 subops = [_op for expr in value for _op in _iter_query(expr)]
                 return composites[op_stmt.op_key](*subops)
 
-            db_field = self._field(data_schema, op_stmt.field_key, db_mapping.get(op_stmt.field_key))
+            db_field = self._field(data_schema, op_stmt.field_name, db_mapping.get(op_stmt.field_name))
 
             return FIELD_OPERATOR[op_stmt.mode][op_stmt.op_key](db_field, value)
 
@@ -128,11 +128,11 @@ class QueryBuilder(object):
     def _sort_clauses(self, data_schema, sort_query, db_mapping=None):
         db_mapping = db_mapping or {}
         for sort_expr in sort_query:
-            field_key, _, sort_type = sort_expr.rpartition(OPERATOR_SEP)
-            if not field_key:
-                field_key = sort_type
+            field_name, _, sort_type = sort_expr.rpartition(OPERATOR_SEP)
+            if not field_name:
+                field_name = sort_type
                 sort_type = DEFAULT_SORT_ORDER
-            db_field = self._field(data_schema, field_key, db_mapping.get(field_key))
+            db_field = self._field(data_schema, field_name, db_mapping.get(field_name))
             sort_type = sort_type or DEFAULT_SORT_ORDER
             yield getattr(db_field, sort_type)()
 

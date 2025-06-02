@@ -3,14 +3,16 @@
     @TODO: Add transaction management primitives
 """
 
-from functools import wraps, partial
-from types import SimpleNamespace
+from collections.abc import Mapping
 from contextlib import asynccontextmanager
 from datetime import datetime
+from functools import wraps, partial
+from types import SimpleNamespace
 from typing import List, Optional, Type, Union
 
 from fluvius.helper import select_value
-from fluvius.data import UUID_TYPE, UUID_GENR, logger, timestamp, config, serialize_mapping
+from fluvius.data import UUID_TYPE, UUID_GENR, logger, timestamp, config
+from fluvius.data.helper import serialize_mapping
 from fluvius.data.data_driver import DataDriver
 from fluvius.data.data_model import DataModel, BlankModel
 from fluvius.data.query import BackendQuery
@@ -227,7 +229,7 @@ class DataAccessManagerBase(object):
         if isinstance(data, model_cls):
             return data
         
-        if not isinstance(data, dict):
+        if not isinstance(data, Mapping):
             data = serialize_mapping(data)
 
         return model_cls(**data)

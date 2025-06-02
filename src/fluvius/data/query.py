@@ -9,7 +9,7 @@ from . import config
 
 BACKEND_QUERY_LIMIT = config.BACKEND_QUERY_INTERNAL_LIMIT
 RX_PARAM_SPLIT = re.compile(r'(:|!)')
-OperatorStatement = namedtuple('OperatorStatement', 'field_key mode op_key')
+OperatorStatement = namedtuple('OperatorStatement', 'field_name mode op_key')
 
 
 def operator_statement(op_stmt, default_op='eq', default_mode=':'):

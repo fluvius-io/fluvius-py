@@ -71,8 +71,8 @@ def register_resource_endpoints(app, query_manager, query_resource):
 
     if query_resource.Meta.allow_meta_view:
         @endpoint(base=f"/_info{base_uri}", tags=["Introspection"])
-        async def query_info(request: Request) -> QueryResourceMeta:
-            return query_resource.Meta
+        async def query_info(request: Request) -> dict:
+            return query_resource.specs()
 
     if query_resource.Meta.allow_item_view:
         @endpoint("{identifier}")

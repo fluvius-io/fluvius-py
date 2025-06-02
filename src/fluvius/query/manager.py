@@ -156,8 +156,8 @@ class QueryManager(object):
         """ Convert from the frontend query to the backend query """
         scope   = query_resource.base_query(scope)
         query   = query_resource.validate_schema_args(fe_query)
-        limit   = fe_query.size
-        offset  = (fe_query.page - 1) * fe_query.size
+        limit   = fe_query.limit
+        offset  = (fe_query.page - 1) * fe_query.limit
         select  = _compute_select(fe_query, query_resource)
 
         backend_query = BackendQuery.create(

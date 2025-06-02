@@ -26,16 +26,16 @@ def validate_lower_dash(value):
     raise ValueError(f'Invalid lower-dash identifier: {value}')
 
 
-def load_string(module_path):
+def load_string(class_path):
     """
     Import a dotted module path and return the attribute/class designated by the
     last name in the path. Raise ImportError if the import failed.
     """
     try:
-        module_path, class_name = module_path.rsplit('.', 1)
+        module_path, class_name = class_path.rsplit('.', 1)
         module = importlib.import_module(module_path)
     except ValueError as e:
-        raise ImportError("%s doesn't look like a module path: [%s]" % (module_path, e))
+        raise ImportError("Unable to dynamically import module [%s]. Error:\n %s" % (class_path, e))
 
     try:
         return getattr(module, class_name)

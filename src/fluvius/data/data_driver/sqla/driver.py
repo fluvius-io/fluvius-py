@@ -251,11 +251,10 @@ class SqlaDriver(DataDriver, QueryBuilder):
         DEBUG_CONNECTOR and logger.warning("\n[QUERY] %r\n=> [RESULT] %s items", str(stmt), items)
         if return_meta:
             meta.update({
-                "total_items": total_items,   # = -1 if total_items is not calculated
-                "items_count": len(items),
                 "limit": query.limit,
                 "offset": query.offset,
                 "page_no": (query.offset // query.limit) + 1,
+                "total_items": total_items,   # = -1 if total_items is not calculated
                 "total_pages": (total_items // query.limit) + 1   # = 0 if total_items = -1
             })
 

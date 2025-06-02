@@ -263,6 +263,17 @@ def create_data_schema_base(driver_cls=None):
 
 SqlaDataSchema = create_data_schema_base()
 
+class DomainSchema:
+    _id = sa.Column(pg.UUID, primary_key=True, nullable=False, default=UUID_GENR, server_default=sa.text("uuid_generate_v4()"))
+    _created = sa.Column(sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()"))
+    _updated = sa.Column(sa.DateTime(timezone=True), nullable=True)
+    _creator = sa.Column(pg.UUID, default=UUID_GENR)
+    _updater = sa.Column(pg.UUID, nullable=True)
+    _deleted = sa.Column(sa.DateTime(timezone=True))
+    _etag = sa.Column(sa.String(64), server_default=sa.text("uuid_generate_v4()::varchar"))
+
+
+
 class DomainDataSchema(SqlaDataSchema):
     __abstract__ = True
 
