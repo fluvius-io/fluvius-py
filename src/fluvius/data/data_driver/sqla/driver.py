@@ -207,7 +207,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
         return await self.query(resource, query)
 
     async def query_count(self, session, statement):
-        result = await session.execute(select(func.count()).select_from(statement.subquery()))
+        result = await session.execute(select(func.count()).select_from(statement.limit(None).offset(None).subquery()))
         return cast(int, result.scalar())
 
     async def query(self, resource, query: BackendQuery, meta=None):
