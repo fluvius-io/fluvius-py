@@ -236,7 +236,7 @@ class DataAccessManagerBase(object):
 
     @classmethod
     def _wrap_many(cls, model_name, *items):
-        return self._wrap_list(model_name, items)
+        return cls._wrap_list(model_name, items)
 
     @classmethod
     def _wrap_list(cls, model_name, item_list):
