@@ -143,7 +143,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
     def __init_subclass__(cls):
         cls.__data_schema_registry__ = {}
-        cls.__data_schema_base__ = cls.__data_schema_base__ or create_data_schema_base(cls)
+        cls.__data_schema_base__ = create_data_schema_base(cls)
 
     def session(self):
         return self._async_session.session()
