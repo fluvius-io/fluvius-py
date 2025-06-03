@@ -60,6 +60,9 @@ class BackendQuery(PClass):
     scope   = field(nullable(dict), initial=None)
     mapping = field(dict, initial=dict)
 
+    # Default don't query the deleted item.
+    show_deleted = field(bool, initial=False)
+
     def field_map(self, field_name):
         if not self.mapping:
             return field_name

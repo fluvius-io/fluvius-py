@@ -34,6 +34,7 @@ DEBUG_CONNECTOR = config.DEBUG
 NORMAL_MODE = ':'
 NEGATE_MODE = '!'
 FIELD_SEP = "."
+FIELD_DEL = "_deleted"
 OPERATOR_SEP = ":"
 DEFAULT_SORT_ORDER = 'asc'
 
@@ -173,6 +174,9 @@ class QueryBuilder(object):
 
         if q.where:
             yield from self._build_expression(data_schema, q.where, q.mapping)
+
+        if not q.show_deleted:
+            yield (self._field(data_schema, FIELD_DEL) == None)
 
     def _build_where(self, data_schema, stmt, q: BackendQuery):
         return stmt.where(*self._where_clauses(data_schema, q))
