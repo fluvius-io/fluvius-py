@@ -39,9 +39,9 @@ def _compute_select(fe_query, query_resource):
 
 class QueryManagerMeta(DataModel):
     name: str
-    api_prefix: str
-    api_tags: Optional[List[str]] = None
-    api_docs: Optional[str] = None
+    prefix: str
+    tags: Optional[List[str]] = None
+    desc: Optional[str] = None
 
 
 class QueryManager(object):
@@ -64,9 +64,9 @@ class QueryManager(object):
 
         cls.Meta = QueryManagerMeta.create(cls.Meta, defaults={
             'name': cls.__name__,
-            'api_prefix': camel_to_lower(cls.__name__),
-            'api_docs': (cls.__doc__ or '').strip(),
-            'api_tags': [cls.__name__,]
+            'prefix': camel_to_lower(cls.__name__),
+            'desc': (cls.__doc__ or '').strip(),
+            'tags': [cls.__name__,]
         })
 
     @property

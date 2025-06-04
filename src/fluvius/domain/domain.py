@@ -79,9 +79,9 @@ def _setup_message_dispatcher_selector(handler_list):
 class DomainMeta(DataModel):
     name: str = None
     revision: int = 0
-    api_docs: Optional[str] = None
-    api_tags: Optional[List[str]] = None
-    api_prefix: str
+    desc: Optional[str] = None
+    tags: Optional[List[str]] = None
+    prefix: str
 
 
 class Domain(DomainSignalManager, DomainEntityRegistry):
@@ -142,9 +142,9 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         cls.Event = EventBase
         cls.Meta = DomainMeta.create(cls.Meta, defaults={
             'name': cls.__name__,
-            'api_prefix': cls.__namespace__,
-            'api_docs': (cls.__doc__ or '').strip(),
-            'api_tags': [cls.__name__, ]
+            'prefix': cls.__namespace__,
+            'desc': (cls.__doc__ or '').strip(),
+            'tags': [cls.__name__, ]
         })
 
 
@@ -409,7 +409,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
     def metadata(self):
         return {
             'name': self.Meta.name,
-            'desc': self.Meta.api_docs,
+            'desc': self.Meta.desc,
             'revision': self.Meta.revision,
             'commands': [name for _, name, _ in self.enumerate_command()]
         }

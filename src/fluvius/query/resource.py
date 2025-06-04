@@ -25,8 +25,8 @@ def endpoint(url):
 
 class QueryResourceMeta(DataModel):
     name: str
-    api_docs: Optional[str] = None
-    api_tags: Optional[List] = None
+    desc: Optional[str] = None
+    tags: Optional[List] = None
 
     backend_model: Optional[str] = None
 
@@ -57,7 +57,7 @@ class QueryResource(object):
         cls.OPS_INDEX = {}
         cls.Meta = QueryResourceMeta.create(cls.Meta, defaults={
             'name': cls.__name__,
-            'api_docs': (cls.__doc__ or '').strip()
+            'desc': (cls.__doc__ or '').strip()
         })
 
     @classmethod

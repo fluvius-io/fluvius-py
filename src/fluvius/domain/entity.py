@@ -70,7 +70,9 @@ class DomainEntity(object):
         if cls.__dict__.get('__abstract__'):
             return
 
-        cls.Meta = cls.__meta_schema__(**cls.Meta.__dict__)
+        meta = {"name": cls.__name__, "desc": cls.__doc__} | cls.Meta.__dict__
+        cls.Meta = cls.__meta_schema__(**meta)
+
         if not issubclass(cls.Data, (DataModel, BlankModel)):
             raise ValueError(f'Invalid Entity Data Model: {cls.Data}')
 
