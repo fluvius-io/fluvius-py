@@ -227,6 +227,10 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         return self._logstore
 
     @property
+    def policymgr(self):
+        return self._policymgr
+
+    @property
     def config(self):
         return self._config
 
@@ -297,7 +301,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         and set the selector scope in order to fetch the aggroot
         '''
         if self.__policymgr__:
-            allowed, narration = self._policymgr.check(
+            rs = self._policymgr.check(
                 context.profile_id,
                 context.organization_id,
                 self.__namespace__,
@@ -305,8 +309,8 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
                 command.resource,
                 command.resource_id
             )
-            if not allowed:
-                raise ForbiddenError('D10012', f'Permission Failed: [{narration}]')
+            if not rs.allowed:
+                raise ForbiddenError('D10012', f'Permission Failed: [{rs.narration}]')
 
         return command
 

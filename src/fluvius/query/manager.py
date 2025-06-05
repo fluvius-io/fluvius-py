@@ -185,10 +185,14 @@ class QueryManager(object):
 
 class DomainQueryManager(QueryManager):
     __abstract__ = True
+    __policymgr__ = None
 
     def __init__(self, app=None):
         self._app = app
         self._data_manager = self.__data_manager__(app)
+
+        if self.__policymgr__:
+            self._policymgr = self.__policymgr__(self._data_manager)
 
     @property
     def data_manager(self):
