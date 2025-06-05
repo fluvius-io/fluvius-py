@@ -1,0 +1,9 @@
+ptype,v0,v1,v2,v3,v4,v5,e1,e2,_id,_deleted
+p,project-admin,domain-1,project,view,,,,,3e964648-00f4-4c10-945c-45bff30006eb,
+p,team-lead,domain-1,project,view,,,,,6110bb64-e18f-42b2-b8a7-7282247b6354,
+g,profile-123,project-admin,org-1,,,,,,4cb74844-1e90-4e45-b4dc-d32a9c78cd6b,
+g,profile-456,team-lead,org-1,,,,,,b5829e92-0792-46d0-875f-802aa06c7a41,
+g2,org-1,project,proj-1,,,,,,6eb7af9b-40e6-494c-a45e-aa807fd915ac,
+g2,org-1,project,proj-2,,,,,,91aaef21-f9e3-457b-b4ed-3626a8494ae7,
+p,project-admin,domain-1,project,update,,,,,37c1117b-7775-4036-8934-cb8b1ba9d9f7,
+p,project-admin,domain-1,project,create,,,,,e819f0d5-5e3e-4057-a3bf-07fdc67b9e1c,

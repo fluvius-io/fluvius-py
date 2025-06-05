@@ -13,6 +13,7 @@ from fluvius.helper import camel_to_lower, select_value
 from fluvius.helper.timeutil import timestamp
 from fluvius.helper.registry import ClassRegistry
 from fluvius.error import ForbiddenError
+from fluvius.casbin import PolicyManager
 
 from . import logger, config  # noqa
 from . import activity as act
@@ -92,6 +93,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
     __revision__    = 0       # API compatibility revision number
     __config__      = SimpleNamespace
     __context__     = DomainContext
+    __policymgr__   = None
 
     _cmd_processors = tuple()
     _msg_dispatchers = tuple()
@@ -171,6 +173,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         self.cmd_processors = _setup_command_processor_selector(self._cmd_processors)
         self.msg_dispatchers = _setup_message_dispatcher_selector(self._msg_dispatchers)
         self.register_signals()
+        self.setup_policymgr()
 
     def validate_domain_config(self, config):
         if not issubclass(self.__aggregate__, Aggregate):
@@ -192,6 +195,15 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
     def validate_application(self, app):
         return app
+
+    def setup_policymgr(self):
+        if not self.__policymgr__:
+            return
+
+        if not issubclass(self.__policymgr__, PolicyManager):
+            raise ValueError(f'Domain has invalid policy manager [{self.__policymgr__}]')
+
+        self._policymgr = self.__policymgr__(self._statemgr)
 
     @property
     def app(self):
@@ -284,6 +296,17 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         Override this method to authorize the command
         and set the selector scope in order to fetch the aggroot
         '''
+        if self.__policymgr__:
+            allowed, narration = self._policymgr.check(
+                context.profile_id,
+                context.organization_id,
+                self.__namespace__,
+                command.command,
+                command.resource,
+                command.resource_id
+            )
+            if not allowed:
+                raise ForbiddenError('D10012', f'Permission Failed: [{narration}]')
 
         return command
 
