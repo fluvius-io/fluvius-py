@@ -23,7 +23,7 @@ class QueryOperator(DataModel):
 
     def __init__(self, query_resource, operator, field_name: str='', widget=None):
         super().__init__(index=query_resource.next_index(), field_name=field_name, widget=widget, operator=operator)
-        self._selector = f"{field_name}:{operator}"
+        self._selector = (field_name, operator)
         query_resource.register_operator(self)
 
     @property

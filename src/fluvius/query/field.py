@@ -1,9 +1,9 @@
-from .operator import FieldQueryOperator
 from typing import List, Tuple, Any, Optional, Callable
 from fluvius.data import DataModel
+from fluvius.constant import RANGE_OPERATOR_KIND
 
+from .operator import FieldQueryOperator
 
-RANGE_OPERATOR_KIND = "range"
 
 # all available widget can be found in `doc/operator.md"
 class QueryField(DataModel):
@@ -113,8 +113,6 @@ def python_list_validator(self, op_stmt, value):
             f"Field [{self.__key__}] value [{value}] is not valid. Must be a non-empty list."
         )
     return value
-
-
 
 
 class StringField(QueryField):

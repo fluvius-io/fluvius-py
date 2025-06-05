@@ -291,27 +291,32 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             domain_iid=aggroot.domain_iid,
         )
 
+    def authorize_by_policy(self, context, command):
+        '''
+        Override this method to authorize the command
+        and set the selector scope in order to fetch the aggroot
+        '''
+        if not self.__policymgr__:
+            return
+
+        rs = self._policymgr.check(
+            context.profile_id,
+            context.organization_id,
+            self.__namespace__,
+            command.command,
+            command.resource,
+            command.resource_id
+        )
+        if not rs.allowed:
+            raise ForbiddenError('D10012', f'Permission Failed: [{rs.narration}]')
+
+        return command
+
     async def authorize_command(self,
         context: DomainContext,
         authorization: Optional[AuthorizationContext],
         command: Type[cc.CommandBundle]
     ):
-        '''
-        Override this method to authorize the command
-        and set the selector scope in order to fetch the aggroot
-        '''
-        if self.__policymgr__:
-            rs = self._policymgr.check(
-                context.profile_id,
-                context.organization_id,
-                self.__namespace__,
-                command.command,
-                command.resource,
-                command.resource_id
-            )
-            if not rs.allowed:
-                raise ForbiddenError('D10012', f'Permission Failed: [{rs.narration}]')
-
         return command
 
     async def invoke_processors(self, ctx, statemgr, cmd_bundle, cmd_def):
@@ -402,7 +407,8 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
                     domain=self.__namespace__,
                     revision=self.__revision__
                 )
-                auth_cmd = await self.authorize_command(context, authorization, preauth_cmd)
+                policy_cmd = self.authorize_by_policy(context, preauth_cmd)
+                auth_cmd = await self.authorize_command(context, authorization, policy_cmd)
                 async for evt in self.process_command_internal(context, stm, auth_cmd):
                     await self.logstore.add_event(evt)
             

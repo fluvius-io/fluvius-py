@@ -4,21 +4,21 @@ from fluvius.data.helper import nullable
 from contextlib import contextmanager
 from pyrsistent import PClass, field, pvector_field
 from fluvius.data import UUID_TYPE, identifier_factory
+from fluvius.constant import OPERATOR_SEP, OPERATOR_SEP_NEGATE, RX_PARAM_SPLIT, DEFAULT_OPERATOR
 
 from . import config
 
 BACKEND_QUERY_LIMIT = config.BACKEND_QUERY_INTERNAL_LIMIT
-RX_PARAM_SPLIT = re.compile(r'(:|!)')
 OperatorStatement = namedtuple('OperatorStatement', 'field_name mode op_key')
 
 
-def operator_statement(op_stmt, default_op='eq', default_mode=':'):
+def operator_statement(op_stmt):
     if isinstance(op_stmt, OperatorStatement):
         return op_stmt
 
     result = RX_PARAM_SPLIT.split(op_stmt)
     if len(result) == 1:
-        return OperatorStatement(op_stmt, default_mode, default_op)
+        return OperatorStatement(op_stmt, OPERATOR_SEP, DEFAULT_OPERATOR)
     return OperatorStatement(*result)
 
 

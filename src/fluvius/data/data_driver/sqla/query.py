@@ -28,6 +28,7 @@ from sqlalchemy.sql.operators import contains_op, custom_op, ilike_op, in_op, eq
 from fluvius.data.query import BackendQuery, OperatorStatement, operator_statement
 from fluvius.data import logger, config
 from fluvius.error import InternalServerError
+from fluvius.constant import OPERATOR_SEP, DEFAULT_DELETED_FIELD
 
 DEBUG_CONNECTOR = config.DEBUG
 

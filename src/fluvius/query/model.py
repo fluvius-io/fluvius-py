@@ -9,8 +9,6 @@ class FrontendQuery(DataModel):
     page: int = 1
 
     select: Optional[List[str]] = None
-    deselect: Optional[List[str]] = None
-
     sort: Optional[List[str]] = None
     query: Optional[str] = None
 

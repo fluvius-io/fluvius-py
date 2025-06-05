@@ -5,15 +5,16 @@ from types import SimpleNamespace
 from fluvius.data import DataModel, BlankModel
 from fluvius.helper import assert_
 from fluvius.data.query import operator_statement, OperatorStatement
+from fluvius.constant import DEFAULT_DELETED_FIELD, OPERATOR_SEP, OPERATOR_SEP_NEGATE
 
 from .field import QueryField
 from .model import FrontendQuery
 
 from . import operator, logger, config
 
-DEFAULT_DELETED_FIELD = "_deleted"
 DEVELOPER_MODE = config.DEVELOPER_MODE
-RX_PARAM_SPLIT = re.compile(r'(:|!)')
+RX_PARAM_SPLIT = re.compile(rf'({OPERATOR_SEP}|{OPERATOR_SEP_NEGATE})')
+
 
 def endpoint(url):
     def decorator(func):
@@ -121,7 +122,7 @@ class QueryResource(object):
             return bool(soft_delete)
 
 
-        def query_params(fields):
+        def gen_query_params(fields):
             for op in operator.BUILTIN_OPS:
                 yield op(self)
 
@@ -144,7 +145,7 @@ class QueryResource(object):
 
         self.query_fields = tuple(gen_fields())
         self.query_mapping = {f._key: f._source for f in self.query_fields if f._key != f._source}
-        self.query_params = {op.selector: op for op in query_params(self.query_fields)}
+        self.query_params = {op.selector: op for op in gen_query_params(self.query_fields)}
         self.select_fields = set(qfield.key for qfield in self.query_fields if not qfield.hidden)
         self.sortable_fields = (qfield.key for qfield in self.query_fields if qfield.sortable)
         self.default_order = parse_default_order()
@@ -154,7 +155,7 @@ class QueryResource(object):
     def specs(self):
         return {
             'fields': {f._key: f for f in self.query_fields},
-            'params': self.query_params,
+            'operators': {f"{fn}:{op}": p for (fn, op), p in self.query_params.items()},
             'sortables': self.sortable_fields,
             'default_order': self.default_order
         }
