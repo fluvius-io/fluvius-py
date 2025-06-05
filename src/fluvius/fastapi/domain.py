@@ -23,17 +23,17 @@ class FastAPIDomainManager(DomainManager):
         self.initialize_domains(app)
         tags = []
         for domain in self._domains:
-            metadata_uri = f"/_metadata/{domain.__namespace__}/"
+            metadata_uri = f"/_meta/{domain.__namespace__}/"
             tags.append({
                 "name": domain.Meta.name,
-                "description": domain.Meta.api_docs,
+                "description": domain.Meta.desc,
                 "externalDocs": {
                     "description": "Metadata",
                     "url": f"http://localhost:8000{metadata_uri}"
                 }
             })
 
-            @app.get(metadata_uri, summary=f"Domain [{domain.Meta.name}] Metadata", tags=['Metadata'])
+            @app.get(metadata_uri, summary=f"Domain Metadata [{domain.Meta.name}]", tags=['Metadata'])
             async def domain_metadata(request: Request):
                 return domain.metadata()
 
@@ -56,16 +56,16 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
     default_path = bool(not cmd_cls.Meta.scope_required)
     endpoint_info = dict(
         summary=cmd_cls.Meta.name,
-        description=cmd_cls.Meta.api_docs,
-        tags=domain.Meta.api_tags
+        description=cmd_cls.Meta.desc,
+        tags=domain.Meta.tags
     )
 
-    def endpoint(*paths, method=app.post, **kwargs):
-        api_decorator = method(uri(f"/{fq_name}", *paths), **endpoint_info)
+    def endpoint(*paths, method=app.post, auth={}, **kwargs):
+        api_decorator = method(uri(f"/{fq_name}", *paths), **(endpoint_info | kwargs))
         if not cmd_cls.Meta.auth_required:
             return api_decorator
 
-        auth_decorator = auth_required(**kwargs)
+        auth_decorator = auth_required(**auth)
         def _api_def(func):
             return api_decorator(auth_decorator(func))
 
@@ -104,7 +104,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
 
     if cmd_cls.Meta.new_resource:
         if default_path:
-            @endpoint("{resource}", ":new")
+            @endpoint("{resource}", ":new", summary=cmd_cls.Meta.name, description=cmd_cls.Meta.desc)
             async def command_handler(
                 request: Request,
                 payload: PayloadType,
@@ -114,7 +114,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
                 return await _command_handler(request, payload, resource, identifier, {})
 
         if scope_schema:
-            @endpoint(SCOPES_SELECTOR, "{resource}", ":new")
+            @endpoint(SCOPES_SELECTOR, "{resource}", ":new", summary=f"{cmd_cls.Meta.name} (Scoped)", description=cmd_cls.Meta.desc)
             async def scoped_command_handler(
                 request: Request,
                 payload: PayloadType,
@@ -128,7 +128,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
         return app
 
     if default_path:
-        @endpoint("{resource}", "{identifier}")
+        @endpoint("{resource}", "{identifier}", summary=cmd_cls.Meta.name, description=cmd_cls.Meta.desc)
         async def command_handler(
             request: Request,
             payload: PayloadType,
@@ -139,7 +139,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
 
 
     if scope_schema:
-        @endpoint(SCOPES_SELECTOR, "{resource}", "{identifier}")
+        @endpoint(SCOPES_SELECTOR, "{resource}", "{identifier}", summary=f"{cmd_cls.Meta.name} (Scoped)", description=cmd_cls.Meta.desc)
         async def scoped_command_handler(
             request: Request,
             payload: PayloadType,

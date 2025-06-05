@@ -42,14 +42,13 @@ class CommandMeta(DataModel):
     key: Optional[str] = None
     name: Optional[str] = None
     desc: Optional[str] = None
+    tags: Optional[List[str]] = None
     resources: Optional[tuple[str]] = None
     tags: List[str] = []
     scope_required: Optional[Dict] = None
     scope_optional: Optional[Dict] = None
     new_resource: bool = False
     auth_required: bool = True
-    api_docs: Optional[str] = None
-    api_tags: Optional[List[str]] = None
     resource_desc: Optional[str] = None
 
 
