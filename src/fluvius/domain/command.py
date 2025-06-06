@@ -49,6 +49,7 @@ class CommandMeta(DataModel):
     scope_optional: Optional[Dict] = None
     new_resource: bool = False
     auth_required: bool = True
+    policy_required: bool = True
     resource_desc: Optional[str] = None
 
 

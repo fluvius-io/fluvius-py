@@ -1,7 +1,7 @@
 # See: https://github.com/casbin/pycasbin
 
 from ._meta import config, logger
-from .base import PolicyManager, PolicyRequest, PolicyResponse, PolicyRule
+from .base import PolicyManager, PolicyRequest, PolicyResponse
 from .adapter import PolicySchema
 
 __all__ = [
@@ -10,7 +10,6 @@ __all__ = [
     'PolicyManager',
     'PolicyRequest',
     'PolicyResponse',
-    'PolicyRule',
     'PolicySchema'
 ]
 

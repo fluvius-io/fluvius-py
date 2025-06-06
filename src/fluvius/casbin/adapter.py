@@ -9,46 +9,54 @@ from casbin import persist
 class PolicySchema:
     _id = sa.Column(UUID, primary_key=True, nullable=False)
     ptype = sa.Column(sa.String(255))
-    v0 = sa.Column(sa.String(255))
-    v1 = sa.Column(sa.String(255))
-    v2 = sa.Column(sa.String(255))
-    v3 = sa.Column(sa.String(255))
-    v4 = sa.Column(sa.String(255))
-    v5 = sa.Column(sa.String(255))
+    role = sa.Column(sa.String(255))
+    sub = sa.Column(sa.String(255))
+    org = sa.Column(sa.String(255))
+    dom = sa.Column(sa.String(255))
+    res = sa.Column(sa.String(255))
+    rid = sa.Column(sa.String(255))
+    act = sa.Column(sa.String(255))
+    cqrs = sa.Column(sa.String(255))
+    meta = sa.Column(sa.String(1000))
 
     _deleted = sa.Column(sa.DateTime)
 
+    @classmethod
+    def format_policy(cls, p):
+        ptype = p.ptype
+        match ptype:
+            case "p":
+                return [ptype, p.role, p.dom, p.res, p.act, p.cqrs, p.meta]
+            case "g":
+                return [ptype, p.sub, p.role, p.org]
+            case "g2":
+                return [ptype, p.org, p.res, p.rid]
+            case _:
+                raise ValueError(f"Unsupported policy type: {ptype}")
 
 class SqlAdapter(AsyncAdapter):
     """SQL adapter for Casbin that uses Fluvius data driver."""
-    
-    def __init__(self, manager, table):
+    def __init__(self, manager, schema):
         self._manager = manager
-        self._table = table
+        self._schema = schema
+        self._table = schema.__tablename__
 
     async def load_policy(self, model: Model) -> None:
         """Load all policies from database."""
-        policies = await self._manager.find_all(self._table)
+        policies = await self._manager.query(self._table)
         for policy in policies:
             self._load_policy_line(policy, model)
 
     async def load_filtered_policy(self, model: Model, filter_: Dict[str, Any]) -> None:
         """Load filtered policies from database."""
-        policies = self._manager.find_all(self._table, **filter_)
+        # @TODO: Need implement load filtered policies for performance purpose.
+        policies = self._manager.query(self._table, filter_)
         for policy in policies:
             self._load_policy_line(policy, model)
 
     def _load_policy_line(self, policy: Any, model: Model) -> None:
         """Load a policy line into the model."""
-        values = [
-            policy.ptype,
-            policy.v0,
-            policy.v1,
-            policy.v2,
-            policy.v3,
-            policy.v4,
-            policy.v5
-        ]
+        values = self._schema.format_policy(policy)
         values = [str(v) for v in values if v is not None]
         persist.load_policy_line(", ".join(values), model)
 
