@@ -25,7 +25,7 @@ from sqlalchemy import select, update, delete, insert
 from sqlalchemy import and_, or_, not_
 from sqlalchemy.sql.operators import contains_op, custom_op, ilike_op, in_op, eq, ge, gt, le, lt, ne
 
-from fluvius.data.query import BackendQuery, OperatorStatement, operator_statement
+from fluvius.data.query import BackendQuery, QueryStatement, QueryElement
 from fluvius.data import logger, config
 from fluvius.error import InternalServerError
 from fluvius.constant import QUERY_OPERATOR_SEP, OPERATOR_SEP_NEGATE, DEFAULT_DELETED_FIELD
@@ -100,29 +100,23 @@ class QueryBuilder(object):
         except AttributeError:
             raise InternalServerError("D100-501", f"type object {data_schema} has no attribute {fieldspec}", None)
 
-    def _build_expression(self, data_schema, expr: dict, db_mapping=None):
+    def _build_expression(self, data_schema, expr: QueryStatement, db_mapping=None):
+        if not isinstance(expr, QueryStatement):
+            raise ValueError(f'Invalid query expression: {expr}')
+
         db_mapping = db_mapping or {}
 
-        def _gen_op(op_stmt, value):
-            composites = COMPOSITE_OPERATOR[op_stmt.mode]
-            if op_stmt.op_key in composites:
-                subops = [_op for expr in value for _op in _iter_query(expr)]
-                return composites[op_stmt.op_key](*subops)
+        def _gen_query(q):
+            for stmt in _iter_statement(q):
+                if stmt.composite:
+                    subops = tuple(op for op in _gen_query(stmt.value))
+                    return COMPOSITE_OPERATOR[stmt.mode][stmt.operator](*subops)
 
-            db_field = self._field(data_schema, op_stmt.field_name, db_mapping.get(op_stmt.field_name))
+                db_field = self._field(data_schema, stmt.field_name, db_mapping.get(stmt.field_name))
 
-            return FIELD_OPERATOR[op_stmt.mode][op_stmt.op_key](db_field, value)
+                return FIELD_OPERATOR[stmt.mode][stmt.operator](db_field, value)
 
-        def _iter_query(q):
-            for key, value in _iter_statement(q):
-                if isinstance(key, str):
-                    op_stmt = operator_statement(key)
-                else:
-                    op_stmt = key
-
-                yield _gen_op(op_stmt, value)
-
-        yield from _iter_query(expr)
+        yield from _gen_query(expr)
 
     def _sort_clauses(self, data_schema, sort_query, db_mapping=None):
         db_mapping = db_mapping or {}

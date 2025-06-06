@@ -6,7 +6,7 @@ from pipe import Pipe
 from typing import Annotated, Union, Any, Optional, Dict
 from types import MethodType
 from fastapi import Request, Path, Body, Query
-from fluvius.query import FrontendQuery, QueryResourceMeta, QueryManager
+from fluvius.query import QueryParams, FrontendQuery, QueryResourceMeta, QueryManager
 from fluvius.helper import load_class
 
 from . import logger, config
@@ -21,13 +21,13 @@ def register_resource_endpoints(app, query_manager, query_resource):
     api_docs = query_resource.Meta.desc or query_manager.Meta.desc
     scope_schema = (query_resource.Meta.scope_required or query_resource.Meta.scope_optional)
 
-    async def resource_query(auth_ctx, fe_query: FrontendQuery, path_query: str=None, scopes: str=None):
+    async def resource_query(auth_ctx, query_params: QueryParams, path_query: str=None, scopes: str=None):
         query = fe_query and fe_query.query
         if isinstance(query, str):
             query = json.loads(query)
 
         if path_query:
-            params = jurl_data(path_query)
+            pa = jurl_data(path_query)
             if not query:
                 query = params
             else:
@@ -40,7 +40,7 @@ def register_resource_endpoints(app, query_manager, query_resource):
         elif scopes:
             raise BadRequestError('Q01-00383', f'Scoping is not allowed for resource: {query_resource}')
 
-        query_params = FrontendQuery.create(fe_query, scopes=scopes, query=query)
+        query_params = FrontendQuery.from_query_params(params, scopes=scopes, query=query)
 
         data, meta = await query_manager.query_resource(auth_ctx, query_id, query_params)
         return {
@@ -49,7 +49,7 @@ def register_resource_endpoints(app, query_manager, query_resource):
         }
 
     async def item_query(auth_ctx, item_identifier, scopes: str=None):
-        query_params = FrontendQuery.create(scopes=scopes)
+        query_params = QueryParams.create(scopes=scopes)
         if scope_schema:
             scopes = parse_scopes(scopes, scope_schema)
             if query_resource.Meta.scope_required and not scopes:
@@ -85,21 +85,21 @@ def register_resource_endpoints(app, query_manager, query_resource):
             @endpoint(SCOPES_SELECTOR, "",
                 summary=query_resource.Meta.name,
                 description=query_resource.Meta.desc)  # "" for trailing slash
-            async def query_resource_scoped_json(request: Request, query_params: Annotated[FrontendQuery, Query()], scopes: str):
+            async def query_resource_scoped_json(request: Request, query_params: Annotated[QueryParams, Query()], scopes: str):
                 ctx = getattr(request.state, 'auth_context', None)
                 return await resource_query(ctx, query_params, None, scopes)
 
         @endpoint(PATH_QUERY_SELECTOR, "",
                 summary=query_resource.Meta.name,
                 description=query_resource.Meta.desc)
-        async def query_resource_json(request: Request, path_query: Annotated[str, Path()], query_params: Annotated[FrontendQuery, Query()]):
+        async def query_resource_json(request: Request, path_query: Annotated[str, Path()], query_params: Annotated[QueryParams, Query()]):
             ctx = getattr(request.state, 'auth_context', None)
             return await resource_query(ctx, None, path_query, None)
 
         @endpoint("",
                 summary=query_resource.Meta.name,
                 description=query_resource.Meta.desc) # Trailing slash
-        async def query_resource_default(request: Request, query_params: Annotated[FrontendQuery, Query()]):
+        async def query_resource_default(request: Request, query_params: Annotated[QueryParams, Query()]):
             ctx = getattr(request.state, 'auth_context', None)
             return await resource_query(ctx, query_params, None, None)
 
@@ -161,7 +161,7 @@ def register_query_manager(app, qm_cls):
 @Pipe
 def configure_query_manager(app, *query_managers):
     @app.get(uri("/_meta/_echo", SCOPES_SELECTOR, PATH_QUERY_SELECTOR, "{identifier}"), tags=["Metadata"])
-    async def query_echo(query_params: Annotated[FrontendQuery, Query()], scopes, path_query, identifier):
+    async def query_echo(query_params: Annotated[QueryParams, Query()], scopes, path_query, identifier):
         return {
             "identifier": identifier,
             "query_params": query_params,

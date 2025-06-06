@@ -218,9 +218,9 @@ class SqlaDriver(DataDriver, QueryBuilder):
         query = {
             "select": ["field", "table.field"]
             "where": {
-                "field:op": "value",
+                "field.op": "value",
                 "field!op": "value",
-                ":and": [
+                ".and": [
                     {
                         "field!op": "value",
                     }

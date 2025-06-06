@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from fluvius.error import BadRequestError
 from fluvius.data import DataModel, BlankModel
 from fluvius.helper import assert_
-from fluvius.data.query import operator_statement, OperatorStatement
+from fluvius.data.query import operator_statement, OperatorStatement, QueryStatement
 from fluvius.constant import DEFAULT_DELETED_FIELD, QUERY_OPERATOR_SEP, OPERATOR_SEP_NEGATE, RX_PARAM_SPLIT
 
 from .field import QueryField
@@ -105,16 +105,16 @@ class QueryResource(object):
                 for stmt in _unpack(*statements):
                     for key, val in stmt.items():
                         op_stmt = operator_statement(key)
-                        param_schema = param_specs[op_stmt.field_name, op_stmt.op_key]
+                        param_schema = param_specs[op_stmt.field_name, op_stmt.operator]
                         value = param_schema.process_value(val)
                         if param_schema.composite:
-                            value = _process_statement(value)
+                            value = tuple(_process_statement(value))
 
-                        yield op_stmt, value
+                        yield QueryStatement(*op_stmt, value)
             except KeyError as e:
                 raise BadRequestError("Q01-3939", f'Cannot locate operator: {e}')
 
-        return tuple(_process_statement({":and": queries})
+        return tuple(_process_statement({":and": queries}))
 
     def __init__(self):
         meta = self.Meta

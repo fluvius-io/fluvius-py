@@ -41,9 +41,9 @@ class FrontendQuery(DataModel):
     path_query: Optional[Dict] = None
     scopes: Optional[Dict] = None
 
-
-    def from_query_params(qp: QueryParams, /, **kwargs) -> FrontendQuery:
-        return FrontendQuery(
+    @classmethod
+    def from_query_params(cls, qp: QueryParams, /, **kwargs):
+        return cls(
             limit=qp.limit,
             page=qp.page,
             select=parse_list(qp.select),
