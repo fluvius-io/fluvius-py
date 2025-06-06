@@ -13,7 +13,7 @@ from fluvius.helper import camel_to_lower, select_value
 from fluvius.helper.timeutil import timestamp
 from fluvius.helper.registry import ClassRegistry
 from fluvius.error import ForbiddenError
-from fluvius.casbin import PolicyManager
+from fluvius.casbin import PolicyManager, PolicyRequest
 
 from . import logger, config  # noqa
 from . import activity as act
@@ -291,24 +291,28 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             domain_iid=aggroot.domain_iid,
         )
 
-    def authorize_by_policy(self, context, command):
+    async def authorize_by_policy(self, context, command):
         '''
         Override this method to authorize the command
         and set the selector scope in order to fetch the aggroot
         '''
-        if not self.__policymgr__:
-            return
+        cmdc = self.lookup_command(command.command)
+        if not self.__policymgr__ or not cmdc.Meta.policy_required:
+            return command
 
-        rs = self._policymgr.check(
-            context.profile_id,
-            context.organization_id,
-            self.__namespace__,
-            command.command,
-            command.resource,
-            command.resource_id
+        rsid = "" if cmdc.Meta.new_resource else command.identifier 
+        reqs = PolicyRequest(
+            sub=context.profile_id,
+            org=context.organization_id,
+            dom=self.__namespace__,
+            res=command.resource,
+            rid=rsid,
+            act=command.command
         )
-        if not rs.allowed:
-            raise ForbiddenError('D10012', f'Permission Failed: [{rs.narration}]')
+
+        resp = await self._policymgr.check_permission(reqs)
+        if not resp.allowed:
+            raise ForbiddenError('D10012', f'Permission Failed: [{resp.narration}]')
 
         return command
 
@@ -407,7 +411,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
                     domain=self.__namespace__,
                     revision=self.__revision__
                 )
-                policy_cmd = self.authorize_by_policy(context, preauth_cmd)
+                policy_cmd = await self.authorize_by_policy(context, preauth_cmd)
                 auth_cmd = await self.authorize_command(context, authorization, policy_cmd)
                 async for evt in self.process_command_internal(context, stm, auth_cmd):
                     await self.logstore.add_event(evt)
