@@ -37,6 +37,7 @@ def _compute_select(fe_query, query_resource):
 
     return query_resource.select_fields & set(fe_query.select)
 
+
 class QueryManagerMeta(DataModel):
     name: str
     prefix: str
@@ -125,20 +126,20 @@ class QueryManager(object):
 
         return fe_query
 
-    async def query_resource(self, query_identifier, fe_query: Optional[FrontendQuery]=None, **kwargs):
+    async def query_resource(self, context: Any, query_identifier: str, fe_query: Optional[FrontendQuery]=None, **kwargs):
         query_resource = self.lookup_query_resource(query_identifier)
 
         fe_query = self.validate_fe_query(query_resource, fe_query, kwargs)
-        be_query = self.construct_backend_query(query_resource, fe_query)
-        data, meta = await self.execute_query(query_resource, be_query, {})
+        be_query = self.construct_backend_query(context, query_resource, fe_query)
+        data, meta = await self.execute_query(context, query_resource, be_query, {})
 
         return self.process_result(data, meta)
 
-    async def query_item(self, query_identifier, item_identifier, fe_query: Optional[FrontendQuery]=None, **kwargs):
+    async def query_item(self, context: Any, query_identifier: str, item_identifier, fe_query: Optional[FrontendQuery]=None, **kwargs):
         query_resource = self.lookup_query_resource(query_identifier)
         fe_query = self.validate_fe_query(query_resource, fe_query, kwargs)
-        be_query = self.construct_backend_query(query_resource, fe_query, identifier=item_identifier)
-        data, meta = await self.execute_query(query_resource, be_query, None)
+        be_query = self.construct_backend_query(context, query_resource, fe_query, identifier=item_identifier)
+        data, meta = await self.execute_query(context, query_resource, be_query, None)
 
         result, _ = self.process_result(data, meta)
 
@@ -152,9 +153,9 @@ class QueryManager(object):
         handler = MethodType(func, self)
         return handler(**kwargs)
 
-    def construct_backend_query(self, query_resource, fe_query, identifier=None, scope=None):
+    def construct_backend_query(self, context: Any, query_resource: str, fe_query, identifier=None):
         """ Convert from the frontend query to the backend query """
-        scope   = query_resource.base_query(scope)
+        scope   = query_resource.base_query(context, fe_query.scopes)
         query   = query_resource.validate_schema_args(fe_query)
         limit   = fe_query.limit
         offset  = (fe_query.page - 1) * fe_query.limit
@@ -172,7 +173,7 @@ class QueryManager(object):
         )
         return self.validate_backend_query(query_resource, backend_query)
 
-    async def execute_query(self, query_resource, backend_query: BackendQuery, meta: Optional[Dict] = None):
+    async def execute_query(self, context: Any, query_resource: str, backend_query: BackendQuery, meta: Optional[Dict] = None):
         """ Execute the backend query with the state manager and return """
         raise NotImplementedError('QueryResource.execute_query')
 
@@ -198,7 +199,7 @@ class DomainQueryManager(QueryManager):
     def data_manager(self):
         return self._data_manager
 
-    async def execute_query(self, query_resource, backend_query: BackendQuery, meta: Optional[Dict] = None):
+    async def execute_query(self, context: Any, query_resource: str, backend_query: BackendQuery, meta: Optional[Dict] = None):
         """ Execute the backend query with the state manager and return """
         resource = query_resource.backend_model()
         try:

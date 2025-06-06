@@ -286,6 +286,7 @@ class KCAdmin(object):
                 r"(?<=@)(\S+$)", user_data.get("email")).group(0)
             if config.WHITELIST_DOMAIN:
                 self.check_whitelist_email(domain)
+
             if config.BLACKLIST_DOMAIN:
                 self.check_blacklist_email(domain)
         except AttributeError:

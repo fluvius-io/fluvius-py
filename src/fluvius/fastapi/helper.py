@@ -17,6 +17,15 @@ def uri(*elements):
 
 
 def jurl_data(data):
+    '''
+    Follow: https://jsonurl.org/
+    ... with the start and ending brackets remove, since it needs to be alway an object.
+    ... the path queries is designed to be used with query builder components (front-end) where it has
+    some pre-defined query conditions.
+
+    e.g. /~abc.eq:def,ghi.in:(1,2,3)/ -> {"abc.eq": "def", "ghi.in": [1,2,3]}
+    '''
+
     if not data:
         return None
 
@@ -24,6 +33,19 @@ def jurl_data(data):
 
 
 def parse_scopes(scoping_stmt, scope_schema={}):
+    '''
+    Scoping parameters are designed bo the used in conjunction with the
+    permission system to generate a scoping query for the dataset
+    and also to to check if user have access to the base resource.
+
+    /:domain_sid_value:key=value:.../
+    => {
+        "domain_sid": "domain_sid_value",
+        "key": "value"
+    }
+
+    /:399291-3838183-1838318-38182/dafadsf/...
+    '''
     def _parse():
         if not scoping_stmt:
             return

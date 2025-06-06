@@ -2,10 +2,11 @@ import re
 import json
 from typing import Optional, List, Dict, Any, Tuple
 from types import SimpleNamespace
+from fluvius.error import BadRequestError
 from fluvius.data import DataModel, BlankModel
 from fluvius.helper import assert_
 from fluvius.data.query import operator_statement, OperatorStatement
-from fluvius.constant import DEFAULT_DELETED_FIELD, OPERATOR_SEP, OPERATOR_SEP_NEGATE
+from fluvius.constant import DEFAULT_DELETED_FIELD, QUERY_OPERATOR_SEP, OPERATOR_SEP_NEGATE, RX_PARAM_SPLIT
 
 from .field import QueryField
 from .model import FrontendQuery
@@ -13,7 +14,6 @@ from .model import FrontendQuery
 from . import operator, logger, config
 
 DEVELOPER_MODE = config.DEVELOPER_MODE
-RX_PARAM_SPLIT = re.compile(rf'({OPERATOR_SEP}|{OPERATOR_SEP_NEGATE})')
 
 
 def endpoint(url):
@@ -79,7 +79,7 @@ class QueryResource(object):
     def backend_model(self):
         return self.Meta.backend_model or self._identifier
 
-    def base_query(self, fe_query, **scope):
+    def base_query(self, context, scopes):
         return None
 
     def validate_schema_args(self, fe_query):
@@ -89,14 +89,21 @@ class QueryResource(object):
         if args is None:
             return {}
 
-        args = json.loads(args)
+        if isinstance(args, str):
+            args = json.loads(args)
+
+        if not isinstance(args, dict):
+            raise BadRequestError("Q01-3938", f'Invalid query: {args}')
 
         def _run():
-            for k, v in args.items():
-                op_stmt = operator_statement(k)
-                param_schema = query_params[op_stmt.field_name, op_stmt.op_key]
-                value = param_schema.process_value(v)
-                yield op_stmt, value
+            try:
+                for k, v in args.items():
+                    op_stmt = operator_statement(k)
+                    param_schema = query_params[op_stmt.field_name, op_stmt.op_key]
+                    value = param_schema.process_value(v)
+                    yield op_stmt, value
+            except KeyError as e:
+                raise BadRequestError("Q01-3939", f'Cannot locate operator: {e}')
 
         return dict(_run())
 

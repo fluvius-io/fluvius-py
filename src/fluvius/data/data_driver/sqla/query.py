@@ -28,29 +28,26 @@ from sqlalchemy.sql.operators import contains_op, custom_op, ilike_op, in_op, eq
 from fluvius.data.query import BackendQuery, OperatorStatement, operator_statement
 from fluvius.data import logger, config
 from fluvius.error import InternalServerError
-from fluvius.constant import OPERATOR_SEP, DEFAULT_DELETED_FIELD
+from fluvius.constant import QUERY_OPERATOR_SEP, OPERATOR_SEP_NEGATE, DEFAULT_DELETED_FIELD
 
 DEBUG_CONNECTOR = config.DEBUG
 
-NORMAL_MODE = ':'
-NEGATE_MODE = '!'
-FIELD_SEP = "."
-FIELD_DEL = "_deleted"
-OPERATOR_SEP = ":"
+FIELD_SEP = ":"
+FIELD_DEL = DEFAULT_DELETED_FIELD
 DEFAULT_SORT_ORDER = 'asc'
 
 COMPOSITE_OPERATOR = {
-    NORMAL_MODE: {
+    QUERY_OPERATOR_SEP: {
         "and": and_,
         "or": or_
     },
-    NEGATE_MODE: {
+    OPERATOR_SEP_NEGATE: {
         "and": lambda *ag, **kw: not_(and_(*ag, **kw)),
         "or": lambda *ag, **kw: not_(or_(*ag, **kw))
     }
 }
 FIELD_OPERATOR = {
-    NORMAL_MODE: {
+    QUERY_OPERATOR_SEP: {
         "gt": gt,
         "gte": ge,
         "eq": eq,
@@ -63,7 +60,7 @@ FIELD_OPERATOR = {
         "notin": lambda col, vals: col.notin_(vals),
         "ilike": ilike_op,
     },
-    NEGATE_MODE: {
+    OPERATOR_SEP_NEGATE: {
         "gt": le,
         "gte": lt,
         "eq": ne,
@@ -130,7 +127,7 @@ class QueryBuilder(object):
     def _sort_clauses(self, data_schema, sort_query, db_mapping=None):
         db_mapping = db_mapping or {}
         for sort_expr in sort_query:
-            field_name, _, sort_type = sort_expr.rpartition(OPERATOR_SEP)
+            field_name, _, sort_type = sort_expr.rpartition(QUERY_OPERATOR_SEP)
             if not field_name:
                 field_name = sort_type
                 sort_type = DEFAULT_SORT_ORDER

@@ -4,7 +4,7 @@ from fluvius.data.helper import nullable
 from contextlib import contextmanager
 from pyrsistent import PClass, field, pvector_field
 from fluvius.data import UUID_TYPE, identifier_factory
-from fluvius.constant import OPERATOR_SEP, OPERATOR_SEP_NEGATE, RX_PARAM_SPLIT, DEFAULT_OPERATOR
+from fluvius.constant import QUERY_OPERATOR_SEP, OPERATOR_SEP_NEGATE, RX_PARAM_SPLIT, DEFAULT_OPERATOR
 
 from . import config
 
@@ -18,7 +18,7 @@ def operator_statement(op_stmt):
 
     result = RX_PARAM_SPLIT.split(op_stmt)
     if len(result) == 1:
-        return OperatorStatement(op_stmt, OPERATOR_SEP, DEFAULT_OPERATOR)
+        return OperatorStatement(op_stmt, QUERY_OPERATOR_SEP, DEFAULT_OPERATOR)
     return OperatorStatement(*result)
 
 
