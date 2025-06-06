@@ -33,6 +33,13 @@ def register_resource_endpoints(app, query_manager, query_resource):
             else:
                 query = {":and": [query, params]}
 
+        if scope_schema:
+            scopes = parse_scopes(scopes, scope_schema)
+            if query_resource.Meta.scope_required and not scopes:
+                raise ForbiddenError('Q01-49939', f"Scoping is required for resource: {query_resource}")
+        elif scopes:
+            raise BadRequestError('Q01-00383', f'Scoping is not allowed for resource: {query_resource}')
+
         query_params = FrontendQuery.create(fe_query, scopes=scopes, query=query)
 
         data, meta = await query_manager.query_resource(auth_ctx, query_id, query_params)
@@ -43,6 +50,13 @@ def register_resource_endpoints(app, query_manager, query_resource):
 
     async def item_query(auth_ctx, item_identifier, scopes: str=None):
         query_params = FrontendQuery.create(scopes=scopes)
+        if scope_schema:
+            scopes = parse_scopes(scopes, scope_schema)
+            if query_resource.Meta.scope_required and not scopes:
+                raise ForbiddenError('Q01-49939', f"Scoping is required for resource: {query_resource}")
+        elif scopes:
+            raise BadRequestError('Q01-00383', f'Scoping is not allowed for resource: {query_resource}')
+
         return await query_manager.query_item(auth_ctx, query_id, item_identifier, query_params)
 
     def endpoint(*paths, method=app.get, base=base_uri, auth={}, **kwargs):
