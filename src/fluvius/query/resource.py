@@ -83,29 +83,38 @@ class QueryResource(object):
         return None
 
     def validate_schema_args(self, fe_query):
-        args = fe_query.query
-        query_params = self.query_params
+        queries = (fe_query.user_query, fe_query.path_query)
+        param_specs = self.query_params
 
-        if args is None:
-            return {}
+        def _unpack(*statements):
+            for stmt in statements:
+                if not stmt:
+                    continue
 
-        if isinstance(args, str):
-            args = json.loads(args)
+                if isinstance(stmt, (list, tuple)):
+                    yield from _unpack(*stmt)
 
-        if not isinstance(args, dict):
-            raise BadRequestError("Q01-3938", f'Invalid query: {args}')
+                if not isinstance(stmt, dict):
+                    raise ValueError(f'Invalid query statement: {stmt}')
 
-        def _run():
+                yield stmt
+
+
+        def _process_statement(*statements):
             try:
-                for k, v in args.items():
-                    op_stmt = operator_statement(k)
-                    param_schema = query_params[op_stmt.field_name, op_stmt.op_key]
-                    value = param_schema.process_value(v)
-                    yield op_stmt, value
+                for stmt in _unpack(*statements):
+                    for key, val in stmt.items():
+                        op_stmt = operator_statement(key)
+                        param_schema = param_specs[op_stmt.field_name, op_stmt.op_key]
+                        value = param_schema.process_value(val)
+                        if param_schema.composite:
+                            value = _process_statement(value)
+
+                        yield op_stmt, value
             except KeyError as e:
                 raise BadRequestError("Q01-3939", f'Cannot locate operator: {e}')
 
-        return dict(_run())
+        return tuple(_process_statement({":and": queries})
 
     def __init__(self):
         meta = self.Meta

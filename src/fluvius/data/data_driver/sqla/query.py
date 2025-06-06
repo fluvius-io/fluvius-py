@@ -114,11 +114,11 @@ class QueryBuilder(object):
             return FIELD_OPERATOR[op_stmt.mode][op_stmt.op_key](db_field, value)
 
         def _iter_query(q):
-            for k, value in _iter_statement(q):
-                if isinstance(k, str):
-                    op_stmt = operator_statement(k)
+            for key, value in _iter_statement(q):
+                if isinstance(key, str):
+                    op_stmt = operator_statement(key)
                 else:
-                    op_stmt = k
+                    op_stmt = key
 
                 yield _gen_op(op_stmt, value)
 
@@ -176,37 +176,37 @@ class QueryBuilder(object):
         if not q.show_deleted:
             yield (self._field(data_schema, FIELD_DEL) == None)
 
-    def _build_where(self, data_schema, stmt, q: BackendQuery):
-        return stmt.where(*self._where_clauses(data_schema, q))
+    def _build_where(self, data_schema, sql, q: BackendQuery):
+        return sql.where(*self._where_clauses(data_schema, q))
 
-    def _build_values(self, stmt, values):
+    def _build_values(self, sql, values):
         if not values:
-            return stmt
+            return sql
 
         if isinstance(values, dict):
-            return stmt.values(**values)
+            return sql.values(**values)
 
         if isinstance(values, (list, tuple)):
-            return stmt.values(values)
+            return sql.values(values)
 
     def build_delete(self, data_schema, query: BackendQuery):
-        stmt = delete(data_schema)
-        stmt = self._build_where(stmt, query)
+        sql = delete(data_schema)
+        sql = self._build_where(sql, query)
 
-        return stmt
+        return sql
 
     def build_update(self, data_schema, query: BackendQuery, values):
-        stmt = update(data_schema)
-        stmt = self._build_where(data_schema, stmt, query)
-        stmt = self._build_values(stmt, values)
+        sql = update(data_schema)
+        sql = self._build_where(data_schema, sql, query)
+        sql = self._build_values(sql, values)
 
-        return stmt
+        return sql
 
     def build_insert(self, data_schema, values):
-        stmt = insert(data_schema)
-        stmt = self._build_values(stmt, values)
+        sql = insert(data_schema)
+        sql = self._build_values(sql, values)
 
-        return stmt
+        return sql
 
     def build_select(self, data_schema, query: BackendQuery):
         def _gen_select(q):
@@ -217,11 +217,11 @@ class QueryBuilder(object):
             return tuple(self._field(data_schema, k, db_mapping.get(k)) for k in q.select)
 
         fields = _gen_select(query)
-        stmt = select(*fields)
-        stmt = self._build_join(data_schema, stmt, query)
-        stmt = self._build_where(data_schema, stmt, query)
-        stmt = self._build_limit(data_schema, stmt, query)
-        stmt = self._build_sort(data_schema, stmt, query)
+        sql = select(*fields)
+        sql = self._build_join(data_schema, sql, query)
+        sql = self._build_where(data_schema, sql, query)
+        sql = self._build_limit(data_schema, sql, query)
+        sql = self._build_sort(data_schema, sql, query)
 
-        DEBUG_CONNECTOR and logger.info("[SELECT STMT] %s", stmt)
-        return stmt
+        DEBUG_CONNECTOR and logger.info("[SELECT STMT] %s", sql)
+        return sql

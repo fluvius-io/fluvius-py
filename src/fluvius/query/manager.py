@@ -3,6 +3,7 @@ import sqlalchemy
 
 from types import MethodType
 from typing import Optional, List, Dict, Any
+from fluvius.auth import AuthorizationContext
 from fluvius.data import BackendQuery, DataModel
 from fluvius.helper import camel_to_lower, select_value
 from fluvius.error import InternalServerError
@@ -117,29 +118,26 @@ class QueryManager(object):
 
         return _decorator
 
-    def validate_fe_query(self, query_resource, fe_query, kwargs):
-        if fe_query is None:
-            return FrontendQuery(**kwargs)
-
-        if kwargs:
-            return fe_query.set(**kwargs)
+    def validate_fe_query(self, query_resource, fe_query):
+        if not isinstance(fe_query, FrontendQuery):
+            raise ValueError(f'Invalid query: {fe_query}')
 
         return fe_query
 
-    async def query_resource(self, context: Any, query_identifier: str, fe_query: Optional[FrontendQuery]=None, **kwargs):
+    async def query_resource(self, auth_ctx: AuthorizationContext, query_identifier: str, fe_query: FrontendQuery):
         query_resource = self.lookup_query_resource(query_identifier)
 
-        fe_query = self.validate_fe_query(query_resource, fe_query, kwargs)
+        fe_query = self.validate_fe_query(query_resource, fe_query)
         be_query = self.construct_backend_query(context, query_resource, fe_query)
         data, meta = await self.execute_query(context, query_resource, be_query, {})
 
         return self.process_result(data, meta)
 
-    async def query_item(self, context: Any, query_identifier: str, item_identifier, fe_query: Optional[FrontendQuery]=None, **kwargs):
+    async def query_item(self, auth_ctx: AuthorizationContext, query_identifier: str, item_identifier, fe_query: FrontendQuery):
         query_resource = self.lookup_query_resource(query_identifier)
-        fe_query = self.validate_fe_query(query_resource, fe_query, kwargs)
+        fe_query = self.validate_fe_query(query_resource, fe_query)
         be_query = self.construct_backend_query(context, query_resource, fe_query, identifier=item_identifier)
-        data, meta = await self.execute_query(context, query_resource, be_query, None)
+        data, meta = await self.execute_query(context, query_resource, be_query)
 
         result, _ = self.process_result(data, meta)
 
@@ -153,7 +151,7 @@ class QueryManager(object):
         handler = MethodType(func, self)
         return handler(**kwargs)
 
-    def construct_backend_query(self, context: Any, query_resource: str, fe_query, identifier=None):
+    def construct_backend_query(self, auth_ctx: AuthorizationContext, query_resource: str, fe_query, identifier=None):
         """ Convert from the frontend query to the backend query """
         scope   = query_resource.base_query(context, fe_query.scopes)
         query   = query_resource.validate_schema_args(fe_query)
@@ -173,7 +171,7 @@ class QueryManager(object):
         )
         return self.validate_backend_query(query_resource, backend_query)
 
-    async def execute_query(self, context: Any, query_resource: str, backend_query: BackendQuery, meta: Optional[Dict] = None):
+    async def execute_query(self, auth_ctx: AuthorizationContext, query_resource: str, backend_query: BackendQuery, meta: Optional[Dict] = None):
         """ Execute the backend query with the state manager and return """
         raise NotImplementedError('QueryResource.execute_query')
 
@@ -199,7 +197,7 @@ class DomainQueryManager(QueryManager):
     def data_manager(self):
         return self._data_manager
 
-    async def execute_query(self, context: Any, query_resource: str, backend_query: BackendQuery, meta: Optional[Dict] = None):
+    async def execute_query(self, auth_ctx: AuthorizationContext, query_resource: str, backend_query: BackendQuery, meta: Optional[Dict] = None):
         """ Execute the backend query with the state manager and return """
         resource = query_resource.backend_model()
         try:

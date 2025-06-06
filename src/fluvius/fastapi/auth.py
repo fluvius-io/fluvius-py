@@ -11,13 +11,15 @@ from functools import wraps
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from types import SimpleNamespace
-from pipe import Pipe
+
 
 from fluvius.error import BadRequestError
 from fluvius.data import DataModel
 from fluvius.auth import AuthorizationContext
+
 from pydantic import AnyUrl, EmailStr
 from uuid import UUID
+from pipe import Pipe
 from typing import Literal
 
 from .setup import on_startup

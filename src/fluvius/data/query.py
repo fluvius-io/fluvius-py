@@ -10,15 +10,17 @@ from . import config
 
 BACKEND_QUERY_LIMIT = config.BACKEND_QUERY_INTERNAL_LIMIT
 OperatorStatement = namedtuple('OperatorStatement', 'field_name mode op_key')
+QueryOperation = namedtuple('QueryOperation', 'field_name mode op_key value')
 
 
 def operator_statement(op_stmt):
     if isinstance(op_stmt, OperatorStatement):
         return op_stmt
 
-    result = RX_PARAM_SPLIT.split(op_stmt)
-    if len(result) == 1:
+    matches = tuple(RX_PARAM_SPLIT.finditer(op_stmt))
+    if not matches:
         return OperatorStatement(op_stmt, QUERY_OPERATOR_SEP, DEFAULT_OPERATOR)
+
     return OperatorStatement(*result)
 
 
@@ -36,6 +38,23 @@ def validate_list(sort_stmt):
         return tuple(sort_stmt)
 
     raise ValueError('Invalid list value.')
+
+
+def validate_query(query):
+    if not query:
+        return tuple()
+
+    if isinstance(query, list):
+        return tuple(query)
+
+    if isinstance(query, dict):
+        return tuple(query.items())
+
+    if isinstance(query, tuple):
+        return query
+
+    raise ValueError(f'Invalid query value: {query}')
+
 
 
 class JoinStatement(PClass):
@@ -56,8 +75,8 @@ class BackendQuery(PClass):
     limit   = field(int, initial=lambda: config.BACKEND_QUERY_DEFAULT_LIMIT)
     offset  = field(int, initial=lambda: 0)
     sort    = field(tuple, factory=validate_list, initial=tuple)
-    where   = field(nullable(dict), initial=None)
-    scope   = field(nullable(dict), initial=None)
+    where   = field(tuple, initial=tuple(), factory=validate_query)  # A tuple can hold duplicated keys if needed
+    scope   = field(tuple, initial=tuple(), factory=validate_query)
     mapping = field(dict, initial=dict)
 
     # Default don't query the deleted item.

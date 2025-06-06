@@ -20,6 +20,7 @@ class QueryOperator(DataModel):
     field_name: str = ''
     operator: str
     widget: Optional[OperatorWidget] = None
+    composite: bool = False
 
     def __init__(self, query_resource, operator, field_name: str='', widget=None):
         super().__init__(index=query_resource.next_index(), field_name=field_name, widget=widget, operator=operator)
@@ -50,6 +51,8 @@ class FieldQueryOperator(QueryOperator):
         return value
 
 class UnaryQueryOperator(QueryOperator):
+    composite: bool = True
+
     def processor(self, value):
         return tuple(parse_list_stmt(value))
 
