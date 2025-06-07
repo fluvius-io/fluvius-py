@@ -175,7 +175,7 @@ class QueryBuilder(object):
             yield from self._build_expression(data_schema, q.where, q.mapping)
 
         if hasattr(data_schema, FIELD_DEL):
-            if not q.show_deleted:
+            if not q.incl_deleted:
                 yield (self._field(data_schema, FIELD_DEL) == None)
 
     def _build_where(self, data_schema, sql, q: BackendQuery):

@@ -80,5 +80,5 @@ async def test_manager():
     # ============== Test Invalidate ===============
     async with manager.transaction():
         await manager.invalidate_one('user', "1")
-    item = await manager.find_one('user', identifier='1')
+    item = await manager.find_one('user', identifier='1', incl_deleted=True)
     assert item._deleted is not None

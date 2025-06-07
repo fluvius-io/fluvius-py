@@ -17,7 +17,6 @@ PAGE = "page"
 QUERY = "where"
 SELECT = "select"
 SELECT_ESCAPE_CHAR = "_"
-SHOW_DELETED = "show_deleted"
 SORT = "sort"
 TEXT = "txt"
 

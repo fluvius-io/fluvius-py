@@ -17,16 +17,16 @@ from ..base import DataDriver
 
 
 def query_resource(store, q: BackendQuery):
-    match_attrs = tuple()
+    query_stmts = tuple()
 
     if q.where:
-        match_attrs += q.where
+        query_stmts += q.where
 
     if q.scope:
-        match_attrs += q.scope
+        query_stmts += q.scope
 
     if q.identifier:
-        match_attrs += (process_query_element('_id.eq', q.identifier),)
+        query_stmts += (process_query_element('_id.eq', q.identifier),)
 
     def _apply_operator(item_value, expected_value, operator, mode):
         """Apply operator logic for memory driver queries"""
@@ -62,25 +62,22 @@ def query_resource(store, q: BackendQuery):
         return not result if negate else result
 
     def _match(item):
-        try:
-            # Handle both dict and object items
-            for qe in match_attrs:
-                # Handle OperatorStatement objects
-                field_name = qe.field_name
+        # Handle both dict and object items
+        for qe in query_stmts:
+            # Handle OperatorStatement objects
+            field_name = qe.field_name
 
-                # Get the item value
-                if isinstance(item, dict):
-                    item_value = item.get(field_name)
-                else:
-                    item_value = getattr(item, field_name, None)
+            # Get the item value
+            if isinstance(item, dict):
+                item_value = item.get(field_name)
+            else:
+                item_value = getattr(item, field_name, None)
 
-                # Apply operator logic
-                if not _apply_operator(item_value, qe.value, qe.op_key, qe.mode):
-                    return False
+            # Apply operator logic
+            if not _apply_operator(item_value, qe.value, qe.operator, qe.mode):
+                return False
 
-            return True
-        except (AttributeError, KeyError):
-            return False
+        return True
 
     results = list(filter(_match, store.values()))
 

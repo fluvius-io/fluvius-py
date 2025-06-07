@@ -106,7 +106,7 @@ def test_build_select_with_where_eq(test_driver):
     assert_sql_equivalent(test_driver.compile_statement(stmt), expected_sql)
 
 def test_build_select_with_where_ne(test_driver):
-    query = BackendQuery.create(where={"name:ne": "John Doe"})
+    query = BackendQuery.create(where={"name.ne": "John Doe"})
     stmt = test_driver.build_select(UserSchema, query)
     expected_sql = '''
         SELECT user._id, user.name, user.age, user.email, user.is_active, user.created_at
@@ -128,7 +128,7 @@ def test_build_select_with_where_negated_eq(test_driver):
     assert_sql_equivalent(test_driver.compile_statement(stmt), expected_sql)
 
 def test_build_select_with_where_gt_lt_gte_lte(test_driver):
-    query = BackendQuery.create(where={":and": [{"age:gt": 30}, {"age:lte": 40}]})
+    query = BackendQuery.create(where={".and": [{"age.gt": 30}, {"age.lte": 40}]})
     stmt = test_driver.build_select(UserSchema, query)
     expected_sql = '''
         SELECT user._id, user.name, user.age, user.email, user.is_active, user.created_at
@@ -140,7 +140,7 @@ def test_build_select_with_where_gt_lt_gte_lte(test_driver):
 
 def test_build_select_with_where_in_notin(test_driver):
     names = ["Alice", "Bob"]
-    query_in = BackendQuery.create(where={"name:in": names})
+    query_in = BackendQuery.create(where={"name.in": names})
     stmt_in = test_driver.build_select(UserSchema, query_in)
     expected_sql_in = '''
         SELECT user._id, user.name, user.age, user.email, user.is_active, user.created_at
@@ -152,7 +152,7 @@ def test_build_select_with_where_in_notin(test_driver):
     assert "user.name IN" in actual_sql_in
     assert "LIMIT 100 OFFSET 0" in actual_sql_in
 
-    query_notin = BackendQuery.create(where={"name:notin": names})
+    query_notin = BackendQuery.create(where={"name.notin": names})
     stmt_notin = test_driver.build_select(UserSchema, query_notin)
     expected_sql_notin = '''
         SELECT user._id, user.name, user.age, user.email, user.is_active, user.created_at
@@ -170,20 +170,20 @@ def test_build_select_with_where_in_notin(test_driver):
     assert "user.name NOT IN" in actual_sql_negated_in
 
 def test_build_select_with_where_cs_ilike(test_driver):
-    query_cs = BackendQuery.create(where={"name:cs": "%John%"})
+    query_cs = BackendQuery.create(where={"name.cs": "%John%"})
     stmt_cs = test_driver.build_select(UserSchema, query_cs)
     actual_sql_cs = test_driver.compile_statement(stmt_cs)
     assert "user.name LIKE" in actual_sql_cs
     assert "LIMIT 100 OFFSET 0" in actual_sql_cs
 
-    query_ilike = BackendQuery.create(where={"name:ilike": "%john%"})
+    query_ilike = BackendQuery.create(where={"name.ilike": "%john%"})
     stmt_ilike = test_driver.build_select(UserSchema, query_ilike)
     actual_sql_ilike = test_driver.compile_statement(stmt_ilike)
     assert "lower(" in actual_sql_ilike or "ILIKE" in actual_sql_ilike or "user.name LIKE" in actual_sql_ilike
     assert "LIMIT 100 OFFSET 0" in actual_sql_ilike
 
 def test_build_select_with_where_and_or(test_driver):
-    query_and = BackendQuery.create(where={":and": [{"name": "John"}, {"age:gt": 25}]})
+    query_and = BackendQuery.create(where={".and": [{"name": "John"}, {"age.gt": 25}]})
     stmt_and = test_driver.build_select(UserSchema, query_and)
     expected_sql_and = '''
         SELECT user._id, user.name, user.age, user.email, user.is_active, user.created_at
@@ -193,7 +193,7 @@ def test_build_select_with_where_and_or(test_driver):
     '''
     assert_sql_equivalent(test_driver.compile_statement(stmt_and), expected_sql_and)
 
-    query_or = BackendQuery.create(where={":or": [{"name": "Jane"}, {"age:lt": 20}]})
+    query_or = BackendQuery.create(where={".or": [{"name": "Jane"}, {"age.lt": 20}]})
     stmt_or = test_driver.build_select(UserSchema, query_or)
     expected_sql_or = '''
         SELECT user._id, user.name, user.age, user.email, user.is_active, user.created_at
@@ -204,7 +204,7 @@ def test_build_select_with_where_and_or(test_driver):
     assert_sql_equivalent(test_driver.compile_statement(stmt_or), expected_sql_or)
 
 def test_build_select_with_where_negated_and_or(test_driver):
-    query_nand = BackendQuery.create(where={"!and": [{"name": "John"}, {"age:gt": 25}]})
+    query_nand = BackendQuery.create(where={"!and": [{"name": "John"}, {"age.gt": 25}]})
     stmt_nand = test_driver.build_select(UserSchema, query_nand)
     expected_sql_nand = '''
         SELECT user._id, user.name, user.age, user.email, user.is_active, user.created_at
@@ -214,7 +214,7 @@ def test_build_select_with_where_negated_and_or(test_driver):
     '''
     assert_sql_equivalent(test_driver.compile_statement(stmt_nand), expected_sql_nand)
 
-    query_nor = BackendQuery.create(where={"!or": [{"name": "Jane"}, {"age:lt": 20}]})
+    query_nor = BackendQuery.create(where={"!or": [{"name": "Jane"}, {"age.lt": 20}]})
     stmt_nor = test_driver.build_select(UserSchema, query_nor)
     expected_sql_nor = '''
         SELECT user._id, user.name, user.age, user.email, user.is_active, user.created_at
@@ -245,7 +245,7 @@ def test_build_select_with_sort(test_driver):
     '''
     assert_sql_equivalent(test_driver.compile_statement(stmt_asc), expected_sql_asc)
     
-    query_desc = BackendQuery.create(sort=['name:desc'])
+    query_desc = BackendQuery.create(sort=['name.desc'])
     stmt_desc = test_driver.build_select(UserSchema, query_desc)
     expected_sql_desc = '''
         SELECT user._id, user.name, user.age, user.email, user.is_active, user.created_at
@@ -255,7 +255,7 @@ def test_build_select_with_sort(test_driver):
     '''
     assert_sql_equivalent(test_driver.compile_statement(stmt_desc), expected_sql_desc)
 
-    query_multi_sort = BackendQuery.create(sort=['age:desc', 'name:asc'])
+    query_multi_sort = BackendQuery.create(sort=['age.desc', 'name.asc'])
     stmt_multi_sort = test_driver.build_select(UserSchema, query_multi_sort)
     expected_sql_multi_sort = '''
         SELECT user._id, user.name, user.age, user.email, user.is_active, user.created_at
@@ -267,7 +267,7 @@ def test_build_select_with_sort(test_driver):
 
 def test_build_select_with_join(test_driver):
     query_for_join = BackendQuery.create(
-        select=['_id', 'name', 'department.name'], # Company._id, Company.name, Department.name
+        select=['_id', 'name', 'department:name'], # Company._id, Company.name, Department.name
         join=[
             JoinStatement(
                 local_field='_id',
