@@ -140,7 +140,7 @@ class DataAccessManagerBase(object):
             cls._MODELS[model_name] = model_cls
             cls._AUTO[model_name] = is_generated
 
-            logger.info(f'{"Generated" if is_generated else "Registered"} model: {model_name} => {model_cls}')
+            DEBUG and logger.debug(f'{"Generated" if is_generated else "Registered"} model: {model_name} => {model_cls}')
             return model_cls
 
         return _decorator

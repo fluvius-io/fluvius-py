@@ -4,13 +4,13 @@ import queue
 
 from fluvius.helper import camel_to_lower
 
+from . import logger, config
 from . import event as ce
 from . import command as cc
 from . import context as ct
 from . import message as cm
 from . import resource as cx
 from . import response as cr
-from . import logger
 from .entity import DOMAIN_ENTITY_MARKER, DomainEntityType, DOMAIN_ENTITY_KEY
 from .exceptions import DomainEntityError
 from .helper import consume_queue
@@ -25,7 +25,7 @@ MESSAGE_DISPATCHER_FUNC = '_dispatch'
 HANDLER_MARKER_FIELD = '__domain_handler__'
 HANDLER_PRIORITY_FIELD = '__priority__'
 META_ATTRIBUTES = 'Meta'
-DEBUG = True
+DEBUG = config.DEVELOPER_MODE
 
 
 class OrderCounter:
