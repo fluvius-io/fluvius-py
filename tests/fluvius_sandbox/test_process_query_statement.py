@@ -1,6 +1,8 @@
 import pytest
 from collections import namedtuple
 
+from fluvius.error import BadRequestError
+from fluvius.data import logger
 from fluvius.data.query import (
     process_query_statement, 
     QueryElement, 
@@ -82,12 +84,12 @@ def test_process_query_statement_with_operators():
 
 def test_process_query_statement_with_negation():
     """Test process_query_statement with negation operator"""
-    result = process_query_statement({'!name.eq': 'John'})
+    result = process_query_statement({'name!eq': 'John'})
     element = result[0]
     assert element.field_name == 'name'
     assert element.mode == '!'
     assert element.operator == 'eq'
-    assert element.composite is True  # negation makes it composite
+    assert element.composite is False
     assert element.value == 'John'
 
 
@@ -98,6 +100,7 @@ def test_process_query_statement_with_nested_list():
         [{'age.gt': 25}, {'status': 'active'}]
     ])
     assert len(result) == 3
+    assert all(isinstance(x, QueryElement) for x in result)
     
     # Check all elements are properly extracted
     fields = [elem.field_name for elem in result]
@@ -168,7 +171,7 @@ def test_process_query_statement_missing_param_spec():
     }
     
     # This should raise KeyError when trying to access missing param spec
-    with pytest.raises(KeyError):
+    with pytest.raises(BadRequestError):
         process_query_statement({'age.gt': 25}, param_specs=param_specs)
 
 
@@ -192,24 +195,34 @@ def test_process_query_statement_complex_nested():
         {'name': 'John'},
         [
             {'age.gt': 25},
-            [
+            {'.and': [
                 {'status': 'active'},
                 {'city.in': ['NY', 'LA']}
-            ]
+            ]}
         ],
-        {'!deleted.eq': True}
+
+        {'deleted!eq': True},
+        {'.or': {'status': 'active', 'city.in': ['NY', 'LA']}}
     ]
     
     result = process_query_statement(complex_query)
     assert len(result) == 5
+    assert isinstance(result, QueryStatement)
+    assert all(isinstance(x, QueryElement) for x in result)
     
     # Verify all fields are present
     fields = [elem.field_name for elem in result]
-    assert all(field in fields for field in ['name', 'age', 'status', 'city', 'deleted'])
+    assert all(field in fields for field in ['name', 'age', '', 'deleted'])
     
     # Verify negation is handled
     deleted_elem = next(elem for elem in result if elem.field_name == 'deleted')
-    assert deleted_elem.composite is True  # negation
+    assert deleted_elem.composite is False  # negation
+    assert deleted_elem.mode is '!'  # negation
+
+    and_elem = next(elem for elem in result if elem.field_name == '')
+    assert and_elem.composite is True  # negation
+    assert and_elem.mode is '.'
+    assert and_elem.operator == 'and'
 
 
 def test_operator_statement_function():
@@ -228,11 +241,11 @@ def test_operator_statement_function():
     assert result.composite is False
     
     # Test with negation
-    result = operator_statement('!name.eq')
+    result = operator_statement('name!eq')
     assert result.field_name == 'name'
     assert result.mode == '!'
     assert result.operator == 'eq'
-    assert result.composite is True
+    assert result.composite is False
     
     # Test passing existing OperatorStatement
     existing = OperatorStatement('test', '.', 'eq', False)

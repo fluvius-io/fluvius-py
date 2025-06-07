@@ -27,7 +27,7 @@ from sqlalchemy.sql.operators import contains_op, custom_op, ilike_op, in_op, eq
 
 from fluvius.data.query import BackendQuery, QueryStatement, QueryElement
 from fluvius.data import logger, config
-from fluvius.error import InternalServerError
+from fluvius.error import BadRequestError
 from fluvius.constant import QUERY_OPERATOR_SEP, OPERATOR_SEP_NEGATE, DEFAULT_DELETED_FIELD
 
 DEBUG_CONNECTOR = config.DEBUG
@@ -76,13 +76,20 @@ FIELD_OPERATOR = {
 }
 
 def _iter_statement(statement):
+    if isinstance(statement, QueryElement):
+        yield statement
+        return
+
     if isinstance(statement, dict):
         yield from statement.items()
-    elif isinstance(statement, (list, tuple)):
+        return
+
+    if isinstance(statement, (list, tuple)):
         for q in statement:
             yield from _iter_statement(q)
-    else:
-        raise ValueError('Invalid statement [%s]' % statement)
+        return
+
+    raise ValueError('Invalid statement [%s]' % statement)
 
 
 class QueryBuilder(object):
@@ -98,7 +105,7 @@ class QueryBuilder(object):
 
             return getattr(data_schema, fieldspec)
         except AttributeError:
-            raise InternalServerError("D100-501", f"type object {data_schema} has no attribute {fieldspec}", None)
+            raise BadRequestError("D100-501", f"Type object {data_schema} has no attribute {fieldspec}", None)
 
     def _build_expression(self, data_schema, expr: QueryStatement, db_mapping=None):
         if not isinstance(expr, QueryStatement):
@@ -110,11 +117,11 @@ class QueryBuilder(object):
             for stmt in _iter_statement(q):
                 if stmt.composite:
                     subops = tuple(op for op in _gen_query(stmt.value))
-                    return COMPOSITE_OPERATOR[stmt.mode][stmt.operator](*subops)
+                    yield COMPOSITE_OPERATOR[stmt.mode][stmt.operator](*subops)
+                    continue
 
                 db_field = self._field(data_schema, stmt.field_name, db_mapping.get(stmt.field_name))
-
-                return FIELD_OPERATOR[stmt.mode][stmt.operator](db_field, value)
+                yield FIELD_OPERATOR[stmt.mode][stmt.operator](db_field, stmt.value)
 
         yield from _gen_query(expr)
 
@@ -167,8 +174,9 @@ class QueryBuilder(object):
         if q.where:
             yield from self._build_expression(data_schema, q.where, q.mapping)
 
-        if not q.show_deleted:
-            yield (self._field(data_schema, FIELD_DEL) == None)
+        if hasattr(data_schema, FIELD_DEL):
+            if not q.show_deleted:
+                yield (self._field(data_schema, FIELD_DEL) == None)
 
     def _build_where(self, data_schema, sql, q: BackendQuery):
         return sql.where(*self._where_clauses(data_schema, q))

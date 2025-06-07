@@ -3,6 +3,7 @@ from collections import namedtuple
 from fluvius.data.helper import nullable
 from contextlib import contextmanager
 from pyrsistent import PClass, field, pvector_field
+from fluvius.error import BadRequestError
 from fluvius.data import UUID_TYPE, identifier_factory
 from fluvius.constant import QUERY_OPERATOR_SEP, OPERATOR_SEP_NEGATE, RX_PARAM_SPLIT, DEFAULT_OPERATOR
 
@@ -16,6 +17,10 @@ class QueryStatement(tuple):
     pass
 
 
+def process_query_element(key, value):
+    return QueryElement(*operator_statement(key), value)
+
+
 def process_query_statement(*statements, param_specs=None):
     def _unpack(*stmts):
         for stmt in stmts:
@@ -24,28 +29,33 @@ def process_query_statement(*statements, param_specs=None):
 
             if isinstance(stmt, QueryElement):
                 yield stmt
+                continue
 
             if isinstance(stmt, (list, tuple)):
                 yield from _unpack(*stmt)
+                continue
 
             if not isinstance(stmt, dict):
                 raise ValueError(f'Invalid query statement: {stmt}')
 
             yield stmt
 
-    def _process(stmts):
+    def _process(*stmts):
         try:
             for stmt in _unpack(*stmts):
                 if isinstance(stmt, QueryElement):
                     yield stmt
+                    continue
 
-                for key, val in stmt.items():
+                for key, value in stmt.items():
                     op_stmt = operator_statement(key)
 
+                    # First process the value using the operator's processors
                     if param_specs:
                         param_schema = param_specs[op_stmt.field_name, op_stmt.operator]
-                        value = param_schema.process_value(val)
+                        value = param_schema.process_value(value)
 
+                    # For composite operators, its value is a list of statements
                     if not op_stmt.field_name: # composite operators
                         value = tuple(_process(value))
 
@@ -64,7 +74,10 @@ def operator_statement(op_stmt):
     if len(result) == 1:  # no operator specified
         return OperatorStatement(op_stmt, QUERY_OPERATOR_SEP, DEFAULT_OPERATOR, False)
 
-    return OperatorStatement(*result, not result[0])
+    try:
+        return OperatorStatement(*result, not result[0])
+    except:
+        raise ValueError(f'Invalid: {op_stmt}')
 
 
 def validate_list(sort_stmt):
@@ -91,6 +104,14 @@ def validate_query(query) -> QueryStatement:
         return query
 
     return process_query_statement(query)
+
+
+def combine_query_statement(*queries):
+    stmt = tuple()
+    for q in queries:
+        stmt += validate_query(q)
+
+    return QueryStatement(stmt)
 
 
 class JoinStatement(PClass):

@@ -117,9 +117,9 @@ def python_list_validator(self, op_stmt, value):
 
 class StringField(QueryField):
     _ops = [
+        ("ne", "Not Equal", None, "single-text"),
         ("eq", "Equal", None, "single-text"),
         ("ilike", "Like", None, "single-text"),
-        ("is", "Is (null,true)", None, "single-text"),
         ("in", "In List", in_validator, "multiple-select"),
     ]
 

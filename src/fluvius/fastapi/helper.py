@@ -4,7 +4,7 @@ import jsonurl_py
 SCOPING_SIGN = ':'
 SCOPING_SEP = '='
 PATH_QUERY_SIGN = "~"
-SCOPES_SELECTOR = f"{SCOPING_SIGN}{{scopes}}"
+SCOPE_SELECTOR = f"{SCOPING_SIGN}{{scope}}"
 PATH_QUERY_SELECTOR = f"{PATH_QUERY_SIGN}{{path_query}}"
 
 
@@ -32,7 +32,7 @@ def jurl_data(data):
     return jsonurl_py.loads("(" + data + ")")
 
 
-def parse_scopes(scoping_stmt, scope_schema={}):
+def parse_scope(scoping_stmt, scope_schema={}):
     '''
     Scoping parameters are designed bo the used in conjunction with the
     permission system to generate a scoping query for the dataset

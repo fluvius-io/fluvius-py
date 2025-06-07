@@ -4,6 +4,12 @@ from pydantic import BaseModel, Field, PrivateAttr
 
 
 def _create(cls, data=None, defaults=None, **kwargs):
+    """
+    Construct a new data model object from mutiple sources
+    (dict, keyword args, other models, etc.)
+    and allow setting default values.
+    """
+
     base = {**defaults} if defaults else {}
 
     if isinstance(data, dict):
@@ -21,6 +27,14 @@ def _create(cls, data=None, defaults=None, **kwargs):
 
 
 class DataModel(BaseModel):
+    """
+    Pydantic BaseModel with custom defaults:
+    - frozen = True
+    - model_dump(by_alias=True)
+    - `set` method to update and create a new instance.
+    - `create` method to construct a new instance from multiple sources
+    """
+
     model_config = {"frozen": True}
     create = classmethod(_create)
 

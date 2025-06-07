@@ -39,7 +39,7 @@ class FrontendQuery(DataModel):
     sort: Optional[List[str]] = None
     user_query: Optional[Dict] = None
     path_query: Optional[Dict] = None
-    scopes: Optional[Dict] = None
+    scope: Optional[Dict] = None
 
     @classmethod
     def from_query_params(cls, qp: QueryParams, /, **kwargs):

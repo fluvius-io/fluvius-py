@@ -11,7 +11,7 @@ from fluvius.helper import load_class
 
 from . import logger, config
 from .auth import auth_required
-from .helper import uri, jurl_data, parse_scopes, SCOPES_SELECTOR, PATH_QUERY_SELECTOR
+from .helper import uri, jurl_data, parse_scope, SCOPE_SELECTOR, PATH_QUERY_SELECTOR
 
 
 def register_resource_endpoints(app, query_manager, query_resource):
@@ -21,7 +21,7 @@ def register_resource_endpoints(app, query_manager, query_resource):
     api_docs = query_resource.Meta.desc or query_manager.Meta.desc
     scope_schema = (query_resource.Meta.scope_required or query_resource.Meta.scope_optional)
 
-    async def resource_query(auth_ctx, query_params: QueryParams, path_query: str=None, scopes: str=None):
+    async def resource_query(auth_ctx, query_params: QueryParams, path_query: str=None, scope: str=None):
         query = fe_query and fe_query.query
         if isinstance(query, str):
             query = json.loads(query)
@@ -34,13 +34,13 @@ def register_resource_endpoints(app, query_manager, query_resource):
                 query = {":and": [query, params]}
 
         if scope_schema:
-            scopes = parse_scopes(scopes, scope_schema)
-            if query_resource.Meta.scope_required and not scopes:
+            scope = parse_scope(scope, scope_schema)
+            if query_resource.Meta.scope_required and not scope:
                 raise ForbiddenError('Q01-49939', f"Scoping is required for resource: {query_resource}")
-        elif scopes:
+        elif scope:
             raise BadRequestError('Q01-00383', f'Scoping is not allowed for resource: {query_resource}')
 
-        query_params = FrontendQuery.from_query_params(params, scopes=scopes, query=query)
+        query_params = FrontendQuery.from_query_params(params, scope=scope, query=query)
 
         data, meta = await query_manager.query_resource(auth_ctx, query_id, query_params)
         return {
@@ -48,13 +48,13 @@ def register_resource_endpoints(app, query_manager, query_resource):
             'meta': meta
         }
 
-    async def item_query(auth_ctx, item_identifier, scopes: str=None):
-        query_params = QueryParams.create(scopes=scopes)
+    async def item_query(auth_ctx, item_identifier, scope: str=None):
+        query_params = QueryParams.create(scope=scope)
         if scope_schema:
-            scopes = parse_scopes(scopes, scope_schema)
-            if query_resource.Meta.scope_required and not scopes:
+            scope = parse_scope(scope, scope_schema)
+            if query_resource.Meta.scope_required and not scope:
                 raise ForbiddenError('Q01-49939', f"Scoping is required for resource: {query_resource}")
-        elif scopes:
+        elif scope:
             raise BadRequestError('Q01-00383', f'Scoping is not allowed for resource: {query_resource}')
 
         return await query_manager.query_item(auth_ctx, query_id, item_identifier, query_params)
@@ -75,19 +75,19 @@ def register_resource_endpoints(app, query_manager, query_resource):
     if query_resource.Meta.allow_list_view:
         if scope_schema:
             @endpoint(
-                SCOPES_SELECTOR, PATH_QUERY_SELECTOR, "",
+                SCOPE_SELECTOR, PATH_QUERY_SELECTOR, "",
                 summary=query_resource.Meta.name,
                 description=query_resource.Meta.desc)  # "" for trailing slash
-            async def query_resource_scoped(request: Request, path_query: Annotated[str, Path()], scopes: str):
+            async def query_resource_scoped(request: Request, path_query: Annotated[str, Path()], scope: str):
                 ctx = getattr(request.state, 'auth_context', None)
-                return await resource_query(ctx, None, path_query, scopes)
+                return await resource_query(ctx, None, path_query, scope)
 
-            @endpoint(SCOPES_SELECTOR, "",
+            @endpoint(SCOPE_SELECTOR, "",
                 summary=query_resource.Meta.name,
                 description=query_resource.Meta.desc)  # "" for trailing slash
-            async def query_resource_scoped_json(request: Request, query_params: Annotated[QueryParams, Query()], scopes: str):
+            async def query_resource_scoped_json(request: Request, query_params: Annotated[QueryParams, Query()], scope: str):
                 ctx = getattr(request.state, 'auth_context', None)
-                return await resource_query(ctx, query_params, None, scopes)
+                return await resource_query(ctx, query_params, None, scope)
 
         @endpoint(PATH_QUERY_SELECTOR, "",
                 summary=query_resource.Meta.name,
@@ -114,15 +114,15 @@ def register_resource_endpoints(app, query_manager, query_resource):
                 description=query_resource.Meta.desc)
         async def query_item_default(request: Request, identifier: Annotated[str, Path()]):
             ctx = getattr(request.state, 'auth_context', None)
-            return await item_query(ctx, identifier, scopes=scopes)
+            return await item_query(ctx, identifier, scope=scope)
 
         if scope_schema:
-            @endpoint(SCOPES_SELECTOR, "{identifier}",
+            @endpoint(SCOPE_SELECTOR, "{identifier}",
                 summary=f"{query_resource.Meta.name} (Item)",
                 description=query_resource.Meta.desc)
-            async def query_item_scoped(request: Request, identifier: Annotated[str, Path()], scopes: str):
+            async def query_item_scoped(request: Request, identifier: Annotated[str, Path()], scope: str):
                 ctx = getattr(request.state, 'auth_context', None)
-                return await item_query(ctx, identifier, scopes=scopes)
+                return await item_query(ctx, identifier, scope=scope)
 
 
 def regsitery_manager_endpoints(app, query_manager):
@@ -160,12 +160,12 @@ def register_query_manager(app, qm_cls):
 
 @Pipe
 def configure_query_manager(app, *query_managers):
-    @app.get(uri("/_meta/_echo", SCOPES_SELECTOR, PATH_QUERY_SELECTOR, "{identifier}"), tags=["Metadata"])
-    async def query_echo(query_params: Annotated[QueryParams, Query()], scopes, path_query, identifier):
+    @app.get(uri("/_meta/_echo", SCOPE_SELECTOR, PATH_QUERY_SELECTOR, "{identifier}"), tags=["Metadata"])
+    async def query_echo(query_params: Annotated[QueryParams, Query()], scope, path_query, identifier):
         return {
             "identifier": identifier,
             "query_params": query_params,
-            "scopes": parse_scopes(scopes),
+            "scope": parse_scope(scope),
             "path_query": jurl_data(path_query)
         }
 

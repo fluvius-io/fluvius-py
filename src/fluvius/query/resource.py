@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from fluvius.error import BadRequestError
 from fluvius.data import DataModel, BlankModel
 from fluvius.helper import assert_
-from fluvius.data.query import operator_statement, OperatorStatement, QueryStatement
+from fluvius.data.query import operator_statement, OperatorStatement, QueryStatement, process_query_statement
 from fluvius.constant import DEFAULT_DELETED_FIELD, QUERY_OPERATOR_SEP, OPERATOR_SEP_NEGATE, RX_PARAM_SPLIT
 
 from .field import QueryField
@@ -79,42 +79,12 @@ class QueryResource(object):
     def backend_model(self):
         return self.Meta.backend_model or self._identifier
 
-    def base_query(self, context, scopes):
+    def base_query(self, context, scope):
         return None
 
-    def validate_schema_args(self, fe_query):
-        queries = (fe_query.user_query, fe_query.path_query)
-        param_specs = self.query_params
+    def generate_query_statement(self, *queries) -> QueryStatement:
+        return process_query_statement(queries, param_specs=self.query_params)
 
-        def _unpack(*statements):
-            for stmt in statements:
-                if not stmt:
-                    continue
-
-                if isinstance(stmt, (list, tuple)):
-                    yield from _unpack(*stmt)
-
-                if not isinstance(stmt, dict):
-                    raise ValueError(f'Invalid query statement: {stmt}')
-
-                yield stmt
-
-
-        def _process_statement(*statements):
-            try:
-                for stmt in _unpack(*statements):
-                    for key, val in stmt.items():
-                        op_stmt = operator_statement(key)
-                        param_schema = param_specs[op_stmt.field_name, op_stmt.operator]
-                        value = param_schema.process_value(val)
-                        if param_schema.composite:
-                            value = tuple(_process_statement(value))
-
-                        yield QueryStatement(*op_stmt, value)
-            except KeyError as e:
-                raise BadRequestError("Q01-3939", f'Cannot locate operator: {e}')
-
-        return tuple(_process_statement({":and": queries}))
 
     def __init__(self):
         meta = self.Meta
@@ -125,7 +95,7 @@ class QueryResource(object):
                 return meta.default_order
 
             _id = self.id_field
-            return ["_id:asc"]
+            return ["_id.asc"]
 
         def parse_soft_delete():
             soft_delete = meta.soft_delete_query
@@ -138,14 +108,14 @@ class QueryResource(object):
             return bool(soft_delete)
 
 
-        def gen_query_params(fields):
+        def generate_query_operators(fields):
             for op in operator.BUILTIN_OPS:
                 yield op(self)
 
             for qfield in fields:
                 yield from qfield.gen_params()
 
-        def gen_fields():
+        def process_fields():
             for fn in dir(self):
                 qfield = getattr(self, fn)
                 if not isinstance(qfield, QueryField):
@@ -159,9 +129,9 @@ class QueryResource(object):
 
                     self.id_field = qfield.key
 
-        self.query_fields = tuple(gen_fields())
+        self.query_fields = tuple(process_fields())
         self.query_mapping = {f._key: f._source for f in self.query_fields if f._key != f._source}
-        self.query_params = {op.selector: op for op in gen_query_params(self.query_fields)}
+        self.query_params = {op.selector: op for op in generate_query_operators(self.query_fields)}
         self.select_fields = set(qfield.key for qfield in self.query_fields if not qfield.hidden)
         self.sortable_fields = (qfield.key for qfield in self.query_fields if qfield.sortable)
         self.default_order = parse_default_order()

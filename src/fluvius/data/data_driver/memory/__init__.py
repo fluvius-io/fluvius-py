@@ -4,22 +4,29 @@ import pickle
 from contextlib import asynccontextmanager
 from fluvius.data import identifier, logger, timestamp
 from fluvius.data.exceptions import ItemNotFoundError, NoItemModifiedError
-from fluvius.data.query import BackendQuery, OperatorStatement
+from fluvius.data.query import (
+    BackendQuery,
+    OperatorStatement,
+    process_query_statement,
+    combine_query_statement,
+    process_query_element,
+    QueryStatement
+)
 
 from ..base import DataDriver
 
 
 def query_resource(store, q: BackendQuery):
-    match_attrs = {}
+    match_attrs = tuple()
 
     if q.where:
-        match_attrs.update(q.where)
+        match_attrs += q.where
 
     if q.scope:
-        match_attrs.update(q.scope)
+        match_attrs += q.scope
 
     if q.identifier:
-        match_attrs['_id'] = q.identifier
+        match_attrs += (process_query_element('_id.eq', q.identifier),)
 
     def _apply_operator(item_value, expected_value, operator, mode):
         """Apply operator logic for memory driver queries"""
@@ -49,7 +56,7 @@ def query_resource(store, q: BackendQuery):
             result = expected_value.lower() in str(item_value).lower() if item_value is not None else False
         else:
             # Default to equality for unknown operators
-            result = item_value == expected_value
+            raise ValueError(f'(memory store) Unsupported query operator: {operator}')
         
         # Apply negation if needed
         return not result if negate else result
@@ -57,31 +64,20 @@ def query_resource(store, q: BackendQuery):
     def _match(item):
         try:
             # Handle both dict and object items
-            for k, v in match_attrs.items():
+            for qe in match_attrs:
                 # Handle OperatorStatement objects
-                if hasattr(k, 'field_name'):  # Check if it's an OperatorStatement
-                    field_name = k.field_name
-                    operator = k.op_key
-                    mode = k.mode
-                    
-                    # Get the item value
-                    if isinstance(item, dict):
-                        item_value = item.get(field_name)
-                    else:
-                        item_value = getattr(item, field_name, None)
-                    
-                    # Apply operator logic
-                    if not _apply_operator(item_value, v, operator, mode):
-                        return False
-                else:
-                    # Handle simple string keys (backward compatibility)
-                    if isinstance(item, dict):
-                        item_value = item.get(k)
-                    else:
-                        item_value = getattr(item, k, None)
+                field_name = qe.field_name
 
-                    if item_value != v:
-                        return False
+                # Get the item value
+                if isinstance(item, dict):
+                    item_value = item.get(field_name)
+                else:
+                    item_value = getattr(item, field_name, None)
+
+                # Apply operator logic
+                if not _apply_operator(item_value, qe.value, qe.op_key, qe.mode):
+                    return False
+
             return True
         except (AttributeError, KeyError):
             return False

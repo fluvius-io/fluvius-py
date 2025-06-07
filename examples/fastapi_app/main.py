@@ -52,7 +52,7 @@ def configure_sample_app(app):
 
     # Item query ...
     @app.get("/protected/{identifier}", tags=["Sample API"])
-    @app.get("/protected/~{scopes}/{identifier}", tags=["Sample API"])
+    @app.get("/protected/~{scope}/{identifier}", tags=["Sample API"])
     @auth_required()
     async def protected_2(request: Request, identifier, scoping=None):
         return {

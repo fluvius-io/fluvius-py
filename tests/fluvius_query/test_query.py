@@ -144,8 +144,8 @@ async def test_query_1():
     # OR of above = DEF3, XYZ Corp
     # NOT of that = ABC1
     # But the actual query seems to work differently - let's check what it actually returns
-    pa = {"!or": [{"business_name!ne": "ABC1"}, {"business_name": "DEF3"}]}
-    r, m = await hd.query_resource("company-query", query=json.dumps(pa))
+    fe_query = FrontendQuery(user_query={"!or": [{"business_name!ne": "ABC1"}, {"business_name": "DEF3"}]})
+    r, m = await hd.query_resource("company-query", fe_query)
     # The actual result was XYZ Corp, which means the query is: NOT(business_name = "ABC1" OR business_name = "DEF3")
     # So it returns records that are neither "ABC1" nor "DEF3"
     assert len(r) == 1 and len(m) > 0  # Should return 1 record (XYZ Corp)
@@ -155,8 +155,12 @@ async def test_query_1():
     # Query: {":or": [{"business_name!ne": "ABC1"}, {"business_name": "DEF3"}]}
     # This means: business_name != "ABC1" OR business_name = "DEF3"
     # Expected result: DEF3, XYZ Corp (all records except ABC1, plus DEF3 explicitly)
-    pa = {":or": [{"business_name!ne": "ABC1"}, {"business_name": "DEF3"}]}
-    r, m = await hd.query_resource("company-query", query=json.dumps(pa), limit=1, page=2)
+    fe_query = FrontendQuery(
+        path_query={".or": [{"business_name!ne": "ABC1"}, {"business_name": "DEF3"}]},
+        limit=1,
+        page=2
+    )
+    r, m = await hd.query_resource("company-query", fe_query)
     assert len(r) == 1 and len(m) > 0  # Should return 1 record (since limit=1, page=2)
     logger.info("✅ Test query 1 pagination result: %s", serialize_json(r))
 
@@ -167,7 +171,7 @@ async def test_query_2():
     await ensure_databases_ready()
     
     query_handler_2 = ObjectDomainQueryManager()
-    r, m = await query_handler_2.query_resource('economist', query=json.dumps({"job": 'economist'}))
+    r, m = await query_handler_2.query_resource('economist', FrontendQuery(user_query={"job": 'economist'}))
     logger.info("✅ Test query 2 result: %s", serialize_json(r))
 
 
@@ -179,13 +183,13 @@ async def test_query_items():
     hd = SampleQueryManager()
     
     # Test basic query with pagination
-    r, m = await hd.query_resource("company-query", limit=2, page=1)
+    r, m = await hd.query_resource("company-query", FrontendQuery(limit=2, page=1))
     assert len(r) <= 2, "Should respect page limit"
     logger.info("✅ Test query items pagination: returned %d items", len(r))
     
     # Test query with system_entity filter (if we add that field to our query resource)
     # For now, test with business_name filters
-    r, m = await hd.query_resource("company-query", query=json.dumps({"business_name": "ABC1"}))
+    r, m = await hd.query_resource("company-query", FrontendQuery(user_query={"business_name": "ABC1"}))
     assert len(r) == 1, "Should find exactly one ABC1 company"
     assert r[0].business_name == "ABC1"
     logger.info("✅ Test query items filter: %s", serialize_json(r))
@@ -200,13 +204,13 @@ async def test_query_endpoints():
     hd = SampleQueryManager()
     
     # Test complex AND query
-    query = {":and": [{"business_name!eq": "XYZ Corp"}, {"business_name!eq": "DEF3"}]}
-    r, m = await hd.query_resource("company-query", query=json.dumps(query))
+    query = FrontendQuery(user_query={".and": [{"business_name!eq": "XYZ Corp"}, {"business_name!eq": "DEF3"}]})
+    r, m = await hd.query_resource("company-query", query)
     assert len(r) == 1, "Should find only ABC1 (not XYZ Corp and not DEF3)"
     assert r[0].business_name == "ABC1"
     logger.info("✅ Test query endpoints complex AND: %s", serialize_json(r))
     
     # Test ObjectDomainQueryManager endpoint
     query_handler_2 = ObjectDomainQueryManager()
-    r, m = await query_handler_2.query_resource('economist', query=json.dumps({}))  # Get all economists
+    r, m = await query_handler_2.query_resource('economist', FrontendQuery())  # Get all economists
     logger.info("✅ Test query endpoints ObjectDomain: %s", serialize_json(r))
