@@ -14,18 +14,18 @@ from .model import MediaManager
 
 
 class MediaInterface(object):
-    def __init__(self, app, media_manager=MediaManager):
+    def __init__(self, app, media_manager=MediaManager, filesystem: fsspec.filesystem=None):
         self._manager = media_manager(app)
-        self._filesystem = {}
+        self._filesystem = filesystem
 
 
-    async def put(self, fileobj, /, filesystem=None) -> MediaEntry:
+    async def put(self, fileobj) -> MediaEntry:
         fs = await self.get_filesystem(filesystem)
-        with open(fileobj) as f:
-            fs.write(f.read())
+        fs.write(fileobj)
 
     async def open(self, file_id):
-        pass
+        fs = await self.get_filesystem(filesystem)
+        return fs.open(file_id)
 
     async def get_filesystem(self, fsname):
         if fsname in self._filesystem:

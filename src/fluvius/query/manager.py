@@ -1,4 +1,3 @@
-import re
 import sqlalchemy
 
 from types import MethodType
@@ -8,24 +7,6 @@ from fluvius.data import BackendQuery, DataModel
 from fluvius.helper import camel_to_lower, select_value
 from fluvius.error import InternalServerError, NotFoundError
 from .resource import QueryResource, FrontendQuery
-from . import config
-
-DESELECT = "deselect"
-LIMIT = "max_results"
-OFFSET = "offset"
-PAGE = "page"
-QUERY = "where"
-SELECT = "select"
-SELECT_ESCAPE_CHAR = "_"
-SORT = "sort"
-TEXT = "txt"
-
-LIMIT_DEFAULT = config.DEFAULT_QUERY_LIMIT
-ALLOW_ESCAPE = config.ALLOW_SELECT_ESCAPE
-DEVELOPER_MODE = config.DEVELOPER_MODE
-
-RX_SELECT_SPLIT = re.compile(r"[,;\s]+")
-RX_TEXT_SPLIT = re.compile(r"[,]+")
 
 
 def _compute_select(query_select, query_resource):
