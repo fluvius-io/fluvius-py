@@ -1,6 +1,7 @@
 from pyrsistent import PClass, field
 from casbin import AsyncEnforcer, Model
 from casbin.persist.adapters.asyncio import AsyncAdapter
+from .enforcer import FluviusEnforcer
 
 from ._meta import config
 from .adapter import SqlAdapter
@@ -10,6 +11,7 @@ DEFAULT_CASBIN_TABLE = 'casbin_rule'
 
 
 class PolicyRequest(PClass):
+    usr = field(type=str, factory=str)
     sub = field(type=str, factory=str)
     org = field(type=str, factory=str)
     dom = field(type=str, factory=str)
@@ -62,7 +64,8 @@ class PolicyManager:
             self._adapter = self.__adapter__
 
     def _setup_enforcer(self):
-        self._enforcer = AsyncEnforcer(self._model, self._adapter)
+        # self._enforcer = AsyncEnforcer(self._model, self._adapter)
+        self._enforcer = FluviusEnforcer(self._model, self._adapter)
 
     async def check(self, *params) -> PolicyResponse:
         try:
@@ -80,6 +83,7 @@ class PolicyManager:
             # await self.enforcer.load_filtered_policy()
             await self._enforcer.load_policy()
             allowed, narration = self._enforcer.enforce_ex(
+                request.usr,
                 request.sub,
                 request.org,
                 request.dom,
