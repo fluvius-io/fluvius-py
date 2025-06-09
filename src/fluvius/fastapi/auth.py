@@ -21,6 +21,7 @@ from pydantic import AnyUrl, EmailStr
 from uuid import UUID
 from pipe import Pipe
 from typing import Literal
+from urllib.parse import urlparse
 
 from .setup import on_startup
 from .helper import uri
@@ -29,6 +30,7 @@ from . import config, logger
 
 IDEMPOTENCY_KEY = config.RESP_HEADER_IDEMPOTENCY
 DEVELOPER_MODE = config.DEVELOPER_MODE
+SAFE_REDIRECT_DOMAINS = config.SAFE_REDIRECT_DOMAINS
 
 
 def auth_required(inject_ctx=True, **kwargs):
@@ -43,6 +45,46 @@ def auth_required(inject_ctx=True, **kwargs):
         return wrapper
     return decorator
 
+
+
+def is_safe_redirect_url(url: str) -> bool:
+    """
+    Validates if a given URL is a safe redirect:
+    - It's either relative (no scheme or netloc),
+    - Or it's an absolute URL pointing to a whitelisted domain.
+
+    Args:
+        url (str): The URL to validate.
+        whitelist_domains (list[str]): List of allowed domains (e.g. ["example.com"]).
+
+    Returns:
+        bool: True if safe, False otherwise.
+    """
+    try:
+        if not url:
+            return False
+
+        parsed = urlparse(url)
+
+        # Case 1: Relative URL (e.g., "/login")
+        if not parsed.netloc and not parsed.scheme:
+            return True
+
+        # Case 2: Absolute URL with whitelisted domain
+        domain = parsed.hostname
+        if domain and domain.lower() in SAFE_REDIRECT_DOMAINS:
+            return True
+
+        return False
+
+    except Exception:
+        return False
+
+def validate_direct_url(url: str, default: str) -> str:
+    if is_safe_redirect_url(url):
+        return url
+
+    return default
 
 class KeycloakTokenPayload(DataModel):
     exp: int
@@ -182,7 +224,7 @@ def configure_authentication(app, config=config, base_path="/auth"):
             client_id=config.KEYCLOAK_CLIENT_ID,
             client_secret=config.KEYCLOAK_CLIENT_SECRET,
             client_kwargs={"scope": "openid profile email"},
-            redirect_uri=config.DEFAULT_REDIRECT_URI,
+            redirect_uri=config.DEFAULT_CALLBACK_URI,
         )
 
         app.add_middleware(FluviusAuthMiddleware, auth_profile_provider=config.AUTH_PROFILE_PROVIDER)
@@ -251,7 +293,8 @@ def configure_authentication(app, config=config, base_path="/auth"):
 
     @api("login")
     async def login(request: Request):
-        return await oauth.keycloak.authorize_redirect(request, config.DEFAULT_REDIRECT_URI)
+        request.session["next"] = request.query_params.get('next')
+        return await oauth.keycloak.authorize_redirect(request, config.DEFAULT_CALLBACK_URI)
 
     @api("callback")
     async def oauth_callback(request: Request):
@@ -268,7 +311,8 @@ def configure_authentication(app, config=config, base_path="/auth"):
         id_data.update(realm_access=ac_data.get("realm_access"), resource_access=ac_data.get("resource_access"))
 
         request.session["user"] = id_data
-        response = RedirectResponse(url=SIGNIN_REDIRECT_URI)
+        next_url = validate_direct_url(request.session["next"], config.DEFAULT_SIGNIN_REDIRECT_URI)
+        response = RedirectResponse(url=next_url)
         response.set_cookie('id_token', id_token)
         return response
 
@@ -284,11 +328,20 @@ def configure_authentication(app, config=config, base_path="/auth"):
             "headers": dict(request.headers)
         }
 
+    @api("info")
+    @auth_required()
+    async def verify_auth(request: Request):
+        return request.state.auth_context
+
     @api("logout")
     async def logout(request: Request):
         ''' Log out user locally (only for this API) '''
         request.session.clear()
-        return {"message": "Logged out"}
+        redirect_uri = validate_direct_url(
+            request.query_params.get('redirect'),
+            config.DEFAULT_LOGOUT_REDIRECT_URI
+        )
+        return RedirectResponse(url=redirect_uri)  # Redirect after logout
 
 
     @api("signoff", method=app.post)
@@ -299,7 +352,6 @@ def configure_authentication(app, config=config, base_path="/auth"):
         if not access_token:
             raise HTTPException(status_code=400, detail="No access token found")
 
-        request.session.clear()
         async with httpx.AsyncClient() as client:
             # Make the request to Keycloak's logout endpoint
             logout_response = await client.get(
@@ -312,14 +364,16 @@ def configure_authentication(app, config=config, base_path="/auth"):
 
         # 1. Clear FastAPI session/cookie
         # Assuming you're storing the JWT token in a secure cookie
-        response = RedirectResponse(url=LOGOUT_REDIRECT_URI)  # Redirect after logout
+
+        redirect_uri = validate_direct_url(request.query_params.get('redirect'), config.DEFAULT_LOGOUT_REDIRECT_URI)
+        response = RedirectResponse(url=redirect_uri)  # Redirect after logout
         response.delete_cookie("id_token")  # Clear the access_token cookie
+        request.session.clear()
 
         return response
 
     # === Keycloak Configuration ===
-    LOGOUT_REDIRECT_URI = "/auth/verify"
-    SIGNIN_REDIRECT_URI = "/auth/verify"
+
     KEYCLOAK_ISSUER = uri(config.KEYCLOAK_BASE_URL, "realms", config.KEYCLOAK_REALM)
     KEYCLOAK_JWKS_URI = uri(KEYCLOAK_ISSUER, "protocol/openid-connect/certs")
     KEYCLOAK_LOGOUT_URI = uri(KEYCLOAK_ISSUER, "protocol/openid-connect/logout")
