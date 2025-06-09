@@ -6,6 +6,9 @@ from casbin.model import Model
 from casbin import persist
 
 
+MAX_POLICY_LINE = 10000
+
+
 class PolicySchema:
     _id = sa.Column(UUID, primary_key=True, nullable=False)
     ptype = sa.Column(sa.String(255))
@@ -31,6 +34,10 @@ class PolicySchema:
                 return [ptype, p.sub, p.role, p.org]
             case "g2":
                 return [ptype, p.org, p.res, p.rid]
+            case "g3":
+                return [ptype, p.sub, p.role]
+            case "g4":
+                return [ptype, p.sub, p.res, p.rid]
             case _:
                 raise ValueError(f"Unsupported policy type: {ptype}")
 
@@ -43,7 +50,7 @@ class SqlAdapter(AsyncAdapter):
 
     async def load_policy(self, model: Model) -> None:
         """Load all policies from database."""
-        policies = await self._manager.query(self._table)
+        policies = await self._manager.query(self._table, limit=MAX_POLICY_LINE)
         for policy in policies:
             self._load_policy_line(policy, model)
 
