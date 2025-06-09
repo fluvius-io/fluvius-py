@@ -305,7 +305,7 @@ class DataAccessManager(DataAccessManagerBase):
         """ Fetch exactly 1 item from the data store using either a query object or where statements
             Raises an error if there are 0 or multiple results """
         q = BackendQuery.create(q, **query, limit=1, offset=0)
-        if q.limit != 1 or q.offset != 0 or not q.identifier:
+        if q.limit != 1 or q.offset != 0:
             raise ValueError(f'Invalid find_one query: {q}')
 
         try:
