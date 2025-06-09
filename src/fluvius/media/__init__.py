@@ -1,45 +1,15 @@
-# @app.get("/read-s3/")
-# async def read_s3_file(bucket: str, key: str):
-#     fs = fsspec.filesystem("s3", anon=False)
-#     s3_path = f"{bucket}/{key}"
-#     try:
-#         with fs.open(s3_path, "rb") as f:
-#             return StreamingResponse(io.BytesIO(f.read()), media_type="application/octet-stream")
-#     except FileNotFoundError:
-#         raise HTTPException(status_code=404, detail="S3 file not found")
+from ._meta import config, logger
+from .compressor import MediaCompressor
+from .media import MediaInterface
+from .nullmgr import NullMediaManager
+from .model import MediaEntry, MediaManager, MediaFilesystem, FsSpecCompressionMethod
 
-import fsspec
-
-from .model import MediaManager
-
-
-class MediaInterface(object):
-    def __init__(self, app, media_manager=MediaManager, filesystem: fsspec.filesystem=None):
-        self._manager = media_manager(app)
-        self._filesystem = filesystem
-
-
-    async def put(self, fileobj) -> MediaEntry:
-        fs = await self.get_filesystem(filesystem)
-        fs.write(fileobj)
-
-    async def open(self, file_id):
-        fs = await self.get_filesystem(filesystem)
-        return fs.open(file_id)
-
-    async def get_filesystem(self, fsname):
-        if fsname in self._filesystem:
-            return self._filesystem[fsname]
-
-        spec = await self._manager.fetch('media-filesystem', identifier=fsname)
-        fsys = fsspec.filesystem(spec.protocol, **spec.params)
-        self._filesystem[fsname] = fsys
-        return fsys
-
-
-    async def get_metadata(self, file_id):
-        metadata = await self._manager.fetch('media-metadata', identifier=file_id)
-        return metadata
-
-    async def save_file(self, fileobj, **kwargs):
-        pass
+# Export key classes
+__all__ = [
+    'MediaInterface',
+    'NullMediaManager',
+    'MediaEntry', 
+    'MediaManager',
+    'MediaFilesystem',
+    'FsSpecCompressionMethod'
+]

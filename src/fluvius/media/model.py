@@ -1,9 +1,9 @@
 import enum
 import sqlalchemy as sa
-from . import config, logger
 from sqlalchemy.dialects import postgresql as pg
 
-from fluvius.data import DomainDataSchema, SqlaDriver, DataAccessManager
+from fluvius.data import SqlaDriver, DataAccessManager, UUID_GENR
+from ._meta import config, logger
 
 
 class FsSpecCompressionMethod(enum.Enum):
@@ -30,15 +30,15 @@ class MediaManager(DataAccessManager):
     __automodel__ = True
 
 
-class MediaSchema(DomainDataSchema):
+class MediaSchema(MediaDataConnector.__data_schema_base__):
     __abstract__ = True
     __table_args__ = {'schema': config.MEDIA_DB_SCHEMA}
 
-    def __init_subclass__(cls):
-        MediaDataConnector.register(cls)
 
-
-class MediaMetadata(MediaSchema):
+class MediaEntry(MediaSchema):
+    _id = sa.Column(pg.UUID, primary_key=True, nullable=False, default=UUID_GENR, server_default=sa.text("uuid_generate_v4()"))
+    _created = sa.Column(sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()"))
+    _updated = sa.Column(sa.DateTime(timezone=True), nullable=True)
     filename = sa.Column(sa.String(1024), nullable=False)
     filehash = sa.Column(sa.CHAR(64))
     filemime = sa.Column(sa.String(256))
@@ -56,7 +56,10 @@ class MediaMetadata(MediaSchema):
 
 
 class MediaFilesystem(MediaSchema):
-    fskey = sa.Column(sa.String(1024), nullable=False)
+    _id = sa.Column(pg.UUID, primary_key=True, nullable=False, default=UUID_GENR, server_default=sa.text("uuid_generate_v4()"))
+    _created = sa.Column(sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()"))
+    _updated = sa.Column(sa.DateTime(timezone=True), nullable=True)
+    fskey = sa.Column(sa.String(1024), nullable=False, unique=True)
     fstype = sa.Column(sa.Enum(FsSpecFsType))
     name = sa.Column(sa.String(1024), nullable=False)
     protocol = sa.Column(sa.String(1024), nullable=False)
