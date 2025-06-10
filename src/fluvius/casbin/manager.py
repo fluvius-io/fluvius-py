@@ -1,28 +1,13 @@
-from pyrsistent import PClass, field
-from casbin import AsyncEnforcer, Model
+from casbin import Model
 from casbin.persist.adapters.asyncio import AsyncAdapter
-from .enforcer import FluviusEnforcer
 
-from ._meta import config
+from .enforcer import FluviusEnforcer
 from .adapter import SqlAdapter
+from .datadef import PolicyRequest, PolicyResponse, PolicyData, PolicyNarration
+from ._meta import config
 
 
 DEFAULT_CASBIN_TABLE = 'casbin_rule'
-
-
-class PolicyRequest(PClass):
-    usr = field(type=str, factory=str)
-    sub = field(type=str, factory=str)
-    org = field(type=str, factory=str)
-    dom = field(type=str, factory=str)
-    res = field(type=str, factory=str)
-    rid = field(type=str, factory=str)
-    act = field(type=str, factory=str)
-
-
-class PolicyResponse(PClass):
-    allowed = field(type=bool, factory=bool)
-    narration = field(type=str, factory=str)
 
 
 class PolicyManager:
@@ -73,7 +58,7 @@ class PolicyManager:
             # await self.enforcer.load_filtered_policy()
             await self._enforcer.load_policy()
             allowed, narration = self._enforcer.enforce_ex(*params)
-            return PolicyResponse(allowed=allowed, narration=narration)
+            return PolicyResponse(allowed=allowed, narration=self._generate_narration(params, allowed, narration))
         except Exception as e:
             raise RuntimeError(f"Permission check failed: {str(e)}")
 
@@ -101,9 +86,21 @@ class PolicyManager:
 
     def _generate_narration(self, request: PolicyRequest, allowed: bool, narration: list) -> str:
         """Generate a human readable explanation of the policy decision."""
-        status = "allowed" if allowed else "denied"
-        return (
-            f"Sub {request.sub} from organization {request.org} is {status} "
-            f"to perform {request.act} on {request.res}/{request.rid} "
-            f"in doman {request.dom}"
-        )
+        message = f"Request: {request}"
+
+        policies = []
+        if narration:
+            policies = []
+            for policy in narration:
+                print(policy)
+                prule = PolicyData(
+                    role=policy[0],
+                    dom=policy[1],
+                    res=policy[2],
+                    act=policy[3],
+                    cqrs=policy[4],
+                    meta=policy[5],
+                )
+                policies.append(prule)
+
+        return PolicyNarration(message=message, policies=policies)

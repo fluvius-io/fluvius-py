@@ -45,6 +45,8 @@ class QueryResourceMeta(DataModel):
     default_order: List = tuple()
     select_all: bool = False
 
+    policy_required: bool = False
+
 
 class QueryResource(object):
     class Meta(BlankModel):

@@ -1,3 +1,4 @@
+import json
 from fluvius.data import DataModel, Field
 from typing import Optional, List, Dict, Any, Tuple, Union
 from fluvius.data.query import OperatorStatement
@@ -28,7 +29,7 @@ class QueryParams(DataModel):
 
     select: Optional[str] = None
     sort: Optional[str] = None
-    query: Optional[str] = Field(alias='q')
+    query: Optional[str] = Field(alias='q', default=None)
 
 
 class FrontendQuery(DataModel):

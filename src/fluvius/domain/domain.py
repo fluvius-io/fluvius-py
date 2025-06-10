@@ -302,6 +302,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
         rsid = "" if cmdc.Meta.new_resource else command.identifier 
         reqs = PolicyRequest(
+            usr=context.user_id,
             sub=context.profile_id,
             org=context.organization_id,
             dom=self.__namespace__,
