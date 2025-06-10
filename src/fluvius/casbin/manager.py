@@ -1,3 +1,4 @@
+import os
 from casbin import Model
 from casbin.persist.adapters.asyncio import AsyncAdapter
 
@@ -14,12 +15,13 @@ class PolicyManager:
     """Policy manager using Casbin for access control."""
 
     __adapter__ = SqlAdapter
-    __model__ = config.CASBIN_MODEL_PATH
+    __model__ = None
     __schema__ = DEFAULT_CASBIN_TABLE
 
     def __init_subclass__(cls):
         if not cls.__model__:
-            raise ValueError("[__model__] is required! e.g. `model.conf`")
+            base_path = os.path.dirname(os.path.abspath(__file__))
+            cls.__model__ = os.path.join(base_path, config.CASBIN_MODEL_PATH)
 
         if not cls.__adapter__:
             raise ValueError("[__adapter__] is required! e.g. `policy.csv` or `SqlAdapter`. etc.")

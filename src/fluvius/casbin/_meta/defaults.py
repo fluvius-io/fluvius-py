@@ -1,1 +1,1 @@
-CASBIN_MODEL_PATH = "model.conf"
+CASBIN_MODEL_PATH = "./model/model.conf"
