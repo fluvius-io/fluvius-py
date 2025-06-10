@@ -148,7 +148,7 @@ def _locate_handler(cls, name_match=None, domain_cls=None):
 
         if inspect.isfunction(func) and hasattr(func, HANDLER_MARKER_FIELD):
             assert domain_cls is None or domain_cls == getattr(func, HANDLER_MARKER_FIELD), \
-                "Handler [%s] is registered with a different domain." % str(attr)
+                "Handler [%s] is registered with a different domain." % str(func)
 
             yield name, func
 
@@ -239,12 +239,11 @@ class DomainEntityRegistry(object):
     def message(domain_cls, cls_or_key):
         def decorator(cls):
             msg_cls = _validate_domain_message(cls)
+            domain_cls._register_entity(cls, key, DomainEntityType.MESSAGE)
 
             for name, msg_dispatch in _locate_handler(msg_cls, MESSAGE_DISPATCHER_FUNC):
                 wrapper = domain_cls.message_dispatcher(msg_cls)
                 setattr(msg_cls, MESSAGE_DISPATCHER_FUNC, wrapper(msg_dispatch))
-
-            domain_cls._register_entity(cls, key, DomainEntityType.MESSAGE)
 
             DEBUG and logger.info("[REGISTERED MESSAGE] %s/%d [%s]", domain_cls.__namespace__, DomainEntityType.MESSAGE, key)
             return cls
@@ -358,15 +357,15 @@ class DomainEntityRegistry(object):
             for msg_cls in msg_classes:
                 msg_key = getattr(msg_cls, DOMAIN_ENTITY_KEY)
                 dispatcher = _normalize_message_dispatcher(msg_cls, func)
-                cls._msg_dispatchers += ((_priority, msg_key, func), )
+                cls._msg_dispatchers += ((_priority, msg_key, dispatcher), )
 
             def _error(*args, **kwargs):
                 raise RuntimeError('Domain Message Dispatchers are not meant to call directly.')
 
             return _error
 
-        if len(cmd_classes) == 1 and inspect.isfunction(cmd_classes[0]):
-            return class_method_decorator(cmd_classes[0])
+        if len(msg_classes) == 1 and inspect.isfunction(msg_classes[0]):
+            return class_method_decorator(msg_classes[0])
 
         return decorator
 
