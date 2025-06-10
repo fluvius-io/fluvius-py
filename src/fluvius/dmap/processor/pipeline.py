@@ -1,9 +1,9 @@
 import functools
 import queue
 
-from fluvius.mapper import logger, config, writer
-from fluvius.mapper.interface import OutputRow, DataElement, PipelineConfig, ReaderError, ReaderFinished, ResourceMeta
-from fluvius.typecast import get_coercer_profile, get_dtype, get_reducer
+from fluvius.dmap import logger, config, writer
+from fluvius.dmap.interface import OutputRow, DataElement, PipelineConfig, ReaderError, ReaderFinished, ResourceMeta
+from fluvius.dmap.typecast import get_coercer_profile, get_dtype, get_reducer
 from .transform import process_tfspec
 
 

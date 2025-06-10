@@ -1,8 +1,8 @@
 import glob
 from dataclasses import dataclass
-from fluvius.mapper.interface import InputFile
-from fluvius.mapper.fetcher import DataFetcher
-from fluvius.mapper import logger
+from fluvius.dmap.interface import InputFile
+from fluvius.dmap.fetcher import DataFetcher
+from fluvius.dmap import logger
 
 
 @dataclass

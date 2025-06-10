@@ -4,10 +4,10 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import Iterator
 
-from fluvius.mapper import reader, writer, logger, config, helper
-from fluvius.mapper.fetcher import DataFetcher
-from fluvius.mapper.processor import ProcessPipeline, get_transformer
-from fluvius.mapper.interface import InputFile, DataProcessConfig, ReaderError, PipelineConfig
+from fluvius.dmap import reader, writer, logger, config, helper
+from fluvius.dmap.fetcher import DataFetcher
+from fluvius.dmap.processor import ProcessPipeline, get_transformer
+from fluvius.dmap.interface import InputFile, DataProcessConfig, ReaderError, PipelineConfig
 
 
 def process_input(process_config: DataProcessConfig, *args):

@@ -10,9 +10,9 @@ from enum import Enum
 from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from fluvius.mapper.fetcher import DataFetcher
-from fluvius.mapper.interface import InputFile
-from fluvius.mapper import logger
+from fluvius.dmap.fetcher import DataFetcher
+from fluvius.dmap.interface import InputFile
+from fluvius.dmap import logger
 
 STAGING_LOCATION = "/tmp"
 

@@ -1,9 +1,9 @@
 import csv
 from contextlib import contextmanager
 
-from fluvius.mapper.reader import register_reader
-from fluvius.mapper.cfg import config
-from fluvius.mapper.reader.tabular import TabularReader
+from fluvius.dmap.reader import register_reader
+from fluvius.dmap.cfg import config
+from fluvius.dmap.reader.tabular import TabularReader
 
 DEFAULT_CSV_OPTS = dict(quotechar='"', quoting=csv.QUOTE_ALL, skipinitialspace=True)
 

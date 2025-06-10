@@ -1,6 +1,6 @@
 from pyrsistent import PClass, field
-from fluvius.mapper.interface import InputAlreadyProcessedError, InputFile
-from fluvius.mapper import logger
+from fluvius.dmap.interface import InputAlreadyProcessedError, InputFile
+from fluvius.dmap import logger
 
 from sqlalchemy import text, pgsql_execute
 

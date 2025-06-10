@@ -1,9 +1,9 @@
 from pyrsistent import PClass, field
 
-from fluvius.mapper import logger
-from fluvius.mapper.interface import DataLoop, DataElement, ReaderConfig
-from fluvius.mapper.reader import BaseReader
-from fluvius.mapper.processor import get_transformer
+from fluvius.dmap import logger
+from fluvius.dmap.interface import DataLoop, DataElement, ReaderConfig
+from fluvius.dmap.reader import BaseReader
+from fluvius.dmap.processor import get_transformer
 
 EMPTY_VALUES = (None, '')
 

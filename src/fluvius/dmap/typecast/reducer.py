@@ -1,6 +1,6 @@
 import json
 import uuid
-from fluvius.typecast import dtype
+from fluvius.dmap.typecast import dtype
 from .constant import UUID5_NAMESPACE
 
 

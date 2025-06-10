@@ -3,8 +3,8 @@ import openpyxl
 
 from pyrsistent import field
 from contextlib import contextmanager
-from fluvius.mapper.reader import register_reader
-from fluvius.mapper import logger, config
+from fluvius.dmap.reader import register_reader
+from fluvius.dmap import logger, config
 from slugify import slugify
 from fluvius.datapack import DatapackAPI
 

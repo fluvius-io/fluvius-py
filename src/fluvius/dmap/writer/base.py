@@ -2,9 +2,9 @@ import os
 from time import perf_counter
 
 from fluvius.helper import safe_filename
-from fluvius.mapper import logger
-from fluvius.mapper.interface import WriterConfig
-from fluvius.mapper.processor.transform import process_tfspec
+from fluvius.dmap import logger
+from fluvius.dmap.interface import WriterConfig
+from fluvius.dmap.processor.transform import process_tfspec
 from pyrsistent import PClass, field
 
 
