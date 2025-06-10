@@ -113,4 +113,4 @@ class FluviusWorkerTracker(SQLTrackerManager):
         return wrapper
 
 
-SQLWorkTracker = FluviusWorkerTracker()
+SQLWorkTracker = FluviusWorkerTracker(None)
