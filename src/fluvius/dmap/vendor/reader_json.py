@@ -1,6 +1,6 @@
 import json
-from fluvius.mapper.interface import DataLoop, DataElement
-from fluvius.mapper.reader import BaseReader, register_reader
+from fluvius.dmap.interface import DataLoop, DataElement
+from fluvius.dmap.reader import BaseReader, register_reader
 
 
 @register_reader('json')

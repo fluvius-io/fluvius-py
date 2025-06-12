@@ -1,7 +1,7 @@
 import click
 
 
-from fluvius.mapper import cli, logger
+from fluvius.dmap import cli, logger
 
 
 FILE_PATH = click.Path(exists=True, dir_okay=False)

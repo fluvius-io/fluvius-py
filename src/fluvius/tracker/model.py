@@ -43,7 +43,7 @@ class SQLTrackerConnector(SqlaDriver):
     __db_dsn__ = config.TRACKER_DSN
 
 
-class SQLTrackerDataModel(SqlaDataSchema):
+class SQLTrackerDataModel(SQLTrackerConnector.__data_schema_base__):
     __abstract__ = True
     __table_args__ = {'schema': config.TRACKER_DATA_SCHEMA}
 
@@ -53,9 +53,6 @@ class SQLTrackerDataModel(SqlaDataSchema):
     _realm   = sa.Column(pg.UUID)  # User profile id, using to separate tenants
     _deleted = sa.Column(sa.DateTime(timezone=True))
     _etag = sa.Column(sa.String)
-
-    def __init_subclass__(cls):
-        SQLTrackerConnector.register_schema(cls)
 
 
 class Worker(SQLTrackerDataModel):

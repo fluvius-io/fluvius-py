@@ -2,16 +2,16 @@ from typing import Optional, Dict, List
 from fluvius.domain.aggregate import AggregateRoot
 from fluvius.domain.context import DomainContext
 from fluvius.data.helper import identifier_factory, nullable
-from fluvius.data import UUID_GENR, UUID_TYPE, DataModel
+from fluvius.data import UUID_GENR, UUID_TYPE, DataModel, Field
 
 
 class WorkerRequestRelation(DataModel):
     label: str
     attrs: Dict = Field(default_factory=dict)
     resource: str
-    identifier: UUID
-    domain_sid: Optional[UUID] = None
-    domain_iid: Optional[UUID] = None
+    identifier: UUID_TYPE
+    domain_sid: Optional[UUID_TYPE] = None
+    domain_iid: Optional[UUID_TYPE] = None
 
 
 class WorkerContext(DataModel):
@@ -25,9 +25,9 @@ class WorkerContext(DataModel):
 class DomainWorkerCommand(DataModel):
     command: str
     resource: str
-    identifier: UUID = Field(default_factory=uuid4)
-    domain_sid: Optional[UUID] = None
-    domain_iid: Optional[UUID] = None
+    identifier: UUID_TYPE = Field(default_factory=UUID_GENR)
+    domain_sid: Optional[UUID_TYPE] = None
+    domain_iid: Optional[UUID_TYPE] = None
     payload: Dict = Field(default_factory=dict)
 
 

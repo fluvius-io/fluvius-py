@@ -5,8 +5,8 @@ from functools import wraps
 # from fluvius.datapack import FileResource
 # from fluvius.datapack.dataprocess import FileAlreadyProcessed, PostgresFileProcessManager
 
-from fluvius.mapper import logger, processor
-from fluvius.mapper.interface import DataProcessConfig
+from fluvius.dmap import logger, processor
+from fluvius.dmap.interface import DataProcessConfig
 
 FILE_PARSER_REGISTRY = dict()
 

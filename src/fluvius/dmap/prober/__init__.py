@@ -1,6 +1,6 @@
 from slugify import slugify
 from ruamel import yaml
-from fluvius.mapper import config
+from fluvius.dmap import config
 
 quote = yaml.scalarstring.SingleQuotedScalarString
 

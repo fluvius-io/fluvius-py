@@ -8,9 +8,9 @@ def __closure__():
     READER_REGISTRY = {}
     READER_ALIASES = {
         'x12reader': 'fii_x12',
-        'xlsx': 'fluvius.mapper.vendor.reader_excel',
-        'csv': 'fluvius.mapper.vendor.reader_csv',
-        'json': 'fluvius.mapper.vendor.reader_json'
+        'xlsx': 'fluvius.dmap.vendor.reader_excel',
+        'csv': 'fluvius.dmap.vendor.reader_csv',
+        'json': 'fluvius.dmap.vendor.reader_json'
     }
 
     def get_reader(reader_key):
@@ -18,7 +18,7 @@ def __closure__():
         import_path = READER_ALIASES[import_path] if import_path in READER_ALIASES else import_path            
 
         # if '.' not in import_path:
-        #     import_path = f'fluvius.mapper.reader.impl.{import_path}'
+        #     import_path = f'fluvius.dmap.reader.impl.{import_path}'
 
         if reader_key not in READER_REGISTRY:
             module = importlib.import_module(import_path)

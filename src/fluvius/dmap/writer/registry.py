@@ -2,10 +2,10 @@ import importlib
 from . import logger
 
 WRITER_ALIASES = {
-    'xlsx': 'fluvius.mapper.vendor.writer_excel',
-    'csv': 'fluvius.mapper.vendor.writer_csv',
-    'pickle': 'fluvius.mapper.vendor.writer_pickle',
-    'sql': 'fluvius.mapper.vendor.writer_sql',
+    'xlsx': 'fluvius.dmap.vendor.writer_excel',
+    'csv': 'fluvius.dmap.vendor.writer_csv',
+    'pickle': 'fluvius.dmap.vendor.writer_pickle',
+    'sql': 'fluvius.dmap.vendor.writer_sql',
 }
 
 

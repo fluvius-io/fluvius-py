@@ -11,6 +11,7 @@ UUID5_NAMESPACE = 'f853f38d-83f8-4ef4-9e1b-12b9e27bc1ad'
 DB_DSN = "sqlite+aiosqlite:////tmp/fluvius_pyiac.sqlite"
 DB_POOL_SIZE = 10
 DB_POOL_TIMEOUT = 10
+DB_MAX_OVERFLOW = 20
 
 SCHEMA_BASE = "fluvius--base"
 SQLALCHEMY_DIALECT = 'sqlite'  # sqlite | postgresql

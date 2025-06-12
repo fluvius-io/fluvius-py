@@ -1,9 +1,9 @@
 import os
 from time import perf_counter
 
-from fluvius.mapper import config
-from fluvius.mapper.interface import InputFile, ReaderConfig, InputResourceKind, ReaderError, ReaderFinished, ResourceMeta
-from fluvius.mapper.processor.transform import process_tfspec
+from fluvius.dmap import config
+from fluvius.dmap.interface import InputFile, ReaderConfig, InputResourceKind, ReaderError, ReaderFinished, ResourceMeta
+from fluvius.dmap.processor.transform import process_tfspec
 
 
 from .. import logger

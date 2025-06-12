@@ -8,6 +8,7 @@ from types import MethodType
 from fastapi import Request, Path, Body, Query
 from fluvius.query import QueryParams, FrontendQuery, QueryResourceMeta, QueryManager
 from fluvius.helper import load_class
+from fluvius.error import ForbiddenError, BadRequestError
 
 from . import logger, config
 from .auth import auth_required
@@ -21,17 +22,19 @@ def register_resource_endpoints(app, query_manager, query_resource):
     api_docs = query_resource.Meta.desc or query_manager.Meta.desc
     scope_schema = (query_resource.Meta.scope_required or query_resource.Meta.scope_optional)
 
-    async def resource_query(auth_ctx, query_params: QueryParams, path_query: str=None, scope: str=None):
-        query = query_params.query
+    async def resource_query(request: Request, query_params: QueryParams, path_query: str=None, scope: str=None):
+        auth_ctx = getattr(request.state, 'auth_context', None)
+        query = query_params.query if query_params.query else None
+
         if isinstance(query, str):
             query = json.loads(query)
 
         if path_query:
             params = jurl_data(path_query)
             if not query:
-                query = params
+                query = pa
             else:
-                query = {":and": [query, params]}
+                query = {".and": [query, pa]}
 
         if scope_schema:
             scope = parse_scope(scope, scope_schema)
@@ -40,16 +43,16 @@ def register_resource_endpoints(app, query_manager, query_resource):
         elif scope:
             raise BadRequestError('Q01-00383', f'Scoping is not allowed for resource: {query_resource}')
 
-        fe_query = FrontendQuery.from_query_params(query_params, scope=scope, query=query)
+        query_params = FrontendQuery.from_query_params(query_params, scope=scope, query=query)
 
-        data, meta = await query_manager.query_resource(query_id, fe_query, auth_ctx=auth_ctx)
+        data, meta = await query_manager.query_resource(query_id, query_params, auth_ctx=auth_ctx)
         return {
             'data': data,
             'meta': meta
         }
 
-    async def item_query(auth_ctx, item_identifier, scope: str=None):
-        fe_query = FrontendQuery.create(scope=scope)
+    async def item_query(request: Request, item_identifier, scope: str=None):
+        auth_ctx = getattr(request.state, 'auth_context', None)
         if scope_schema:
             scope = parse_scope(scope, scope_schema)
             if query_resource.Meta.scope_required and not scope:
@@ -57,6 +60,7 @@ def register_resource_endpoints(app, query_manager, query_resource):
         elif scope:
             raise BadRequestError('Q01-00383', f'Scoping is not allowed for resource: {query_resource}')
 
+        fe_query = FrontendQuery.create(scope=scope)
         return await query_manager.query_item(query_id, item_identifier, fe_query, auth_ctx=auth_ctx)
 
     def endpoint(*paths, method=app.get, base=base_uri, auth={}, **kwargs):
@@ -79,29 +83,25 @@ def register_resource_endpoints(app, query_manager, query_resource):
                 summary=query_resource.Meta.name,
                 description=query_resource.Meta.desc)  # "" for trailing slash
             async def query_resource_scoped(request: Request, path_query: Annotated[str, Path()], scope: str):
-                ctx = getattr(request.state, 'auth_context', None)
-                return await resource_query(ctx, None, path_query, scope)
+                return await resource_query(request, None, path_query, scope)
 
             @endpoint(SCOPE_SELECTOR, "",
                 summary=query_resource.Meta.name,
                 description=query_resource.Meta.desc)  # "" for trailing slash
             async def query_resource_scoped_json(request: Request, query_params: Annotated[QueryParams, Query()], scope: str):
-                ctx = getattr(request.state, 'auth_context', None)
-                return await resource_query(ctx, query_params, None, scope)
+                return await resource_query(request, query_params, None, scope)
 
         @endpoint(PATH_QUERY_SELECTOR, "",
                 summary=query_resource.Meta.name,
                 description=query_resource.Meta.desc)
         async def query_resource_json(request: Request, path_query: Annotated[str, Path()], query_params: Annotated[QueryParams, Query()]):
-            ctx = getattr(request.state, 'auth_context', None)
-            return await resource_query(ctx, None, path_query, None)
+            return await resource_query(request, None, path_query, None)
 
         @endpoint("",
                 summary=query_resource.Meta.name,
                 description=query_resource.Meta.desc) # Trailing slash
         async def query_resource_default(request: Request, query_params: Annotated[QueryParams, Query()]):
-            ctx = getattr(request.state, 'auth_context', None)
-            return await resource_query(ctx, query_params, None, None)
+            return await resource_query(request, query_params, None, None)
 
     if query_resource.Meta.allow_meta_view:
         @endpoint(base=f"/_meta{base_uri}", summary=f"Query Metadata [{query_resource.Meta.name}]", tags=["Metadata"])
@@ -113,16 +113,14 @@ def register_resource_endpoints(app, query_manager, query_resource):
                 summary=f"{query_resource.Meta.name} (Item)",
                 description=query_resource.Meta.desc)
         async def query_item_default(request: Request, identifier: Annotated[str, Path()]):
-            ctx = getattr(request.state, 'auth_context', None)
-            return await item_query(ctx, identifier, scope=scope)
+            return await item_query(request, identifier)
 
         if scope_schema:
             @endpoint(SCOPE_SELECTOR, "{identifier}",
                 summary=f"{query_resource.Meta.name} (Item)",
                 description=query_resource.Meta.desc)
             async def query_item_scoped(request: Request, identifier: Annotated[str, Path()], scope: str):
-                ctx = getattr(request.state, 'auth_context', None)
-                return await item_query(ctx, identifier, scope=scope)
+                return await item_query(request, identifier, scope=scope)
 
 
 def regsitery_manager_endpoints(app, query_manager):

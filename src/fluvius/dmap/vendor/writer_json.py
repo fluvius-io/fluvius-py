@@ -1,6 +1,6 @@
 import json
-from fluvius.mapper.writer import config, logger
-from fluvius.mapper.writer import register_writer, FileWriter
+from fluvius.dmap.writer import config, logger
+from fluvius.dmap.writer import register_writer, FileWriter
 
 DEBUG_WRITER = config.DEBUG_WRITER
 

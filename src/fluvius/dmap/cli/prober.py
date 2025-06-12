@@ -1,8 +1,8 @@
 import click
 
-from fluvius.mapper import logger, cli
-from fluvius.mapper.reader import init_reader
-from fluvius.mapper.prober import DatamapProber
+from fluvius.dmap import logger, cli
+from fluvius.dmap.reader import init_reader
+from fluvius.dmap.prober import DatamapProber
 from fluvius.datapack import FileResource
 
 FILE_PATH = click.Path(exists=True, dir_okay=False)

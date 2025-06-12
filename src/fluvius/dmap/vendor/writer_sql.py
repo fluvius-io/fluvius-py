@@ -3,10 +3,10 @@
 from pyrsistent import PClass, field
 from sqlalchemy import types
 from sqlalchemy.dialects.postgresql import UUID
-from fluvius_connector.sqlalchemy import PostgresConnectionManager
-from fluvius.mapper import logger, config
-from fluvius.mapper.writer import register_writer, Writer
-from fluvius.mapper.interface import WriterConfig
+from fluvius.data.data_driver.sqla.sync import SyncSqlDriver
+from fluvius.dmap import logger, config
+from fluvius.dmap.writer import register_writer, Writer
+from fluvius.dmap.interface import WriterConfig
 
 DEBUG_WRITER = config.DEBUG_WRITER
 
@@ -95,7 +95,7 @@ class SQLWriter(Writer):
             logger.warning('Empty data profile: [%s]', table_name)
             return
 
-        with PostgresConnectionManager.connection(self.uri) as conn:
+        with SyncSqlDriver.connection(self.uri) as conn:
             df.to_sql(
                 table_name,
                 conn,

@@ -1,3 +1,4 @@
+import json
 from fluvius.data import DataModel, Field
 from typing import Optional, List, Dict, Any, Tuple, Union
 from fluvius.data.query import OperatorStatement

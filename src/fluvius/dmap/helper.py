@@ -5,7 +5,7 @@ import threading
 import traceback
 
 from fluvius.helper import load_yaml
-from fluvius.mapper.interface import DataProcessConfig
+from fluvius.dmap.interface import DataProcessConfig
 
 from . import logger
 
