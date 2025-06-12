@@ -108,7 +108,7 @@ class QueryManager(object):
         query_resource = self.lookup_query_resource(query_identifier)
 
         fe_query = self.validate_fe_query(query_resource, fe_query)
-        be_query = self.construct_backend_query(query_resource, fe_query, auth_ctx)
+        be_query = self.construct_backend_query(query_resource, fe_query, auth_ctx=auth_ctx)
         data, meta = await self.execute_query(query_resource, be_query, meta={}, auth_ctx=auth_ctx)
 
         return self.process_result(data, meta)
@@ -131,7 +131,7 @@ class QueryManager(object):
         handler = MethodType(func, self)
         return handler(**kwargs)
 
-    def construct_backend_query(self, query_resource: str, fe_query, identifier=None, auth_ctx: Optional[AuthorizationContext]=None):
+    def construct_backend_query(self, query_resource: str, fe_query, identifier=None, /, auth_ctx: Optional[AuthorizationContext]=None):
         """ Convert from the frontend query to the backend query """
         scope   = query_resource.base_query(auth_ctx, fe_query.scope)
         query   = query_resource.generate_query_statement(fe_query.user_query, fe_query.path_query)
@@ -155,6 +155,7 @@ class QueryManager(object):
         self,
         query_resource: str,
         backend_query: BackendQuery,
+        /,
         meta: Optional[Dict] = None,
         auth_ctx: Optional[AuthorizationContext]=None):
         """ Execute the backend query with the state manager and return """
@@ -186,6 +187,7 @@ class DomainQueryManager(QueryManager):
         self,
         query_resource: str,
         backend_query: BackendQuery,
+        /,
         meta: Optional[Dict] = None,
         auth_ctx: Optional[AuthorizationContext]=None):
         """ Execute the backend query with the state manager and return """

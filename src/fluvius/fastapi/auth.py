@@ -72,6 +72,10 @@ def is_safe_redirect_url(url: str) -> bool:
 
         # Case 2: Absolute URL with whitelisted domain
         domain = parsed.hostname
+
+        if '*' in SAFE_REDIRECT_DOMAINS:
+            return True
+
         if domain and domain.lower() in SAFE_REDIRECT_DOMAINS:
             return True
 
@@ -294,7 +298,8 @@ def configure_authentication(app, config=config, base_path="/auth"):
     @api("login")
     async def login(request: Request):
         request.session["next"] = request.query_params.get('next')
-        return await oauth.keycloak.authorize_redirect(request, config.DEFAULT_CALLBACK_URI)
+        callback_uri = validate_direct_url(request.query_params.get('callback'), config.DEFAULT_CALLBACK_URI)
+        return await oauth.keycloak.authorize_redirect(request, callback_uri)
 
     @api("callback")
     async def oauth_callback(request: Request):

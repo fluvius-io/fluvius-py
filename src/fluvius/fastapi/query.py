@@ -22,12 +22,12 @@ def register_resource_endpoints(app, query_manager, query_resource):
     scope_schema = (query_resource.Meta.scope_required or query_resource.Meta.scope_optional)
 
     async def resource_query(auth_ctx, query_params: QueryParams, path_query: str=None, scope: str=None):
-        query = fe_query and fe_query.query
+        query = query_params.query
         if isinstance(query, str):
             query = json.loads(query)
 
         if path_query:
-            pa = jurl_data(path_query)
+            params = jurl_data(path_query)
             if not query:
                 query = params
             else:
@@ -40,16 +40,16 @@ def register_resource_endpoints(app, query_manager, query_resource):
         elif scope:
             raise BadRequestError('Q01-00383', f'Scoping is not allowed for resource: {query_resource}')
 
-        query_params = FrontendQuery.from_query_params(params, scope=scope, query=query)
+        fe_query = FrontendQuery.from_query_params(query_params, scope=scope, query=query)
 
-        data, meta = await query_manager.query_resource(auth_ctx, query_id, query_params)
+        data, meta = await query_manager.query_resource(query_id, fe_query, auth_ctx=auth_ctx)
         return {
             'data': data,
             'meta': meta
         }
 
     async def item_query(auth_ctx, item_identifier, scope: str=None):
-        query_params = QueryParams.create(scope=scope)
+        fe_query = FrontendQuery.create(scope=scope)
         if scope_schema:
             scope = parse_scope(scope, scope_schema)
             if query_resource.Meta.scope_required and not scope:
@@ -57,7 +57,7 @@ def register_resource_endpoints(app, query_manager, query_resource):
         elif scope:
             raise BadRequestError('Q01-00383', f'Scoping is not allowed for resource: {query_resource}')
 
-        return await query_manager.query_item(auth_ctx, query_id, item_identifier, query_params)
+        return await query_manager.query_item(query_id, item_identifier, fe_query, auth_ctx=auth_ctx)
 
     def endpoint(*paths, method=app.get, base=base_uri, auth={}, **kwargs):
         api_path = uri(base, *paths)
