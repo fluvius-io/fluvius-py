@@ -161,7 +161,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
         return self._dsn
 
     async def disconnect(self):
-        async_session = cls._async_session
+        async_session = self._async_session
         if async_session.connected:
             await async_session.dispose()
 

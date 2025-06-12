@@ -164,8 +164,8 @@ class DataAccessManagerBase(object):
         self.connector.connect(*args, **kwargs)
         return self
 
-    def disconnect(self):
-        self.connector.disconnect()
+    async def disconnect(self):
+        await self.connector.disconnect()
         return self
 
     @asynccontextmanager
