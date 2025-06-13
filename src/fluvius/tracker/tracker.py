@@ -40,7 +40,7 @@ class SQLTrackerManager(DataAccessManagerBase):
         super().__init_subclass__()
 
     async def add_entry(self, model_name, **data):
-        data['_id'] = UUID_GENR()
+        data['_id'] = data.get('_id', UUID_GENR())
         await self.connector.insert(model_name, data)
 
         model_cls = self.lookup_model(model_name)

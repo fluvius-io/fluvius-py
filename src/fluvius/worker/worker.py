@@ -17,6 +17,7 @@ from arq.worker import func as arq_func
 
 from fluvius.helper import assert_, camel_to_lower_underscore, when
 from fluvius.helper.timeutil import timestamp
+from fluvius.data import UUID_GENR
 from fluvius.tracker import config as tracker_config
 from fluvius.domain.context import DomainTransport
 from . import config, event, logger
@@ -148,7 +149,7 @@ class FluviusWorker(arq.Worker):
         self._last_heart_beat = time() - WORKER_HEART_BEAT_INTERVAL_SECONDS
         self._downstream_clients = dict(self._init_clients())
 
-        ctx = {"queue_name": self.__queue_name__, **self._downstream_clients}
+        ctx = {"queue_name": self.__queue_name__, **self._downstream_clients, "worker_id": UUID_GENR()}
 
         super().__init__(ctx=ctx, **self.build_settings(**kwargs))
 
@@ -374,6 +375,7 @@ class FluviusWorker(arq.Worker):
         # self._tracker.connect()
         self._handle = await self._tracker.add_entry(
             tracker_config.ARQ_WORKER_TABLE,
+            _id=ctx["worker_id"],
             hostname=socket.gethostname(),
             start_time=timestamp(),
             queue_name=self.__queue_name__,
