@@ -351,12 +351,10 @@ class DataAccessManager(DataAccessManagerBase):
         return await self.connector.upsert(model_name, [values])
     
     async def insert_many(self, model_name: str, *records: list[dict]):
-        data = [self._serialize(model_name, rec) for rec in records]
-        return await self.connector.insert(model_name, data)
+        return await self.connector.insert(model_name, records)
 
     async def upsert_many(self, model_name: str, *records: list[dict]):
-        data = [self._serialize(model_name, rec) for rec in records]
-        return await self.connector.upsert(model_name, data)
+        return await self.connector.upsert(model_name, records)
 
     async def invalidate_one(self, model_name: str, identifier: UUID_TYPE, etag=None, /, **updates):
         q = BackendQuery.create(identifier=identifier, etag=etag)

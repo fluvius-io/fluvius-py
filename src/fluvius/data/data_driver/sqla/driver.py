@@ -162,8 +162,8 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
     async def disconnect(self):
         async_session = self._async_session
-        if async_session.connected:
-            await async_session.dispose()
+        # if async_session.connected:
+        await async_session.dispose()
 
     @classmethod
     def validate_data_schema(cls, schema_model):
