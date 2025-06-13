@@ -371,7 +371,7 @@ class FluviusWorker(arq.Worker):
         if not self._tracker:
             return
 
-        self._tracker.connect()
+        # self._tracker.connect()
         self._handle = await self._tracker.add_entry(
             tracker_config.ARQ_WORKER_TABLE,
             hostname=socket.gethostname(),
