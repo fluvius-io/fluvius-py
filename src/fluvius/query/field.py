@@ -205,3 +205,9 @@ class BooleanField(QueryField):
 
 class FloatField(IntegerField):
     _dtype = "decimal"
+
+class JSONField(QueryField):
+    _dtype = "json"
+    _ops = [
+        ("is", "Is", None, "single-select"),
+    ]

@@ -92,11 +92,9 @@ class QueryResource(object):
         meta = self.Meta
 
         def parse_default_order():
-            default_order = meta.default_order
             if meta.default_order:
                 return meta.default_order
 
-            _id = self.id_field
             return ["_id.asc"]
 
         def parse_soft_delete():
