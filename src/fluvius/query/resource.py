@@ -7,11 +7,9 @@ from fluvius.data import DataModel, BlankModel
 from fluvius.helper import assert_
 from fluvius.data.query import operator_statement, OperatorStatement, QueryStatement, process_query_statement
 from fluvius.constant import DEFAULT_DELETED_FIELD, QUERY_OPERATOR_SEP, OPERATOR_SEP_NEGATE, RX_PARAM_SPLIT
+from pydantic import BaseModel, Field
 
-from .field import QueryField
-from .model import FrontendQuery
-
-from . import operator, logger, config
+from . import logger, config
 
 DEVELOPER_MODE = config.DEVELOPER_MODE
 
