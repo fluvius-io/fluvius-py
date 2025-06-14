@@ -22,9 +22,8 @@ def widget_spec(spec):
 class QueryField(DataModel):
     label: str
     sortable: bool = True
-    hidden: bool = Field(exclude=True, default=False)
+    hidden: bool = False
     identifier: bool = False
-    factory: Optional[Callable] = Field(exclude=True, default=None)
     source: Optional[str] = None
 
     _dtype: str = "string"
@@ -208,6 +207,11 @@ class UUIDField(QueryField):
         ("eq", "Equal", None, "select"),
         ("is", "Is", None, "text"),
     ]
+
+
+class PrimaryID(QueryField):
+    hidden: bool = True
+    identifier: bool = True
 
 
 class ArrayField(QueryField):

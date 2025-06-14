@@ -142,8 +142,8 @@ class QueryResource(object):
 
     def specs(self):
         return {
-            'fields': {f._key: f for f in self.query_fields},
-            'operators': {f"{fn}:{op}": p for (fn, op), p in self.query_params.items()},
+            'fields': {f.key: f for f in self.query_fields},
+            'operators': {QUERY_OPERATOR_SEP.join((fn, op)): pa for (fn, op), pa in self.query_params.items()},
             'sortables': self.sortable_fields,
             'default_order': self.default_order
         }
