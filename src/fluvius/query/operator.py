@@ -9,7 +9,7 @@ OPERATOR_REGISTRY = {}
 
 
 class OperatorWidget(DataModel):
-    name: str
+    type: str
     desc: Optional[str] = None
     inversible: bool = True
     data_query: Optional[str] = None
@@ -19,11 +19,19 @@ class QueryOperator(DataModel):
     index: int = 0
     field_name: str = ''
     operator: str
+    label: str
+    dtype: str = 'string'
     widget: Optional[OperatorWidget] = None
     composite: bool = False
 
-    def __init__(self, query_resource, operator, field_name: str='', widget=None):
-        super().__init__(index=query_resource.next_index(), field_name=field_name, widget=widget, operator=operator)
+    def __init__(self, query_resource, operator, label='', factory=None, field_name: str='', widget=None):
+        super().__init__(
+            index=query_resource.next_index(),
+            label=label,
+            field_name=field_name,
+            widget=widget,
+            operator=operator,
+            factory=factory)
         self._selector = (field_name, operator)
         query_resource.register_operator(self)
 
@@ -60,12 +68,12 @@ class AndOperator(UnaryQueryOperator):
     '''AND operator'''
 
     def __init__(self, query_resource):
-        super().__init__(query_resource, operator='and', widget=dict(label="AND", name="AND"))
+        super().__init__(query_resource, operator='and', widget=dict(label="AND", type="AND"))
 
 class OrOperator(UnaryQueryOperator):
     '''OR operator'''
     def __init__(self, query_resource):
-        super().__init__(query_resource, operator='or', widget=dict(label="OR", name="OR"))
+        super().__init__(query_resource, operator='or', widget=dict(label="OR", type="OR"))
 
 
 def parse_list_stmt(stmt):

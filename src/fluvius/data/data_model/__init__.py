@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 from typing import Any
-from pydantic import BaseModel, Field, PrivateAttr
+from pydantic import BaseModel, Field, PrivateAttr, ConfigDict
 
 
 def _create(cls, data=None, defaults=None, **kwargs):
@@ -35,18 +35,16 @@ class DataModel(BaseModel):
     - `create` method to construct a new instance from multiple sources
     """
 
-    model_config = {"frozen": True}
+    model_config = ConfigDict(
+        frozen=True,
+        exclude_none=True,
+        by_alias=True
+    )
+
     create = classmethod(_create)
 
     def set(self, **kwargs):
         return self.model_copy(update=kwargs)
-
-    def model_dump(
-        self,
-        by_alias: bool = True,
-        **kwargs: Any,
-    ) -> dict[str, Any]:
-        return super().model_dump(by_alias=by_alias, **kwargs)
 
 
 class BlankModel(SimpleNamespace):
