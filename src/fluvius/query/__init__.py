@@ -4,8 +4,9 @@ See: https://github.com/dialoguemd/fastapi-sqla/
 '''
 
 from ._meta import config, logger
+from .base import Field, QueryResource, QueryResourceMeta, endpoint
 from .model import QueryParams, FrontendQuery
-from .resource import QueryResource, QueryResourceMeta, endpoint
+# from .resource import
 from .manager import QueryManager, DomainQueryManager
 from .loader import (
     load_query_resources_from_file,
@@ -23,6 +24,7 @@ __all__ = (
     "QueryResource",
     "QueryResourceMeta",
     "QueryResourceSpec",
+    "Field",
     "config",
     "endpoint",
     "load_query_resources_from_file",

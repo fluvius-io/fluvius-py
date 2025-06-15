@@ -5,7 +5,7 @@ from fluvius.error import BadRequestError
 from fluvius.data import logger
 from fluvius.data.query import (
     process_query_statement, 
-    QueryElement, 
+    QueryExpression,
     QueryStatement, 
     OperatorStatement, 
     operator_statement
@@ -35,7 +35,7 @@ def test_process_query_statement_single_dict():
     assert len(result) == 1
     
     element = result[0]
-    assert isinstance(element, QueryElement)
+    assert isinstance(element, QueryExpression)
     assert element.field_name == 'name'
     assert element.mode == '.'
     assert element.operator == 'eq'
@@ -100,7 +100,7 @@ def test_process_query_statement_with_nested_list():
         [{'age.gt': 25}, {'status': 'active'}]
     ])
     assert len(result) == 3
-    assert all(isinstance(x, QueryElement) for x in result)
+    assert all(isinstance(x, QueryExpression) for x in result)
     
     # Check all elements are properly extracted
     fields = [elem.field_name for elem in result]
@@ -110,8 +110,8 @@ def test_process_query_statement_with_nested_list():
 
 
 def test_process_query_statement_with_query_element():
-    """Test process_query_statement with existing QueryElement"""
-    existing_element = QueryElement('name', '.', 'eq', False, 'John')
+    """Test process_query_statement with existing QueryExpression"""
+    existing_element = QueryExpression('name', '.', 'eq', False, 'John')
     result = process_query_statement(existing_element, {'age': 25})
     assert len(result) == 2
     
@@ -208,7 +208,7 @@ def test_process_query_statement_complex_nested():
     result = process_query_statement(complex_query)
     assert len(result) == 5
     assert isinstance(result, QueryStatement)
-    assert all(isinstance(x, QueryElement) for x in result)
+    assert all(isinstance(x, QueryExpression) for x in result)
     
     # Verify all fields are present
     fields = [elem.field_name for elem in result]

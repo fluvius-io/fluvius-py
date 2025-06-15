@@ -47,6 +47,10 @@ class DataModel(BaseModel):
         return self.model_copy(update=kwargs)
 
 
+    def serialize(self, **kwargs):
+        return self.model_dump(**kwargs)
+
+
 class BlankModel(SimpleNamespace):
     create = classmethod(_create)
 

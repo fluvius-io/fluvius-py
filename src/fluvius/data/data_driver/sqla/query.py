@@ -25,7 +25,7 @@ from sqlalchemy import select, update, delete, insert
 from sqlalchemy import and_, or_, not_
 from sqlalchemy.sql.operators import contains_op, custom_op, ilike_op, in_op, eq, ge, gt, le, lt, ne
 
-from fluvius.data.query import BackendQuery, QueryStatement, QueryElement
+from fluvius.data.query import BackendQuery, QueryStatement, QueryExpression
 from fluvius.data import logger, config
 from fluvius.error import BadRequestError
 from fluvius.constant import QUERY_OPERATOR_SEP, OPERATOR_SEP_NEGATE, DEFAULT_DELETED_FIELD
@@ -75,8 +75,8 @@ FIELD_OPERATOR = {
     }
 }
 
-def _iter_statement(statement):
-    if isinstance(statement, QueryElement):
+def _iter_expression(statement):
+    if isinstance(statement, QueryExpression):
         yield statement
         return
 
@@ -86,7 +86,7 @@ def _iter_statement(statement):
 
     if isinstance(statement, (list, tuple)):
         for q in statement:
-            yield from _iter_statement(q)
+            yield from _iter_expression(q)
         return
 
     raise ValueError('Invalid statement [%s]' % statement)
@@ -114,13 +114,13 @@ class QueryBuilder(object):
         db_mapping = db_mapping or {}
 
         def _gen_query(q):
-            for stmt in _iter_statement(q):
-                if stmt.composite:
+            for stmt in _iter_expression(q):
+                if not stmt.field:
                     subops = tuple(op for op in _gen_query(stmt.value))
                     yield COMPOSITE_OPERATOR[stmt.mode][stmt.operator](*subops)
                     continue
 
-                db_field = self._field(data_schema, stmt.field_name, db_mapping.get(stmt.field_name))
+                db_field = self._field(data_schema, stmt.field, db_mapping.get(stmt.field))
                 yield FIELD_OPERATOR[stmt.mode][stmt.operator](db_field, stmt.value)
 
         yield from _gen_query(expr)
