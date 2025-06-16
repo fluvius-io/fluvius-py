@@ -190,7 +190,7 @@ class QueryResource(BaseModel):
             if not hidden:
                 select_fields.append(name)
 
-        cls._default_order = None
+        cls._default_order = cls.Meta.default_order or ("id.desc",)
         cls._field_filters = filters
         cls._identifier = identifier
         cls._fields = fields
