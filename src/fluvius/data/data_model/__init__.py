@@ -35,20 +35,18 @@ class DataModel(BaseModel):
     - `create` method to construct a new instance from multiple sources
     """
 
-    model_config = ConfigDict(
-        frozen=True,
-        exclude_none=True,
-        by_alias=True
-    )
+    model_config = ConfigDict(frozen=True)
 
     create = classmethod(_create)
 
     def set(self, **kwargs):
         return self.model_copy(update=kwargs)
 
-
     def serialize(self, **kwargs):
         return self.model_dump(**kwargs)
+
+    def model_dump(self, by_alias=True, exclude_none=True, **kwargs):
+        return super().model_dump(by_alias=by_alias, exclude_none=exclude_none, **kwargs)
 
 
 class BlankModel(SimpleNamespace):

@@ -106,19 +106,21 @@ def register_resource_endpoints(app, query_manager, query_resource):
     if query_resource.Meta.allow_meta_view:
         @endpoint(base=f"/_meta{base_uri}", summary=f"Query Metadata [{query_resource.Meta.name}]", tags=["Metadata"])
         async def query_info(request: Request) -> dict:
-            return query_resource.specs()
+            return query_resource.resource_meta()
 
     if query_resource.Meta.allow_item_view:
         @endpoint("{identifier}",
                 summary=f"{query_resource.Meta.name} (Item)",
-                description=query_resource.Meta.desc)
+                description=query_resource.Meta.desc,
+                response_model=query_resource)
         async def query_item_default(request: Request, identifier: Annotated[str, Path()]):
             return await item_query(request, identifier)
 
         if scope_schema:
             @endpoint(SCOPE_SELECTOR, "{identifier}",
                 summary=f"{query_resource.Meta.name} (Item)",
-                description=query_resource.Meta.desc)
+                description=query_resource.Meta.desc,
+                response_model=query_resource)
             async def query_item_scoped(request: Request, identifier: Annotated[str, Path()], scope: str):
                 return await item_query(request, identifier, scope=scope)
 

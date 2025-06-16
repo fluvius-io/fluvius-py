@@ -93,25 +93,19 @@ def _iter_expression(statement):
 
 
 class QueryBuilder(object):
-    def _field(self, data_schema, field_name, db_source=None):
-        fieldspec = db_source or field_name
-        if FIELD_SEP in fieldspec:
-            resource, _, fieldspec = fieldspec.partition(FIELD_SEP)
+    def _field(self, data_schema, field_name):
+        if FIELD_SEP in field_name:
+            resource, _, field_name = field_name.partition(FIELD_SEP)
             data_schema = self.lookup_data_schema(resource)
 
         try:
-            if db_source is not None:
-                return getattr(data_schema, fieldspec).label(field_name)
-
-            return getattr(data_schema, fieldspec)
+            return getattr(data_schema, field_name)
         except AttributeError:
-            raise BadRequestError("D100-501", f"Type object {data_schema} has no attribute {fieldspec}", None)
+            raise BadRequestError("D100-501", f"Type object {data_schema} has no attribute {field_name}", None)
 
-    def _build_expression(self, data_schema, expr: QueryStatement, db_mapping=None):
+    def _build_expression(self, data_schema, expr: QueryStatement):
         if not isinstance(expr, QueryStatement):
             raise ValueError(f'Invalid query expression: {expr}')
-
-        db_mapping = db_mapping or {}
 
         def _gen_query(q):
             for stmt in _iter_expression(q):
@@ -120,19 +114,18 @@ class QueryBuilder(object):
                     yield COMPOSITE_OPERATOR[stmt.mode][stmt.operator](*subops)
                     continue
 
-                db_field = self._field(data_schema, stmt.field, db_mapping.get(stmt.field))
+                db_field = self._field(data_schema, stmt.field)
                 yield FIELD_OPERATOR[stmt.mode][stmt.operator](db_field, stmt.value)
 
         yield from _gen_query(expr)
 
-    def _sort_clauses(self, data_schema, sort_query, db_mapping=None):
-        db_mapping = db_mapping or {}
+    def _sort_clauses(self, data_schema, sort_query):
         for sort_expr in sort_query:
             field_name, _, sort_type = sort_expr.rpartition(QUERY_OPERATOR_SEP)
             if not field_name:
                 field_name = sort_type
                 sort_type = DEFAULT_SORT_ORDER
-            db_field = self._field(data_schema, field_name, db_mapping.get(field_name))
+            db_field = self._field(data_schema, field_name)
             sort_type = sort_type or DEFAULT_SORT_ORDER
             yield getattr(db_field, sort_type)()
 
@@ -150,7 +143,7 @@ class QueryBuilder(object):
         if not q.sort:
             return stmt
 
-        return stmt.order_by(*self._sort_clauses(data_schema, q.sort, q.mapping))
+        return stmt.order_by(*self._sort_clauses(data_schema, q.sort))
 
     def _build_join(self, data_schema, stmt, q: BackendQuery):
         join = q.join
@@ -169,10 +162,10 @@ class QueryBuilder(object):
             yield (data_schema._primary_key() == q.identifier)  # noqa
 
         if q.scope:
-            yield from self._build_expression(data_schema, q.scope, q.mapping)
+            yield from self._build_expression(data_schema, q.scope)
 
         if q.where:
-            yield from self._build_expression(data_schema, q.where, q.mapping)
+            yield from self._build_expression(data_schema, q.where)
 
         if hasattr(data_schema, FIELD_DEL):
             if not q.incl_deleted:
@@ -212,11 +205,10 @@ class QueryBuilder(object):
 
     def build_select(self, data_schema, query: BackendQuery):
         def _gen_select(q):
-            db_mapping = q.mapping or {}
             if not q.select:
                 return data_schema.__table__.columns
 
-            return tuple(self._field(data_schema, k, db_mapping.get(k)) for k in q.select)
+            return tuple(self._field(data_schema, k) for k in q.select)
 
         fields = _gen_select(query)
         sql = select(*fields)

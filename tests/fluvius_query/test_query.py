@@ -112,9 +112,10 @@ class SampleQueryManager(DomainQueryManager):
 
 resource = SampleQueryManager.register_resource
 
+
 @resource('company-query')
 class CompanyQuery(QueryResource):
-    business_name: str = Field(title="Test Field", identifier=True, preset="string")
+    business_name: str = Field("Business Name", identifier=True, preset="string")
 
     class Meta:
         backend_model = 'company'
@@ -122,7 +123,7 @@ class CompanyQuery(QueryResource):
 
 @ObjectDomainQueryManager.register_resource('economist')
 class EconomistQuery(QueryResource):
-    job: str = Field(title="Job match", identifier=True, preset="string")
+    job: str = Field("Job match", identifier=True, preset="string")
 
     class Meta:
         backend_model = 'people-economist'

@@ -48,9 +48,9 @@ def process_query_statement(statements, expr_schema=None, allowed_composites=('a
 
                     # First process the value using the operator's processors
                     if op_stmt.field and expr_schema:
-                        param_key = QUERY_OPERATOR_SEP.join((op_stmt.field, op_stmt.operator))
-                        param_spec = expr_schema[param_key]
-                        value = param_spec.validator(value) if param_spec.validator else value
+                        param_spec = expr_schema[op_stmt.field, op_stmt.operator]
+                        yield param_spec.expression(op_stmt.mode, value)
+                        continue
 
                     # For composite operators, its value is a list of statements
                     if not op_stmt.field: # composite operators
@@ -127,19 +127,9 @@ class BackendQuery(PClass):
     sort    = field(tuple, factory=validate_list, initial=tuple)
     where   = field(QueryStatement, initial=QueryStatement(), factory=validate_query)  # A tuple can hold duplicated keys if needed
     scope   = field(QueryStatement, initial=QueryStatement(), factory=validate_query)
-    mapping = field(dict, initial=dict)
 
     # Default don't query the deleted item.
     incl_deleted = field(bool, initial=False)
-
-    def field_map(self, field_name):
-        if not self.mapping:
-            return field_name
-
-        if field_name in self.mapping:
-            return self.mapping[field_name]
-
-        return field_name
 
     @classmethod
     def create(cls, query_data=None, **kwargs):

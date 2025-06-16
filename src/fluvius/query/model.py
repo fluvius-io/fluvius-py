@@ -4,6 +4,7 @@ from typing import Optional, List, Dict, Any, Tuple, Union
 from fluvius.data.query import OperatorStatement
 from fluvius.error import BadRequestError
 from . import config
+from fluvius.constant import DEFAULT_DELETED_FIELD
 
 
 def parse_list(value: Optional[str]) -> Optional[List[str]]:
@@ -52,3 +53,27 @@ class FrontendQuery(DataModel):
             user_query=parse_json(qp.query),
             **kwargs
         )
+
+
+class QueryResourceMeta(DataModel):
+    name: str
+    desc: Optional[str] = None
+    tags: Optional[List] = None
+
+    backend_model: Optional[str] = None
+
+    allow_item_view: bool = True
+    allow_list_view: bool = True
+    allow_meta_view: bool = True
+    auth_required: bool = True
+
+    scope_required: Optional[Dict] = None
+    scope_optional: Optional[Dict] = None
+
+    soft_delete_query: Optional[str] = DEFAULT_DELETED_FIELD
+
+    ignored_params: List = tuple()
+    default_order: List = tuple()
+    select_all: bool = False
+
+    policy_required: bool = False

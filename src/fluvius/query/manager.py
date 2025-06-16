@@ -193,7 +193,6 @@ class QueryManager(object):
             select=select,
             sort=fe_query.sort,
             where=query,
-            mapping=query_resource._query_mapping
         )
         return self.validate_backend_query(query_resource, backend_query)
 

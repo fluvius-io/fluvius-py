@@ -5,16 +5,16 @@
 
 from collections import namedtuple
 from fluvius.constant import QUERY_OPERATOR_SEP, OPERATOR_SEP_NEGATE, RX_PARAM_SPLIT, DEFAULT_OPERATOR, DEFAULT_DELETED_FIELD
-from fluvius.data import DataModel, BlankModel
-from fluvius.data.query import process_query_statement
+from fluvius.data.query import process_query_statement, QueryExpression
 from fluvius.error import BadRequestError
 from fluvius.helper import assert_
 from pprint import pprint
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, field_validator, Field as PydanticField
 from types import SimpleNamespace
 from typing import Optional, List, Dict, Any, Tuple, Callable
-import json
-import re
+
+from .field import QueryField
+from .model import QueryResourceMeta
 
 from . import logger, config
 
@@ -29,30 +29,6 @@ def endpoint(url):
     return decorator
 
 
-class QueryResourceMeta(DataModel):
-    name: str
-    desc: Optional[str] = None
-    tags: Optional[List] = None
-
-    backend_model: Optional[str] = None
-
-    allow_item_view: bool = True
-    allow_list_view: bool = True
-    allow_meta_view: bool = True
-    auth_required: bool = True
-
-    scope_required: Optional[Dict] = None
-    scope_optional: Optional[Dict] = None
-
-    soft_delete_query: Optional[str] = DEFAULT_DELETED_FIELD
-
-    ignored_params: List = tuple()
-    default_order: List = tuple()
-    select_all: bool = False
-
-    policy_required: bool = False
-
-
 class FilterPreset(object):
     REGISTRY = {}
     DEFAULTS = {}
@@ -64,15 +40,17 @@ class FilterPreset(object):
         has_default: str = None
         for attr in dir(cls):
             flt = getattr(cls, attr)
+            operator = attr[:-1] if attr.endswith('_') else attr
+
             if not (flt and isinstance(flt, Filter)):
                 continue
 
             if flt.default:
                 if has_default:
-                    raise ValueError(f'Multiple default filters for preset [{cls}] {has_default} & {attr}')
-                has_default = attr
+                    raise ValueError(f'Multiple default filters for preset [{cls}] {has_default} & {operator}')
+                has_default = operator
 
-            filters[attr] = flt
+            filters[operator] = flt
 
         if not has_default:
             raise ValueError(f'No default filter is set for preset [{cls}]')
@@ -97,9 +75,10 @@ class FilterPreset(object):
 
     @classmethod
     def generate(cls, field, field_name, preset_name):
-        for opr, flt in FilterPreset.get(preset_name).items():
-            qfield = field.alias or field_name
-            yield f"{qfield}.{opr}", flt.associate(field_name)
+        for opr, ftmpl in FilterPreset.get(preset_name).items():
+            db_field = field.alias or field_name
+            db_op    = ftmpl.operator or opr
+            yield (field_name, opr), ftmpl.associate(field_name, (db_field, db_op))
 
 
 class Filter(BaseModel):
@@ -111,8 +90,12 @@ class Filter(BaseModel):
     label: str
     dtype: str
     input: dict
-    default: bool = False
-    validator: Optional[Callable] = Field(exclude=True, default=None)
+
+    # Backend-only fields, hidden from exports
+    default: bool = PydanticField(exclude=True, default=False)
+    selector: Optional[Tuple] = PydanticField(exclude=True, default=None)   # Associated field,
+    operator: Optional[str] = PydanticField(exclude=True, default=None)
+    validator: Optional[Callable] = PydanticField(exclude=True, default=None)
 
     @classmethod
     def process_input(cls, value: str | dict) -> dict:
@@ -126,34 +109,41 @@ class Filter(BaseModel):
         raise ValueError(f'Invalid input widget: {value}')
 
 
-    def __init__(self, label, dtype="string", field=None, input="text", **kwargs):
-        assert field is None, "Field association is not allowed for filter definition."
+    def __init__(self, label, dtype="string", field=None, selector=None, input="text", **kwargs):
+        assert field is None and selector is None, "Field association is not allowed for filter definition."
         super().__init__(label=label, dtype=dtype, input=Filter.process_input(input), **kwargs)
 
-    def associate(self, field):
-        return self.model_copy(update=dict(field=field))
+    def associate(self, field, selector):
+        return self.model_copy(update=dict(field=field, selector=selector))
 
-
-class CompositeFilter(BaseModel):
-    """
-    Composite filter defintion.
-    Composite filters' input are always a list other filters, thus no need to input specification.
-    """
-    operator: str
-    label: str
+    def expression(self, mode: str, value: Any) -> QueryExpression:
+        return QueryExpression(*self.selector, mode, value)
 
 
 class UUIDFilterPreset(FilterPreset, name="uuid"):
-    eq = Filter("Equal", "uuid", default=True)
+    eq = Filter("Equals", "uuid", default=True)
+    in_ = Filter("In List", "uuid")
+
 
 class StringFilterPreset(FilterPreset, name="string"):
-    eq = Filter("Equal", "string", default=True)
-    ne = Filter("Not Equal", "string")
+    eq = Filter("Equals", "string", default=True)
+    ne = Filter("Not Equals", "string")
     ilike = Filter("Contains", "string")
 
 class IntegerFilterPreset(FilterPreset, name="integer"):
-    eq = Filter("Equal", dtype="integer", input="number", default=True)
-    ilike = Filter("Contains", dtype="integer", input="number")
+    eq = Filter("Equals", dtype="integer", input="integer", default=True)
+    gt = Filter("Greater than", dtype="integer", input="integer")
+    lt = Filter("Less than", dtype="integer", input="integer")
+    lte = Filter("Less or Equals", dtype="integer", input="integer")
+    gte = Filter("Greater or Equals", dtype="integer", input="integer")
+
+
+class NumberFilterPreset(FilterPreset, name="number"):
+    eq = Filter("Equals", dtype="number", input="number", default=True)
+    gt = Filter("Greater than", dtype="number", input="number")
+    lt = Filter("Less than", dtype="number", input="number")
+    lte = Filter("Less or Equals", dtype="number", input="number")
+    gte = Filter("Greater or Equals", dtype="number", input="number")
 
 
 class QueryResource(BaseModel):
@@ -174,34 +164,37 @@ class QueryResource(BaseModel):
     def initialize_resource(cls, identifier):
         if hasattr(cls, '_identifier'):
             raise ValueError(f'Resource already initialized: {cls._identifier}')
+
         filters = {}
         fields = {}
         select_fields = []
-        query_mapping = {}
+
         for name, field in cls.__pydantic_fields__.items():
             field_meta = field.json_schema_extra
             preset = field_meta.get('preset')
             source = field.alias or name
+            hidden = bool(field_meta.get('hidden'))
             filters.update(FilterPreset.generate(field, name, preset))
             field_meta['default_filter'] = field_meta.get('default_filter') or FilterPreset.default_filter(preset)
+            field_meta['source'] = source
+
             fields[name] = dict(
                 label=field.title,
                 name=name,
                 desc=field.description,
-                default_filter= field_meta['default_filter'],
-                hidden=bool(field_meta.get('hidden')),
+                noop=field_meta['default_filter'],
+                hidden=hidden,
                 sortable=bool(field_meta.get('sortable', True)),
             )
 
-            select_fields.append(name)
-            query_mapping[name] = source
+            if not hidden:
+                select_fields.append(name)
 
         cls._default_order = None
         cls._field_filters = filters
         cls._identifier = identifier
         cls._fields = fields
         cls._select_fields = select_fields
-        cls._query_mapping = query_mapping
 
         return cls
 
@@ -212,11 +205,14 @@ class QueryResource(BaseModel):
     @classmethod
     def resource_meta(cls):
         return {
-            'label': cls.Meta.name,
             'name': cls._identifier,
+            'title': cls.Meta.name,
             'desc': cls.Meta.desc,
             'fields': cls._fields,
-            'filters': cls._field_filters,
+            'filters': {
+                QUERY_OPERATOR_SEP.join((field, operator)): meta
+                for (field, operator), meta in cls._field_filters.items()
+            },
             'default_order': cls._default_order
         }
 
@@ -230,24 +226,68 @@ class QueryResource(BaseModel):
         return None
 
 
-
 if __name__ == "__main__":
     class CustomFilterPreset(IntegerFilterPreset, name="integer:custom"):
         eq = None
         gte = Filter("Greater or Equal", dtype="integer", input="number", default=True)
 
+
     class User(QueryResource):
         """
         User query
         """
-        id: int = Field(title="ID", description="User ID", preset="uuid", alias="_id")
-        name: str = Field(alias="full_name", description="Full name of the user", preset="string")
-        age: int | None = Field(default=None, ge=0, description="Optional age", preset="integer:custom")
+        id: int = QueryField("ID", description="User ID", preset="uuid", source="_id")
+        name: str = QueryField("Full name", source="full_name", description="Full name of the user", preset="string")
+        age: int | None = QueryField("Age", default=None, ge=0, description="Optional age", preset="integer:custom")
+
 
     User.initialize_resource('user')
 
 
-    pprint(User.resource_meta())
-    pprint(User.process_query({'_id.eq': 100}))
-    pprint(User.process_query({'_id': 100}))
-    pprint(User.process_query({'.and': {'full_name': 100, 'age.gte': 100}}))
+    pprint(User._field_filters)
+    pprint(User.process_query({'id.eq': 100}))
+    pprint(User.process_query({'id': 100}))
+    pprint(User.process_query({'.and': {'name': 100, 'age.gte': 100}}))
+
+    # Most verbose
+    q1 = [
+    {
+      ".and": [
+        {
+          "name__family": "Potter"
+        },
+        {
+          ".or": [
+            {
+              "name__given": "Harry"
+            },
+            {
+              "name__given!eq": "James"
+            }
+          ]
+        },
+        {
+          "age.gt": 10
+        }
+      ]
+    }
+    ]
+
+    # Most compact
+    q2 = {
+      ".and": [
+        {
+          "name__family": "Potter",
+          ".or": {
+              "name__given": "Harry",
+              "name__given!": "James"
+          },
+          "age.gt": 10
+        }
+      ]
+    }
+
+    print(process_query_statement(q1))
+    print(process_query_statement(q2))
+
+    assert process_query_statement(q1) == process_query_statement(q2)
