@@ -14,13 +14,16 @@ from ._meta import config, logger
 
 
 def _compute_select(query_select, query_resource):
-    if query_resource.Meta.select_all:
-        return query_select  # Either none, or as-is
+    def _compute():
+        if query_resource.Meta.select_all:
+            return query_select or []  # Either none, or as-is
 
-    if not query_select:
-        return query_resource._select_fields
+        if not query_select:
+            return query_resource._selectable_fields
 
-    return query_resource._select_fields & set(query_select)
+        return (set(query_resource._selectable_fields) & set(query_select)) or query_resource._selectable_fields
+
+    return query_resource.select_fields(*_compute())
 
 
 class QueryManagerMeta(DataModel):
@@ -177,7 +180,13 @@ class QueryManager(object):
         except (jsonurl_py.ParseError, KeyError) as e:
             raise InternalServerError('Q4031215', f"Interal Error: {e}")
 
-    def construct_backend_query(self, query_resource: str, fe_query, /, identifier=None, auth_ctx: Optional[AuthorizationContext]=None, policy_scope=None):
+    def construct_backend_query(self,
+        query_resource: QueryResource,
+        fe_query: FrontendQuery, /,
+        identifier=None,
+        auth_ctx: Optional[AuthorizationContext]=None,
+        policy_scope=None
+    ):
         """ Convert from the frontend query to the backend query """
         scope   = policy_scope
         query   = query_resource.process_query(fe_query.user_query, fe_query.path_query)

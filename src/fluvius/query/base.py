@@ -150,6 +150,9 @@ class QueryResource(BaseModel):
     class Meta:
         pass
 
+    def model_dump(self, by_alias=True, **kwargs):
+        return super().model_dump(by_alias=by_alias, **kwargs)
+
     def __init_subclass__(cls):
         if cls.__dict__.get('__abstract__'):
             return
@@ -183,20 +186,23 @@ class QueryResource(BaseModel):
                 name=name,
                 desc=field.description,
                 noop=field_meta['default_filter'],
-                hidden=hidden,
                 sortable=bool(field_meta.get('sortable', True)),
             )
 
-            if not hidden:
-                select_fields.append(name)
+            select_fields.append(name)
 
-        cls._default_order = cls.Meta.default_order or ("id.desc",)
+        cls._default_order = cls.Meta.default_order or ("_created.desc",)
         cls._field_filters = filters
         cls._identifier = identifier
         cls._fields = fields
-        cls._select_fields = select_fields
+        cls._selectable_fields = select_fields
 
         return cls
+
+    @classmethod
+    def select_fields(cls, *fields):
+        fmap = cls.__pydantic_fields__
+        return [fmap[field_name].alias or field_name for field_name in fields]
 
     @classmethod
     def process_query(cls, *statements):
@@ -213,6 +219,10 @@ class QueryResource(BaseModel):
                 QUERY_OPERATOR_SEP.join((field, operator)): meta
                 for (field, operator), meta in cls._field_filters.items()
             },
+            'composites': {
+                ".and": {"label": "AND Group"},
+                ".or": {"label": "OR Group"}
+            },
             'default_order': cls._default_order
         }
 
@@ -225,6 +235,10 @@ class QueryResource(BaseModel):
     def base_query(self, context, scope):
         return None
 
+
+    def model_dump(self, **kwargs):
+        kwargs.setdefault('by_alias', False)
+        return super().model_dump(**kwargs)
 
 if __name__ == "__main__":
     class CustomFilterPreset(IntegerFilterPreset, name="integer:custom"):

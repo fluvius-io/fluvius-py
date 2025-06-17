@@ -1,4 +1,4 @@
-from fluvius import config
+from fluvius import config, logger
 
 
 DEBUG_APP_EXCEPTION = config.DEBUG_APP_EXCEPTION

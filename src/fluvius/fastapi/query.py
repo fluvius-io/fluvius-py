@@ -3,7 +3,7 @@ import json
 from functools import wraps, partial
 
 from pipe import Pipe
-from typing import Annotated, Union, Any, Optional, Dict
+from typing import Annotated, Union, Any, Optional, Dict, List
 from types import MethodType
 from fastapi import Request, Path, Body, Query
 from fluvius.query import QueryParams, FrontendQuery, QueryResourceMeta, QueryManager
@@ -13,6 +13,7 @@ from fluvius.error import ForbiddenError, BadRequestError
 from . import logger, config
 from .auth import auth_required
 from .helper import uri, jurl_data, parse_scope, SCOPE_SELECTOR, PATH_QUERY_SELECTOR
+from pydantic import BaseModel
 
 
 def register_resource_endpoints(app, query_manager, query_resource):
@@ -21,6 +22,10 @@ def register_resource_endpoints(app, query_manager, query_resource):
     api_tags = query_resource.Meta.tags or query_manager.Meta.tags
     api_docs = query_resource.Meta.desc or query_manager.Meta.desc
     scope_schema = (query_resource.Meta.scope_required or query_resource.Meta.scope_optional)
+
+    class ListResult(BaseModel):
+        data: List[query_resource]
+        meta: Dict
 
     async def resource_query(request: Request, query_params: QueryParams, path_query: str=None, scope: str=None):
         auth_ctx = getattr(request.state, 'auth_context', None)
@@ -77,29 +82,28 @@ def register_resource_endpoints(app, query_manager, query_resource):
         return _api_def
 
     if query_resource.Meta.allow_list_view:
+        list_params = dict(
+            summary=query_resource.Meta.name,
+            description=query_resource.Meta.desc,
+            response_model=ListResult,
+            response_model_by_alias=False
+        )
         if scope_schema:
             @endpoint(
-                SCOPE_SELECTOR, PATH_QUERY_SELECTOR, "",
-                summary=query_resource.Meta.name,
-                description=query_resource.Meta.desc)  # "" for trailing slash
+                SCOPE_SELECTOR, PATH_QUERY_SELECTOR, "", **list_params
+                )  # "" for trailing slash
             async def query_resource_scoped(request: Request, path_query: Annotated[str, Path()], scope: str):
                 return await resource_query(request, None, path_query, scope)
 
-            @endpoint(SCOPE_SELECTOR, "",
-                summary=query_resource.Meta.name,
-                description=query_resource.Meta.desc)  # "" for trailing slash
+            @endpoint(SCOPE_SELECTOR, "", **list_params)  # "" for trailing slash
             async def query_resource_scoped_json(request: Request, query_params: Annotated[QueryParams, Query()], scope: str):
                 return await resource_query(request, query_params, None, scope)
 
-        @endpoint(PATH_QUERY_SELECTOR, "",
-                summary=query_resource.Meta.name,
-                description=query_resource.Meta.desc)
+        @endpoint(PATH_QUERY_SELECTOR, "", **list_params)
         async def query_resource_json(request: Request, path_query: Annotated[str, Path()], query_params: Annotated[QueryParams, Query()]):
             return await resource_query(request, None, path_query, None)
 
-        @endpoint("",
-                summary=query_resource.Meta.name,
-                description=query_resource.Meta.desc) # Trailing slash
+        @endpoint("", **list_params) # Trailing slash
         async def query_resource_default(request: Request, query_params: Annotated[QueryParams, Query()]):
             return await resource_query(request, query_params, None, None)
 
@@ -109,20 +113,20 @@ def register_resource_endpoints(app, query_manager, query_resource):
             return query_resource.resource_meta()
 
     if query_resource.Meta.allow_item_view:
-        @endpoint("{identifier}",
-                summary=f"{query_resource.Meta.name} (Item)",
-                description=query_resource.Meta.desc,
-                response_model=query_resource)
+        item_params = dict(
+            summary=f"{query_resource.Meta.name} (Item)",
+            description=query_resource.Meta.desc,
+            response_model=query_resource,
+            response_model_by_alias=False)
+        @endpoint("{identifier}", **item_params)
         async def query_item_default(request: Request, identifier: Annotated[str, Path()]):
-            return await item_query(request, identifier)
+            item = await item_query(request, identifier)
+            return item
 
         if scope_schema:
-            @endpoint(SCOPE_SELECTOR, "{identifier}",
-                summary=f"{query_resource.Meta.name} (Item)",
-                description=query_resource.Meta.desc,
-                response_model=query_resource)
+            @endpoint(SCOPE_SELECTOR, "{identifier}", **item_params)
             async def query_item_scoped(request: Request, identifier: Annotated[str, Path()], scope: str):
-                return await item_query(request, identifier, scope=scope)
+                return query_resource(**(await item_query(request, identifier, scope=scope)).__dict__)
 
 
 def regsitery_manager_endpoints(app, query_manager):
