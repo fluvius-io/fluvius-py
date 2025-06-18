@@ -161,9 +161,9 @@ class SqlaDriver(DataDriver, QueryBuilder):
         return self._dsn
 
     async def disconnect(self):
-        async_session = cls._async_session
-        if async_session.connected:
-            await async_session.dispose()
+        async_session = self._async_session
+        # if async_session.connected:
+        await async_session.dispose()
 
     @classmethod
     def validate_data_schema(cls, schema_model):
@@ -359,10 +359,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
             stmt = nquery
         else:
             raise ValueError(f'[E92853] Invalid SQL query: {nquery}')
-
-        # @TODO: validate whether this method is effective/efficient or not
-        # It is working for now.
-        # conn = await cls._async_session.session.connection()
+        
         conn = await self.connection()
         cursor = await conn.exec_driver_sql(stmt, params)
 

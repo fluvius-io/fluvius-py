@@ -62,8 +62,6 @@ def data_query(key_or_func=None, **query_options):
 
         return wrapper
 
-        raise ValueError(f'Invalid query result type: {result} (available: list, item, value)')
-
     if callable(key_or_func):
         return _decorator(key_or_func)
 
@@ -164,8 +162,8 @@ class DataAccessManagerBase(object):
         self.connector.connect(*args, **kwargs)
         return self
 
-    def disconnect(self):
-        self.connector.disconnect()
+    async def disconnect(self):
+        await self.connector.disconnect()
         return self
 
     @asynccontextmanager
@@ -351,12 +349,10 @@ class DataAccessManager(DataAccessManagerBase):
         return await self.connector.upsert(model_name, [values])
     
     async def insert_many(self, model_name: str, *records: list[dict]):
-        data = [self._serialize(model_name, rec) for rec in records]
-        return await self.connector.insert(model_name, data)
+        return await self.connector.insert(model_name, records)
 
     async def upsert_many(self, model_name: str, *records: list[dict]):
-        data = [self._serialize(model_name, rec) for rec in records]
-        return await self.connector.upsert(model_name, data)
+        return await self.connector.upsert(model_name, records)
 
     async def invalidate_one(self, model_name: str, identifier: UUID_TYPE, etag=None, /, **updates):
         q = BackendQuery.create(identifier=identifier, etag=etag)
@@ -366,10 +362,6 @@ class DataAccessManager(DataAccessManagerBase):
     async def update_one(self, model_name: str, identifier: UUID_TYPE, etag=None, /, **updates):
         query = BackendQuery.create(identifier=identifier, etag=etag)
         return await self.connector.update_one(model_name, query, **updates)
-
-    async def native_query(self, *args, **kwargs):
-        return await self.connector.native_query(*args, **kwargs)
-
 
 class ReadonlyDataManagerProxy(object):
     def __init__(self, data_manager):
