@@ -10,6 +10,8 @@ def QueryField(
     default_filter=None,
     order=0,
     hidden=False,
+    array=False,
+    enum=None,
     json_schema_extra=None,
     **kwargs
 ):
@@ -19,6 +21,8 @@ def QueryField(
         identifier=identifier,
         default_filter=default_filter,
         hidden=hidden,
+        array=array,
+        enum=enum,
         order=order
     )
 
