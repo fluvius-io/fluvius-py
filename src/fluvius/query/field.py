@@ -41,6 +41,29 @@ def TextSearchField(title, **kwargs):
     return QueryField(title=title, preset="textsearch", **kwargs)
 
 
+def BooleanField(title, **kwargs):
+    return QueryField(title=title, preset="string", **kwargs)
+
+
+def EnumField(title, **kwargs):
+    return QueryField(title=title, preset="string", **kwargs)
+
+
+def DateField(title, **kwargs):
+    return QueryField(title=title, preset="date", **kwargs)
+
+
+def DatetimeField(title, **kwargs):
+    return QueryField(title=title, preset="datetime", **kwargs)
+
+
+def ArrayField(title, **kwargs):
+    return QueryField(title=title, preset="array", **kwargs)
+
+
+def JSONField(title, **kwargs):
+    return QueryField(title=title, preset="json", **kwargs)
+
 # <<<<<<< HEAD
 
 # def date_range_validator(self, op_stmt, value):
