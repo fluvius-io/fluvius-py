@@ -72,6 +72,14 @@ def ArrayField(title, **kwargs):
 def JSONField(title, **kwargs):
     return QueryField(title=title, preset="json", **kwargs)
 
+
+def IntegerField(title, **kwargs):
+    return QueryField(title=title, preset="integer", **kwargs)
+
+
+def NumberField(title, **kwargs):
+    return QueryField(title=title, preset="number", **kwargs)
+
 # <<<<<<< HEAD
 
 # def date_range_validator(self, op_stmt, value):
