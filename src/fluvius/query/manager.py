@@ -8,18 +8,22 @@ from fluvius.data import BackendQuery, DataModel
 from fluvius.helper import camel_to_lower, select_value
 from fluvius.error import InternalServerError, NotFoundError, ForbiddenError
 from fluvius.casbin import PolicyRequest
-from .resource import QueryResource, FrontendQuery
+from .resource import QueryResource
+from .model import FrontendQuery
 from ._meta import config, logger
 
 
 def _compute_select(query_select, query_resource):
-    if query_resource.Meta.select_all:
-        return query_select  # Either none, or as-is
+    def _compute():
+        if query_resource.Meta.select_all:
+            return query_select or []  # Either none, or as-is
 
-    if not query_select:
-        return query_resource.select_fields
+        if not query_select:
+            return query_resource._selectable_fields
 
-    return query_resource.select_fields & set(query_select)
+        return (set(query_resource._selectable_fields) & set(query_select)) or query_resource._selectable_fields
+
+    return query_resource.select_fields(*_compute())
 
 
 class QueryManagerMeta(DataModel):
@@ -79,25 +83,18 @@ class QueryManager(object):
         return _decorator
 
     @classmethod
-    def validate_query_resource(cls, schema_cls):
-        if issubclass(schema_cls, QueryResource):
-            return schema_cls
-
-        raise ValueError(f'Invalid query model: {schema_cls}')
-
-    @classmethod
     def register_resource(cls, query_identifier):
-        def _decorator(schema_cls):
-            if getattr(schema_cls, '_identifier', None):
-                raise ValueError(f'QueryResource already registered with identifier: {schema_cls._identifier}')
+        def _decorator(resource_cls):
+            if getattr(resource_cls, '_identifier', None):
+                raise ValueError(f'QueryResource already registered with identifier: {resource_cls._identifier}')
 
-            schema_cls._identifier = query_identifier
+            resource_cls.initialize_resource(query_identifier)
+
             if query_identifier in cls.__resources__:
-                raise ValueError(f'Resource identifier is already registered: {query_identifier} => {schema_cls}')
+                raise ValueError(f'Resource identifier is already registered: {query_identifier} => {resource_cls}')
 
-            query_resource = cls.validate_query_resource(schema_cls)
-            cls.__resources__[query_identifier] = query_resource()
-            return query_resource
+            cls.__resources__[query_identifier] = resource_cls
+            return resource_cls
 
         return _decorator
 
@@ -183,10 +180,16 @@ class QueryManager(object):
         except (jsonurl_py.ParseError, KeyError) as e:
             raise InternalServerError('Q4031215', f"Interal Error: {e}")
 
-    def construct_backend_query(self, query_resource: str, fe_query, /, identifier=None, auth_ctx: Optional[AuthorizationContext]=None, policy_scope=None):
+    def construct_backend_query(self,
+        query_resource: QueryResource,
+        fe_query: FrontendQuery, /,
+        identifier=None,
+        auth_ctx: Optional[AuthorizationContext]=None,
+        policy_scope=None
+    ):
         """ Convert from the frontend query to the backend query """
         scope   = policy_scope
-        query   = query_resource.generate_query_statement(fe_query.user_query, fe_query.path_query)
+        query   = query_resource.process_query(fe_query.user_query, fe_query.path_query)
         limit   = fe_query.limit
         offset  = (fe_query.page - 1) * fe_query.limit
         select  = _compute_select(fe_query.select, query_resource)
@@ -199,7 +202,6 @@ class QueryManager(object):
             select=select,
             sort=fe_query.sort,
             where=query,
-            mapping=query_resource.query_mapping
         )
         return self.validate_backend_query(query_resource, backend_query)
 

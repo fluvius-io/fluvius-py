@@ -16,8 +16,7 @@ See: docs/notes.ai/2024-12-20-fluvius-query-test-review-and-vscode-setup.md
 
 import pytest
 import json
-from fluvius.query import QueryResource, logger, config, QueryManager, FrontendQuery, DomainQueryManager
-from fluvius.query.field import StringField
+from fluvius.query import QueryResource, logger, config, QueryManager, FrontendQuery, DomainQueryManager, Field
 from fluvius.data.serializer import serialize_json
 from sample_data_model import *
 
@@ -113,9 +112,10 @@ class SampleQueryManager(DomainQueryManager):
 
 resource = SampleQueryManager.register_resource
 
+
 @resource('company-query')
 class CompanyQuery(QueryResource):
-    business_name = StringField("Test Field", identifier=True)
+    business_name: str = Field("Business Name", identifier=True, preset="string")
 
     class Meta:
         backend_model = 'company'
@@ -123,7 +123,7 @@ class CompanyQuery(QueryResource):
 
 @ObjectDomainQueryManager.register_resource('economist')
 class EconomistQuery(QueryResource):
-    job = StringField("Job match", identifier=True)
+    job: str = Field("Job match", identifier=True, preset="string")
 
     class Meta:
         backend_model = 'people-economist'

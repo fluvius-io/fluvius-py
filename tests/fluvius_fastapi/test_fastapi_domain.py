@@ -14,7 +14,8 @@ def test_read_root():
 
 
 def test_domain_metadata():
-    response = client.get("/_metadata/generic-object/")
+    response = client.get("/_meta/generic-object/")
+    assert response.status_code == 200
     data = response.json()
     assert data["name"] == 'ObjectDomain'
 
@@ -34,7 +35,7 @@ def test_domain_create():
 
 
 def test_domain_query():
-    para = dict(query=json.dumps({"!or":[{"business_name!ne": "ABC1"},{"business_name": "DEF3"}]}))
+    para = dict(q=json.dumps({"!or":[{"business_name!ne": "ABC1"},{"business_name": "DEF3"}]}))
     resp = client.get("/sample-query-manager.company-query/", params=para)
     logger.info('JSON QUERY OUTPUT: %s', resp.json())
     assert resp.status_code == 200

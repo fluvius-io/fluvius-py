@@ -10,24 +10,20 @@ from fluvius.constant import QUERY_OPERATOR_SEP, OPERATOR_SEP_NEGATE, RX_PARAM_S
 from . import config
 
 BACKEND_QUERY_LIMIT = config.BACKEND_QUERY_INTERNAL_LIMIT
-OperatorStatement = namedtuple('OperatorStatement', 'field_name mode operator composite')
-QueryElement = namedtuple('QueryElement', 'field_name mode operator composite value')
+OperatorStatement = namedtuple('OperatorStatement', 'field operator mode')
+QueryExpression   = namedtuple('QE',   'field operator mode value')
 
 class QueryStatement(tuple):
     pass
 
 
-def process_query_element(key, value):
-    return QueryElement(*operator_statement(key), value)
-
-
-def process_query_statement(*statements, param_specs=None):
+def process_query_statement(statements, expr_schema=None, allowed_composites=('and', 'or')):
     def _unpack(*stmts):
         for stmt in stmts:
             if not stmt:
                 continue
 
-            if isinstance(stmt, QueryElement):
+            if isinstance(stmt, QueryExpression):
                 yield stmt
                 continue
 
@@ -43,7 +39,7 @@ def process_query_statement(*statements, param_specs=None):
     def _process(*stmts):
         try:
             for stmt in _unpack(*stmts):
-                if isinstance(stmt, QueryElement):
+                if isinstance(stmt, QueryExpression):
                     yield stmt
                     continue
 
@@ -51,33 +47,38 @@ def process_query_statement(*statements, param_specs=None):
                     op_stmt = operator_statement(key)
 
                     # First process the value using the operator's processors
-                    if param_specs:
-                        param_schema = param_specs[op_stmt.field_name, op_stmt.operator]
-                        value = param_schema.process_value(value)
+                    if op_stmt.field and expr_schema:
+                        param_spec = expr_schema[op_stmt.field, op_stmt.operator]
+                        yield param_spec.expression(op_stmt.mode, value)
+                        continue
 
                     # For composite operators, its value is a list of statements
-                    if not op_stmt.field_name: # composite operators
+                    if not op_stmt.field: # composite operators
+                        assert op_stmt.operator in allowed_composites
                         value = tuple(_process(value))
 
-                    yield QueryElement(*op_stmt, value)
+                    yield QueryExpression(*op_stmt, value)
         except KeyError as e:
-            raise BadRequestError("Q01-3939", f'Cannot locate operator: {e}')
+            raise BadRequestError("Q01-3939", f'Cannot locate operator: {e} => {expr_schema}')
 
     return QueryStatement(_process(statements))
 
 
-def operator_statement(op_stmt):
-    if isinstance(op_stmt, OperatorStatement):
-        return op_stmt
-
+def operator_statement(op_stmt: str, default_operator: str=DEFAULT_OPERATOR) -> OperatorStatement:
     result = RX_PARAM_SPLIT.split(op_stmt)
+
     if len(result) == 1:  # no operator specified
-        return OperatorStatement(op_stmt, QUERY_OPERATOR_SEP, DEFAULT_OPERATOR, False)
+        mode = QUERY_OPERATOR_SEP
+        return OperatorStatement(op_stmt, default_operator, mode)
+
+    field_name, mode, operator = result
+    field_name = field_name or None
+    operator = operator or default_operator
 
     try:
-        return OperatorStatement(*result, not result[0])
+        return OperatorStatement(field_name, operator, mode)
     except:
-        raise ValueError(f'Invalid: {op_stmt}')
+        raise ValueError(f'Invalid query operator statement: {op_stmt}')
 
 
 def validate_list(sort_stmt):
@@ -106,14 +107,6 @@ def validate_query(query) -> QueryStatement:
     return process_query_statement(query)
 
 
-def combine_query_statement(*queries):
-    stmt = tuple()
-    for q in queries:
-        stmt += validate_query(q)
-
-    return QueryStatement(stmt)
-
-
 class JoinStatement(PClass):
     local_field = field(str)
     foreign_table = field(str)
@@ -134,19 +127,9 @@ class BackendQuery(PClass):
     sort    = field(tuple, factory=validate_list, initial=tuple)
     where   = field(QueryStatement, initial=QueryStatement(), factory=validate_query)  # A tuple can hold duplicated keys if needed
     scope   = field(QueryStatement, initial=QueryStatement(), factory=validate_query)
-    mapping = field(dict, initial=dict)
 
     # Default don't query the deleted item.
     incl_deleted = field(bool, initial=False)
-
-    def field_map(self, field_name):
-        if not self.mapping:
-            return field_name
-
-        if field_name in self.mapping:
-            return self.mapping[field_name]
-
-        return field_name
 
     @classmethod
     def create(cls, query_data=None, **kwargs):

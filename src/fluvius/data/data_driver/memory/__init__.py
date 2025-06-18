@@ -8,9 +8,8 @@ from fluvius.data.query import (
     BackendQuery,
     OperatorStatement,
     process_query_statement,
-    combine_query_statement,
-    process_query_element,
-    QueryStatement
+    QueryStatement,
+    QueryExpression
 )
 
 from ..base import DataDriver
@@ -26,7 +25,7 @@ def query_resource(store, q: BackendQuery):
         query_stmts += q.scope
 
     if q.identifier:
-        query_stmts += (process_query_element('_id.eq', q.identifier),)
+        query_stmts += (QueryExpression('_id', 'eq', '.', q.identifier),)
 
     def _apply_operator(item_value, expected_value, operator, mode):
         """Apply operator logic for memory driver queries"""
@@ -65,7 +64,7 @@ def query_resource(store, q: BackendQuery):
         # Handle both dict and object items
         for qe in query_stmts:
             # Handle OperatorStatement objects
-            field_name = qe.field_name
+            field_name = qe.field
 
             # Get the item value
             if isinstance(item, dict):

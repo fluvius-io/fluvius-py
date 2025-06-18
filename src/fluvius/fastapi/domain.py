@@ -9,7 +9,7 @@ from fluvius.data.serializer import serialize_json
 from fluvius.domain import Domain
 from fluvius.domain.context import DomainContext, DomainTransport
 from fluvius.domain.manager import DomainManager
-from fluvius.query.resource import FrontendQuery, QueryResourceMeta
+from fluvius.query import FrontendQuery, QueryResourceMeta
 from fluvius.helper import load_class
 from pipe import Pipe
 

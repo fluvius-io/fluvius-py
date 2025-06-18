@@ -18,7 +18,7 @@ class SampleQueryManager(DomainQueryManager):
 
 @SampleQueryManager.register_resource('company-query')
 class CompanyQuery(QueryResource):
-    business_name = StringField("Test Field", identifier=True)
+    business_name: str = StringField("Test Field", identifier=True)
 
     class Meta:
         backend_model = 'company'
@@ -27,7 +27,7 @@ class CompanyQuery(QueryResource):
 
 @ObjectDomainQueryManager.register_resource('economist')
 class EconomistQuery(QueryResource):
-    job = StringField("Job match", identifier=True)
+    job: str = StringField("Job match", identifier=True)
 
     class Meta:
         backend_model = 'people-economist'
