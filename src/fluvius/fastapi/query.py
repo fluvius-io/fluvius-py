@@ -5,6 +5,7 @@ from functools import wraps, partial
 from pipe import Pipe
 from typing import Annotated, Union, Any, Optional, Dict, List
 from types import MethodType
+from pydantic import BaseModel
 from fastapi import Request, Path, Body, Query
 from fluvius.query import QueryParams, FrontendQuery, QueryResourceMeta, QueryManager
 from fluvius.helper import load_class
@@ -13,7 +14,6 @@ from fluvius.error import ForbiddenError, BadRequestError
 from . import logger, config
 from .auth import auth_required
 from .helper import uri, jurl_data, parse_scope, SCOPE_SELECTOR, PATH_QUERY_SELECTOR
-from pydantic import BaseModel
 
 
 def register_resource_endpoints(app, query_manager, query_resource):
