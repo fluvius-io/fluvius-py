@@ -62,8 +62,6 @@ def data_query(key_or_func=None, **query_options):
 
         return wrapper
 
-        raise ValueError(f'Invalid query result type: {result} (available: list, item, value)')
-
     if callable(key_or_func):
         return _decorator(key_or_func)
 
@@ -364,10 +362,6 @@ class DataAccessManager(DataAccessManagerBase):
     async def update_one(self, model_name: str, identifier: UUID_TYPE, etag=None, /, **updates):
         query = BackendQuery.create(identifier=identifier, etag=etag)
         return await self.connector.update_one(model_name, query, **updates)
-
-    async def native_query(self, *args, **kwargs):
-        return await self.connector.native_query(*args, **kwargs)
-
 
 class ReadonlyDataManagerProxy(object):
     def __init__(self, data_manager):

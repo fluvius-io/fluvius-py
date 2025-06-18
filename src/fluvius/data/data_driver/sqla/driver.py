@@ -359,10 +359,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
             stmt = nquery
         else:
             raise ValueError(f'[E92853] Invalid SQL query: {nquery}')
-
-        # @TODO: validate whether this method is effective/efficient or not
-        # It is working for now.
-        # conn = await cls._async_session.session.connection()
+        
         conn = await self.connection()
         cursor = await conn.exec_driver_sql(stmt, params)
 
