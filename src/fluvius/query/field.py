@@ -22,7 +22,7 @@ def QueryField(
         default_filter=default_filter,
         hidden=hidden,
         array=array,
-        enum=enum,
+        enum=str(enum) if enum else None,
         weight=weight
     )
 
