@@ -73,17 +73,16 @@ class QueryResource(BaseModel):
 
                 select_fields.append(name)
 
-                yield dict(
+                yield (field_meta['weight'], dict(
                     label=field.title,
                     name=name,
                     desc=field.description,
                     noop=field_meta['default_filter'],
                     sortable=bool(field_meta.get('sortable', True)),
                     hidden=hidden,
-                    weight=field_meta['weight']
-                )
+                ))
 
-        cls._fields = sorted(process_fields(), key=lambda f: f['weight'])
+        cls._fields = [f for w, f in sorted(process_fields(), key=lambda f: f[0])]
         cls._field_filters = filters
 
         if not idfield["value"]:
