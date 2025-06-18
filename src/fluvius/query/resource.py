@@ -52,46 +52,47 @@ class QueryResource(BaseModel):
             raise ValueError(f'Resource already initialized: {cls._identifier}')
 
         filters = {}
-        fields = {}
         select_fields = []
-        idfield = None
+        idfield = {"value": None}
 
-        for name, field in cls.__pydantic_fields__.items():
-            field_meta = field.json_schema_extra
-            preset = field_meta.get('preset')
-            source = field.alias or name
-            hidden = bool(field_meta.get('hidden'))
-            filters.update(FilterPreset.generate(field, name, preset))
-            field_meta['default_filter'] = field_meta.get('default_filter') or FilterPreset.default_filter(preset)
-            field_meta['source'] = source
+        def process_fields():
+            for name, field in cls.__pydantic_fields__.items():
+                field_meta = field.json_schema_extra
+                preset = field_meta.get('preset')
+                source = field.alias or name
+                hidden = bool(field_meta.get('hidden'))
+                filters.update(FilterPreset.generate(field, name, preset))
+                field_meta['default_filter'] = field_meta.get('default_filter') or FilterPreset.default_filter(preset)
+                field_meta['source'] = source
 
-            fields[name] = dict(
-                label=field.title,
-                name=name,
-                desc=field.description,
-                noop=field_meta['default_filter'],
-                order=field_meta.get('order', 0),
-                sortable=bool(field_meta.get('sortable', True)),
-                hidden=hidden,
-            )
+                if field_meta.get('identifier'):
+                    if idfield["value"]:
+                        raise ValueError(f'Multiple identifier for query resource [{cls}]: {idfield["value"]} & {name}')
 
-            if field_meta.get('identifier'):
-                if idfield:
-                    raise ValueError(f'Multiple identifier for query resource [{cls}]: {idfield} & {name}')
+                    idfield["value"] = name
 
-                idfield = name
+                select_fields.append(name)
 
-            select_fields.append(name)
+                yield dict(
+                    label=field.title,
+                    name=name,
+                    desc=field.description,
+                    noop=field_meta['default_filter'],
+                    sortable=bool(field_meta.get('sortable', True)),
+                    hidden=hidden,
+                    weight=field_meta['weight']
+                )
 
-        if not idfield:
-            assert not cls.Meta.allow_item_view, "Resource allow item view yet no identifier provided."
+        cls._fields = sorted(process_fields(), key=lambda f: f['weight'])
+        cls._field_filters = filters
+
+        if not idfield["value"]:
+            assert not cls.Meta.allow_item_view, f"Resource allow item view yet no identifier provided. {cls}"
             logger.info(f'No identifier for query resource [{cls}]')
 
         cls._default_order = cls.Meta.default_order or ("id.desc",)
-        cls._field_filters = filters
         cls._identifier = identifier
-        cls._fields = fields
-        cls._idfield = idfield
+        cls._idfield = idfield["value"]
         cls._selectable_fields = select_fields
 
         return cls
@@ -112,7 +113,7 @@ class QueryResource(BaseModel):
             'title': cls.Meta.name,
             'desc': cls.Meta.desc,
             'idfield': cls._idfield,
-            'fields': sorted(cls._fields.values(), key=lambda f: f['order']),
+            'fields': cls._fields,
             'filters': {
                 QUERY_OPERATOR_SEP.join((field, operator)): meta
                 for (field, operator), meta in cls._field_filters.items()

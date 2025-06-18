@@ -8,7 +8,7 @@ def QueryField(
     sortable=True,
     source=None,
     default_filter=None,
-    order=0,
+    weight=0,
     hidden=False,
     array=False,
     enum=None,
@@ -23,7 +23,7 @@ def QueryField(
         hidden=hidden,
         array=array,
         enum=enum,
-        order=order
+        weight=weight
     )
 
     return PydanticField(title=title, json_schema_extra=extra, alias=source, **kwargs)
@@ -33,8 +33,12 @@ def StringField(title, **kwargs):
     return QueryField(title=title, preset="string", **kwargs)
 
 
-def PrimaryID(title, identifier=True, order=100, **kwargs):
-    return QueryField(title=title, preset="uuid", source="_id", order=order, identifier=identifier, hidden=True, **kwargs)
+def FloatField(title, **kwargs):
+    return QueryField(title=title, preset="string", **kwargs)
+
+
+def PrimaryID(title, weight=100, **kwargs):
+    return QueryField(title=title, preset="uuid", source="_id", weight=weight, identifier=True, hidden=True, **kwargs)
 
 
 def UUIDField(title, **kwargs):
