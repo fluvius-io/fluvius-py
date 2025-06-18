@@ -171,6 +171,7 @@ class QueryResource(BaseModel):
         filters = {}
         fields = {}
         select_fields = []
+        idfield = None
 
         for name, field in cls.__pydantic_fields__.items():
             field_meta = field.json_schema_extra
@@ -186,15 +187,28 @@ class QueryResource(BaseModel):
                 name=name,
                 desc=field.description,
                 noop=field_meta['default_filter'],
+                order=field_meta.get('order', 0),
                 sortable=bool(field_meta.get('sortable', True)),
+                hidden=hidden,
             )
+
+            if field_meta.get('identifier'):
+                if idfield:
+                    raise ValueError(f'Multiple identifier for query resource [{cls}]: {idfield} & {name}')
+
+                idfield = name
 
             select_fields.append(name)
 
-        cls._default_order = cls.Meta.default_order or ("_created.desc",)
+        if not idfield:
+            assert not cls.Meta.allow_item_view, "Resource allow item view yet no identifier provided."
+            logger.info(f'No identifier for query resource [{cls}]')
+
+        cls._default_order = cls.Meta.default_order or ("id.desc",)
         cls._field_filters = filters
         cls._identifier = identifier
         cls._fields = fields
+        cls._idfield = idfield
         cls._selectable_fields = select_fields
 
         return cls
@@ -214,7 +228,8 @@ class QueryResource(BaseModel):
             'name': cls._identifier,
             'title': cls.Meta.name,
             'desc': cls.Meta.desc,
-            'fields': cls._fields,
+            'idfield': cls._idfield,
+            'fields': sorted(cls._fields.values(), key=lambda f: f['order']),
             'filters': {
                 QUERY_OPERATOR_SEP.join((field, operator)): meta
                 for (field, operator), meta in cls._field_filters.items()
