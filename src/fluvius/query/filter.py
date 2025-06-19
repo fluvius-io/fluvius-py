@@ -158,3 +158,10 @@ class ArrayFilterPreset(FilterPreset, name="array"):
 class BooleanFilterPreset(FilterPreset, name="boolean"):
     eq = Filter("Equals", dtype="boolean", input="boolean", default=True)
     ne = Filter("Not Equals", dtype="boolean", input="boolean")
+
+class DatetimeFilterPreset(FilterPreset, name="datetime"):
+    eq = Filter("Equals", dtype="datetime", input="datetime", default=True)
+    gt = Filter("Greater than", dtype="datetime", input="datetime")
+    lt = Filter("Less than", dtype="datetime", input="datetime")
+    lte = Filter("Less or Equals", dtype="datetime", input="datetime")
+    gte = Filter("Greater or Equals", dtype="datetime", input="datetime")
