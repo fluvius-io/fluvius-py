@@ -10,12 +10,13 @@ from fluvius.domain import Domain
 from fluvius.domain.context import DomainContext, DomainTransport
 from fluvius.domain.manager import DomainManager
 from fluvius.query import FrontendQuery, QueryResourceMeta
+from fluvius.query.helper import scope_decoder
 from fluvius.helper import load_class
 from pipe import Pipe
 
 from . import logger, config
 from .auth import auth_required
-from .helper import uri, jurl_data, parse_scope, SCOPE_SELECTOR
+from .helper import uri, SCOPE_SELECTOR
 
 
 class FastAPIDomainManager(DomainManager):
@@ -122,7 +123,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
                 scoping: Annotated[str, Path(description=f"Resource scoping: `{', '.join(scope_keys)}`. E.g. `~domain_sid:H9cNmGXLEc8NWcZzSThA9S`")]
             ):
                 identifier = UUID_GENR()
-                scope = parse_scope(scoping, scope_schema)
+                scope = scope_decoder(scoping, scope_schema)
                 return await _command_handler(request, payload, resource, identifier, scope)
 
         return app
@@ -137,7 +138,6 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
         ):
             return await _command_handler(request, payload, resource, identifier, {})
 
-
     if scope_schema:
         @endpoint(SCOPE_SELECTOR, "{resource}", "{identifier}", summary=f"{cmd_cls.Meta.name} (Scoped)", description=cmd_cls.Meta.desc)
         async def scoped_command_handler(
@@ -147,7 +147,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
             identifier: Annotated[UUID_TYPE, Path(description="Resource identifier")],
             scoping: Annotated[str, Path(description=f"Resource scoping: `{', '.join(scope_keys)}`. E.g. `domain_sid~H9cNmGXLEc8NWcZzSThA9S`")]
         ):
-            scope = parse_scope(scoping, scope_schema)
+            scope = scope_decoder(scoping, scope_schema)
             return await _command_handler(request, payload, resource, identifier, scope)
 
     return app

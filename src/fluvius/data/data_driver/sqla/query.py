@@ -34,7 +34,6 @@ DEBUG_CONNECTOR = config.DEBUG
 
 FIELD_SEP = ":"
 FIELD_DEL = DEFAULT_DELETED_FIELD
-DEFAULT_SORT_ORDER = 'asc'
 
 COMPOSITE_OPERATOR = {
     QUERY_OPERATOR_SEP: {
@@ -93,13 +92,16 @@ def _iter_expression(statement):
 
 
 class QueryBuilder(object):
-    def _field(self, data_schema, field_name):
+    def _field(self, data_schema, field_name, alias=None):
         if FIELD_SEP in field_name:
             resource, _, field_name = field_name.partition(FIELD_SEP)
             data_schema = self.lookup_data_schema(resource)
 
         try:
-            return getattr(data_schema, field_name)
+            if not alias:
+                return getattr(data_schema, field_name)
+
+            return getattr(data_schema, field_name).label(alias)
         except AttributeError:
             raise BadRequestError("D100-501", f"Type object {data_schema} has no attribute {field_name}", None)
 
@@ -120,13 +122,9 @@ class QueryBuilder(object):
         yield from _gen_query(expr)
 
     def _sort_clauses(self, data_schema, sort_query):
-        for sort_expr in sort_query:
-            field_name, _, sort_type = sort_expr.rpartition(QUERY_OPERATOR_SEP)
-            if not field_name:
-                field_name = sort_type
-                sort_type = DEFAULT_SORT_ORDER
+        logger.warning('SORT: %s', sort_query)
+        for field_name, sort_type in sort_query:
             db_field = self._field(data_schema, field_name)
-            sort_type = sort_type or DEFAULT_SORT_ORDER
             yield getattr(db_field, sort_type)()
 
 
@@ -208,7 +206,11 @@ class QueryBuilder(object):
             if not q.select:
                 return data_schema.__table__.columns
 
-            return tuple(self._field(data_schema, k) for k in q.select)
+            cols = q.select or data_schema.__table__.columns
+            alias = q.alias or {}
+            logger.warning('ALIAS: %s', alias)
+
+            return tuple(self._field(data_schema, k, alias.get(k)) for k in cols)
 
         fields = _gen_select(query)
         sql = select(*fields)

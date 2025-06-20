@@ -125,8 +125,9 @@ class BackendQuery(PClass):
     limit   = field(int, initial=lambda: config.BACKEND_QUERY_DEFAULT_LIMIT)
     offset  = field(int, initial=lambda: 0)
     sort    = field(tuple, factory=validate_list, initial=tuple)
-    where   = field(QueryStatement, initial=QueryStatement(), factory=validate_query)  # A tuple can hold duplicated keys if needed
-    scope   = field(QueryStatement, initial=QueryStatement(), factory=validate_query)
+    where   = field(QueryStatement, initial=QueryStatement, factory=validate_query)  # A tuple can hold duplicated keys if needed
+    scope   = field(QueryStatement, initial=QueryStatement, factory=validate_query)
+    alias   = field(dict, initial=dict)
 
     # Default don't query the deleted item.
     incl_deleted = field(bool, initial=False)

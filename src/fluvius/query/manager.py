@@ -23,7 +23,7 @@ def _compute_select(query_select, query_resource):
 
         return (set(query_resource._selectable_fields) & set(query_select)) or query_resource._selectable_fields
 
-    return query_resource.select_fields(*_compute())
+    return query_resource.process_select(*_compute())
 
 
 class QueryManagerMeta(DataModel):
@@ -193,6 +193,7 @@ class QueryManager(object):
         limit   = fe_query.limit
         offset  = (fe_query.page - 1) * fe_query.limit
         select  = _compute_select(fe_query.select, query_resource)
+        sort    = query_resource.process_sort(*fe_query.sort) if fe_query.sort else tuple()
 
         backend_query = BackendQuery.create(
             identifier=identifier,
@@ -200,8 +201,9 @@ class QueryManager(object):
             offset=offset,
             scope=scope,
             select=select,
-            sort=fe_query.sort,
+            sort=sort,
             where=query,
+            alias=query_resource._alias
         )
         return self.validate_backend_query(query_resource, backend_query)
 

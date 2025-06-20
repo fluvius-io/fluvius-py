@@ -69,9 +69,9 @@ class FilterPreset(object):
             raise ValueError(f'Filter Preset [{preset_name}] does not exist.')
 
     @classmethod
-    def generate(cls, field, field_name, preset_name):
+    def generate(cls, field_name, field_alias, preset_name):
         for opr, ftmpl in FilterPreset.get(preset_name).items():
-            db_field = field.alias or field_name
+            db_field = field_alias or field_name
             db_op    = ftmpl.operator or opr
             yield (field_name, opr), ftmpl.associate(field_name, (db_field, db_op))
 

@@ -253,9 +253,9 @@ class SqlaDriver(DataDriver, QueryBuilder):
             meta.update({
                 "limit": query.limit,
                 "offset": query.offset,
-                "page_no": (query.offset // query.limit) + 1,
-                "total_items": total_items,   # = -1 if total_items is not calculated
-                "total_pages": (total_items // query.limit) + 1   # = 0 if total_items = -1
+                "page": (query.offset // query.limit) + 1,
+                "total": total_items,   # = -1 if total_items is not calculated
+                "pages": (total_items // query.limit) + 1   # = 0 if total_items = -1
             })
 
         return items

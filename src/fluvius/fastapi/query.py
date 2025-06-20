@@ -6,73 +6,67 @@ from pipe import Pipe
 from typing import Annotated, Union, Any, Optional, Dict, List
 from types import MethodType
 from fastapi import Request, Path, Body, Query
+from fluvius.query.helper import scope_decoder
 from fluvius.query import QueryParams, FrontendQuery, QueryResourceMeta, QueryManager
 from fluvius.helper import load_class
 from fluvius.error import ForbiddenError, BadRequestError
 
 from . import logger, config
 from .auth import auth_required
-from .helper import uri, jurl_data, parse_scope, SCOPE_SELECTOR, PATH_QUERY_SELECTOR
+from .helper import uri, SCOPE_SELECTOR, PATH_QUERY_SELECTOR
 from pydantic import BaseModel
 
 
 def register_resource_endpoints(app, query_manager, query_resource):
     query_id = query_resource._identifier
-    base_uri = f"/{query_manager.Meta.prefix}.{query_id}/"
-    api_tags = query_resource.Meta.tags or query_manager.Meta.tags
-    api_docs = query_resource.Meta.desc or query_manager.Meta.desc
-    scope_schema = (query_resource.Meta.scope_required or query_resource.Meta.scope_optional)
+    meta = query_resource.Meta
 
-    class ListResult(BaseModel):
-        data: List[query_resource]
-        meta: Dict
+    base_uri = f"/{query_manager.Meta.prefix}.{query_id}/"
+    api_tags = meta.tags or query_manager.Meta.tags
+    api_docs = meta.desc or query_manager.Meta.desc
+    scope_schema = (meta.scope_required or meta.scope_optional)
+
+    if meta.strict_response:
+        class ListResultSchema(BaseModel):
+            data: List[query_resource]
+            meta: Dict
+    else:
+        ListResultSchema = None
 
     async def resource_query(request: Request, query_params: QueryParams, path_query: str=None, scope: str=None):
         auth_ctx = getattr(request.state, 'auth_context', None)
-        query = query_params.query if query_params.query else None
 
-        if isinstance(query, str):
-            query = json.loads(query)
-
-        if path_query:
-            params = jurl_data(path_query)
-            if not query:
-                query = pa
-            else:
-                query = {".and": [query, pa]}
-
-        if scope_schema:
-            scope = parse_scope(scope, scope_schema)
-            if query_resource.Meta.scope_required and not scope:
-                raise ForbiddenError('Q01-49939', f"Scoping is required for resource: {query_resource}")
-        elif scope:
+        if not scope_schema and scope:
             raise BadRequestError('Q01-00383', f'Scoping is not allowed for resource: {query_resource}')
 
-        query_params = FrontendQuery.from_query_params(query_params, scope=scope, query=query)
+        fe_query = FrontendQuery.from_query_params(query_params, scope=scope, scope_schema=scope_schema, path_query=path_query)
 
-        data, meta = await query_manager.query_resource(query_id, query_params, auth_ctx=auth_ctx)
+        if meta.scope_required and not fe_query.scope:
+            raise ForbiddenError('Q01-49939', f"Scoping is required for resource: {query_resource}")
+
+        data, page = await query_manager.query_resource(query_id, fe_query, auth_ctx=auth_ctx)
         return {
             'data': data,
-            'meta': meta
+            'pagination': page
         }
 
     async def item_query(request: Request, item_identifier, scope: str=None):
         auth_ctx = getattr(request.state, 'auth_context', None)
-        if scope_schema:
-            scope = parse_scope(scope, scope_schema)
-            if query_resource.Meta.scope_required and not scope:
-                raise ForbiddenError('Q01-49939', f"Scoping is required for resource: {query_resource}")
-        elif scope:
+        if not scope_schema and scope:
             raise BadRequestError('Q01-00383', f'Scoping is not allowed for resource: {query_resource}')
 
-        fe_query = FrontendQuery.create(scope=scope)
+        fe_query = FrontendQuery.from_query_params(QueryParams(), scope=scope, scope_schema=scope_schema)
+
+        if meta.scope_required and not fe_query.scope:
+            raise ForbiddenError('Q01-49939', f"Scoping is required for resource: {query_resource}")
+
         return await query_manager.query_item(query_id, item_identifier, fe_query, auth_ctx=auth_ctx)
 
     def endpoint(*paths, method=app.get, base=base_uri, auth={}, **kwargs):
         api_path = uri(base, *paths)
         api_meta = {"tags": api_tags, "description": api_docs} | kwargs
         api_decorator = method(api_path, **api_meta)
-        if not query_resource.Meta.auth_required:
+        if not meta.auth_required:
             return api_decorator
 
         auth_decorator = auth_required(**auth)
@@ -81,12 +75,11 @@ def register_resource_endpoints(app, query_manager, query_resource):
 
         return _api_def
 
-    if query_resource.Meta.allow_list_view:
+    if meta.allow_list_view:
         list_params = dict(
-            summary=query_resource.Meta.name,
-            description=query_resource.Meta.desc,
-            response_model=ListResult,
-            response_model_by_alias=False
+            summary=meta.name,
+            description=meta.desc,
+            response_model=ListResultSchema
         )
         if scope_schema:
             @endpoint(
@@ -107,17 +100,21 @@ def register_resource_endpoints(app, query_manager, query_resource):
         async def query_resource_default(request: Request, query_params: Annotated[QueryParams, Query()]):
             return await resource_query(request, query_params, None, None)
 
-    if query_resource.Meta.allow_meta_view:
-        @endpoint(base=f"/_meta{base_uri}", summary=f"Query Metadata [{query_resource.Meta.name}]", tags=["Metadata"])
+    if meta.allow_meta_view:
+        @endpoint(base=f"/_meta{base_uri}", summary=f"Query Metadata [{meta.name}]", tags=["Metadata"])
         async def query_info(request: Request) -> dict:
             return query_resource.resource_meta()
 
-    if query_resource.Meta.allow_item_view:
+    if meta.allow_item_view:
+        if meta.strict_response:
+            ItemResultSchema = query_resource
+        else:
+            ItemResultSchema = None
+
         item_params = dict(
-            summary=f"{query_resource.Meta.name} (Item)",
-            description=query_resource.Meta.desc,
-            response_model=query_resource,
-            response_model_by_alias=False)
+            summary=f"{meta.name} (Item)",
+            description=meta.desc,
+            response_model=ItemResultSchema)
         @endpoint("{identifier}", **item_params)
         async def query_item_default(request: Request, identifier: Annotated[str, Path()]):
             item = await item_query(request, identifier)
@@ -166,11 +163,47 @@ def register_query_manager(app, qm_cls):
 def configure_query_manager(app, *query_managers):
     @app.get(uri("/_meta/_echo", SCOPE_SELECTOR, PATH_QUERY_SELECTOR, "{identifier}"), tags=["Metadata"])
     async def query_echo(query_params: Annotated[QueryParams, Query()], scope, path_query, identifier):
+        """
+        This endpoint can be used to inspect how the url search params being parsed into structure query for the backend.
+
+        E.g:
+        $ curl "http://localhost:8000/_meta/_echo/:abc%3A38182/~xyz%3Atuv/12838383812?limit=25&page=1&select=abcdef%2Cghijkl&sort=abc.desc%2Cxyz.asc&query=%7B%22abcdef%22%3A%22ghijkl%22%7D" | jq
+        {
+          "identifier": "12838383812",
+          "parsed_query": {
+            "limit": 25,
+            "page": 1,
+            "select": [
+              "abcdef",
+              "ghijkl"
+            ],
+            "sort": [
+              "abc.desc",
+              "xyz.asc"
+            ],
+            "user_query": {
+              "abcdef": "ghijkl"
+            },
+            "path_query": {
+              "xyz": "tuv"
+            },
+            "scope": null
+          },
+          "query_params": {
+            "limit": 25,
+            "page": 1,
+            "select": "abcdef,ghijkl",
+            "sort": "abc.desc,xyz.asc",
+            "query": "{\"abcdef\":\"ghijkl\"}"
+          }
+        }
+        """
+
+        fe_query = FrontendQuery.from_query_params(query_params, scope=scope, path_query=path_query)
         return {
             "identifier": identifier,
+            "parsed_query": fe_query,
             "query_params": query_params,
-            "scope": parse_scope(scope),
-            "path_query": jurl_data(path_query)
         }
 
     for qm_spec in query_managers:

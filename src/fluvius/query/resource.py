@@ -54,16 +54,19 @@ class QueryResource(BaseModel):
         filters = {}
         select_fields = []
         idfield = {"value": None}
+        fieldmap = {}
 
         def process_fields():
             for name, field in cls.__pydantic_fields__.items():
                 field_meta = field.json_schema_extra
                 preset = field_meta.get('preset')
-                source = field.alias or name
+                source = field_meta.get('source')
                 hidden = bool(field_meta.get('hidden'))
-                filters.update(FilterPreset.generate(field, name, preset))
+                filters.update(FilterPreset.generate(name, source, preset))
                 field_meta['default_filter'] = field_meta.get('default_filter') or FilterPreset.default_filter(preset)
-                field_meta['source'] = source
+
+                if source:
+                    fieldmap[name] = source
 
                 if field_meta.get('identifier'):
                     if idfield["value"]:
@@ -84,6 +87,8 @@ class QueryResource(BaseModel):
 
         cls._fields = [f for w, f in sorted(process_fields(), key=lambda f: f[0])]
         cls._field_filters = filters
+        cls._fieldmap = fieldmap
+        cls._alias = {v: k for k, v in fieldmap.items()}
 
         if not idfield["value"]:
             assert not cls.Meta.allow_item_view, f"Resource allow item view yet no identifier provided. {cls}"
@@ -97,13 +102,29 @@ class QueryResource(BaseModel):
         return cls
 
     @classmethod
-    def select_fields(cls, *fields):
-        fmap = cls.__pydantic_fields__
-        return [fmap[field_name].alias or field_name for field_name in fields]
+    def process_select(cls, *fields):
+        fmap = cls._fieldmap
+        return tuple(fmap.get(f, f) for f in fields) + ('_id',)
 
     @classmethod
     def process_query(cls, *statements):
         return process_query_statement(statements, expr_schema=cls._field_filters)
+
+    @classmethod
+    def process_sort(cls, *sorts):
+        fmap = cls._fieldmap
+        def gen():
+            for sort in sorts:
+                sort = sort.split('.')
+                if len(sort) == 1:
+                    dr = "asc"
+                    fn = sort
+                else:
+                    fn, dr = sort
+
+                yield (fmap.get(fn, fn), dr)
+
+        return tuple(gen())
 
     @classmethod
     def resource_meta(cls):
