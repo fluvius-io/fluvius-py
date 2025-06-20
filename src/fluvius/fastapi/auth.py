@@ -20,7 +20,7 @@ from fluvius.auth import AuthorizationContext
 from pydantic import AnyUrl, EmailStr
 from uuid import UUID
 from pipe import Pipe
-from typing import Literal
+from typing import Literal, Optional
 from urllib.parse import urlparse
 
 from .setup import on_startup
@@ -103,7 +103,7 @@ class KeycloakTokenPayload(DataModel):
     nonce: str
     session_state: UUID
     at_hash: str
-    acr: str
+    acr: Optional[str] = None
     sid: UUID
     email_verified: bool
     name: str

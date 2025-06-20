@@ -144,3 +144,24 @@ class NumberFilterPreset(FilterPreset, name="number"):
     lte = Filter("Less or Equals", dtype="number", input="number")
     gte = Filter("Greater or Equals", dtype="number", input="number")
 
+
+class JsonFilterPreset(FilterPreset, name="json"):
+    eq = Filter("Equals", dtype="json", input="json", default=True)
+    ne = Filter("Not Equals", dtype="json", input="json")
+
+
+class ArrayFilterPreset(FilterPreset, name="array"):
+    eq = Filter("Equals", dtype="array", input="array", default=True)
+    ov = Filter("Not Equals", dtype="array", input="array")
+
+
+class BooleanFilterPreset(FilterPreset, name="boolean"):
+    eq = Filter("Equals", dtype="boolean", input="boolean", default=True)
+    ne = Filter("Not Equals", dtype="boolean", input="boolean")
+
+class DatetimeFilterPreset(FilterPreset, name="datetime"):
+    eq = Filter("Equals", dtype="datetime", input="datetime", default=True)
+    gt = Filter("Greater than", dtype="datetime", input="datetime")
+    lt = Filter("Less than", dtype="datetime", input="datetime")
+    lte = Filter("Less or Equals", dtype="datetime", input="datetime")
+    gte = Filter("Greater or Equals", dtype="datetime", input="datetime")

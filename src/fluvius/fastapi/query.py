@@ -5,6 +5,7 @@ from functools import wraps, partial
 from pipe import Pipe
 from typing import Annotated, Union, Any, Optional, Dict, List
 from types import MethodType
+from pydantic import BaseModel
 from fastapi import Request, Path, Body, Query
 from fluvius.query.helper import scope_decoder
 from fluvius.query import QueryParams, FrontendQuery, QueryResourceMeta, QueryManager

@@ -4,6 +4,7 @@ from fluvius.error import FluviusException
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import ResponseValidationError
 
 from . import config, logger
 
@@ -80,6 +81,23 @@ def setup_error_handler(app: FastAPI) -> FastAPI:
             content=content
         )
 
+    @app.exception_handler(ResponseValidationError)
+    async def response_validation_exception_handler(request: Request, exc: ResponseValidationError):
+        logger.error(f"Response validation failed: {exc}")
+        content = {
+            "message": "Internal Server Error - Response Validation Failed",
+            "errcode": "A01500",
+            "details": str(exc.errors()),
+        }
+
+        if DEVELOPER_MODE:
+            content['traceback'] = traceback.format_exc()
+
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content=content
+        )
+    
     return app
 
 def setup_kcadmin(app):
