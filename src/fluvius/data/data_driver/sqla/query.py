@@ -203,14 +203,10 @@ class QueryBuilder(object):
 
     def build_select(self, data_schema, query: BackendQuery):
         def _gen_select(q):
-            if not q.select:
-                return data_schema.__table__.columns
+            cols = q.select or data_schema.__table__.columns.keys()
+            alias = q.alias or None
 
-            cols = q.select or data_schema.__table__.columns
-            alias = q.alias or {}
-            logger.warning('ALIAS: %s', alias)
-
-            return tuple(self._field(data_schema, k, alias.get(k)) for k in cols)
+            return tuple(self._field(data_schema, k, alias and alias.get(k)) for k in cols)
 
         fields = _gen_select(query)
         sql = select(*fields)

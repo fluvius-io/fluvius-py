@@ -53,7 +53,7 @@ class QueryResource(BaseModel):
 
         filters = {}
         select_fields = []
-        idfield = {"value": None}
+        idfield = SimpleNamespace(name=None)
         fieldmap = {}
 
         def process_fields():
@@ -69,10 +69,10 @@ class QueryResource(BaseModel):
                     fieldmap[name] = source
 
                 if field_meta.get('identifier'):
-                    if idfield["value"]:
+                    if idfield.name:
                         raise ValueError(f'Multiple identifier for query resource [{cls}]: {idfield["value"]} & {name}')
 
-                    idfield["value"] = name
+                    idfield.name = name
 
                 select_fields.append(name)
 
@@ -90,21 +90,23 @@ class QueryResource(BaseModel):
         cls._fieldmap = fieldmap
         cls._alias = {v: k for k, v in fieldmap.items()}
 
-        if not idfield["value"]:
-            assert not cls.Meta.allow_item_view, f"Resource allow item view yet no identifier provided. {cls}"
-            logger.info(f'No identifier for query resource [{cls}]')
+        if not idfield.name:
+            raise ValueError(f'No identifier provided for query resource [{cls}]')
 
         cls._default_order = cls.Meta.default_order or ("id.desc",)
         cls._identifier = identifier
-        cls._idfield = idfield["value"]
+        cls._idfield = idfield.name
         cls._selectable_fields = select_fields
 
         return cls
 
     @classmethod
     def process_select(cls, *fields):
+        if not fields:
+            return fields
+
         fmap = cls._fieldmap
-        return tuple(fmap.get(f, f) for f in fields) + ('_id',)
+        return tuple(fmap.get(f, f) for f in set(fields + (cls._idfield,)))
 
     @classmethod
     def process_query(cls, *statements):
