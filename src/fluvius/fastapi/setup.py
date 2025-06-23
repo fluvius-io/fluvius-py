@@ -16,7 +16,8 @@ def create_app(config=config, **kwargs) -> FastAPI:
     cfg = dict(
         title=config.APPLICATION_NAME,
         version=config.APPLICATION_VERSION,
-        description=config.APPLICATION_DESC
+        description=config.APPLICATION_DESC,
+        root_path=config.APPLICATION_ROOT
     )
     cfg.update(kwargs)
     app = FastAPI(lifespan=lifespan, **cfg)

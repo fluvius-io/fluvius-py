@@ -5,6 +5,7 @@ APPLICATION_BUILD_TIME = str(timestamp())
 APPLICATION_DESC = 'Fluvius API Application (Update config to change this)'
 APPLICATION_NAME = 'Fluvius API'
 APPLICATION_SECRET_KEY = "super-secret-session-key-IUUUCBhv4NRDVB4ONpe8lcNJJY"
+APPLICATION_ROOT = None
 APPLICATION_SERIAL_NUMBER = 1001
 APPLICATION_VERSION = __version__
 AUTH_PROFILE_PROVIDER = None
