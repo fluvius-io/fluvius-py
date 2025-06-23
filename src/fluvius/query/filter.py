@@ -115,6 +115,10 @@ class Filter(BaseModel):
         return QueryExpression(*self.selector, mode, value)
 
 
+class NonePreset(FilterPreset, name="none"):
+    eq = Filter("Equals", "string", default=True)
+
+
 class TextSearchPreset(FilterPreset, name="textsearch"):
     eq = Filter("Equals", "string", default=True)
 
@@ -165,3 +169,4 @@ class DatetimeFilterPreset(FilterPreset, name="datetime"):
     lt = Filter("Less than", dtype="datetime", input="datetime")
     lte = Filter("Less or Equals", dtype="datetime", input="datetime")
     gte = Filter("Greater or Equals", dtype="datetime", input="datetime")
+    between = Filter("Between", dtype="timerange", input="timerange")

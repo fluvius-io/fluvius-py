@@ -21,7 +21,7 @@ class UserQuery(QueryResource):
     """
 
     class Meta(QueryResource.Meta):
-        select_all = True
+        include_all = True
         allow_item_view = False
         allow_list_view = False
         allow_meta_view = False

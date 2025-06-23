@@ -122,7 +122,6 @@ class QueryBuilder(object):
         yield from _gen_query(expr)
 
     def _sort_clauses(self, data_schema, sort_query):
-        logger.warning('SORT: %s', sort_query)
         for field_name, sort_type in sort_query:
             db_field = self._field(data_schema, field_name)
             yield getattr(db_field, sort_type)()
@@ -203,10 +202,11 @@ class QueryBuilder(object):
 
     def build_select(self, data_schema, query: BackendQuery):
         def _gen_select(q):
-            cols = q.select or data_schema.__table__.columns.keys()
-            alias = q.alias or None
+            include = sorted(q.include or data_schema.__table__.columns.keys())
+            exclude = q.exclude
+            alias = q.alias or {}
 
-            return tuple(self._field(data_schema, k, alias and alias.get(k)) for k in cols)
+            return tuple(self._field(data_schema, k, alias.get(k)) for k in include if k not in exclude)
 
         fields = _gen_select(query)
         sql = select(*fields)

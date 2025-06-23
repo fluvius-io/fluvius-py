@@ -13,19 +13,6 @@ from .model import FrontendQuery
 from ._meta import config, logger
 
 
-def _compute_select(query_select, query_resource):
-    def _compute():
-        if query_resource.Meta.select_all:
-            return query_select or []  # Either none, or as-is
-
-        if not query_select:
-            return query_resource._selectable_fields
-
-        return (set(query_resource._selectable_fields) & set(query_select)) or query_resource._selectable_fields
-
-    return query_resource.process_select(*_compute())
-
-
 class QueryManagerMeta(DataModel):
     name: str
     prefix: str
@@ -154,7 +141,7 @@ class QueryManager(object):
                 act=query_resource._identifier
             )
             resp = await self._policymgr.check_permission(reqs)
-            logger.info("QUERY PERMISSION RESPONSE: %r" % resp)
+
             if not resp.allowed:
                 raise ForbiddenError('Q4031212', f'Permission Failed: [{resp.narration}]')
 
@@ -192,15 +179,16 @@ class QueryManager(object):
         query   = query_resource.process_query(fe_query.user_query, fe_query.path_query)
         limit   = fe_query.limit
         offset  = (fe_query.page - 1) * fe_query.limit
-        select  = _compute_select(fe_query.select, query_resource)
         sort    = query_resource.process_sort(*fe_query.sort) if fe_query.sort else tuple()
+        include, exclude = query_resource.process_select(fe_query.include, fe_query.exclude)
 
         backend_query = BackendQuery.create(
             identifier=identifier,
             limit=limit,
             offset=offset,
             scope=scope,
-            select=select,
+            include=include,
+            exclude=exclude,
             sort=sort,
             where=query,
             alias=query_resource._alias
@@ -223,47 +211,3 @@ class QueryManager(object):
     def process_result(self, data, meta):
         return data, meta
 
-
-class DomainQueryManager(QueryManager):
-    __abstract__ = True
-    __policymgr__ = None
-
-    def __init__(self, app=None):
-        self._app = app
-        self._data_manager = self.__data_manager__(app)
-
-        if self.__policymgr__:
-            self._policymgr = self.__policymgr__(self._data_manager)
-
-    @property
-    def data_manager(self):
-        return self._data_manager
-
-    @property
-    def policymgr(self):
-        return self._policymgr
-
-    async def execute_query(
-        self,
-        query_resource: str,
-        backend_query: BackendQuery,
-        /,
-        meta: Optional[Dict] = None,
-        auth_ctx: Optional[AuthorizationContext]=None):
-        """ Execute the backend query with the state manager and return """
-        resource = query_resource.backend_model()
-        try:
-            data = await self.data_manager.query(resource, backend_query, return_meta=meta)
-        except (
-            sqlalchemy.exc.ProgrammingError,
-            sqlalchemy.exc.DBAPIError
-        ) as e:
-            details = None if not config.DEVELOPER_MODE else {
-                "pgcode": getattr(e.orig, 'pgcode', None),
-                "statement": e.statement,
-                "params": e.params,
-            }
-
-            raise InternalServerError("Q101-501", f"Query Error [{getattr(e.orig, 'pgcode', None)}]: {e.orig}", details)
-
-        return data, meta

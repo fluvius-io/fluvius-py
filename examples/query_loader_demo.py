@@ -105,7 +105,7 @@ def demo_load_from_file():
                 "meta": {
                     "allow_item_view": True,
                     "allow_list_view": True,
-                    "select_all": False,
+                    "include_all": False,
                     "default_order": ["published_date.desc"]
                 }
             },

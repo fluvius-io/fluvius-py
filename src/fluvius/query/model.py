@@ -19,19 +19,21 @@ SCOPE_DECODER = scope_decoder
 
 
 class QueryParams(DataModel):
-    limit: int = config.DEFAULT_QUERY_LIMIT
-    page: int = 1
+    limit: int = Field(description="Page size. Maximum returned items.", default=config.DEFAULT_QUERY_LIMIT)
+    page: int = Field(description="Page number.", default=1)
 
-    select: Optional[str] = None
-    sort: Optional[str] = None
-    query: Optional[str] = None
+    include: str | None = Field(description="Fields to be included in the result. Empty to include all fields. Comma separated.", default=None)
+    exclude: str | None = Field(description="Fields to be excluded from the result. Comma separated. E.g. `id,name,desc`", default=None)
+    sort: str | None = Field(description="Comma separated sort order. E.g. `sort=created.asc,name.desc`", default=None)
+    query: str | None = Field(description="Conditional query. URL encoded JSON. E.g. `query={\"name.eq\":\"Harry\"}`", default=None)
 
 
 class FrontendQuery(DataModel):
     limit: int = config.DEFAULT_QUERY_LIMIT
     page: int = 1
 
-    select: Optional[List[str]] = None
+    include: Optional[List[str]] = None
+    exclude: Optional[List[str]] = None
     sort: Optional[List[str]] = None
     user_query: Optional[Dict] = None
     path_query: Optional[Dict] = None
@@ -42,7 +44,8 @@ class FrontendQuery(DataModel):
         return cls(
             limit=qp.limit,
             page=qp.page,
-            select=SELECT_DECODER(qp.select),
+            include=SELECT_DECODER(qp.include),
+            exclude=SELECT_DECODER(qp.exclude),
             sort=SORT_DECODER(qp.sort),
             user_query=QUERY_DECODER(qp.query),
             path_query=PATH_DECODER(path_query),
@@ -70,6 +73,7 @@ class QueryResourceMeta(DataModel):  # We need DataModel.create method
 
     ignored_params: List = tuple()
     default_order: List = tuple()
-    select_all: bool = False
+    include_all: bool = False
+    excluded_fields: List = tuple()
 
     policy_required: bool = False

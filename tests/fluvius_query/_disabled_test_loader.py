@@ -226,7 +226,7 @@ def test_resource_meta_config_defaults():
     assert meta_config.allow_list_view is True
     assert meta_config.allow_meta_view is True
     assert meta_config.auth_required is True
-    assert meta_config.select_all is False
+    assert meta_config.include_all is False
     assert meta_config.default_order is None
     assert meta_config.ignored_params == []
 
@@ -251,7 +251,7 @@ def test_create_dynamic_query_resource():
         },
         meta=ResourceMetaConfig(
             allow_item_view=True,
-            select_all=False
+            include_all=False
         )
     )
     
@@ -266,7 +266,7 @@ def test_create_dynamic_query_resource():
     assert resource_class.Meta.backend_model == "test_model"
     assert resource_class.Meta.tags == ["test"]
     assert resource_class.Meta.allow_item_view is True
-    assert resource_class.Meta.select_all is False
+    assert resource_class.Meta.include_all is False
     
     # Check docstring
     assert "A test resource" in resource_class.__doc__
@@ -540,7 +540,7 @@ def test_integration_full_workflow():
                 "meta": {
                     "allow_item_view": True,
                     "allow_list_view": True,
-                    "select_all": False
+                    "include_all": False
                 }
             }
         }
@@ -578,7 +578,7 @@ def test_integration_full_workflow():
         assert resource_instance.Meta.backend_model == "products"
         assert resource_instance.Meta.tags == ["products", "catalog"]
         assert resource_instance.Meta.allow_item_view is True
-        assert resource_instance.Meta.select_all is False
+        assert resource_instance.Meta.include_all is False
         
     finally:
         Path(temp_path).unlink() 

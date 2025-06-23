@@ -116,7 +116,8 @@ class JoinStatement(PClass):
 
 class BackendQuery(PClass):
     identifier = field(nullable(UUID_TYPE, str), initial=None)
-    select = field(tuple, factory=validate_list, initial=tuple)
+    include = field(tuple, factory=validate_list, initial=tuple)
+    exclude = field(tuple, factory=validate_list, initial=tuple)
     etag = field(nullable(str), initial=None)
 
     # # @DONE: Make join a top-level concept, not an extension

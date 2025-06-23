@@ -51,10 +51,9 @@ class QueryResource(BaseModel):
         if hasattr(cls, '_identifier'):
             raise ValueError(f'Resource already initialized: {cls._identifier}')
 
-        filters = {}
-        select_fields = []
         idfield = SimpleNamespace(name=None)
-        fieldmap = {}
+        include_fields, excluded_fields = [], []
+        fieldmap, filters = {}, {}
 
         def process_fields():
             for name, field in cls.__pydantic_fields__.items():
@@ -62,11 +61,16 @@ class QueryResource(BaseModel):
                 preset = field_meta.get('preset')
                 source = field_meta.get('source')
                 hidden = bool(field_meta.get('hidden'))
-                filters.update(FilterPreset.generate(name, source, preset))
-                field_meta['default_filter'] = field_meta.get('default_filter') or FilterPreset.default_filter(preset)
 
                 if source:
                     fieldmap[name] = source
+
+                if field_meta['excluded']:
+                    excluded_fields.append(name)
+                    continue
+
+                field_meta['default_filter'] = field_meta.get('default_filter') or FilterPreset.default_filter(preset)
+                filters.update(FilterPreset.generate(name, source, preset))
 
                 if field_meta.get('identifier'):
                     if idfield.name:
@@ -74,7 +78,7 @@ class QueryResource(BaseModel):
 
                     idfield.name = name
 
-                select_fields.append(name)
+                include_fields.append(name)
 
                 yield (field_meta['weight'], dict(
                     label=field.title,
@@ -85,10 +89,12 @@ class QueryResource(BaseModel):
                     hidden=hidden,
                 ))
 
+
         cls._fields = [f for w, f in sorted(process_fields(), key=lambda f: f[0])]
         cls._field_filters = filters
         cls._fieldmap = fieldmap
         cls._alias = {v: k for k, v in fieldmap.items()}
+        cls._excluded_fields = tuple(excluded_fields + list(cls.Meta.excluded_fields))
 
         if not idfield.name:
             raise ValueError(f'No identifier provided for query resource [{cls}]')
@@ -96,17 +102,29 @@ class QueryResource(BaseModel):
         cls._default_order = cls.Meta.default_order or ("id.desc",)
         cls._identifier = identifier
         cls._idfield = idfield.name
-        cls._selectable_fields = select_fields
+        cls._included_fields = tuple(include_fields)
 
         return cls
 
     @classmethod
-    def process_select(cls, *fields):
-        if not fields:
-            return fields
-
+    def process_select(cls, include: Tuple, exclude: Tuple) -> (Tuple, Tuple):
         fmap = cls._fieldmap
-        return tuple(fmap.get(f, f) for f in set(fields + (cls._idfield,)))
+        include = tuple(include or [])
+        exclude = tuple(exclude or []) + cls._excluded_fields  # always exclude built-in
+
+        if not cls.Meta.include_all: # Keep include statement as-is if include_all
+            if include:
+                include = tuple(set(include) & set(cls._included_fields)) # Restrict to available fields.
+            else:
+                include = cls._included_fields
+
+        # Ensure that ID is presence.
+        if include and cls._idfield not in include:
+            include += (cls._idfield,)
+
+        mapped_include = tuple(fmap.get(f, f) for f in include)
+        mapped_exclude = tuple(fmap.get(f, f) for f in exclude)
+        return mapped_include, mapped_exclude
 
     @classmethod
     def process_query(cls, *statements):
@@ -160,6 +178,7 @@ class QueryResource(BaseModel):
     def model_dump(self, **kwargs):
         kwargs.setdefault('by_alias', False)
         return super().model_dump(**kwargs)
+
 
 
 

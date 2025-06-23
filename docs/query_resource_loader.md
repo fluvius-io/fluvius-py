@@ -46,7 +46,7 @@ resources:
     meta:
       allow_item_view: true
       allow_list_view: true
-      select_all: false
+      include_all: false
 ```
 
 ### 2. Load QueryResources
@@ -129,7 +129,7 @@ meta:
   allow_list_view: true       # Allow list queries
   allow_meta_view: true       # Allow metadata queries
   auth_required: true         # Require authentication
-  select_all: false           # Select all fields by default
+  include_all: false           # Select all fields by default
   default_order: ["field.asc", "other.desc"]  # Default sort order
 ```
 
