@@ -13,6 +13,8 @@ from . import logger
 
 
 class DomainQueryResource(QueryResource):
+    __abstract__ = True
+
     id: UUID_TYPE = f.PrimaryID()
     realm: str | None = f.ExcludedField(source="_realm")
     deleted: datetime | None = f.ExcludedField(source="_deleted")
