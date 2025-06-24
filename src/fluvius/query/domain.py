@@ -52,7 +52,6 @@ class DomainQueryManager(QueryManager):
         """ Execute the backend query with the state manager and return """
         resource = query_resource.backend_model()
 
-        logger.warning('QUERY: %s', backend_query)
         try:
             data = await self.data_manager.query(resource, backend_query, return_meta=meta)
         except (
