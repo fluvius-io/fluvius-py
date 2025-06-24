@@ -238,12 +238,12 @@ class DomainEntityRegistry(object):
     @classmethod
     def message(domain_cls, cls_or_key):
         def decorator(cls):
-            msg_cls = _validate_domain_message(cls)
+            cls = _validate_domain_message(cls)
             domain_cls._register_entity(cls, key, DomainEntityType.MESSAGE)
 
-            for name, msg_dispatch in _locate_handler(msg_cls, MESSAGE_DISPATCHER_FUNC):
-                wrapper = domain_cls.message_dispatcher(msg_cls)
-                setattr(msg_cls, MESSAGE_DISPATCHER_FUNC, wrapper(msg_dispatch))
+            for name, msg_dispatch in _locate_handler(cls, MESSAGE_DISPATCHER_FUNC):
+                wrapper = domain_cls.message_dispatcher(cls)
+                setattr(cls, MESSAGE_DISPATCHER_FUNC, wrapper(msg_dispatch))
 
             DEBUG and logger.info("[REGISTERED MESSAGE] %s/%d [%s]", domain_cls.__namespace__, DomainEntityType.MESSAGE, key)
             return cls

@@ -244,7 +244,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
     async def dispatch_messages(self, msg_queue):
         for msg_record in consume_queue(msg_queue):
-            for dispatcher in self.msg_dispatchers(msg_record.message):
+            for dispatcher in self.msg_dispatchers(msg_record):
                 await dispatcher(msg_record)
 
     @contextmanager
