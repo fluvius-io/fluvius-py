@@ -51,6 +51,10 @@ class FastAPIDomainManager(DomainManager):
 
 
 def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
+    if cmd_cls.Meta.internal:
+        # Note: Internal commands are not exposed to the API, registered for worker only.
+        return app
+
     PayloadType = cmd_cls.Data if issubclass(cmd_cls.Data, DataModel) else Dict
 
     scope_schema = (cmd_cls.Meta.scope_required or cmd_cls.Meta.scope_optional)
