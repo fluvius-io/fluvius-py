@@ -14,10 +14,19 @@ class WorkerRequestRelation(DataModel):
     domain_iid: Optional[UUID_TYPE] = None
 
 
+class WorkerAudit(DataModel):
+    user_id: Optional[UUID_TYPE] = None
+    profile_id: Optional[UUID_TYPE] = None
+    organization_id: Optional[UUID_TYPE] = None
+    realm: Optional[str] = None
+    iam_roles: Optional[List[str]] = None
+
+
 class WorkerContext(DataModel):
     user: Dict = Field(default_factory=dict)
+    audit: Optional[WorkerAudit] = WorkerAudit()
     source: Optional[str] = None
-    realm: Dict = Field(default_factory=dict)
+    realm: Optional[str] = None
     domain: Optional[str] = None
     revision: int = 0
 

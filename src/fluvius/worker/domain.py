@@ -28,7 +28,8 @@ class DomainWorker(FluviusWorker, DomainManager):
             context = domain.setup_context(
                 headers=request.headers,
                 transport=DomainTransport.REDIS,
-                source=request.context.source
+                source=request.context.source,
+                **request.context.audit.serialize()
             )
 
             cmddata = request.command

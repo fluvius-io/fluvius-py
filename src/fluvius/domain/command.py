@@ -51,6 +51,7 @@ class CommandMeta(DataModel):
     auth_required: bool = True
     policy_required: bool = True
     resource_desc: Optional[str] = None
+    internal: bool = False
 
 
 class Command(DomainEntity):
