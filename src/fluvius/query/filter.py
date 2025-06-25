@@ -129,9 +129,9 @@ class UUIDFilterPreset(FilterPreset, name="uuid"):
 
 
 class StringFilterPreset(FilterPreset, name="string"):
-    eq = Filter("Equals", "string", default=True)
+    ilike = Filter("Contains", "string", default=True)
+    eq = Filter("Equals", "string")
     ne = Filter("Not Equals", "string")
-    ilike = Filter("Contains", "string")
 
 class IntegerFilterPreset(FilterPreset, name="integer"):
     eq = Filter("Equals", dtype="integer", input="integer", default=True)
@@ -163,6 +163,7 @@ class BooleanFilterPreset(FilterPreset, name="boolean"):
     eq = Filter("Equals", dtype="boolean", input="boolean", default=True)
     ne = Filter("Not Equals", dtype="boolean", input="boolean")
 
+
 class DatetimeFilterPreset(FilterPreset, name="datetime"):
     eq = Filter("Equals", dtype="datetime", input="datetime", default=True)
     gt = Filter("Greater than", dtype="datetime", input="datetime")
@@ -170,3 +171,7 @@ class DatetimeFilterPreset(FilterPreset, name="datetime"):
     lte = Filter("Less or Equals", dtype="datetime", input="datetime")
     gte = Filter("Greater or Equals", dtype="datetime", input="datetime")
     between = Filter("Between", dtype="timerange", input="timerange")
+
+
+class EnumFilterPreset(FilterPreset, name="enum"):
+    eq = Filter("Equals", dtype="string", input="string", default=True)
