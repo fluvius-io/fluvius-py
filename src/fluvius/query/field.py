@@ -12,24 +12,27 @@ def QueryField(
     hidden=False,
     array=False,
     enum=None,
-    json_schema_extra=None,
     excluded=False,
+    dtype=None,
+    json_schema_extra=None,
     **kwargs
 ):
     extra = (json_schema_extra or {}) | dict(
         preset=preset,
-        sortable=sortable,
         identifier=identifier,
+        sortable=sortable,
+        source=source,
         default_filter=default_filter,
+        weight=weight,
         hidden=hidden,
         array=array,
         enum=str(enum) if enum else None,
-        weight=weight,
-        source=source,
-        excluded=excluded
+        excluded=excluded,
+        dtype=dtype,
     )
 
     return PydanticField(title=title, json_schema_extra=extra, **kwargs)
+
 
 def ExcludedField(title="Excluded", preset=None, excluded=True, sortable=False, identifier=None, hidden=True, **kwargs):
     return QueryField(title=title, preset="none", excluded=True, **kwargs)
