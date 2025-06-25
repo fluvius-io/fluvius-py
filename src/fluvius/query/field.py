@@ -65,7 +65,7 @@ def TextSearchField(title, **kwargs):
 
 
 def BooleanField(title, **kwargs):
-    return QueryField(title=title, preset="string", **kwargs)
+    return QueryField(title=title, preset="boolean", **kwargs)
 
 
 def EnumField(title, **kwargs):
