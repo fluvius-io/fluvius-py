@@ -87,7 +87,7 @@ class QueryResource(BaseModel):
                     noop=field_meta['default_filter'],
                     sortable=bool(field_meta.get('sortable', True)),
                     hidden=hidden,
-                    dtype=field_meta.get('dtype', preset)
+                    dtype=field_meta.get('dtype') or preset
                 ))
 
 
