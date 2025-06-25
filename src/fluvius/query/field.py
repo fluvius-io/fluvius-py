@@ -49,7 +49,7 @@ def StringField(title, **kwargs):
 
 
 def FloatField(title, **kwargs):
-    return QueryField(title=title, preset="string", **kwargs)
+    return QueryField(title=title, preset="number", **kwargs)
 
 
 def PrimaryID(title="ID", weight=100, **kwargs):
