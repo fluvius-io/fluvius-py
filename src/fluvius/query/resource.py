@@ -88,6 +88,7 @@ class QueryResource(BaseModel):
                     sortable=bool(field_extra.get('sortable', True)),
                     hidden=hidden,
                     finput=field_extra.get('finput'),
+                    dtype=field_meta.get('dtype') or preset,
                 ))
 
 

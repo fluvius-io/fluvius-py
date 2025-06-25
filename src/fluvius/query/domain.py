@@ -1,7 +1,9 @@
-from typing import Optional, List, Dict, Any
+import sqlalchemy
+from typing import Optional, Dict
 
 from fluvius.auth import AuthorizationContext
 from fluvius.data import UUID_TYPE, BackendQuery
+from fluvius.error import InternalServerError
 
 from datetime import datetime
 
@@ -9,10 +11,12 @@ from .resource import QueryResource
 from .manager import QueryManager
 
 from . import field as f
-from . import logger
+from . import logger, config
 
 
 class DomainQueryResource(QueryResource):
+    __abstract__ = True
+
     id: UUID_TYPE = f.PrimaryID()
     realm: str | None = f.ExcludedField(source="_realm")
     deleted: datetime | None = f.ExcludedField(source="_deleted")
