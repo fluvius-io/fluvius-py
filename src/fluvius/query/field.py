@@ -15,6 +15,8 @@ def QueryField(
     excluded=False,
     finput=None,
     dtype=None,
+    item_type=None,
+    enum_values=None,
     json_schema_extra=None,
     **kwargs
 ):
@@ -28,11 +30,11 @@ def QueryField(
         hidden=hidden,
         array=array,
         enum=str(enum) if enum else None,
-        weight=weight,
-        source=source,
         excluded=excluded,
         finput=finput,
         dtype=dtype,
+        enum_values=enum_values,
+        item_type=item_type,
     )
 
     return PydanticField(title=title, json_schema_extra=extra, **kwargs)
