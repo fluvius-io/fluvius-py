@@ -57,22 +57,22 @@ class QueryResource(BaseModel):
 
         def process_fields():
             for name, field in cls.__pydantic_fields__.items():
-                field_meta = field.json_schema_extra
-                preset = field_meta.get('preset')
-                source = field_meta.get('source')
-                hidden = bool(field_meta.get('hidden'))
+                field_extra = field.json_schema_extra
+                preset = field_extra.get('preset')
+                source = field_extra.get('source')
+                hidden = bool(field_extra.get('hidden'))
 
                 if source:
                     fieldmap[name] = source
 
-                if field_meta['excluded']:
+                if field_extra['excluded']:
                     excluded_fields.append(name)
                     continue
 
-                field_meta['default_filter'] = field_meta.get('default_filter') or FilterPreset.default_filter(preset)
+                field_extra['default_filter'] = field_extra.get('default_filter') or FilterPreset.default_filter(preset)
                 filters.update(FilterPreset.generate(name, source, preset))
 
-                if field_meta.get('identifier'):
+                if field_extra.get('identifier'):
                     if idfield.name:
                         raise ValueError(f'Multiple identifier for query resource [{cls}]: {idfield["value"]} & {name}')
 
@@ -80,13 +80,14 @@ class QueryResource(BaseModel):
 
                 include_fields.append(name)
 
-                yield (field_meta['weight'], dict(
+                yield (field_extra['weight'], dict(
                     label=field.title,
                     name=name,
                     desc=field.description,
-                    noop=field_meta['default_filter'],
-                    sortable=bool(field_meta.get('sortable', True)),
+                    noop=field_extra['default_filter'],
+                    sortable=bool(field_extra.get('sortable', True)),
                     hidden=hidden,
+                    finput=field_extra.get('finput'),
                 ))
 
 

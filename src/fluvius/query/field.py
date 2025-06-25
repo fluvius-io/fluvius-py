@@ -14,6 +14,7 @@ def QueryField(
     enum=None,
     json_schema_extra=None,
     excluded=False,
+    finput=None,
     **kwargs
 ):
     extra = (json_schema_extra or {}) | dict(
@@ -26,7 +27,8 @@ def QueryField(
         enum=str(enum) if enum else None,
         weight=weight,
         source=source,
-        excluded=excluded
+        excluded=excluded,
+        finput=finput,
     )
 
     return PydanticField(title=title, json_schema_extra=extra, **kwargs)
