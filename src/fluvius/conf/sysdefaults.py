@@ -6,6 +6,7 @@
         - a configuration in the default configuration file (in the correct section)
         - a default value in `defaults.py`
 '''
+
 LOG_LEVEL = "info"
 LOG_FORMATTER_LONG = (
     "[%(asctime)-15s] [{hostname}] "
@@ -24,8 +25,7 @@ LOG_FORMATTER = LOG_FORMATTER_SHORT
 LOG_OUTPUT = None
 LOG_OUTPUT_SECONDARY = None
 LOG_COLORED = False
-EXCHANGE_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
-# Print module configuration. Accept the name of a module.
+# Print module configuration. Accept the name of a module. E.g. "fluvius.query"
 DEBUG_MODULE_CONFIG = None
-DEBUG_APP_EXCEPTION = False
+DEBUG_APP_EXCEPTION = True
