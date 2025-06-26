@@ -70,6 +70,8 @@ def create_data_schema_base(driver_cls=None):
             if cls.__dict__.get('__abstract__', False):
                 return
 
+            cls.__columns__ = tuple(cls.__table__.columns.keys())
+
             if driver_cls is not None:
                 driver_cls.register_schema(cls)
 

@@ -23,8 +23,8 @@ class DomainQueryResource(QueryResource):
     etag: str | None = f.QueryField("ETag", source="_etag", preset="none", hidden=True)
     created: datetime = f.DatetimeField("Created", source="_created", hidden=True)
     updated: datetime | None = f.DatetimeField("Updated", source="_updated", hidden=True)
-    creator: UUID_TYPE | None = f.UUIDField("Creator", source="_creator", hidden=True)
-    updater: UUID_TYPE | None = f.UUIDField("Updater", source="_updater", hidden=True)
+    creator: UUID_TYPE | None= f.UUIDField("Creator", source="_creator", hidden=True, etype="user-profile")
+    updater: UUID_TYPE | None= f.UUIDField("Updater", source="_updater", hidden=True, etype="user-profile")
 
 
 class DomainQueryManager(QueryManager):

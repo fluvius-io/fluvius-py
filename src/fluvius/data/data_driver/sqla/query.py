@@ -202,7 +202,7 @@ class QueryBuilder(object):
 
     def build_select(self, data_schema, query: BackendQuery):
         def _gen_select(q):
-            include = sorted(q.include or data_schema.__table__.columns.keys())
+            include = q.include or data_schema.__table__.columns.keys()
             exclude = q.exclude
             alias = q.alias or {}
 

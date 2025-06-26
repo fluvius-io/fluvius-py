@@ -3,20 +3,21 @@ from fluvius.query import logger
 
 def QueryField(
     title,
-    preset="string",
-    identifier=None,
-    sortable=True,
-    source=None,
-    default_filter=None,
-    weight=0,
-    hidden=False,
+    preset="string",        # Query operators preset, define the list of query operators available for the field
+    identifier=None,        # Whether the field is the identifier field of the resource. Only one identifier allowed for 1 resource.
+    sortable=True,          # Field is sortable
+    source=None,            # Source field name. The name of the field in the underlying table.
+    default_filter=None,    # Default filter operator for the field.
+    weight=0,               # Ordering weight for the field
     array=False,
-    enum=None,
-    excluded=False,
-    finput=None,
     dtype=None,
-    item_type=None,
+    enum=None,
     enum_values=None,
+    excluded=False,
+    ftype=None,
+    finput=None,
+    hidden=False,
+    item_type=None,         # Unused, to be removed.
     json_schema_extra=None,
     **kwargs
 ):
@@ -27,14 +28,14 @@ def QueryField(
         source=source,
         default_filter=default_filter,
         weight=weight,
-        hidden=hidden,
         array=array,
-        enum=str(enum) if enum else None,
-        excluded=excluded,
-        finput=finput,
         dtype=dtype,
+        enum=str(enum) if enum else None,
         enum_values=enum_values,
-        item_type=item_type,
+        excluded=excluded,
+        ftype=ftype,
+        finput=finput,
+        hidden=hidden,
     )
 
     return PydanticField(title=title, json_schema_extra=extra, **kwargs)
