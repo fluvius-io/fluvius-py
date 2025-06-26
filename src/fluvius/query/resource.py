@@ -89,7 +89,7 @@ class QueryResource(BaseModel):
                     hidden=hidden,
                     finput=field_extra.get('finput'),
                     dtype=field_extra.get('dtype') or preset,
-                    etype=field_extra.get('etype')
+                    ftype=field_extra.get('ftype')
                 ))
 
 
