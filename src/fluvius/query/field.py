@@ -69,8 +69,8 @@ def BooleanField(title, **kwargs):
     return QueryField(title=title, preset="boolean", **kwargs)
 
 
-def EnumField(title, **kwargs):
-    return QueryField(title=title, preset="enum", **kwargs)
+def EnumField(title, ftype="enum", **kwargs):
+    return QueryField(title=title, preset="enum", ftype=ftype, **kwargs)
 
 
 def DateField(title, **kwargs):

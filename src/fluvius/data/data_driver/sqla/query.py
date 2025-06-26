@@ -201,14 +201,12 @@ class QueryBuilder(object):
         return sql
 
     def build_select(self, data_schema, query: BackendQuery):
-        def _gen_select(q):
-            include = q.include or data_schema.__table__.columns.keys()
-            exclude = q.exclude
-            alias = q.alias or {}
+        include = query.include or data_schema.__table__.columns.keys()
+        exclude = query.exclude
+        alias = query.alias or {}
 
-            return tuple(self._field(data_schema, k, alias.get(k)) for k in include if k not in exclude)
+        fields = tuple(self._field(data_schema, k, alias.get(k)) for k in include if k not in exclude)
 
-        fields = _gen_select(query)
         sql = select(*fields)
         sql = self._build_join(data_schema, sql, query)
         sql = self._build_where(data_schema, sql, query)
