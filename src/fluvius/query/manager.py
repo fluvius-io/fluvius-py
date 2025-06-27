@@ -6,7 +6,7 @@ from typing import Optional, List, Dict, Any
 from fluvius.auth import AuthorizationContext
 from fluvius.data import BackendQuery, DataModel
 from fluvius.helper import camel_to_lower, select_value
-from fluvius.error import InternalServerError, NotFoundError, ForbiddenError
+from fluvius.error import InternalServerError, NotFoundError, ForbiddenError, BadRequestError
 from fluvius.casbin import PolicyRequest
 from .resource import QueryResource
 from .model import FrontendQuery
@@ -86,6 +86,9 @@ class QueryManager(object):
         return _decorator
 
     def validate_fe_query(self, query_resource, fe_query):
+        if fe_query.search and not query_resource.Meta.allow_text_search:
+            raise BadRequestError("Q100-502", f"Text search is not allowed for this resource [{query_resource.Meta.name}]")
+
         if not isinstance(fe_query, FrontendQuery):
             raise ValueError(f'Invalid query: {fe_query}')
 
@@ -191,7 +194,8 @@ class QueryManager(object):
             exclude=exclude,
             sort=sort,
             where=query,
-            alias=query_resource._alias
+            alias=query_resource._alias,
+            search=fe_query.search,
         )
         return self.validate_backend_query(query_resource, backend_query)
 

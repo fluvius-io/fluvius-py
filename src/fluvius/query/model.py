@@ -27,6 +27,7 @@ class QueryParams(DataModel):
     sort: str | None = Field(description="Comma separated sort order. E.g. `sort=created.asc,name.desc`", default=None)
     query: str | None = Field(description="Conditional query. URL encoded JSON. E.g. `query={\"name.eq\":\"Harry\"}`", default=None)
 
+    search: str | None = Field(description="Search query. E.g. `search=Harry`", default=None)
 
 class FrontendQuery(DataModel):
     limit: int = config.DEFAULT_QUERY_LIMIT
@@ -38,6 +39,7 @@ class FrontendQuery(DataModel):
     user_query: Optional[Dict] = None
     path_query: Optional[Dict] = None
     scope: Optional[Dict] = None
+    search: Optional[str] = None
 
     @classmethod
     def from_query_params(cls, qp: QueryParams, /, path_query=None, scope=None, scope_schema=None):
@@ -50,6 +52,7 @@ class FrontendQuery(DataModel):
             user_query=QUERY_DECODER(qp.query),
             path_query=PATH_DECODER(path_query),
             scope=SCOPE_DECODER(scope, scope_schema),
+            search=qp.search,
         )
 
 
@@ -63,6 +66,8 @@ class QueryResourceMeta(DataModel):  # We need DataModel.create method
     allow_item_view: bool = True
     allow_list_view: bool = True
     allow_meta_view: bool = True
+    allow_text_search: bool = False
+
     strict_response: bool = False
     auth_required: bool = True
 
@@ -77,3 +82,4 @@ class QueryResourceMeta(DataModel):  # We need DataModel.create method
     excluded_fields: List = tuple()
 
     policy_required: bool = False
+    

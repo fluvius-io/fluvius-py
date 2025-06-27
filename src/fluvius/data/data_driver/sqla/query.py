@@ -21,7 +21,7 @@
     }
 ```
 '''
-from sqlalchemy import select, update, delete, insert
+from sqlalchemy import select, update, delete, insert, func
 from sqlalchemy import and_, or_, not_
 from sqlalchemy.sql.operators import contains_op, custom_op, ilike_op, in_op, eq, ge, gt, le, lt, ne
 
@@ -32,6 +32,7 @@ from fluvius.constant import QUERY_OPERATOR_SEP, OPERATOR_SEP_NEGATE, DEFAULT_DE
 
 DEBUG_CONNECTOR = config.DEBUG
 
+TEXT_SEARCH_ENGINE = 'english'
 FIELD_SEP = ":"
 FIELD_DEL = DEFAULT_DELETED_FIELD
 
@@ -167,6 +168,13 @@ class QueryBuilder(object):
         if hasattr(data_schema, FIELD_DEL):
             if not q.incl_deleted:
                 yield (self._field(data_schema, FIELD_DEL) == None)
+
+        if q.search:
+            if not hasattr(data_schema, '__ts_index__') or not isinstance(data_schema.__ts_index__, list):
+                raise BadRequestError("D100-502", "Data schema does not support text search")
+
+            index = func.concat_ws(' ', *[self._field(data_schema, field) for field in data_schema.__ts_index__])
+            yield (func.to_tsvector(TEXT_SEARCH_ENGINE, index).op('@@')(func.plainto_tsquery(TEXT_SEARCH_ENGINE, q.search)))
 
     def _build_where(self, data_schema, sql, q: BackendQuery):
         return sql.where(*self._where_clauses(data_schema, q))

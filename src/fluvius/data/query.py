@@ -133,6 +133,9 @@ class BackendQuery(PClass):
     # Default don't query the deleted item.
     incl_deleted = field(bool, initial=False)
 
+    # Search field, used for full-text search
+    search = field(nullable(str), initial=None)
+
     @classmethod
     def create(cls, query_data=None, **kwargs):
         if query_data is None:
