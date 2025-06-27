@@ -14,8 +14,7 @@ class FluviusException(Exception):
         self.payload = payload
         self.errcode = errcode
 
-        if DEBUG_APP_EXCEPTION:
-            logger.exception(message)
+        DEBUG_APP_EXCEPTION and logger.exception(message)
 
     def __str__(self):
         if self.payload is None:

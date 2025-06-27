@@ -30,9 +30,12 @@ from fluvius.data import logger, config
 from fluvius.error import BadRequestError
 from fluvius.constant import QUERY_OPERATOR_SEP, OPERATOR_SEP_NEGATE, DEFAULT_DELETED_FIELD
 
+
 DEBUG_CONNECTOR = config.DEBUG
 
-TEXT_SEARCH_ENGINE = 'english'
+DEFAULT_TEXT_SEARCH_LANG = 'english'
+DEFAULT_TEXT_SEARCH_ENGINE = func.plainto_tsquery
+
 FIELD_SEP = ":"
 FIELD_DEL = DEFAULT_DELETED_FIELD
 
@@ -169,12 +172,12 @@ class QueryBuilder(object):
             if not q.incl_deleted:
                 yield (self._field(data_schema, FIELD_DEL) == None)
 
-        if q.search:
+        if q.text:
             if not hasattr(data_schema, '__ts_index__') or not isinstance(data_schema.__ts_index__, list):
                 raise BadRequestError("D100-502", "Data schema does not support text search")
 
             index = func.concat_ws(' ', *[self._field(data_schema, field) for field in data_schema.__ts_index__])
-            yield (func.to_tsvector(TEXT_SEARCH_ENGINE, index).op('@@')(func.plainto_tsquery(TEXT_SEARCH_ENGINE, q.search)))
+            yield (func.to_tsvector(DEFAULT_TEXT_SEARCH_LANG, index).op('@@')(DEFAULT_TEXT_SEARCH_ENGINE(DEFAULT_TEXT_SEARCH_LANG, q.text)))
 
     def _build_where(self, data_schema, sql, q: BackendQuery):
         return sql.where(*self._where_clauses(data_schema, q))

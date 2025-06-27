@@ -136,8 +136,8 @@ class QueryResource(BaseModel):
     @classmethod
     def process_sort(cls, *sorts):
         fmap = cls._fieldmap
-        def gen():
-            for sort in sorts:
+        def gen(stmt):
+            for sort in stmt:
                 sort = sort.split('.')
                 if len(sort) == 1:
                     dr = "asc"
@@ -147,7 +147,7 @@ class QueryResource(BaseModel):
 
                 yield (fmap.get(fn, fn), dr)
 
-        return tuple(gen())
+        return tuple(gen(sorts or cls._default_order))
 
     @classmethod
     def resource_meta(cls):
@@ -164,8 +164,7 @@ class QueryResource(BaseModel):
             'composites': {
                 ".and": {"label": "AND Group"},
                 ".or": {"label": "OR Group"}
-            },
-            'default_order': cls._default_order
+            }
         }
 
 

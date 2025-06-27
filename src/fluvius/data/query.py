@@ -134,7 +134,7 @@ class BackendQuery(PClass):
     incl_deleted = field(bool, initial=False)
 
     # Search field, used for full-text search
-    search = field(nullable(str), initial=None)
+    text = field(nullable(str), initial=None)
 
     @classmethod
     def create(cls, query_data=None, **kwargs):

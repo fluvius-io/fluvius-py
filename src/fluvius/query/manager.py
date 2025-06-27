@@ -86,7 +86,7 @@ class QueryManager(object):
         return _decorator
 
     def validate_fe_query(self, query_resource, fe_query):
-        if fe_query.search and not query_resource.Meta.allow_text_search:
+        if fe_query.text and not query_resource.Meta.allow_text_search:
             raise BadRequestError("Q100-502", f"Text search is not allowed for this resource [{query_resource.Meta.name}]")
 
         if not isinstance(fe_query, FrontendQuery):
@@ -195,7 +195,7 @@ class QueryManager(object):
             sort=sort,
             where=query,
             alias=query_resource._alias,
-            search=fe_query.search,
+            text=fe_query.text,
         )
         return self.validate_backend_query(query_resource, backend_query)
 
