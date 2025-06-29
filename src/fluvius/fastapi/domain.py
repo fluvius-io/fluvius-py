@@ -65,8 +65,8 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
         tags=domain.Meta.tags
     )
 
-    def endpoint(*paths, method=app.post, auth={}, **kwargs):
-        api_decorator = method(uri(f"/{fq_name}", *paths), **(endpoint_info | kwargs))
+    def endpoint(*paths, base=f"/{fq_name}", method=app.post, auth={}, **kwargs):
+        api_decorator = method(uri(base, *paths), **(endpoint_info | kwargs))
         if not cmd_cls.Meta.auth_required:
             return api_decorator
 
@@ -106,6 +106,16 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
 
     if scope_schema:
         scope_keys = list(scope_schema.keys())
+
+    @endpoint(
+        base=f"/_meta/{fq_name}/",
+        method=app.get,
+        summary=cmd_cls.Meta.name,
+        description=cmd_cls.Meta.desc, tags=["Metadata"])
+    async def command_metadata(request: Request):
+        return {
+            "schema": cmd_cls.Data.model_json_schema()
+        }
 
     if cmd_cls.Meta.new_resource:
         if default_path:
@@ -153,6 +163,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
         ):
             scope = scope_decoder(scoping, scope_schema)
             return await _command_handler(request, payload, resource, identifier, scope)
+
 
     return app
 
