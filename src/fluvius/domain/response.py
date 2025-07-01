@@ -20,4 +20,10 @@ class DomainResponse(DomainEntity):
     __meta_schema__ = ResponseMeta
     __abstract__ = True
 
+    # Response may accept any data by default
+    # since the data is generated from server.
+    class Data(BlankModel):
+        pass
+
+
 __all__ = ("DomainResponse",)

@@ -101,7 +101,11 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
             )
         )
 
-        return await domain.process_command(command, context=context)
+        responses = await domain.process_command(command, context=context)
+        return {
+            "data": responses,
+            "status": "OK"
+        }
 
 
     if scope_schema:
@@ -116,7 +120,8 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
         return {
             "schema": cmd_cls.Data.model_json_schema(),
             "name": cmd_cls.Meta.name,
-            "desc": cmd_cls.Meta.desc
+            "desc": cmd_cls.Meta.desc,
+            "noid": cmd_cls.Meta.new_resource
         }
 
     if cmd_cls.Meta.new_resource:

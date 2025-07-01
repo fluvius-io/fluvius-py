@@ -396,6 +396,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             return
 
         ctx = context
+        responses = {}
         context = self.validate_context(select_value(ctx, self._active_context))
         assert isinstance(ctx, self.__context__), f'Invalid domain context: {ctx}. Must be a subclass of {self.__context__}'
 
@@ -420,10 +421,16 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             # Before exiting transaction manager context                    
             await self.publish(sig.TRANSACTION_COMMITTING, self)
 
-        await self.publish(sig.TRANSACTION_COMMITTED, self)
-        await self.trigger_reconciliation(self.cmd_queue)
-        await self.dispatch_messages(self.msg_queue)
-        return [resp.data for resp in consume_queue(self.rsp_queue)]
+            await self.publish(sig.TRANSACTION_COMMITTED, self)
+            await self.trigger_reconciliation(self.cmd_queue)
+            await self.dispatch_messages(self.msg_queue)
+
+            for resp in consume_queue(self.rsp_queue):
+                if resp.response in responses:
+                    raise RuntimeError(f'Duplicated response: [{resp.response}].')
+
+                responses[resp.response] = resp.data
+            return responses
 
 
     async def trigger_reconciliation(self, cmd_queue):
@@ -438,7 +445,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
                 user_id=authorization.user._id,
                 profile_id=authorization.profile._id,
                 organization_id=authorization.organization._id,
-                iam_roles=authorization.iam_roles,
+                iam_roles=authorization.iamroles,
                 realm=authorization.realm
             )
         return self._context.set(_id=UUID_GENR(), **kwargs, **audit)
