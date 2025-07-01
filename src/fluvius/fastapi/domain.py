@@ -114,7 +114,9 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
         description=cmd_cls.Meta.desc, tags=["Metadata"])
     async def command_metadata(request: Request):
         return {
-            "schema": cmd_cls.Data.model_json_schema()
+            "schema": cmd_cls.Data.model_json_schema(),
+            "name": cmd_cls.Meta.name,
+            "desc": cmd_cls.Meta.desc
         }
 
     if cmd_cls.Meta.new_resource:
