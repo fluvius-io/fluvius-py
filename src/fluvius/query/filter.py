@@ -175,3 +175,4 @@ class DatetimeFilterPreset(FilterPreset, name="datetime"):
 
 class EnumFilterPreset(FilterPreset, name="enum"):
     eq = Filter("Equals", dtype="string", input="string", default=True)
+    in_ = Filter("In List", "string")

@@ -128,7 +128,7 @@ class QueryBuilder(object):
     def _sort_clauses(self, data_schema, sort_query):
         for field_name, sort_type in sort_query:
             db_field = self._field(data_schema, field_name)
-            yield getattr(db_field, sort_type)()
+            yield getattr(db_field, sort_type)().nulls_last()
 
 
     def _build_limit(self, data_schema, stmt, q: BackendQuery):
