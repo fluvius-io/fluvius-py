@@ -35,6 +35,7 @@ class FilterPreset(object):
         has_default: str = None
         for attr in dir(cls):
             flt = getattr(cls, attr)
+            # Preprocessing for keyword related operators, e.g. 'in_' => 'in'
             operator = attr[:-1] if attr.endswith('_') else attr
 
             if not (flt and isinstance(flt, Filter)):
