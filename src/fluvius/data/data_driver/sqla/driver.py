@@ -1,6 +1,7 @@
 import asyncpg
 import importlib
 import sqlalchemy as sa
+from functools import wraps
 
 from asyncio import current_task
 from contextlib import asynccontextmanager
@@ -61,6 +62,51 @@ def build_dsn(config):
         password=config.setdefault("DB_PASSWORD", ""),
         database=config.setdefault("DB_DATABASE", "postgres"),
     )
+
+def sqla_error_handler(code_prefix):
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            try:
+                return await func(*args, **kwargs)
+            except asyncpg.exceptions.UniqueViolationError as e:
+                raise UnprocessableError(
+                    f"{code_prefix}.01",
+                    "Duplicate entry detected. Record must be unique.",
+                    str(e.orig)
+                )
+            except exc.IntegrityError as e:
+                raise UnprocessableError(
+                    f"{code_prefix}.02",
+                    "Integrity constraint violated. Please check your input.",
+                    str(e.orig)
+                )
+            except exc.OperationalError as e:
+                raise InternalServerError(
+                    f"{code_prefix}.03",
+                    "The database is currently unreachable. Please try again later.",
+                    str(e.orig)
+                )
+            except exc.ProgrammingError as e:
+                raise InternalServerError(
+                    f"{code_prefix}.04",
+                    "There was a syntax or structure error in the database query.",
+                    str(e.orig)
+                )
+            except exc.DBAPIError as e:
+                raise InternalServerError(
+                    f"{code_prefix}.05",
+                    "A database driver error occurred.",
+                    str(e.orig)
+                )
+            except exc.SQLAlchemyError as e:
+                raise InternalServerError(
+                    f"{code_prefix}.06",
+                    "An unexpected database error occurred while processing your request.",
+                    str(e.orig)
+                )
+        return wrapper
+    return decorator
 
 
 class _AsyncSessionConnection(object):
@@ -200,6 +246,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
                 await async_session_transaction.rollback()
                 raise
 
+    @sqla_error_handler('L1207')
     async def find_all(self, resource, query: BackendQuery):
         if query.offset != 0 or query.limit != BACKEND_QUERY_LIMIT:
             raise ValueError(f'Invalid find all query: {query}')
@@ -269,6 +316,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
     def _unwrap_schema_list(self, item):
         return item.serialize()
 
+    @sqla_error_handler('L1201')
     async def find_one(self, resource, query: BackendQuery):
         data_schema = self.lookup_data_schema(resource)
         stmt = self.build_select(data_schema, query)
@@ -286,6 +334,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
                 message=f"{str(e)}. Query: {query}"
             )
 
+    @sqla_error_handler('L1202')
     async def update_one(self, resource, query, **updates):
         if not query.identifier:
             raise ValueError(f'Invalid update query: {query}')
@@ -297,6 +346,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
         self._check_no_item_modified(cursor, 1, query)
         return self._unwrap_result(cursor)
 
+    @sqla_error_handler('L1203')
     async def remove_one(self, resource, query: BackendQuery):
         data_schema = self.lookup_data_schema(resource)
         if not query.identifier:
@@ -309,17 +359,12 @@ class SqlaDriver(DataDriver, QueryBuilder):
         self._check_no_item_modified(cursor, 1, query)
         return self._unwrap_result(cursor)
 
+    @sqla_error_handler('L1204')
     async def insert(self, resource, values: (dict, list)):
-        try:
-            data_schema = self.lookup_data_schema(resource)
-            stmt = self.build_insert(data_schema, values)
-            async with self.session() as sess:
-                cursor = await sess.execute(stmt)
-        except (asyncpg.exceptions.UniqueViolationError, exc.IntegrityError) as e:
-            raise UnprocessableError(
-                errcode="L1209",
-                message="Unable to insert data due to integrity violation [%s]" % e,
-            )
+        data_schema = self.lookup_data_schema(resource)
+        stmt = self.build_insert(data_schema, values)
+        async with self.session() as sess:
+            cursor = await sess.execute(stmt)
 
         expect = len(values) if isinstance(values, (list, tuple)) else 1
         self._check_no_item_modified(cursor, expect)
@@ -329,6 +374,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
         return self._unwrap_result(cursor)
 
+    @sqla_error_handler('L1205')
     async def upsert(self, resource, data: list):
         # Use dialect dependent (e.g. sqlite, postgres, mysql) version of the statement
         # See: connector.py [setup_sql_satemenet]
@@ -352,6 +398,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
         self._check_no_item_modified(cursor, len(data))
         return self._unwrap_result(cursor)
 
+    @sqla_error_handler('L1206')
     async def native_query(self, nquery, *params, unwrapper):
         if isinstance(nquery, PikaQueryBuilder):
             stmt = nquery.get_sql()
