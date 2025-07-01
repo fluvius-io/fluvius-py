@@ -327,12 +327,12 @@ class DataAccessManager(DataAccessManagerBase):
     async def invalidate(self, record: DataModel):
         model_name = self.lookup_record_model(record)
         query = BackendQuery.create(identifier=record._id, etag=record._etag)
-        return await self.connector.update_one(model_name, query, _deleted=timestamp())
+        return await self.connector.update_one(model_name, query, _deleted=timestamp(), _updated=timestamp())
 
     async def update(self, record: DataModel, /, **updates):
         model_name = self.lookup_record_model(record)
         q = BackendQuery.create(identifier=record._id, etag=record._etag)
-        return await self.connector.update_one(model_name, q, **updates)
+        return await self.connector.update_one(model_name, q, **updates, _updated=timestamp())
 
     async def remove(self, record: DataModel):
         model_name = self.lookup_record_model(record)
@@ -357,11 +357,11 @@ class DataAccessManager(DataAccessManagerBase):
     async def invalidate_one(self, model_name: str, identifier: UUID_TYPE, etag=None, /, **updates):
         q = BackendQuery.create(identifier=identifier, etag=etag)
         updates['_deleted'] = timestamp()
-        return await self.connector.update_one(model_name, q, **updates)
+        return await self.connector.update_one(model_name, q, **updates, _updated=timestamp())
 
     async def update_one(self, model_name: str, identifier: UUID_TYPE, etag=None, /, **updates):
         query = BackendQuery.create(identifier=identifier, etag=etag)
-        return await self.connector.update_one(model_name, query, **updates)
+        return await self.connector.update_one(model_name, query, **updates, _updated=timestamp())
 
 class ReadonlyDataManagerProxy(object):
     def __init__(self, data_manager):
