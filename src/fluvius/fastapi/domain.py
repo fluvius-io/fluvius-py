@@ -22,27 +22,37 @@ from .helper import uri, SCOPE_SELECTOR
 class FastAPIDomainManager(DomainManager):
     def __init__(self, app):
         self.initialize_domains(app)
-        tags = []
-        for domain in self._domains:
+        def setup_domain(domain):
             metadata_uri = f"/_meta/{domain.__namespace__}/"
-            tags.append({
+            cmd_details = {
+                cmd['id']: cmd for cmd in
+                (
+                    register_command_handler(app, *params)
+                    for params in self.enumerate_command_handlers(domain)
+                ) if cmd is not None
+            }
+
+            @app.get(metadata_uri, summary=f"Domain Metadata [{domain.Meta.name}]", tags=['Metadata'])
+            async def domain_metadata(request: Request, details: bool=False):
+                if details:
+                    return domain.metadata(details = cmd_details)
+
+                return domain.metadata()
+
+            return {
                 "name": domain.Meta.name,
                 "description": domain.Meta.desc,
                 "externalDocs": {
                     "description": "Metadata",
                     "url": f"http://localhost:8000{metadata_uri}"
                 }
-            })
+            }
 
-            @app.get(metadata_uri, summary=f"Domain Metadata [{domain.Meta.name}]", tags=['Metadata'])
-            async def domain_metadata(request: Request):
-                return domain.metadata()
 
+        tags = [setup_domain(domain) for domain in self._domains]
         app.openapi_tags = app.openapi_tags or []
         app.openapi_tags.extend(tags)
 
-        for params in self.enumerate_commands():
-            register_command_handler(app, *params)
 
     @classmethod
     def setup_app(cls, app, *domains, **kwargs):
@@ -53,12 +63,12 @@ class FastAPIDomainManager(DomainManager):
 def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
     if cmd_cls.Meta.internal:
         # Note: Internal commands are not exposed to the API, registered for worker only.
-        return app
+        return None
 
     PayloadType = cmd_cls.Data if issubclass(cmd_cls.Data, DataModel) else Dict
 
     scope_schema = (cmd_cls.Meta.scope_required or cmd_cls.Meta.scope_optional)
-    default_path = bool(not cmd_cls.Meta.scope_required)
+    unscoped_path = bool(not cmd_cls.Meta.scope_required)
     endpoint_info = dict(
         summary=cmd_cls.Meta.name,
         description=cmd_cls.Meta.desc,
@@ -80,9 +90,10 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
         request: Request,
         payload: PayloadType,
         resource: str,
-        identifier: UUID_TYPE,
-        scope: dict
+        identifier: Optional[UUID_TYPE] = None,
+        scope: Optional[dict] = None
     ) -> Any:
+        identifier = identifier or UUID_GENR()
         context = domain.setup_context(
             authorization=getattr(request.state, 'auth_context', None),
             headers=dict(request.headers),
@@ -108,6 +119,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
         }
 
 
+    cmd_endpoints = {'meta': f"/_meta/{fq_name}/"}
     if scope_schema:
         scope_keys = list(scope_schema.keys())
 
@@ -117,62 +129,58 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
         summary=cmd_cls.Meta.name,
         description=cmd_cls.Meta.desc, tags=["Metadata"])
     async def command_metadata(request: Request):
-        return {
-            "schema": cmd_cls.Data.model_json_schema(),
-            "name": cmd_cls.Meta.name,
-            "desc": cmd_cls.Meta.desc,
-            "noid": cmd_cls.Meta.new_resource
-        }
+        return cmd_metadata
 
+    identifier_spec = "{identifier}"
     if cmd_cls.Meta.new_resource:
-        if default_path:
-            @endpoint("{resource}", ":new", summary=cmd_cls.Meta.name, description=cmd_cls.Meta.desc)
-            async def command_handler(
-                request: Request,
-                payload: PayloadType,
-                resource: Annotated[str, Path(description=cmd_cls.Meta.resource_desc)]
-            ):
-                identifier = UUID_GENR()
-                return await _command_handler(request, payload, resource, identifier, {})
+        identifier_spec = ":new"
 
-        if scope_schema:
-            @endpoint(SCOPE_SELECTOR, "{resource}", ":new", summary=f"{cmd_cls.Meta.name} (Scoped)", description=cmd_cls.Meta.desc)
-            async def scoped_command_handler(
-                request: Request,
-                payload: PayloadType,
-                resource: Annotated[str, Path(description=cmd_cls.Meta.resource_desc)],
-                scoping: Annotated[str, Path(description=f"Resource scoping: `{', '.join(scope_keys)}`. E.g. `~domain_sid:H9cNmGXLEc8NWcZzSThA9S`")]
-            ):
-                identifier = UUID_GENR()
-                scope = scope_decoder(scoping, scope_schema)
-                return await _command_handler(request, payload, resource, identifier, scope)
-
-        return app
-
-    if default_path:
-        @endpoint("{resource}", "{identifier}", summary=cmd_cls.Meta.name, description=cmd_cls.Meta.desc)
+    if unscoped_path:
+        cmd_endpoints['path'] = uri(f"/{fq_name}", "{resource}", identifier_spec)
+        @endpoint(
+            "{resource}",
+            identifier_spec,
+            summary=cmd_cls.Meta.name,
+            description=cmd_cls.Meta.desc
+        )
         async def command_handler(
             request: Request,
             payload: PayloadType,
             resource: Annotated[str, Path(description=cmd_cls.Meta.resource_desc)],
-            identifier: Annotated[UUID_TYPE, Path(description="Resource identifier")],
+            identifier: Optional[UUID_TYPE] = None,
         ):
             return await _command_handler(request, payload, resource, identifier, {})
 
     if scope_schema:
-        @endpoint(SCOPE_SELECTOR, "{resource}", "{identifier}", summary=f"{cmd_cls.Meta.name} (Scoped)", description=cmd_cls.Meta.desc)
+        cmd_endpoints['scoped'] = uri(f"/{fq_name}", SCOPE_SELECTOR, "{resource}", identifier_spec)
+        @endpoint(
+            SCOPE_SELECTOR,
+            "{resource}",
+            identifier_spec,
+            summary=f"{cmd_cls.Meta.name} (Scoped)",
+            description=cmd_cls.Meta.desc
+        )
         async def scoped_command_handler(
             request: Request,
             payload: PayloadType,
             resource: Annotated[str, Path(description=cmd_cls.Meta.resource_desc)],
+            scoping: Annotated[str, Path(description=f"Resource scoping: `{', '.join(scope_keys)}`. E.g. `domain_sid~H9cNmGXLEc8NWcZzSThA9S`")],
             identifier: Annotated[UUID_TYPE, Path(description="Resource identifier")],
-            scoping: Annotated[str, Path(description=f"Resource scoping: `{', '.join(scope_keys)}`. E.g. `domain_sid~H9cNmGXLEc8NWcZzSThA9S`")]
         ):
             scope = scope_decoder(scoping, scope_schema)
             return await _command_handler(request, payload, resource, identifier, scope)
 
 
-    return app
+    cmd_metadata ={
+        "id": cmd_cls.Meta.key,
+        "schema": cmd_cls.Data.model_json_schema(),
+        "urls": cmd_endpoints,
+        "name": cmd_cls.Meta.name,
+        "desc": cmd_cls.Meta.desc,
+        "genid": cmd_cls.Meta.new_resource
+    }
+
+    return cmd_metadata
 
 @Pipe
 def configure_domain_manager(app, *domains, **kwargs):

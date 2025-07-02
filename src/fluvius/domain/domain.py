@@ -451,10 +451,10 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         return self._context.set(_id=UUID_GENR(), **kwargs, **audit)
 
 
-    def metadata(self):
+    def metadata(self, **kwargs):
         return {
             'name': self.Meta.name,
             'desc': self.Meta.desc,
             'revision': self.Meta.revision,
             'commands': [name for _, name, _ in self.enumerate_command()]
-        }
+        } | kwargs
