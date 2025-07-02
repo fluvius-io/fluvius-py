@@ -10,6 +10,7 @@ from pypika.queries import QueryBuilder as PikaQueryBuilder
 from types import SimpleNamespace
 from typing import cast
 
+from fluvius.error import InternalServerError
 from fluvius.data import logger, config
 from fluvius.data.exceptions import ItemNotFoundError, UnprocessableError, NoItemModifiedError
 from fluvius.data.query import BackendQuery

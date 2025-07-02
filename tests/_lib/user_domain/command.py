@@ -18,8 +18,7 @@ class CreateUserCmd(Command):
 		name: str
 
 	async def _process(self, aggregate, statemgr, payload):
-		data = serialize_mapping(payload)
-		user = yield aggregate.create_user(data)
+		user = await aggregate.create_user(payload)
 		yield aggregate.create_response(serialize_mapping(user), _type="user-response")
 
 
@@ -48,5 +47,5 @@ class InvalidateUserCmd(Command):
 		resources = ('user', )
 		resource_docs = 'Resource key. e.g. `user`'
 
-	async def _process(self, aggregate, statemgr, /):
+	async def _process(self, aggregate, statemgr, payload):
 		await aggregate.invalidate_user()
