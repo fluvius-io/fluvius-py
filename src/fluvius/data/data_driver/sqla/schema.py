@@ -284,4 +284,4 @@ class DomainDataSchema(SqlaDataSchema):
     _updater = sa.Column(pg.UUID, nullable=True)
     _deleted = sa.Column(sa.DateTime(timezone=True))
     _etag = sa.Column(sa.String(64), server_default=sa.text("uuid_generate_v4()::varchar"))
-
+    _realm = sa.Column(sa.String, nullable=True)

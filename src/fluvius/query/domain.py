@@ -18,13 +18,13 @@ class DomainQueryResource(QueryResource):
     __abstract__ = True
 
     id: UUID_TYPE = f.PrimaryID()
-    realm: str | None = f.ExcludedField(source="_realm")
-    deleted: datetime | None = f.ExcludedField(source="_deleted")
-    etag: str | None = f.QueryField("ETag", source="_etag", preset="none", hidden=True)
+    realm: Optional[str] = f.QueryField("Realm", source="_realm", hidden=True)
+    deleted: Optional[datetime] = f.QueryField("Deleted", source="_deleted", hidden=True)
+    etag: Optional[str] = f.QueryField("ETag", source="_etag", preset="none", hidden=True)
     created: datetime = f.DatetimeField("Created", source="_created", hidden=True)
-    updated: datetime | None = f.DatetimeField("Updated", source="_updated", hidden=True)
-    creator: UUID_TYPE | None= f.UUIDField("Creator", source="_creator", hidden=True, ftype="user-profile")
-    updater: UUID_TYPE | None= f.UUIDField("Updater", source="_updater", hidden=True, ftype="user-profile")
+    updated: Optional[datetime] = f.DatetimeField("Updated", source="_updated", hidden=True)
+    creator: Optional[UUID_TYPE] = f.UUIDField("Creator", source="_creator", hidden=True, ftype="user-profile")
+    updater: Optional[UUID_TYPE] = f.UUIDField("Updater", source="_updater", hidden=True, ftype="user-profile")
 
 
 class DomainQueryManager(QueryManager):
