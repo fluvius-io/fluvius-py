@@ -104,7 +104,7 @@ def sqla_error_handler(code_prefix):
                 raise InternalServerError(
                     f"{code_prefix}.06",
                     "An unexpected database error occurred while processing your request.",
-                    str(e.orig)
+                    getattr(e, "orig", str(e))
                 )
         return wrapper
     return decorator
