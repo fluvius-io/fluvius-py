@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from dataclasses import asdict, is_dataclass
 
 from fluvius.data import DataAccessManagerBase, UUID_GENR, BackendQuery
+from fluvius.data.exceptions import ItemNotFoundError
 from fluvius.helper.timeutil import timestamp
 from .model import SQLTrackerConnector
 from . import config, logger

@@ -100,9 +100,15 @@ def sqla_error_handler(code_prefix):
                     "A database driver error occurred.",
                     str(e.orig)
                 )
+            except exc.NoResultFound as e:
+                raise ItemNotFoundError(
+                    f"{code_prefix}.06",
+                    f"Item Not Found Error: {str(e)}",
+                    getattr(e, "orig", str(e))
+                )
             except exc.SQLAlchemyError as e:
                 raise InternalServerError(
-                    f"{code_prefix}.06",
+                    f"{code_prefix}.07",
                     "An unexpected database error occurred while processing your request.",
                     getattr(e, "orig", str(e))
                 )
@@ -323,17 +329,9 @@ class SqlaDriver(DataDriver, QueryBuilder):
         stmt = self.build_select(data_schema, query)
         async with self.session() as sess:
             cursor = await sess.execute(stmt)
-        DEBUG_CONNECTOR and logger.info("\n[FIND_ONE] %r\n=> [QUERY] %s items", query, cursor)
+        DEBUG_CONNECTOR and logger.info("\n[FIND_ONE] %r\n=> [RESOURCE] %s\n=> [QUERY] %s items", query, resource, cursor)
 
-        try:
-            # NOTE: build_select now always includes columns in select(),
-            # which makes cursor.scalars() return only the first column.
-            return cursor.mappings().one()
-        except exc.NoResultFound as e:
-            raise ItemNotFoundError(
-                errcode="E1207",
-                message=f"{str(e)}. Query: {query}"
-            )
+        return cursor.mappings().one()
 
     @sqla_error_handler('L1202')
     async def update_one(self, resource, query, **updates):
