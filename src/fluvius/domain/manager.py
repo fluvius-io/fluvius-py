@@ -34,7 +34,7 @@ class DomainManager(object):
         self._domains = tuple(_validate())
         return self._domains
 
-    def enumerate_command_handlers(self, domain):
+    def enumerate_domain_commands(self, domain):
         for cmd_cls, cmd_key, fq_name in domain.enumerate_command():
             # Never list blacklisted commands
             if fq_name in self.__blacklisted_commands__:
@@ -44,5 +44,7 @@ class DomainManager(object):
                 fq_name in self.__whitelisted_commands__): # Always list whitelisted commands, except they are blacklisted
                 yield domain, cmd_cls, cmd_key, fq_name
 
-
+    def enumerate_commands(self):
+        for domain in self._domains:
+            yield from self.enumerate_domain_commands(domain)
 

@@ -28,18 +28,16 @@ class FastAPIDomainManager(DomainManager):
                 cmd['id']: cmd for cmd in
                 (
                     register_command_handler(app, *params)
-                    for params in self.enumerate_command_handlers(domain)
+                    for params in self.enumerate_domain_commands(domain)
                 ) if cmd is not None
             }
 
             @app.get(metadata_uri, summary=f"Domain Metadata [{domain.Meta.name}]", tags=['Metadata'])
-            async def domain_metadata(request: Request, details: bool=False):
-                if details:
-                    return domain.metadata(details = cmd_details)
-
-                return domain.metadata()
+            async def domain_metadata(request: Request):
+                return domain.metadata(commands = cmd_details)
 
             return {
+                "id": domain.__namespace__,
                 "name": domain.Meta.name,
                 "description": domain.Meta.desc,
                 "externalDocs": {
@@ -173,10 +171,10 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
 
     cmd_metadata ={
         "id": cmd_cls.Meta.key,
+        "name": cmd_cls.Meta.name,
+        "description": cmd_cls.Meta.desc,
         "schema": cmd_cls.Data.model_json_schema(),
         "urls": cmd_endpoints,
-        "name": cmd_cls.Meta.name,
-        "desc": cmd_cls.Meta.desc,
         "genid": cmd_cls.Meta.new_resource
     }
 

@@ -1,5 +1,6 @@
 from enum import IntEnum
 from fluvius.data import BlankModel, DataModel
+from fluvius.helper import camel_to_title
 from .mutation import MutationType  # noqa
 
 
@@ -70,7 +71,7 @@ class DomainEntity(object):
         if cls.__dict__.get('__abstract__'):
             return
 
-        meta = {"name": cls.__name__, "desc": cls.__doc__} | cls.Meta.__dict__
+        meta = {"name": camel_to_title(cls.__name__), "desc": cls.__doc__} | cls.Meta.__dict__
         cls.Meta = cls.__meta_schema__(**meta)
 
         if not issubclass(cls.Data, (DataModel, BlankModel)):

@@ -9,7 +9,7 @@ from typing import Iterator, Optional, List, Type
 
 from fluvius.auth import AuthorizationContext
 from fluvius.data import UUID_GENR, DataModel
-from fluvius.helper import camel_to_lower, select_value
+from fluvius.helper import camel_to_lower, select_value, camel_to_title
 from fluvius.helper.timeutil import timestamp
 from fluvius.helper.registry import ClassRegistry
 from fluvius.error import ForbiddenError
@@ -143,7 +143,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         cls.Message = MessageBase
         cls.Event = EventBase
         cls.Meta = DomainMeta.create(cls.Meta, defaults={
-            'name': cls.__name__,
+            'name': camel_to_title(cls.__name__),
             'prefix': cls.__namespace__,
             'desc': (cls.__doc__ or '').strip(),
             'tags': [cls.__name__, ]
@@ -453,8 +453,8 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
     def metadata(self, **kwargs):
         return {
+            'id': self.__namespace__,
             'name': self.Meta.name,
-            'desc': self.Meta.desc,
+            'description': self.Meta.desc,
             'revision': self.Meta.revision,
-            'commands': [name for _, name, _ in self.enumerate_command()]
         } | kwargs

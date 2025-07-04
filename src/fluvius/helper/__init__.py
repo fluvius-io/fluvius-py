@@ -203,11 +203,18 @@ def merge_order(original, update, prepend=False):
 
 RX_CAMEL_1 = re.compile(r"(.)([A-Z][a-z]+)")
 RX_CAMEL_2 = re.compile(r"([a-z0-9])([A-Z])")
+RX_CAMEL_TITLE = re.compile(r'(?<=[a-z0-9])([A-Z])')
 
 
 def camel_to_lower(name: str):
     s1 = RX_CAMEL_1.sub(r"\1-\2", name)
     return RX_CAMEL_2.sub(r"\1-\2", s1).lower().replace("_", "-")
+
+
+def camel_to_title(name: str) -> str:
+    # Insert space before capital letters that follow lowercase or digits
+    spaced = RX_CAMEL_TITLE.sub(r' \1', name)
+    return spaced.strip()
 
 
 def camel_to_lower_underscore(name: str):
