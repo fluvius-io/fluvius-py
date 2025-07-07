@@ -98,7 +98,7 @@ def register_resource_endpoints(app, query_manager, query_resource):
 
         @endpoint(PATH_QUERY_SELECTOR, "", **list_params)
         async def query_resource_json(request: Request, path_query: Annotated[str, Path()], query_params: Annotated[QueryParams, Query()]):
-            return await resource_query(request, None, path_query, None)
+            return await resource_query(request, query_params, path_query, None)
 
         @endpoint("", **list_params) # Trailing slash
         async def query_resource_default(request: Request, query_params: Annotated[QueryParams, Query()]):
