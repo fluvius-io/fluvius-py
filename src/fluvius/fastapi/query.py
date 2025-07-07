@@ -40,6 +40,9 @@ def register_resource_endpoints(app, query_manager, query_resource):
         if not scope_schema and scope:
             raise BadRequestError('Q01-00383', f'Scoping is not allowed for resource: {query_resource}')
 
+        if not query_params:
+            query_params = QueryParams()
+
         fe_query = FrontendQuery.from_query_params(query_params, scope=scope, scope_schema=scope_schema, path_query=path_query)
 
         if meta.scope_required and not fe_query.scope:
