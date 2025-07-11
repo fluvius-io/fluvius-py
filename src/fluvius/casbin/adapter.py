@@ -5,6 +5,9 @@ from casbin.persist.adapters.asyncio import AsyncAdapter
 from casbin.model import Model
 from casbin import persist
 
+from .datadef import PolicyRequest
+from ._meta import logger
+
 
 MAX_POLICY_LINE = 10000
 
@@ -41,12 +44,62 @@ class PolicySchema:
             case _:
                 raise ValueError(f"Unsupported policy type: {ptype}")
 
+    @classmethod
+    def get_filter_from_request(cls, request: PolicyRequest):
+        """Get the filter from the request."""
+        return {
+            ".or": [
+                {
+                    ".and": [{
+                        "ptype": "p",
+                        "dom": request.dom,
+                        "res": request.res,
+                        "act": request.act
+                    }]
+                },
+                {
+                    ".and": [{
+                        "ptype": "g",
+                        "sub": request.sub,
+                        "org": request.org,
+                    }]
+                },
+                {
+                    ".and": [{
+                        "ptype": "g2",
+                        "org": request.org,
+                        "res": request.res,
+                        "rid": request.rid,
+                    }]
+                },
+                {
+                    ".and": [{
+                        "ptype": "g3",
+                        "sub": request.usr,
+                    }]
+                },
+                {
+                    ".and": [{
+                        "ptype": "g4",
+                        "sub": request.usr,
+                        "res": request.res,
+                        "rid": request.rid,
+                    }]
+                },
+            ]
+        }
+    
+
 class SqlAdapter(AsyncAdapter):
     """SQL adapter for Casbin that uses Fluvius data driver."""
     def __init__(self, manager, schema):
         self._manager = manager
         self._schema = schema
         self._table = schema.__tablename__
+
+    def get_filter_from_request(self, request: PolicyRequest) -> Dict[str, Any]:
+        """Get the filter from the request."""
+        return self._schema.get_filter_from_request(request)
 
     async def load_policy(self, model: Model) -> None:
         """Load all policies from database."""
@@ -56,8 +109,7 @@ class SqlAdapter(AsyncAdapter):
 
     async def load_filtered_policy(self, model: Model, filter_: Dict[str, Any]) -> None:
         """Load filtered policies from database."""
-        # @TODO: Need implement load filtered policies for performance purpose.
-        policies = self._manager.query(self._table, filter_)
+        policies = await self._manager.query(self._table, limit=MAX_POLICY_LINE, where=filter_)
         for policy in policies:
             self._load_policy_line(policy, model)
 
@@ -69,8 +121,7 @@ class SqlAdapter(AsyncAdapter):
 
     def is_filtered(self) -> bool:
         """Return true since this adapter supports policy filtering."""
-        # return True
-        return False
+        return True
 
     async def save_policy(self, model: Model) -> bool:
         """Not implemented as this is a read-only adapter."""

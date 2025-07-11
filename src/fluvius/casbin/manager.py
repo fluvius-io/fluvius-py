@@ -1,11 +1,12 @@
 import os
+from time import time
 from casbin import Model
 from casbin.persist.adapters.asyncio import AsyncAdapter
 
 from .enforcer import FluviusEnforcer
 from .adapter import SqlAdapter
 from .datadef import PolicyRequest, PolicyResponse, PolicyData, PolicyNarration
-from ._meta import config
+from ._meta import config, logger
 
 
 DEFAULT_CASBIN_TABLE = 'casbin_rule'
@@ -51,24 +52,19 @@ class PolicyManager:
             self._adapter = self.__adapter__
 
     def _setup_enforcer(self):
-        # self._enforcer = AsyncEnforcer(self._model, self._adapter)
         self._enforcer = FluviusEnforcer(self._model, self._adapter)
 
-    async def check(self, *params) -> PolicyResponse:
-        try:
-            # @TODO: Need implement filtered policy for performance
-            # await self.enforcer.load_filtered_policy()
-            await self._enforcer.load_policy()
-            allowed, narration = self._enforcer.enforce_ex(*params)
-            return PolicyResponse(allowed=allowed, narration=self._generate_narration(params, allowed, narration))
-        except Exception as e:
-            raise RuntimeError(f"Permission check failed: {str(e)}")
+    def _get_filter_from_request(self, request: PolicyRequest):
+        """Get the filter from the request."""
+        return self._adapter.get_filter_from_request(request)
 
     async def check_permission(self, request: PolicyRequest) -> PolicyResponse:
         try:
-            # @TODO: Need implement filtered policy for performance
-            # await self.enforcer.load_filtered_policy()
-            await self._enforcer.load_policy()
+            fitler = self._get_filter_from_request(request)
+            start = time()
+            await self._enforcer.load_filtered_policy(fitler)
+            logger.info(f"Time taken to load filtered policy: {time() - start}")
+            start = time()
             allowed, narration = self._enforcer.enforce_ex(
                 request.usr,
                 request.sub,
@@ -78,7 +74,6 @@ class PolicyManager:
                 request.rid,
                 request.act,
             )
-
             return PolicyResponse(
                 allowed=allowed,
                 narration=self._generate_narration(request, allowed, narration)
