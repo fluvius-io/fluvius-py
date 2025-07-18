@@ -30,7 +30,23 @@ class AggregateRoot(NamedTuple):
     domain_iid: UUID_TYPE = None
 
 
-def action(evt_key, /, resources=None, emit_event=True):
+def validate_resource_spec(resources):
+    if not resources:
+        return None
+
+    if isinstance(resources, list):
+        return tuple(resources)
+
+    if isinstance(resources, str):
+        return (resources,)
+
+    if isinstance(resources, tuple):
+        return resources
+
+    raise ValueError(f"Invalid resource specification: {resources}")
+
+
+def action(evt_key=None, resources=None):
     """
     Define the aggregate action and event to be generated from the action
     - evt_key: the identifier of the event to be generated
@@ -38,26 +54,23 @@ def action(evt_key, /, resources=None, emit_event=True):
     - emit_event: whether the event should be emitted and collected into the log
     """
 
-    if isinstance(resources, str):
-        resources = (resources,)
-
-    assert resources is None or isinstance(resources, (tuple, list)), "Invalid resources specification."
+    resource_spec = validate_resource_spec(resources)
 
     def _decorator(func):
         func.__domain_event__ = evt_key
 
         @wraps(func)
         async def wrapper(self, *args, **evt_args):
-            if resources is not None and self._aggroot.resource not in resources:
+            if resource_spec is not None and self._aggroot.resource not in resource_spec:
                 raise ForbiddenError("D100-001", f'Action is not allowed on resource: {self._aggroot.resource}')
 
             evt_data = await func(self, self.statemgr, *args, **evt_args)
 
-            if emit_event:
+            if evt_key is not None:
                 self.create_event(evt_key, evt_args, evt_data)
 
-            if not emit_event and evt_data is not None:
-                logger.warning(f'Event [{evt_key}] data is omitted since [emit_event=True] [W11045]')
+            if not evt_key and evt_data is not None:
+                logger.warning(f'Event [{evt_key}] data is omitted since [evt_key=None] [W11045]')
 
             return evt_data
 
