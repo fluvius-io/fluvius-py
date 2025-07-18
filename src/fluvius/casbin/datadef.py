@@ -9,6 +9,7 @@ class PolicyRequest(PClass):
     res = field(type=str, factory=str)
     rid = field(type=str, factory=str)
     act = field(type=str, factory=str)
+    cqrs = field(type=str, factory=str, initial="COMMAND")
 
 
 class PolicyData(PClass):
