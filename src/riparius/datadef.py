@@ -1,101 +1,80 @@
 import re
 from enum import Enum
-from fluvius.data import logger, config
+from typing import List, Dict, Optional
+from fluvius.data import DataModel, Field, UUID_GENF, UUID_GENR, UUID_TYPE
+from .status import WorkflowStatus, StepStatus
 
-from fluvius.data import PClass, field
-from fluvius.data import UUID_GENF, UUID_GENR, nullable, UUID_TYPE
-from fluvius.helper.registry import ClassRegistry
-from fluvius.helper import camel_to_lower
+RX_STATE = re.compile(r'^[A-Z][A-Z\d_]*$')
 
-from .router import EventRouter, st_connect, wf_connect
-from .status import *
+class WorkflowDataModel(DataModel):
+    """Base class for all workflow data models."""
+    pass
 
-
-RX_STATE = re.compile(r'^[A-Z][A-Z\d]*$')
-
-
-class WorkflowState(PClass):
-    _id = field(UUID_TYPE, initial=UUID_GENR)
-    route_id = field(UUID_TYPE, initial=UUID_GENR)
-    state = field(str)
-    label = field(str)
-    steps = field(list, initial=[])
-    tasks = field(list, initial=[])
-    roles = field(list, initial=[])
-    events = field(list, initial=[])
-    stages = field(list, initial=[])
-    params = field(dict, initial={})
-    memory = field(dict, initial={})
-    status = field(WorkflowStatus, initial=lambda: WorkflowStatus.BLANK)
-    strans = field(list, initial=[])  # Status transitions logs
-    participants = field(list, initial=[])
+class WorkflowState(WorkflowDataModel):
+    id: UUID_TYPE = Field(default_factory=UUID_GENR)
+    title: str
+    revision: int = Field(default=0)
+    namespace: str = Field(default=None)
+    route_id: UUID_TYPE = Field(default_factory=UUID_GENR)
+    status: WorkflowStatus = Field(default=WorkflowStatus.NEW)
+    progress: float = Field(default=0.0)
 
 
-class WorkflowEvent(PClass):
-    workflow_id = field(mandatory=True)
-    step_id = field(nullable(str), initial=None)
-    event_name = field(str)
-    event_data = field()
+class WorkflowBundle(WorkflowDataModel):
+    etag: str = Field(default=None)
+    workflow: WorkflowState
+    steps: List = Field(default_factory=list)
+    tasks: List = Field(default_factory=list)
+    roles: List = Field(default_factory=list)
+    events: List = Field(default_factory=list)
+    stages: List = Field(default_factory=list)
+    params: Dict = Field(default_factory=dict)
+    memory: Dict = Field(default_factory=dict)
+    participants: List = Field(default_factory=list)
 
 
-class WorkflowTask(PClass):
+class WorkflowEvent(WorkflowDataModel):
+    workflow_id: UUID_TYPE
+    step_id: Optional[str] = None
+    event_name: str
+    event_data: Optional[dict] = None
+
+
+class WorkflowTask(WorkflowDataModel):
     pass
 
 
-class WorkflowEvent(PClass):
+class WorkflowRoles(WorkflowDataModel):
     pass
 
 
-class WorkflowRoles(PClass):
+class WorkflowStep(WorkflowDataModel):
+    id: UUID_TYPE = Field(default_factory=UUID_GENR)
+    selector: UUID_TYPE
+    workflow_id: UUID_TYPE
+    origin_step: Optional[UUID_TYPE] = None
+    title: str
+    display: str
+    state: str
+    stage: str
+    status: StepStatus = Field(default=StepStatus.ACTIVE)
+    message: Optional[str] = None
+
+WorkflowStep.EDITABLE_FIELDS = ('title', 'state', 'status', 'message', 'display')
+
+
+class WorkflowStage(WorkflowDataModel):
+    id: UUID_TYPE = Field(default_factory=UUID_GENR)
+    workflow_id: UUID_TYPE
+    title: str
+    order: int = Field(default=0)
+    notes: str = Field(default=None)
+
+
+class WorkflowParticipant(WorkflowDataModel):
     pass
 
 
-def validate_label(value):
-    if not RX_STATE.match(value):
-        raise ValueError(f'Invalid step state: {value}')
-
-    return value
-
-
-def validate_labels(*values):
-    for v in values:
-        validate_label(v)
-
-    return values
-
-
-class WorkflowStep(PClass):
-    _id = field(UUID_TYPE, initial=UUID_GENR)
-    selector = field(UUID_TYPE)
-    workflow_id = field(UUID_TYPE)
-    src_step_id = field(nullable(UUID_TYPE), initial=lambda: None)
-    title = field(str)
-    display = field(str)
-    label = field(str, factory=validate_label)
-    stage = field(str)
-    status = field(StepStatus, factory=StepStatus)
-    message = field(str)
-
-WorkflowStep.EDITABLE_FIELDS = ('title', 'label', 'state', 'status', 'message', 'display')
-
-
-class WorkflowStage(PClass):
-    _id = field(str)
-    name = field(str)
-    desc = field(str)
-
-
-class WorkflowParticipant(PClass):
+class WorkflowParameter(WorkflowDataModel):
     pass
 
-
-class WorkflowParameter(PClass):
-    pass
-
-
-class WorkflowParameterValueType(Enum):
-    UUID        = "UUID"
-    STRING      = "STRING"
-    INTEGER     = "INTEGER"
-    DATETIME    = "DATETIME"
-    ARRAY       = "ARRAY"

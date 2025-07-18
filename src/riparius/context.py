@@ -1,6 +1,6 @@
-from fluvius.data import DataElement, field, UUIDField
+from fluvius.data import DataModel, UUID_TYPE
 
 
-class WorkflowContext(DataElement):
-    user_id = UUIDField()
-    source = field()
+class WorkflowContext(DataModel):
+    user_id: UUID_TYPE
+    source: str

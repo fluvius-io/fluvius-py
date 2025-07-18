@@ -25,3 +25,13 @@ run-updatedb:
 
 doc:
 	docpress serve
+
+dev:
+	#!/usr/bin/env bash
+	echo "Start watching for changes in [./src:./tests] ..."
+	fswatch ./src ./tests | while read -r file; do
+	  echo "Detected change in $file..."
+	  sleep 1
+	  just test riparius
+	  while read -t 1 -r; do :; done  # drain remaining events
+	done

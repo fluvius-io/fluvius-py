@@ -3,39 +3,43 @@ from functools import partial, wraps
 from fluvius.data import UUID_GENF, UUID_GENR, UUID_TYPE
 from fluvius.helper.timeutil import timestamp
 
-from .exceptions import WorkflowExecutionError, WorkflowConfigurationError
-from .datadef import WorkflowState, WorkflowStep, WorkflowStatus, StepStatus
-from .workflow import Workflow, Stage, Step, Role, ALL_STATES
+from .exceptions import WorkflowExecutionError, WorkflowConfigurationError, StepTransitionError
+from .datadef import WorkflowStep, WorkflowStatus, StepStatus
+from .workflow import Workflow, Stage, Step, Role, BEGIN_STATE, FINISH_STATE, BEGIN_LABEL, FINISH_LABEL
 from .router import EventRouter
+from .storage import WorkflowBackend
 
 from . import logger
 
 
 class WorkflowStateProxy(object):
-    def __init__(self, wf_engine, selector=None):
-        if not (selector is None or isinstance(selector, UUID_TYPE)):
-            raise WorkflowExecutionError('P0100X', f"Invalid Step Selector: {selector}")
+    def __init__(self, wf_engine):
+        self._id = wf_engine._id
+        self._data = wf_engine._workflow
+        self.add_step = partial(wf_engine.add_step, None)
+        self.add_task = partial(wf_engine.add_task, None)
+        self.memorize = partial(wf_engine.set_memory, None)
+        self.memory = partial(wf_engine.get_memory, None)
+        self.add_participant = wf_engine.add_participant
+        self.del_participant = wf_engine.del_participant
+        self.cancel_task = wf_engine.cancel_task
+        self.cancel_workflow = wf_engine.cancel_workflow
+        self.abort_workflow = wf_engine.abort_workflow
 
-        if selector:
-            step = wf_engine._stmap[selector]
-            self._id = step_id = step._id
-            self._data = step._data
-            self.set_state = partial(wf_engine._transit_step, step_id, step_id)
-            self.finish = partial(wf_engine._finish_step, step_id, step_id)
-            self.recover = partial(wf_engine._recover_step, step_id, step_id)
-        else:
-            step = None
-            step_id = None
-            self._id = wf_engine._id
 
-        self.add_step = partial(wf_engine._add_step, step_id)
-        self.add_task = partial(wf_engine._add_task, step_id)
-        self.memorize = partial(wf_engine._memorize, step_id)
-        self.memory = partial(wf_engine._getmem, step_id)
+class StepStateProxy(object):
+    def __init__(self, wf_engine, selector):
+        step = wf_engine._stmap[selector]
+        step_id = step.id
+        self._id = step_id
+        self._data = step.data
+        self.transit = partial(wf_engine.transit_step, step_id)
+        self.recover = partial(wf_engine.recover_step, step_id)
 
-        self.set_step_state = partial(wf_engine._transit_step, step_id)
-        self.finish_step = partial(wf_engine._finish_step, step_id)
-        self.recover_step = partial(wf_engine._recover_step, step_id)
+        self.add_step = partial(wf_engine.add_step, step_id)
+        self.add_task = partial(wf_engine.add_task, step_id)
+        self.memorize = partial(wf_engine.set_memory, step_id)
+        self.memory = partial(wf_engine.get_memory, step_id)
 
 
 def blacklist(*statuses):
@@ -45,8 +49,8 @@ def blacklist(*statuses):
     def decorator(func):
         @wraps(func)
         def wrapper(self, *args, **kwargs):
-            if self._status in statuses:
-                raise WorkflowExecutionError('P01001', f'Unable to perform [{func.__name__}] at [{self._status}]')
+            if self.status in statuses:
+                raise WorkflowExecutionError('P01001', f'Unable to perform [{func.__name__}] at [{self.status}]')
 
             return func(self, *args, **kwargs)
         return wrapper
@@ -60,8 +64,8 @@ def whitelist(*statuses):
     def decorator(func):
         @wraps(func)
         def wrapper(self, *args, **kwargs):
-            if self._status not in statuses:
-                raise WorkflowExecutionError('P01002', f'Unable to perform action [{func.__name__}] at workflow status [{self._status}]')
+            if self.status not in statuses:
+                raise WorkflowExecutionError('P01002', f'Unable to perform action [{func.__name__}] at workflow status [{self.status}]')
             return func(self, *args, **kwargs)
         return wrapper
     return decorator
@@ -70,28 +74,21 @@ allow_active = whitelist(*WorkflowStatus._ACTIVE)
 unallow_inactive = blacklist(*WorkflowStatus._INACTIVE)
 
 
-def SET(status=StepStatus.ACTIVE, **kwargs):
-    if not isinstance(status, StepStatus):
-        raise StepTransitionError('P01003', f'Invalid step status: {status}')
-
-    kwargs.update(status=status)
-    return kwargs
-
 def step_transition(transit_func):
     @wraps(transit_func)
-    def wrapper(self, auth_step_id, step_id, *args):
+    def wrapper(self, step_id, *args):
         step = self._steps[step_id]
-        if auth_step_id not in (None, step_id, step.data.src_step_id):
-            raise StepTransitionError('P01004', f'Step transition is not valid. A step can only transit itself or its direct children.')
 
         try:
             updates = transit_func(self, step, *args)
-            return self._update_step(step, **updates)
+            if not isinstance(updates, dict):
+                raise ValueError('Invalid transit values: %s' % str(updates))
+            return self.update_step(step, **updates)
         except Exception as e:
-            step_state = self._stmap[step.selector]
+            raise
             logger.exception('Error handling state transition: %s', e)
-            step.on_error(step_state)
-            return self._update_step(step, status=StepStatus.ERROR, message=str(e))
+            step.on_error()
+            return self.update_step(step, status=StepStatus.ERROR, message=str(e))
 
     return wrapper
 
@@ -100,71 +97,55 @@ class WorkflowEngine(object):
     __steps__      = {}
     __stages__     = {}
     __roles__      = {}
+    __backend__    = WorkflowBackend()
 
-    def __init__(self, wf_state, /, auto_start=False):
-        self.initiaze(wf_state)
+    def __init__(self, wf_state=None):
+        if wf_state is None:
+            wf_state = self.backend.create_workflow(self.__wf_def__)
 
-        if auto_start:
-            self.start_workflow(self._params)
-
-    def initiaze(self, wf_state):
-        self._state = wf_state
-        self._id = self._state._id
-        self._wf_proxy = WorkflowStateProxy(self)
-        self._st_proxy = {}
+        self._id = wf_state.id
+        self._workflow = wf_state
         self._memory = {}
-        self._params = self.__wf__.__params__(**wf_state.params)
-        self._stmap = {}    # Step selector map
-        self._steps = {}    # Step id map
-        self.set_status(wf_state.status)
+        self._etag = None
+        self._st_proxy = {}
+    
+    @property
+    def backend(self):
+        return self.__backend__
+    
+    @property
+    def wf_state(self):
+        return self._workflow
+    
+    def _load_steps(self):
+        self._steps = {step.id: step for step in self.backend.load_steps(self._id)}
+        self._stmap = {step.selector: step for step in self._steps.values()}
+    
+    @property
+    def step_id_map(self):
+        if not hasattr(self, '_steps'):
+            self._load_steps()
 
+        return self._steps
+    
+    @property
+    def selector_map(self):
+        if not hasattr(self, '_stmap'):
+            self._load_steps()
 
-    def set_status(self, status):
-        if not isinstance(status, WorkflowStatus):
-            raise WorkflowExecutionError('P0100X', f'Invalid workflow status: {status}')
+        return self._stmap
+    
+    
+    def __init_subclass__(cls, wf_def):
+        if not issubclass(wf_def, Workflow):
+            raise WorkflowConfigurationError('P01201', f'Invalid workflow definition: {wf_def}')
 
-        self._status = status
-        self._state.strans.append(SimpleNamespace(status=status, time=timestamp()))
-
-
-    @allow_active
-    def run_hook(self, handler_func, wf_context, *args, **kwargs):
-        func = handler_func if callable(handler_func) else \
-                getattr(self.__wf__, f'on_{handler_func}')
-
-        msgs = func(wf_context, *args, **kwargs)
-
-        if msgs is None:
-            return
-
-        for msg in msgs:
-            logger.info(f'WORKFLOW MSG {handler_func}: {msg}')
-
-    @blacklist(WorkflowStatus.BLANK)
-    def state_proxy(self, selector=None):
-        if selector is None:
-            return self._wf_proxy
-
-        if selector not in self._st_proxy:
-            if selector not in self._stmap:
-                raise WorkflowExecutionError('P0100X', f'No step available for selector value: {selector}')
-
-            self._st_proxy[selector] = WorkflowStateProxy(self, selector)
-
-        return self._st_proxy[selector]
-
-    def __init_subclass__(cls, wf_cls):
-        if not issubclass(wf_cls, Workflow):
-            raise WorkflowConfigurationError('P01201', f'Invalid workflow definition: {wf_cls}')
-
-        cls.__key__ = wf_cls.__key__
-        cls.__wf__ = wf_cls
+        cls.__key__ = wf_def.__key__
+        cls.__wf_def__ = wf_def
 
         STEPS = cls.__steps__.copy()
         ROLES = cls.__roles__.copy()
         STAGES = cls.__stages__.copy()
-
-        stage_counter = 0
 
         def is_stage(ele):
             try:
@@ -191,8 +172,7 @@ class WorkflowEngine(object):
                 return None
 
 
-        def define_step(key, step_cls):
-            step_key = step_cls.__name__
+        def define_step(step_cls, step_key):
             stage = step_cls.__stage__
 
             if step_key in STEPS:
@@ -204,18 +184,18 @@ class WorkflowEngine(object):
             step_cls.__stage__ = stage.__key__
             STEPS[step_key] = step_cls
 
-            for attr in dir(wf_cls):
-                ele_cls = getattr(wf_cls, attr)
+            for attr in dir(wf_def):
+                ele_cls = getattr(wf_def, attr)
 
             # Register step's external events listeners
-            EventRouter.connect_st_events(step_cls, wf_cls.__key__, step_key)
+            EventRouter.connect_st_events(step_cls, wf_def.__key__, step_key)
 
         def define_stage(key, stage):
             if hasattr(stage, '__key__'):
                 raise WorkflowConfigurationError('P01103', f'Stage is already defined with key: {stage.__key__}')
 
             if key in STAGES:
-                raise WorkflowConfigurationError('P01104', 'Stage already registered [%s]' % stage_cls)
+                raise WorkflowConfigurationError('P01104', 'Stage already registered [%s]' % stage)
 
             stage.__key__ = key
             STAGES[key] = stage
@@ -228,8 +208,8 @@ class WorkflowEngine(object):
             ROLES[key] = role
 
 
-        for attr in dir(wf_cls):
-            ele_cls = getattr(wf_cls, attr)
+        for attr in dir(wf_def):
+            ele_cls = getattr(wf_def, attr)
             if is_stage(ele_cls):
                 define_stage(attr, ele_cls)
                 continue
@@ -238,149 +218,210 @@ class WorkflowEngine(object):
                 define_role(attr, ele_cls)
                 continue
 
-        for attr in dir(wf_cls):
-            ele_cls = getattr(wf_cls, attr)
+        for attr in dir(wf_def):
+            ele_cls = getattr(wf_def, attr)
             if is_step(ele_cls):
-                define_step(attr, ele_cls)
+                define_step(ele_cls, step_key=attr)
                 continue
 
         cls.__steps__ = STEPS
         cls.__roles__ = ROLES
         cls.__stages__ = STAGES
 
-        EventRouter.connect_wf_events(wf_cls, wf_cls.__key__)
+        EventRouter.connect_wf_events(wf_def, wf_def.__key__)
+    
+    def queue_event(self, event_type, **kwargs):
+        self.backend.queue_event(self._id, event_type, **kwargs)
 
-    @whitelist(WorkflowStatus.BLANK)
-    def start_workflow(self, wf_params):
-        self.set_status(WorkflowStatus.ACTIVE)
-        self.run_hook('started', self._wf_proxy, wf_params)
+    @whitelist(WorkflowStatus.NEW)
+    def start(self):
+        self.update_workflow(status=WorkflowStatus.ACTIVE)
+        self.run_hook('started', self.workflow_state)
+        return self
 
     @unallow_inactive
     def add_participant(self, role, member_id, **kwargs):
-        pass
+        self.queue_event('add_participant', role=role, member_id=member_id, changes=kwargs)
 
     @unallow_inactive
     def del_participant(self, role, member_id):
-        pass
+        self.queue_event('del_participant', role=role, member_id=member_id)
 
-    @whitelist(WorkflowStatus.ACTIVE, WorkflowStatus.ERROR)
-    def cancel_workflow(self, workflow_id):
-        pass
+    @whitelist(*WorkflowStatus._ACTIVE)
+    def cancel_workflow(self):
+        self.update_workflow(status=WorkflowStatus.CANCELLED)
+        self.run_hook('cancelled', self._wf_proxy)
+    
+    @whitelist(*WorkflowStatus._ACTIVE)
+    def abort_workflow(self):
+        self.update_workflow(status=WorkflowStatus.ABORTED)
+        self.run_hook('aborted', self._wf_proxy)
 
     def compute_progress(self):
-        active_steps = len([s for s in self._stmap.values() if s.data.status in StepStatus._ACTIVE])
+        active_steps = len([s for s in self._stmap.values() if s.data.status not in StepStatus._FINISHED])
         total_steps = float(len(self._stmap) or 1.0)
+        return (total_steps - active_steps)/total_steps
 
+    def compute_status(self):
+        step_statuses = [s for s in self._stmap.values() if s.data.status]
+        if StepStatus.ERROR in step_statuses:
+            status = WorkflowStatus.DEGRADED
+        elif all(s in StepStatus._FINISHED for s in step_statuses):
+            status = WorkflowStatus.COMPLETED
+        else:
+            status = WorkflowStatus.ACTIVE
+
+        return status
+
+    def reconcile(self):
         return {
-            status: self.status,
-            progress: (total_steps - active_steps)/total_steps
+            'status': self.compute_status(),
+            'progress': self.compute_progress()
         }
 
     def commit(self):
-        self.set_status(**progress)
+        self.update_workflow(**self.reconcile())
+        changes = self.backend.commit(self._id)
+        return changes
 
     @allow_active
-    def _add_step(self, src_step_id, step_key, selector=None, **kwargs):
+    def add_step(self, origin_step, step_key, selector=None, **kwargs):
         stdef = self.__steps__[step_key]
-        step_id = UUID_GENR() if stdef.__multi__ else UUID_GENF(step_key, self._id)
+        step_id = UUID_GENF(step_key, self._id)
         selector = selector or step_id
-        if selector in self._stmap:
+        if selector in self.selector_map:
             raise WorkflowExecutionError('P01107', f'Selector value already allocated to another step [{selector or step_key}]')
 
         step = stdef(
             _id=step_id,
             selector=selector,
-            title=stdef.__title__,
+            title=kwargs.get('title', stdef.__title__),
             workflow_id=self._id,
-            src_step_id=src_step_id,
+            origin_step=origin_step,
             stage=stdef.__stage__,
-            label=stdef.__start__,
+            state=BEGIN_STATE,
+            display=BEGIN_LABEL,
             status=StepStatus.ACTIVE
         )
 
-        self._stmap[step.data.selector] = step
-        self._steps[step._id] = step
-        self._state.steps.append(step.data)
-        self._memorize(step._id, **kwargs)
-        return self.state_proxy(selector)
+        self.selector_map[step.selector] = step
+        self.step_id_map[step.id] = step
+        if kwargs:
+            self.set_memory(step.id, **kwargs)
+        self.queue_event('add_step', step_id=step.id, step=step)
+        return self.get_state_proxy(step.selector)
 
 
     @allow_active
-    def _update_step(self, step, **kwargs):
-        if step.status in StepStatus._FINISHED:
-            raise WorkflowExecutionError('P01107', f'Cannot modify finished steps [{step_id}]')
+    def update_step(self, step, **kwargs):
+        if kwargs.get('state') == None:
+            pass
+        elif kwargs.get('state') == FINISH_STATE:
+            kwargs['status'] = StepStatus.COMPLETED
+            kwargs['display'] = FINISH_LABEL
+        elif kwargs.get('state') is not None and kwargs.get('state') != BEGIN_STATE:
+            kwargs['status'] = StepStatus.ACTIVE
 
         if not all(k in WorkflowStep.EDITABLE_FIELDS for k in kwargs):
             raise WorkflowExecutionError('P01108', f'Only editable fields can be modified: {WorkflowStep.EDITABLE_FIELDS}')
 
-        return step._set(**kwargs)
+        self.queue_event(
+            'update_step', 
+            changes=kwargs, 
+            step_id=step.id, 
+            from_status=step.status,
+            from_state=step.state
+        )
+        step._data = step._data.set(**kwargs)
+        return step
+
+    def update_workflow(self, **kwargs):
+        self._workflow = self._workflow.set(**kwargs)
+        self.queue_event('update_workflow', changes=kwargs)
 
     @allow_active
-    def _update_workflow(self, status=StepStatus.ACTIVE, **kwargs):
-        pass
+    def add_task(self, step_id, task_key, **kwargs):
+        self.queue_event('add_task', step_id=step_id, task_key=task_key, changes=kwargs)
 
     @allow_active
-    def _add_task(self, step_id, task_key, **kwargs):
-        pass
-
-    @allow_active
-    def _cancel_task(self, task_id):
-        pass
+    def cancel_task(self, task_id):
+        self.queue_event('cancel_task', task_id=task_id)
 
     @allow_active
     @step_transition
-    def _transit_step(self, step, label, status=StepStatus.ACTIVE, **kwargs):
-        if label is None:
-            label = step.label
+    def transit_step(self, step, to_state, **kwargs):
+        from_state = step.state
+        if to_state not in step.__states__:
+            raise WorkflowExecutionError('P01004', f'Invalid step states: {to_state}. Allowed states: {step.__states__}')
 
-        if status is None:
-            status = step.status
-
-        if label not in step.__states__:
-            raise WorkflowExecutionError('P0100X', f'Invalid step states: {label}. Allowed states: {step.__states__}')
-
-        src_label  = step.label
-        if label == src_label:
-            logger.warning(f'[P01120W] Transition to the same label [{src_label}]. No action taken.')
-            return SET(status, label=label, **kwargs)
+        if to_state == from_state:
+            raise WorkflowExecutionError('P01120', f'Transition to the same state [{to_state}]. No action taken.')
 
         transitions = step.__transitions__
 
         # State transition has a handling function
-        if label in transitions:
-            allowed_states, transition_hook = transitions[label]
+        if to_state in transitions:
+            allowed_states, unallowed_states, transition_hook = transitions[to_state]
 
-            if ALL_STATES not in allowed_states and src_label not in allowed_states:
-                raise WorkflowExecutionError('P0100X', f'Transition to label [{label}] is limited to: {allowed_states}. Current label: {src_label}')
+            if allowed_states and step.state not in allowed_states:
+                raise WorkflowExecutionError('P01003', f'Transition to state [{to_state}] is limited to: {allowed_states}. Current state: {step.state}')
 
-            transition_hook(self.state_proxy(step.selector), src_label)
+            if unallowed_states and step.state in unallowed_states:
+                raise WorkflowExecutionError('P01003', f'Transition to state [{to_state}] is not allowed. Current state: {step.state}')
 
-        return SET(status, label=label, **kwargs)
+            transition_hook(self.get_state_proxy(step.selector), from_state)
 
-    def _finish_step(self, src_step_id, step_id, label=None, status=StepStatus.COMPLETED, **kwargs):
-        if status not in StepStatus._FINISHED:
-            raise WorkflowExecutionError('P0100X', f'Steps can only finished with the follow statuses: {StepStatus._FINISHED}')
-
-        return self._transit_step(src_step_id, step_id, label, status, **kwargs)
+        return dict(state=to_state, **kwargs)
 
     @allow_active
     @step_transition
-    def _recover_step(self, step):
+    def recover_step(self, step):
         if step.status != StepStatus.ERROR:
-            raise WorkflowExecutionError('P0100X', f'Cannot recover from a non-error status: {step.status}')
+            raise WorkflowExecutionError('P01005', f'Cannot recover from a non-error status: {step.status}')
 
-        return SET(StepStatus.ACTIVE)
+        return dict(status=StepStatus.ACTIVE)
 
     @allow_active
-    def _memorize(self, step_id, **kwargs):
+    def set_memory(self, step_id=None, **kwargs):
         self._memory.update({
             (step_id, key): value for key, value in kwargs.items()}
         )
+        self.queue_event('set_memory', step_id=step_id, memory=kwargs)
+
+    def get_memory(self, step_id=None):
+        return SimpleNamespace(**{
+            key: val for (sid, key), val in self._memory.items() if sid == step_id or sid is None
+        })
+
+    @property
+    def status(self):
+        return self._workflow.status
 
     @allow_active
-    def _getmem(self, step_id):
-        data = {
-            key: val for (sid, key), val in self._memory.items() if sid == step_id
-        }
+    def run_hook(self, handler_func, wf_context, *args, **kwargs):
+        func = handler_func if callable(handler_func) else \
+                getattr(self.__wf_def__, f'on_{handler_func}')
 
-        return SimpleNamespace(**data)
+        msgs = func(wf_context, *args, **kwargs)
+
+        for msg in msgs or []:
+            logger.info(f'WORKFLOW MSG {handler_func}: {msg}')
+
+    @blacklist(WorkflowStatus.NEW)
+    def get_state_proxy(self, selector):
+        if selector is None:
+            return self.workflow_state
+
+        if selector not in self._st_proxy:
+            if selector not in self.selector_map:
+                raise WorkflowExecutionError('P0100X', f'No step available for selector value: {selector}')
+
+            self._st_proxy[selector] = StepStateProxy(self, selector)
+
+        return self._st_proxy[selector]
+
+    @property
+    def workflow_state(self):
+        if not hasattr(self, '_wf_proxy'):
+            self._wf_proxy = WorkflowStateProxy(self)
+        return self._wf_proxy

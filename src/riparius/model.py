@@ -1,86 +1,84 @@
-from fluvius.data import (
-    DataResource, ResourceProperty,
-    ResourcePropertySchema, DataAccessInterface,
-    EnumField,
-    UUIDField,
-    DateTimeField,
-    nullable
-)
-from pyrsistent import field
-from enum import Enum
-
+import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql as pg
+from fluvius.data import DomainSchema, SqlaDriver
 from .status import StepStatus, TaskStatus, WorkflowStatus
 
-WorkflowDAL = DataAccessInterface()
+
+# --- Connector and Base Schema ---
+class WorkflowConnector(SqlaDriver):
+    __db_dsn__ = "postgresql://user:password@localhost:5432/fluvius_workflow"
 
 
-
-class WorkflowInstance(DataResource):
-    owner_id = UUIDField(nullable=True)
-    company_id = field(type=nullable(str))
-    revison = field(type=int, mandatory=True)
-    identifier = field(type=str, mandatory=True)
-    title = field(type=nullable(str))
-    note = field(type=nullable(str))
-    status = EnumField(WorkflowStatus)
-    progress = field(type=float, factory=float, initial=0.0)
-    desc = field(type=str)
-    started = field(type=nullable(bool))
-    ts_start = DateTimeField(nullable=True)
-    ts_due = DateTimeField(nullable=True)
-    ts_end = DateTimeField(nullable=True)
-    sys_tag = field(type=nullable(list))
-    usr_tag = field(type=nullable(list))
+class WorkflowBaseSchema(WorkflowConnector.__data_schema_base__, DomainSchema):
+    __abstract__ = True
+    __table_args__ = {'schema': 'riparius'}
 
 
-class WorkflowStep(DataResource):
-    step_name = field(type=str)
-    title = field(type=str)
-    workflow_id = UUIDField(mandatory=True)
-    stage_id = UUIDField()
-    src_step = UUIDField(nullable=True)
+# --- Models ---
+class WorkflowInstance(WorkflowBaseSchema):
+    __tablename__ = "workflow-instance"
 
-    sys_status = EnumField(StepStatus)
-    usr_status = field(type=nullable(str))
-    ts_expire = DateTimeField(nullable=True)
-    ts_start = DateTimeField(nullable=True)
-    ts_end = DateTimeField(nullable=True)
+    owner_id = sa.Column(pg.UUID, nullable=True)
+    company_id = sa.Column(sa.String, nullable=True)
+    revison = sa.Column(sa.Integer, nullable=False)
+    identifier = sa.Column(sa.String, nullable=False)
+    title = sa.Column(sa.String, nullable=True)
+    note = sa.Column(sa.String, nullable=True)
+    status = sa.Column(sa.Enum(WorkflowStatus, name="workflow_status"), nullable=False)
+    progress = sa.Column(sa.Float, default=0.0)
+    desc = sa.Column(sa.String, nullable=True)
+    started = sa.Column(sa.Boolean, nullable=True)
+    ts_start = sa.Column(sa.DateTime(timezone=True), nullable=True)
+    ts_due = sa.Column(sa.DateTime(timezone=True), nullable=True)
+    ts_end = sa.Column(sa.DateTime(timezone=True), nullable=True)
+    sys_tag = sa.Column(pg.ARRAY(sa.String), nullable=True)
+    usr_tag = sa.Column(pg.ARRAY(sa.String), nullable=True)
 
+class WorkflowStep(WorkflowBaseSchema):
+    __tablename__ = "workflow-step"
 
-class WorkflowStage(DataResource):
-    workflow_id = UUIDField()
-    key = field(type=nullable(str))
-    title = field(type=nullable(str))
-    desc = field(type=nullable(str))
-    order = field(type=int)
+    step_name = sa.Column(sa.String, nullable=False)
+    title = sa.Column(sa.String, nullable=False)
+    workflow_id = sa.Column(pg.UUID, nullable=False)
+    stage_id = sa.Column(pg.UUID, nullable=True)
+    src_step = sa.Column(pg.UUID, nullable=True)
+    sys_status = sa.Column(sa.Enum(StepStatus, name="step_status"), nullable=False)
+    usr_status = sa.Column(sa.String, nullable=True)
+    ts_expire = sa.Column(sa.DateTime(timezone=True), nullable=True)
+    ts_start = sa.Column(sa.DateTime(timezone=True), nullable=True)
+    ts_end = sa.Column(sa.DateTime(timezone=True), nullable=True)
 
+class WorkflowStage(WorkflowBaseSchema):
+    __tablename__ = "workflow-stage"
 
-class WorkflowParticipant(DataResource):
-    workflow_id = UUIDField()
-    participant_id = UUIDField()
-    role = field(type=str)
+    workflow_id = sa.Column(pg.UUID, nullable=False)
+    key = sa.Column(sa.String, nullable=True)
+    title = sa.Column(sa.String, nullable=True)
+    desc = sa.Column(sa.String, nullable=True)
+    order = sa.Column(sa.Integer, nullable=True)
 
-class WorkflowEvent(DataResource):
-    workflow_id = UUIDField()
-    participant_id = UUIDField()
-    role = field(type=str)
+class WorkflowParticipant(WorkflowBaseSchema):
+    __tablename__ = "workflow-participant"
 
-class WorkflowTask(DataResource):
-    workflow_id = UUIDField()
-    step_id = field(type=str)
-    ts_expire = DateTimeField(nullable=True)
-    ts_start = DateTimeField(nullable=True)
-    ts_end = DateTimeField(nullable=True)
-    status = EnumField(TaskStatus)
-    name = field(type=nullable(str))
-    desc = field(type=nullable(str))
+    workflow_id = sa.Column(pg.UUID, nullable=False)
+    participant_id = sa.Column(pg.UUID, nullable=False)
+    role = sa.Column(sa.String, nullable=False)
 
+class WorkflowEvent(WorkflowBaseSchema):
+    __tablename__ = "workflow-event"
 
-@WorkflowDAL.register
-class WorkflowParams(ResourceProperty):
-    _schema = ResourcePropertySchema.WORKFLOW_PARAMETER
+    workflow_id = sa.Column(pg.UUID, nullable=False)
+    participant_id = sa.Column(pg.UUID, nullable=False)
+    role = sa.Column(sa.String, nullable=False)
 
+class WorkflowTask(WorkflowBaseSchema):
+    __tablename__ = "workflow-task"
 
-@WorkflowDAL.register
-class WorkflowMemory(ResourceProperty):
-    _schema = ResourcePropertySchema.WORKFLOW_MEMORY
+    workflow_id = sa.Column(pg.UUID, nullable=False)
+    step_id = sa.Column(sa.String, nullable=False)
+    ts_expire = sa.Column(sa.DateTime(timezone=True), nullable=True)
+    ts_start = sa.Column(sa.DateTime(timezone=True), nullable=True)
+    ts_end = sa.Column(sa.DateTime(timezone=True), nullable=True)
+    status = sa.Column(sa.Enum(TaskStatus, name="task_status"), nullable=False)
+    name = sa.Column(sa.String, nullable=True)
+    desc = sa.Column(sa.String, nullable=True)
