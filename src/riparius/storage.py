@@ -24,17 +24,14 @@ class WorkflowBackend(object):
             revision=wf_def.revision,
             status=WorkflowStatus.NEW)
 
-        self.queue_event(wf_id, 'create_workflow', workflow=workflow)
         self._workflows[wf_id] = workflow
         return workflow
 
     def fetch_workflow(self, wf_id):
         return self._workflows.get(wf_id)
     
-    def queue_event(self, wf_id, event_type, **kwargs):
-        self._changes.setdefault(wf_id, []).append(
-            (event_type, kwargs)
-        )
+    def queue_action(self, action):
+        self._changes.setdefault(action.workflow_id, []).append(action)
 
     def load_steps(self, wf_id):
         return []

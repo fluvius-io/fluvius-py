@@ -1,3 +1,5 @@
+import queue
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Callable, Literal
 from types import SimpleNamespace
@@ -17,18 +19,14 @@ STEP_ACTION = Literal['step']
 WORKFLOW_ACTION = Literal['workflow']
 
 @dataclass
-class WorkflowAction(object):
+class WorkflowEvent(object):
+    transaction_id: str
     workflow_id: str
     workflow_key: str
-    action_type: str
-    action_data: dict
+    event_name: str
+    event_data: dict
     route_id: str
     step_id: str
-
-@dataclass
-class ActionData(object):
-    data: dict
-    resp: object
 
 class WorkflowStateProxy(object):
     def __init__(self, wf_engine):
@@ -42,6 +40,9 @@ class WorkflowStateProxy(object):
             action_type, action_name = wf_func.__action__
             if action_type == WORKFLOW_ACTION:
                 setattr(self, action_name, wf_func)
+
+def action_response(resp, **kwargs):
+    return SimpleNamespace(data=kwargs, resp=resp)
 
 class StepStateProxy(object):
     def __init__(self, wf_engine, selector):
@@ -70,71 +71,59 @@ def validate_statuses(statuses):
 
     return statuses
 
-def workflow_action(action_name, allow_statuses = None, unallow_statuses = None):
+
+def validate_transaction(wf, action_name, allowed, unallowed):
+    if wf._transaction_id is None:
+        raise WorkflowExecutionError('P01002', f'Unable to perform action [{action_name}] outside of a transaction')
+
+    if allowed and wf.status not in allowed:
+        raise WorkflowExecutionError('P01003', f'Unable to perform action [{action_name}] at workflow status [{wf.status}]')
+
+    if unallowed and wf.status in unallowed:
+        raise WorkflowExecutionError('P01004', f'Unable to perform action [{action_name}] at workflow status [{wf.status}]')
+
+
+def workflow_action(event_name, allow_statuses = None, unallow_statuses = None, hook_name = None):
     allow_statuses = validate_statuses(allow_statuses)
     unallow_statuses = validate_statuses(unallow_statuses)
+    hook_name = hook_name or event_name
 
     def decorator(action_func):
-        action_func.__action__ = (WORKFLOW_ACTION, action_name)
+        action_func.__action__ = (WORKFLOW_ACTION, event_name)
 
         @wraps(action_func)
-        def wrapper(self, /, **kwargs):
-            if allow_statuses and self.status not in allow_statuses:
-                raise WorkflowExecutionError('P01002', f'Unable to perform action [{action_func.__name__}] at workflow status [{self.status}]')
+        def wrapper(self, *args, **kwargs):
+            validate_transaction(self, event_name, allow_statuses, unallow_statuses)
 
-            if unallow_statuses and self.status in unallow_statuses:
-                raise WorkflowExecutionError('P01002', f'Unable to perform action [{action_func.__name__}] at workflow status [{self.status}]')
-
-            action_result = action_func(self, **kwargs)
+            action_result = action_func(self, *args, **kwargs)
             if action_result is None:
                 return None
 
-            self._add_action(action_name, action_result.data)
+            self.queue_event(event_name, None, action_result.data)
+            self.run_hook(hook_name, self._wf_proxy)
+                
             return action_result.resp
         return wrapper
     return decorator
 
-def step_action(action_name, allow_statuses = None, unallow_statuses = None):
+
+def step_action(event_name, allow_statuses = None, unallow_statuses = None, hook_name = None):
     allow_statuses = validate_statuses(allow_statuses)
     unallow_statuses = validate_statuses(unallow_statuses)
+    hook_name = hook_name or event_name
 
     def decorator(action_func):
-        action_func.__action__ = (STEP_ACTION, action_name)
-
+        action_func.__action__ = (STEP_ACTION, event_name)
         @wraps(action_func)
-        def wrapper(self, step_id = None, /, **kwargs):
-            if allow_statuses and self.status not in allow_statuses:
-                raise WorkflowExecutionError('P01002', f'Unable to perform action [{action_func.__name__}] at workflow status [{self.status}]')
+        def wrapper(self, step_id, *args, **kwargs):
+            validate_transaction(self, action_func.__name__, allow_statuses, unallow_statuses)
 
-            if unallow_statuses and self.status in unallow_statuses:
-                raise WorkflowExecutionError('P01002', f'Unable to perform action [{action_func.__name__}] at workflow status [{self.status}]')
-
-            action_result = action_func(self, step_id, **kwargs)
-            if action_result is None:
-                return None
-
-            self._add_action(action_name, step_id, action_result.data)
+            action_result = action_func(self, step_id, *args, **kwargs)
+            self.queue_event(event_name, step_id, action_result.data)
+            self.run_hook(hook_name, self._wf_proxy)
             return action_result.resp
         return wrapper
     return decorator
-
-def step_transition(transit_func):
-    @wraps(transit_func)
-    def wrapper(self, step_id, *args):
-        step = self._steps[step_id]
-
-        try:
-            updates = transit_func(self, step, *args)
-            if not isinstance(updates, dict):
-                raise ValueError('Invalid transit values: %s' % str(updates))
-            return self.update_step(step, **updates)
-        except Exception as e:
-            raise
-            logger.exception('Error handling state transition: %s', e)
-            step.on_error()
-            return self.update_step(step, status=StepStatus.ERROR, message=str(e))
-
-    return wrapper
 
 
 class WorkflowEngine(object):
@@ -143,16 +132,15 @@ class WorkflowEngine(object):
     __roles__      = {}
     __backend__    = WorkflowBackend()
 
-    def __init__(self, wf_state=None):
-        if wf_state is None:
-            wf_state = self.backend.create_workflow(self.__wf_def__)
-
+    def __init__(self, wf_state):
         self._id = wf_state.id
         self._workflow = wf_state
         self._memory = {}
         self._etag = None
         self._st_proxy = {}
         self._wf_proxy = WorkflowStateProxy(self)
+        self._event_queue = queue.Queue()
+        self._transaction_id = None
     
     def __init_subclass__(cls, wf_def):
         if not issubclass(wf_def, Workflow):
@@ -182,13 +170,6 @@ class WorkflowEngine(object):
                 return isinstance(ele, Role)
             except TypeError:
                 return None
-
-        def is_transition(func):
-            try:
-                return func.__transition__
-            except TypeError:
-                return None
-
 
         def define_step(step_cls, step_key):
             stage = step_cls.__stage__
@@ -248,22 +229,33 @@ class WorkflowEngine(object):
 
         EventRouter.connect_wf_events(wf_def, wf_def.__key__)
     
-    def trigger_event(self, event_trigger):
-        wf_context = self.get_state_proxy(event_trigger.selector)
-        self.run_hook(event_trigger.handler_func, wf_context, event_trigger.event_data)
-        return self.commit()
-    
-    def _add_action(self, action_type, step_id = None, /, **kwargs):
-        action = WorkflowAction(
+    def queue_event(self, event_name, step_id, data):
+        action = WorkflowEvent(
+            transaction_id=self._transaction_id,
             workflow_id=self.id,
             workflow_key=self.key,
             route_id=self.route_id,
             step_id=step_id,
-            action_type=action_type,
-            action_data=kwargs,
+            event_name=event_name,
+            event_data=data,
         )
-        self.backend.queue_event(action)
+        self._event_queue.put(action)
 
+    @contextmanager
+    def transaction(self):
+        if self._transaction_id is not None:
+            raise WorkflowExecutionError('P01009', f'Transaction already started.')
+
+        if not self._event_queue.empty():
+            raise WorkflowExecutionError('P01008', f'Transaction events are not fully processed.')
+        
+        self._transaction_id = UUID_GENR()
+        yield self._wf_proxy
+        self._transaction_id = None
+    
+    def consume_events(self):
+        while not self._event_queue.empty():
+            yield self._event_queue.get()
 
     def compute_progress(self):
         active_steps = len([s for s in self._stmap.values() if s.data.status not in StepStatus._FINISHED])
@@ -312,7 +304,10 @@ class WorkflowEngine(object):
 
     def run_hook(self, handler_func, wf_context, *args, **kwargs):
         func = handler_func if callable(handler_func) else \
-                getattr(self.__wf_def__, f'on_{handler_func}')
+                getattr(self.__wf_def__, f'on_{handler_func}', None)
+        
+        if func is None:
+            return
 
         msgs = func(wf_context, *args, **kwargs)
 
@@ -321,7 +316,7 @@ class WorkflowEngine(object):
 
     def get_state_proxy(self, selector):
         if selector is None:
-            return self.workflow_state
+            return self._wf_proxy
 
         if selector not in self._st_proxy:
             if selector not in self.selector_map:
@@ -354,9 +349,9 @@ class WorkflowEngine(object):
 
             transition_hook(self.get_state_proxy(step.selector), from_state)
 
-        return ActionData(data=dict(state=to_state, **kwargs), resp=None)
+        return from_state
     
-    def _add_step(self, origin_step, /, step_key, selector=None, **kwargs):
+    def _add_step(self, origin_step, /, step_key, selector=None, title=None):
         stdef = self.__steps__[step_key]
         step_id = UUID_GENF(step_key, self._id)
         selector = selector or step_id
@@ -366,7 +361,7 @@ class WorkflowEngine(object):
         step = stdef(
             _id=step_id,
             selector=selector,
-            title=kwargs.get('title', stdef.__title__),
+            title=title or stdef.__title__,
             workflow_id=self._id,
             origin_step=origin_step,
             stage=stdef.__stage__,
@@ -377,10 +372,8 @@ class WorkflowEngine(object):
 
         self.selector_map[step.selector] = step
         self.step_id_map[step.id] = step
-        if kwargs:
-            self.set_memory(step.id, **kwargs)
 
-        return ActionData(data={"step": step._data}, resp=self.get_state_proxy(step.selector))
+        return step
 
     def _load_steps(self):
         self._steps = {step.id: step for step in self.backend.load_steps(self._id)}
@@ -390,7 +383,6 @@ class WorkflowEngine(object):
         self._memory.update({
             (step_id, key): value for key, value in kwargs.items()}
         )
-        return ActionData(data=kwargs, resp=None)
 
     def _get_memory(self, step_id=None):
         return SimpleNamespace(**{
@@ -436,37 +428,43 @@ class WorkflowEngine(object):
 
         return self._stmap
 
+    def get_task(self, task_id):
+        return None
+
     @workflow_action('start', allow_statuses=WorkflowStatus.NEW)
     def start(self):
         self.update_workflow(status=WorkflowStatus.ACTIVE)
-        self.run_hook('started', self._wf_proxy)
-        return ActionData(data=dict(status=WorkflowStatus.ACTIVE), resp=None)
+        return action_response(self, status=WorkflowStatus.ACTIVE)
 
+    @workflow_action('trigger', allow_statuses=WorkflowStatus._ACTIVE)
+    def process_trigger(self, trigger):
+        wf_context = self.get_state_proxy(trigger.selector)
+        self.run_hook(trigger.handler_func, wf_context, trigger.activity_data)
+        return action_response(self, activity_data=trigger.activity_data)
+    
     @workflow_action('add_participant', allow_statuses=WorkflowStatus._EDITABLE)
     def add_participant(self, /, role, member_id, **kwargs):
-        return ActionData(data={"role": role, "member_id": member_id}, resp=None)
+        return action_response(self, role=role, member_id=member_id)
 
     @workflow_action('del_participant', allow_statuses=WorkflowStatus._EDITABLE)
     def del_participant(self, /, role, member_id):
-        return ActionData(data={"role": role, "member_id": member_id}, resp=None)
+        return action_response(self, role=role, member_id=member_id)
 
-    @workflow_action('cancel', allow_statuses=WorkflowStatus._EDITABLE)
+    @workflow_action('cancel', allow_statuses=WorkflowStatus._EDITABLE, hook_name='cancelled')
     def cancel_workflow(self):
-        updates = dict(status=WorkflowStatus.CANCELLED)
-        self.update_workflow(**updates)
-        self.run_hook('cancelled', self._wf_proxy)
-        return ActionData(data=updates, resp=None)
+        self.update_workflow(status=WorkflowStatus.CANCELLED)
+        return action_response(self, status=WorkflowStatus.CANCELLED)
 
-    @workflow_action('abort', allow_statuses=WorkflowStatus.DEGRADED)
+    @workflow_action('abort', allow_statuses=WorkflowStatus.DEGRADED, hook_name='aborted')
     def abort_workflow(self):
         self.update_workflow(status=WorkflowStatus.FAILED)
-        self.run_hook('aborted', self._wf_proxy)
-        return ActionData(data=dict(status=WorkflowStatus.FAILED), resp=None)
+        return action_response(self, status=WorkflowStatus.FAILED)
 
-    @workflow_action('add_task', allow_statuses=WorkflowStatus._EDITABLE)
+    @workflow_action('add_task', allow_statuses=WorkflowStatus._ACTIVE, hook_name='task_added')
     def add_task(self, /, origin_step, task_key, **kwargs):
+        task_id = UUID_GENF(task_key, self._id)
         task = {
-            'id': UUID_GENF(task_key, self._id),
+            'id': task_id,
             'origin_step': origin_step,
             'title': kwargs.get('title', ''),
             'status': StepStatus.ACTIVE,
@@ -474,49 +472,74 @@ class WorkflowEngine(object):
             'display': BEGIN_LABEL,
             'workflow_id': self._id,
         }
-        return ActionData(data={"task": task}, resp=task)
+        return action_response(self.get_task(task_id), task=task)
 
-    @workflow_action('cancel_task', allow_statuses=WorkflowStatus._EDITABLE)
+    @workflow_action('cancel_task', allow_statuses=WorkflowStatus._ACTIVE, hook_name='task_cancelled')
     def cancel_task(self, task_id):
-        return ActionData(data=dict(status=StepStatus.CANCELLED), resp=None)
+        task = self.get_task(task_id)
+        return action_response(task, status=StepStatus.CANCELLED)
 
-    @workflow_action('transit_step', allow_statuses=WorkflowStatus._EDITABLE)
-    def workflow_transit(self, step_id, to_state, **kwargs):
-        return self._transit(step_id, to_state, **kwargs)
+    @workflow_action('transit_step', allow_statuses=WorkflowStatus._ACTIVE)
+    def workflow_transit_step(self, step_id, to_state, **kwargs):
+        from_state = self._transit(step_id, to_state, **kwargs)
+        return action_response(None, state=to_state, from_state=from_state, **kwargs)
 
-    @workflow_action('set_memory', allow_statuses=WorkflowStatus._EDITABLE)
+    @workflow_action('add_step', allow_statuses=WorkflowStatus._ACTIVE)
+    def workflow_add_step(self, step_key, /, selector=None, title=None, **kwargs):
+        step = self._add_step(None, step_key, selector, title)
+        resp = {"step": step._data}
+
+        if kwargs:
+            self._set_memory(step.id, **kwargs)
+            resp['memory'] = kwargs
+
+        step_state = self.get_state_proxy(step.selector)
+
+        return action_response(step_state, **resp)
+
+    @workflow_action('memorize', allow_statuses=WorkflowStatus._ACTIVE)
     def workflow_set_memory(self, **kwargs):
-        return self._set_memory(None, **kwargs)
+        self._set_memory(None, **kwargs)
+        return action_response(None, **kwargs)
 
-    @workflow_action('add_step', allow_statuses=WorkflowStatus._EDITABLE)
-    def workflow_add_step(self, step_key, /, selector=None, **kwargs):
-        return self._add_step(None, step_key, selector, **kwargs)
-    
-    @workflow_action('get_memory', allow_statuses=WorkflowStatus._EDITABLE)
+    @workflow_action('recall', allow_statuses=WorkflowStatus._ACTIVE)
     def workflow_get_memory(self):
-        return self._get_memory(None)
+        memory = self._get_memory(None)
+        return action_response(memory)
 
-    @step_action('add_step', allow_statuses=WorkflowStatus._EDITABLE)
-    def step_add_step(self, step_id, step_key, /, selector=None, **kwargs):
-        return self._add_step(step_id, step_key, selector, **kwargs)
+    @step_action('add_step', allow_statuses=WorkflowStatus._ACTIVE)
+    def step_add_step(self, step_id, step_key, /, selector=None, title=None, **kwargs):
+        step = self._add_step(step_id, step_key, selector, title)
+        resp = {"step": step._data}
+        if kwargs:
+            self._set_memory(step.id, **kwargs)
+            resp['memory'] = kwargs
 
-    @step_action('transit', allow_statuses=WorkflowStatus._EDITABLE)
+        step_state = self.get_state_proxy(step.selector)
+
+        return action_response(step_state, **resp)
+
+    @step_action('transit', allow_statuses=WorkflowStatus._ACTIVE)
     def step_transit(self, step_id, to_state, **kwargs):
-        return self._transit(step_id, to_state, **kwargs)
+        from_state = self._transit(step_id, to_state, **kwargs)
+        return action_response(None, state=to_state, from_state=from_state, **kwargs)
 
-    @step_action('recover_step', allow_statuses=WorkflowStatus._EDITABLE)
+    @step_action('recover_step', allow_statuses=WorkflowStatus._ACTIVE)
     def recover_step(self, step_id):
         step = self.step_id_map[step_id]
         if step.status != StepStatus.ERROR:
             raise WorkflowExecutionError('P01005', f'Cannot recover from a non-error status: {step.status}')
 
-        return ActionData(data=dict(status=StepStatus.ACTIVE), resp=None)
+        return action_response(step, status=StepStatus.ACTIVE)
 
-    @step_action('set_memory', allow_statuses=WorkflowStatus._EDITABLE)
+    @step_action('memorize', allow_statuses=WorkflowStatus._ACTIVE)
     def step_set_memory(self, step_id, **kwargs):
-        return self._set_memory(step_id, **kwargs)
+        self._set_memory(step_id, **kwargs)
+        return action_response(None, **kwargs)
 
-    @step_action('get_memory', allow_statuses=WorkflowStatus._EDITABLE)
+    @step_action('recall')
     def step_get_memory(self, step_id):
-        return self._get_memory(step_id)
+        memory = self._get_memory(step_id)
+        return action_response(memory)
+
 

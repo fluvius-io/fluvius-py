@@ -1,6 +1,8 @@
 import re
+from dataclasses import dataclass
 from enum import Enum
-from typing import List, Dict, Optional
+from types import SimpleNamespace
+from typing import List, Dict, Optional, Callable
 from fluvius.data import DataModel, Field, UUID_GENF, UUID_GENR, UUID_TYPE
 from .status import WorkflowStatus, StepStatus
 
@@ -31,13 +33,6 @@ class WorkflowBundle(WorkflowDataModel):
     params: Dict = Field(default_factory=dict)
     memory: Dict = Field(default_factory=dict)
     participants: List = Field(default_factory=list)
-
-
-class WorkflowEvent(WorkflowDataModel):
-    workflow_id: UUID_TYPE
-    step_id: Optional[str] = None
-    event_name: str
-    event_data: Optional[dict] = None
 
 
 class WorkflowTask(WorkflowDataModel):
