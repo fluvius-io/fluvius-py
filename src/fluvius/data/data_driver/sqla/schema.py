@@ -45,6 +45,8 @@ def create_data_schema_base(driver_cls=None):
             >>> {u'email': u'john@localhost', u'posts': [{u'id': 1, u'title': u'My First Post'}], u'name': u'John', u'id': 1}
         """
         __abstract__ = True
+        __table_args__ = {'schema': driver_cls.__schema__} \
+            if hasattr(driver_cls, '__schema__') else {}
 
         @classmethod
         def _primary_key(cls):

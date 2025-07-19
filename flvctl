@@ -1,0 +1,4 @@
+#!/bin/sh
+
+export PYTHONPATH="./src:./cmd"
+python -m flvctl -- $*

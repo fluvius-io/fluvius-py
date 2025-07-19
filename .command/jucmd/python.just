@@ -1,4 +1,4 @@
-export PYTHONPATH 	:= "./src:./tests/_lib"
+export PYTHONPATH 	:= "./src:./tests/_lib:./cmd"
 export FLUVIUS_CONFIG_FILE := "config.ini"
 
 TEST_FILES 			:= "*"

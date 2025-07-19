@@ -1,5 +1,6 @@
 from enum import Enum
 from types import SimpleNamespace
+from typing import Optional
 from fluvius.data import logger, config
 
 from fluvius.data import UUID_GENF, UUID_GENR,nullable, DataModel
@@ -7,7 +8,7 @@ from fluvius.helper.registry import ClassRegistry
 from fluvius.helper import camel_to_lower
 
 from .router import EventRouter, st_connect, wf_connect, connect
-from .datadef import WorkflowStep, WorkflowState, RX_STATE
+from .datadef import WorkflowStep, WorkflowData, RX_STATE
 from .exceptions import WorkflowExecutionError, WorkflowConfigurationError
 
 BEGIN_STATE  = "_CREATED"
@@ -39,7 +40,6 @@ def validate_step_states(states):
 
 
 class Step(object):
-    __start__ = None
     __states__ = tuple()
 
     def __init_subclass__(cls, title=None, stage=None, states=None):
@@ -111,7 +111,7 @@ class Step(object):
 
     @property
     def state(self):
-        return self._data.state
+        return self._data.stm_state
 
     @property
     def status(self):
@@ -129,29 +129,35 @@ class Stage(object):
         self.__order__ = order
 
 
+class WorkflowMeta(DataModel):
+    key: str
+    title: str
+    revision: int
+    namespace: str
+    params_schema: Optional[DataModel] = None
+    memory_schema: Optional[DataModel] = None
+
+
 class Workflow(object):
-    __key__         = None
-    __title__       = None
-    __revision__    = 0
-    __namespace__   = None
     __params__      = SimpleNamespace
 
-    def __init_subclass__(cls, title, revision=0, namespace=None):
-        cls.__key__ = getattr(cls, '__key__') or camel_to_lower(cls.__name__)
-        cls.__title__ = title
-        cls.__revision__ = revision
-        cls.__namespace__ = namespace
+    class Meta(SimpleNamespace):
+        pass
 
-        assert getattr(cls, '__title__', None), "Workflow must have a title set (__title__ = ...)"
-        assert getattr(cls, '__revision__', -1) >= 0, \
-            "Workflow must have a positive integer revision number (__revision__ = ...)"
+    def __init_subclass__(cls):
+        cls.Meta = WorkflowMeta.create(cls.Meta, defaults={
+            "key": camel_to_lower(cls.__name__),
+            "title": cls.__name__,
+            "revision": 0,
+            "namespace": "generic"
+        })
 
         from .manager import WorkflowManager
         WorkflowManager.register(cls)
 
 
     def __init__(self, **data):
-        self._data = WorkflowState(**data)
+        self._data = WorkflowData(**data)
 
     @property
     def id(self):

@@ -1,6 +1,9 @@
 import os
 import hashlib
 import mimetypes
+from contextlib import contextmanager
+from itertools import chain
+from typing import Optional
 
 
 def file_mime(filepath):

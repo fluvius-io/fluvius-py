@@ -46,7 +46,7 @@ def action_response(resp, **kwargs):
 
 class StepStateProxy(object):
     def __init__(self, wf_engine, selector):
-        step = wf_engine._stmap[selector]
+        step = wf_engine.selector_map[selector]
         step_id = step.id
         self._id = step_id
         self._data = step.data
@@ -100,7 +100,7 @@ def workflow_action(event_name, allow_statuses = None, unallow_statuses = None, 
                 return None
 
             self.queue_event(event_name, None, action_result.data)
-            self.run_hook(hook_name, self._wf_proxy)
+            self.run_hook(hook_name, self._state_proxy)
                 
             return action_result.resp
         return wrapper
@@ -120,7 +120,7 @@ def step_action(event_name, allow_statuses = None, unallow_statuses = None, hook
 
             action_result = action_func(self, step_id, *args, **kwargs)
             self.queue_event(event_name, step_id, action_result.data)
-            self.run_hook(hook_name, self._wf_proxy)
+            self.run_hook(hook_name, self._state_proxy)
             return action_result.resp
         return wrapper
     return decorator
@@ -132,21 +132,21 @@ class WorkflowEngine(object):
     __roles__      = {}
     __backend__    = WorkflowBackend()
 
-    def __init__(self, wf_state):
-        self._id = wf_state.id
-        self._workflow = wf_state
+    def __init__(self, wf_data):
+        self._id = wf_data.id
+        self._workflow = wf_data
         self._memory = {}
         self._etag = None
-        self._st_proxy = {}
-        self._wf_proxy = WorkflowStateProxy(self)
-        self._event_queue = queue.Queue()
+        self._step_proxies = {}
+        self._state_proxy = WorkflowStateProxy(self)
+        self._evt_queue = queue.Queue()
+        self._msg_queue = queue.Queue()
         self._transaction_id = None
     
     def __init_subclass__(cls, wf_def):
         if not issubclass(wf_def, Workflow):
             raise WorkflowConfigurationError('P01201', f'Invalid workflow definition: {wf_def}')
 
-        cls.__key__ = wf_def.__key__
         cls.__wf_def__ = wf_def
 
         STEPS = cls.__steps__.copy()
@@ -187,7 +187,7 @@ class WorkflowEngine(object):
                 ele_cls = getattr(wf_def, attr)
 
             # Register step's external events listeners
-            EventRouter.connect_st_events(step_cls, wf_def.__key__, step_key)
+            EventRouter.connect_st_events(step_cls, wf_def.Meta.key, step_key)
 
         def define_stage(key, stage):
             if hasattr(stage, '__key__'):
@@ -205,7 +205,6 @@ class WorkflowEngine(object):
                 raise WorkflowConfigurationError('P01105', 'Role already registered [%s]' % role)
 
             ROLES[key] = role
-
 
         for attr in dir(wf_def):
             ele_cls = getattr(wf_def, attr)
@@ -227,7 +226,7 @@ class WorkflowEngine(object):
         cls.__roles__ = ROLES
         cls.__stages__ = STAGES
 
-        EventRouter.connect_wf_events(wf_def, wf_def.__key__)
+        EventRouter.connect_wf_events(wf_def, wf_def.Meta.key)
     
     def queue_event(self, event_name, step_id, data):
         action = WorkflowEvent(
@@ -239,31 +238,37 @@ class WorkflowEngine(object):
             event_name=event_name,
             event_data=data,
         )
-        self._event_queue.put(action)
+        self._evt_queue.put(action)
 
     @contextmanager
     def transaction(self):
         if self._transaction_id is not None:
             raise WorkflowExecutionError('P01009', f'Transaction already started.')
 
-        if not self._event_queue.empty():
+        if not self._evt_queue.empty():
             raise WorkflowExecutionError('P01008', f'Transaction events are not fully processed.')
         
         self._transaction_id = UUID_GENR()
-        yield self._wf_proxy
+        yield self._state_proxy
         self._transaction_id = None
     
     def consume_events(self):
-        while not self._event_queue.empty():
-            yield self._event_queue.get()
+        while not self._evt_queue.empty():
+            yield self._evt_queue.get()
+
+    def consume_messages(self):
+        while not self._msg_queue.empty():
+            yield self._msg_queue.get()
 
     def compute_progress(self):
-        active_steps = len([s for s in self._stmap.values() if s.data.status not in StepStatus._FINISHED])
-        total_steps = float(len(self._stmap) or 1.0)
+        steps = tuple(self.step_id_map.values())
+        active_steps = len([s for s in steps if s.data.status not in StepStatus._FINISHED])
+        total_steps = float(len(steps) or 1.0)
         return (total_steps - active_steps)/total_steps
 
     def compute_status(self):
-        step_statuses = [s for s in self._stmap.values() if s.data.status]
+        steps = tuple(self.step_id_map.values())
+        step_statuses = [s for s in steps if s.data.status]
         if StepStatus.ERROR in step_statuses:
             status = WorkflowStatus.DEGRADED
         elif all(s in StepStatus._FINISHED for s in step_statuses):
@@ -285,12 +290,10 @@ class WorkflowEngine(object):
         return changes
 
     def update_step(self, step, **kwargs):
-        if kwargs.get('state') == None:
-            pass
-        elif kwargs.get('state') == FINISH_STATE:
+        if kwargs.get('stm_state') == FINISH_STATE:
             kwargs['status'] = StepStatus.COMPLETED
-            kwargs['display'] = FINISH_LABEL
-        elif kwargs.get('state') is not None and kwargs.get('state') != BEGIN_STATE:
+            kwargs['label'] = FINISH_LABEL
+        elif kwargs.get('stm_state') != BEGIN_STATE:
             kwargs['status'] = StepStatus.ACTIVE
 
         if not all(k in WorkflowStep.EDITABLE_FIELDS for k in kwargs):
@@ -309,25 +312,22 @@ class WorkflowEngine(object):
         if func is None:
             return
 
-        msgs = func(wf_context, *args, **kwargs)
-
-        for msg in msgs or []:
-            logger.info(f'WORKFLOW MSG {handler_func}: {msg}')
+        for msg in func(wf_context, *args, **kwargs) or []:
+            self._msg_queue.put(msg)
 
     def get_state_proxy(self, selector):
         if selector is None:
-            return self._wf_proxy
+            return self._state_proxy
 
-        if selector not in self._st_proxy:
+        if selector not in self._step_proxies:
             if selector not in self.selector_map:
                 raise WorkflowExecutionError('P0100X', f'No step available for selector value: {selector}')
 
-            self._st_proxy[selector] = StepStateProxy(self, selector)
+            self._step_proxies[selector] = StepStateProxy(self, selector)
 
-        return self._st_proxy[selector]
+        return self._step_proxies[selector]
 
-    def _transit(self, step_id, to_state, **kwargs):
-        step = self.step_id_map[step_id]
+    def _transit(self, step, to_state):
         from_state = step.state
         if to_state not in step.__states__:
             raise WorkflowExecutionError('P01004', f'Invalid step states: {to_state}. Allowed states: {step.__states__}')
@@ -347,7 +347,8 @@ class WorkflowEngine(object):
             if unallowed_states and step.state in unallowed_states:
                 raise WorkflowExecutionError('P01003', f'Transition to state [{to_state}] is not allowed. Current state: {step.state}')
 
-            transition_hook(self.get_state_proxy(step.selector), from_state)
+            step_proxy = self.get_state_proxy(step.selector)
+            self.run_hook(transition_hook, step_proxy, from_state)
 
         return from_state
     
@@ -363,11 +364,11 @@ class WorkflowEngine(object):
             selector=selector,
             title=title or stdef.__title__,
             workflow_id=self._id,
+            stm_state=BEGIN_STATE,
             origin_step=origin_step,
+            label=BEGIN_LABEL,
+            status=StepStatus.ACTIVE,
             stage=stdef.__stage__,
-            state=BEGIN_STATE,
-            display=BEGIN_LABEL,
-            status=StepStatus.ACTIVE
         )
 
         self.selector_map[step.selector] = step
@@ -399,7 +400,7 @@ class WorkflowEngine(object):
 
     @property
     def key(self):
-        return self.__key__
+        return self.__wf_def__.Meta.key
 
     @property
     def route_id(self):
@@ -410,9 +411,8 @@ class WorkflowEngine(object):
         return self.__backend__
 
     @property
-    def wf_state(self):
+    def wf_data(self):
         return self._workflow
-
 
     @property
     def step_id_map(self):
@@ -480,9 +480,11 @@ class WorkflowEngine(object):
         return action_response(task, status=StepStatus.CANCELLED)
 
     @workflow_action('transit_step', allow_statuses=WorkflowStatus._ACTIVE)
-    def workflow_transit_step(self, step_id, to_state, **kwargs):
-        from_state = self._transit(step_id, to_state, **kwargs)
-        return action_response(None, state=to_state, from_state=from_state, **kwargs)
+    def workflow_transit_step(self, step_id, to_state):
+        step = self.step_id_map[step_id]
+        from_state = self._transit(step, to_state)
+        self.update_step(step, stm_state=to_state)
+        return action_response(None, to_state=to_state, from_state=from_state)
 
     @workflow_action('add_step', allow_statuses=WorkflowStatus._ACTIVE)
     def workflow_add_step(self, step_key, /, selector=None, title=None, **kwargs):
@@ -493,9 +495,9 @@ class WorkflowEngine(object):
             self._set_memory(step.id, **kwargs)
             resp['memory'] = kwargs
 
-        step_state = self.get_state_proxy(step.selector)
+        step_proxy = self.get_state_proxy(step.selector)
 
-        return action_response(step_state, **resp)
+        return action_response(step_proxy, **resp)
 
     @workflow_action('memorize', allow_statuses=WorkflowStatus._ACTIVE)
     def workflow_set_memory(self, **kwargs):
@@ -515,14 +517,16 @@ class WorkflowEngine(object):
             self._set_memory(step.id, **kwargs)
             resp['memory'] = kwargs
 
-        step_state = self.get_state_proxy(step.selector)
+        step_proxy = self.get_state_proxy(step.selector)
 
-        return action_response(step_state, **resp)
+        return action_response(step_proxy, **resp)
 
     @step_action('transit', allow_statuses=WorkflowStatus._ACTIVE)
-    def step_transit(self, step_id, to_state, **kwargs):
-        from_state = self._transit(step_id, to_state, **kwargs)
-        return action_response(None, state=to_state, from_state=from_state, **kwargs)
+    def step_transit(self, step_id, to_state):
+        step = self.step_id_map[step_id]
+        from_state = self._transit(step, to_state)
+        self.update_step(step, stm_state=to_state)
+        return action_response(None, to_state=to_state, from_state=from_state)
 
     @step_action('recover_step', allow_statuses=WorkflowStatus._ACTIVE)
     def recover_step(self, step_id):

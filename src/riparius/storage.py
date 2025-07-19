@@ -1,6 +1,6 @@
 from fluvius.data import UUID_GENR, logger
 from pprint import pformat
-from .datadef import WorkflowState, WorkflowStatus
+from .datadef import WorkflowData, WorkflowStatus
 
 
 class WorkflowBackend(object):
@@ -18,7 +18,7 @@ class WorkflowBackend(object):
 
     def create_workflow(self, wf_def):
         wf_id = UUID_GENR()
-        workflow = WorkflowState(
+        workflow = WorkflowData(
             id=wf_id, 
             title=wf_def.title, 
             revision=wf_def.revision,

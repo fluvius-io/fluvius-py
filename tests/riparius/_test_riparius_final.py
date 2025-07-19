@@ -446,7 +446,7 @@ class TestRipariusWorkflowSystem:
         manager = WorkflowManager()
         assert 'complete-workflow' in manager.__registry__
 
-    def test_workflow_state_transitions_and_memory(self):
+    def test_stm_state_transitions_and_memory(self):
         """Test workflow state management and memory operations"""
         # Create workflow state
         wf_state = WorkflowState(

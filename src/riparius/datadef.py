@@ -1,4 +1,5 @@
 import re
+from datetime import datetime
 from dataclasses import dataclass
 from enum import Enum
 from types import SimpleNamespace
@@ -12,19 +13,22 @@ class WorkflowDataModel(DataModel):
     """Base class for all workflow data models."""
     pass
 
-class WorkflowState(WorkflowDataModel):
-    id: UUID_TYPE = Field(default_factory=UUID_GENR)
+class WorkflowData(WorkflowDataModel):
+    id: UUID_TYPE = Field(default_factory=UUID_GENR, alias='_id')
     title: str
     revision: int = Field(default=0)
     namespace: str = Field(default=None)
     route_id: UUID_TYPE = Field(default_factory=UUID_GENR)
     status: WorkflowStatus = Field(default=WorkflowStatus.NEW)
     progress: float = Field(default=0.0)
+    etag: str = Field(default=None)
+    ts_start: Optional[datetime] = None
+    ts_expire: Optional[datetime] = None
+    ts_finish: Optional[datetime] = None
 
 
 class WorkflowBundle(WorkflowDataModel):
-    etag: str = Field(default=None)
-    workflow: WorkflowState
+    workflow: WorkflowData
     steps: List = Field(default_factory=list)
     tasks: List = Field(default_factory=list)
     roles: List = Field(default_factory=list)
@@ -44,26 +48,28 @@ class WorkflowRoles(WorkflowDataModel):
 
 
 class WorkflowStep(WorkflowDataModel):
-    id: UUID_TYPE = Field(default_factory=UUID_GENR)
+    id: UUID_TYPE = Field(default_factory=UUID_GENR, alias='_id')
     selector: UUID_TYPE
     workflow_id: UUID_TYPE
     origin_step: Optional[UUID_TYPE] = None
     title: str
-    display: str
-    state: str
-    stage: str
-    status: StepStatus = Field(default=StepStatus.ACTIVE)
+    stm_state: str
     message: Optional[str] = None
+    status: StepStatus = Field(default=StepStatus.ACTIVE)
+    label: Optional[str] = None
+    ts_due: Optional[datetime] = None
+    ts_start: Optional[datetime] = None
+    ts_finish: Optional[datetime] = None
 
-WorkflowStep.EDITABLE_FIELDS = ('title', 'state', 'status', 'message', 'display')
+WorkflowStep.EDITABLE_FIELDS = ('title', 'stm_state', 'status', 'message', 'label')
 
 
 class WorkflowStage(WorkflowDataModel):
-    id: UUID_TYPE = Field(default_factory=UUID_GENR)
+    id: UUID_TYPE = Field(default_factory=UUID_GENR, alias='_id')
     workflow_id: UUID_TYPE
     title: str
     order: int = Field(default=0)
-    notes: str = Field(default=None)
+    desc: str = Field(default=None)
 
 
 class WorkflowParticipant(WorkflowDataModel):

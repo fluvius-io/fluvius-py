@@ -11,8 +11,12 @@ st01 = UUID_GENF('100')
 wf01 = UUID_GENF('101')
 
 
-class SampleProcess(Workflow, title='Sample Process', revision=1):
+class SampleProcess(Workflow):
     ''' Sample workflow description ... '''
+
+    class Meta:
+        title = "Sample Process"
+        revision = 1
 
     Stage01 = Stage(title='Stage 01')
     Role01 = Role(title="Role 01")
@@ -48,7 +52,7 @@ class SampleProcess(Workflow, title='Sample Process', revision=1):
 
         @transition('TAKE')
         def to_TAKE(state, cur_state):
-            logger.info('TRANSITIONING TO TAKE: %s => %s', state._id, cur_state)
+            yield f'TRANSITIONING TO TAKE: {state._id} => {cur_state}'
 
     @wf_connect('test-event')
     def test_event(workflow, trigger_data):
@@ -61,8 +65,10 @@ def test_workflow():
     logger.info(EventRouter.ROUTING_TABLE)
     manager = WorkflowManager()
     evt_data = SimpleNamespace(workflow_id=wf01, step_id=st01)
-    wf = manager.process_activity('test-event', evt_data)[0]
-    assert len(wf._steps) == 3
-    logger.info(pformat(wf._steps))
-    logger.info("\n" + pformat(wf.commit()))
+    for wf in manager.process_activity('test-event', evt_data):
+        assert len(wf.step_id_map) == 3
+        logger.info(pformat(wf.step_id_map))
+        logger.info("\n" + pformat(wf.commit()))
+        logger.info("\n" + pformat(tuple(wf.consume_events())))
+        logger.info("\n" + pformat(tuple(wf.consume_messages())))
 

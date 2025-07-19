@@ -1,16 +1,19 @@
 from . import logger, config
-from .datadef import WorkflowState, WorkflowStatus
+from .datadef import WorkflowData, WorkflowStatus
 from .router import EventRouter
 from .engine import WorkflowEngine
+from .domain.model import WorkflowDataManager
 from fluvius.data import UUID_GENR
 
 class WorkflowManager(object):
     __router__ = EventRouter
     __engine__ = WorkflowEngine
+    __datamgr__ = WorkflowDataManager
     __registry__ = {}
 
     def __init__(self):
         self._running = {}
+        self._datamgr = self.__datamgr__(self)
 
     def __init_subclass__(cls, router, engine):
         assert issubclass(router, EventRouter), f"Invalid event router {router}"
@@ -18,54 +21,46 @@ class WorkflowManager(object):
 
         cls.__router__ = router
         cls.__engine__ = engine
-        cls.__registry__ = cls.__registry__.copy()
+        cls.__registry__ = {}
 
     def process_activity(self, activity_name, activity_data):
-        workflows = []
-        for trigger in self.__router__.route_activity(activity_name, activity_data):
+        for trigger in self.route_activity(activity_name, activity_data):
             wf_engine = self.load_workflow(trigger.workflow_key, trigger.route_id)
             with wf_engine.transaction() as wf:
                 if wf_engine.status == WorkflowStatus.NEW:
                     wf.start()
                 wf.trigger(trigger)
 
-            for wf_event in wf_engine.consume_events():
-                logger.info('Processed event %s \n=> %s', wf_event.event_name, wf_event)
+            yield wf_engine
 
-            workflows.append(wf_engine)
-
-        return workflows
+    def route_activity(self, activity_name, activity_data):
+        return self.__router__.route_activity(activity_name, activity_data)
 
     def load_workflow(self, workflow_key, route_id):
         if (workflow_key, route_id) not in self._running:
-            engine_cls = self.__registry__[workflow_key]
-            state_data = WorkflowState(route_id=route_id, title=engine_cls.__name__)
-            wf_engine = engine_cls(state_data)
+            wf_engine = self.create_workflow(workflow_key, route_id)
             self._running[workflow_key, route_id] = wf_engine
 
         return self._running[workflow_key, route_id]
 
-
-    def get_engine(cls, workflow_key):
-        return cls.__registry__[workflow_key]
-
     @classmethod
     def register(cls, wf_cls):
-        workflow_key = wf_cls.__key__
+        workflow_key = wf_cls.Meta.key
         if workflow_key in cls.__registry__:
             raise ValueError(f'Worfklow already registered: {workflow_key}')
 
         cls.__registry__[workflow_key] = type(f'WFE_{wf_cls.__name__}', (cls.__engine__, ), {}, wf_def=wf_cls)
         logger.info('Registered workflow: %s', workflow_key)
 
-    def create_workflow(cls, workflow_key, route_id):
-        wf_def = cls.__registry__[workflow_key].__wf_def__
+    def create_workflow(self, workflow_key, route_id):
+        wf_eng = self.__registry__[workflow_key]
+        wf_def = wf_eng.__wf_def__
 
-        workflow = WorkflowState(
+        wf_state = WorkflowData(
             id=UUID_GENR(), 
-            title=wf_def.title, 
-            revision=wf_def.revision,
+            title=wf_def.Meta.title,
+            revision=wf_def.Meta.revision,
             status=WorkflowStatus.NEW,
             route_id=route_id)
 
-        return workflow
+        return wf_eng(wf_state)

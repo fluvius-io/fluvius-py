@@ -35,3 +35,7 @@ dev:
 	  just test riparius
 	  while read -t 1 -r; do :; done  # drain remaining events
 	done
+
+
+flvctl:
+	python -m flvctl
