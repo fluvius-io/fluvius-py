@@ -47,6 +47,9 @@ class WorkflowStatus(enum.Enum):
     CANCELLED   = "CANCELLED"   # user cancelled workflow without any error
 
 WorkflowStatus._FINISHED = (WorkflowStatus.COMPLETED, WorkflowStatus.CANCELLED, WorkflowStatus.FAILED)
+WorkflowStatus._ACTIVE     = (WorkflowStatus.ACTIVE, WorkflowStatus.DEGRADED)
+WorkflowStatus._EDITABLE   = (WorkflowStatus.ACTIVE, WorkflowStatus.DEGRADED, WorkflowStatus.NEW)
+WorkflowStatus._INACTIVE   = (WorkflowStatus.CANCELLED, WorkflowStatus.COMPLETED, WorkflowStatus.FAILED, WorkflowStatus.NEW)
 
 
 class TaskStatus(enum.Enum):
@@ -69,8 +72,5 @@ class WorkflowDefinitionStatus(enum.Enum):
     DEPRECATED  = "DEPRECATED"
 
 
-WorkflowStatus._FINISHED   = (WorkflowStatus.CANCELLED, WorkflowStatus.COMPLETED, WorkflowStatus.FAILED)
-WorkflowStatus._ACTIVE     = (WorkflowStatus.ACTIVE, WorkflowStatus.DEGRADED)
-WorkflowStatus._INACTIVE   = (WorkflowStatus.CANCELLED, WorkflowStatus.COMPLETED, WorkflowStatus.FAILED, WorkflowStatus.NEW)
 
 

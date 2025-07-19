@@ -1,12 +1,22 @@
+from typing import Callable
 from . import logger, config  # noqa
 
+from dataclasses import dataclass
 from collections import namedtuple
 from fluvius.error import NotFoundError
 
 
-EventHandler = namedtuple('EventHandler', 'workflow_key step_key routing_func, handler_func')
-EventRoute = namedtuple('EventRoute', 'workflow_key step_key route_id selector handler_func')
+EventHandler = namedtuple('EventHandler', 'workflow_key step_key routing_func handler_func')
 
+@dataclass
+class EventTrigger(object):
+    event_name: str
+    event_data: dict
+    route_id: str
+    selector: str
+    workflow_key: str
+    step_key: str
+    handler_func: Callable
 
 def connect(event_name, router):
     def decorator(func):
@@ -35,6 +45,8 @@ def wf_connect(event_name):
 def validate_evt_handler(evt_handler):
     if not callable(evt_handler.routing_func):
         raise ValueError("Invalid Workflow Event Router [%s] does not exists." % evt_handler.routing_func)
+    
+    return evt_handler
 
 
 class EventRouter(object):
@@ -42,7 +54,7 @@ class EventRouter(object):
 
     @classmethod
     def _connect(cls, evt_name, evt_handler):
-        validate_evt_handler(evt_handler)
+        evt_handler = validate_evt_handler(evt_handler)
 
         cls.ROUTING_TABLE.setdefault(evt_name, tuple())
         cls.ROUTING_TABLE[evt_name] += (evt_handler, )
@@ -67,12 +79,14 @@ class EventRouter(object):
                 raise ValueError("Step event must be routed to a specific step, and vice versa.")
 
             routes.append(
-                EventRoute(
-                    entry.workflow_key,
-                    entry.step_key,
-                    route,
-                    selector,
-                    entry.handler_func
+                EventTrigger(
+                    event_name=evt_name,
+                    event_data=evt_data,
+                    route_id=route,
+                    selector=selector,
+                    workflow_key=entry.workflow_key,
+                    step_key=entry.step_key,
+                    handler_func=entry.handler_func
                 )
             )
         return routes

@@ -21,10 +21,9 @@ class WorkflowManager(object):
 
     def process_event(self, event_name, event_data):
         workflows = []
-        for route in self.__router__.route_event(event_name, event_data):
-            wf_engine = self.load_workflow(route.workflow_key, route.route_id)
-            wf_context = wf_engine.get_state_proxy(route.selector)
-            wf_engine.run_hook(route.handler_func, wf_context, event_data)
+        for trigger in self.__router__.route_event(event_name, event_data):
+            wf_engine = self.load_workflow(trigger.workflow_key, trigger.route_id)
+            wf_engine.trigger_event(trigger)
             workflows.append(wf_engine)
 
         return workflows
