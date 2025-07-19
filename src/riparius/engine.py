@@ -152,6 +152,7 @@ class WorkflowEngine(object):
         self._memory = {}
         self._etag = None
         self._st_proxy = {}
+        self._wf_proxy = WorkflowStateProxy(self)
     
     def __init_subclass__(cls, wf_def):
         if not issubclass(wf_def, Workflow):
@@ -413,12 +414,6 @@ class WorkflowEngine(object):
         return self._workflow.route_id
 
     @property
-    def workflow_state(self):
-        if not hasattr(self, '_wf_proxy'):
-            self._wf_proxy = WorkflowStateProxy(self)
-        return self._wf_proxy
-
-    @property
     def backend(self):
         return self.__backend__
 
@@ -444,7 +439,7 @@ class WorkflowEngine(object):
     @workflow_action('start', allow_statuses=WorkflowStatus.NEW)
     def start(self):
         self.update_workflow(status=WorkflowStatus.ACTIVE)
-        self.run_hook('started', self.workflow_state)
+        self.run_hook('started', self._wf_proxy)
         return ActionData(data=dict(status=WorkflowStatus.ACTIVE), resp=None)
 
     @workflow_action('add_participant', allow_statuses=WorkflowStatus._EDITABLE)
@@ -494,7 +489,7 @@ class WorkflowEngine(object):
         return self._set_memory(None, **kwargs)
 
     @workflow_action('add_step', allow_statuses=WorkflowStatus._EDITABLE)
-    def workflow_add_step(self, /, step_key, selector=None, **kwargs):
+    def workflow_add_step(self, step_key, /, selector=None, **kwargs):
         return self._add_step(None, step_key, selector, **kwargs)
     
     @workflow_action('get_memory', allow_statuses=WorkflowStatus._EDITABLE)
@@ -502,7 +497,7 @@ class WorkflowEngine(object):
         return self._get_memory(None)
 
     @step_action('add_step', allow_statuses=WorkflowStatus._EDITABLE)
-    def step_add_step(self, step_id, /, step_key, selector=None, **kwargs):
+    def step_add_step(self, step_id, step_key, /, selector=None, **kwargs):
         return self._add_step(step_id, step_key, selector, **kwargs)
 
     @step_action('transit', allow_statuses=WorkflowStatus._EDITABLE)
