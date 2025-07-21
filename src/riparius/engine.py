@@ -8,7 +8,7 @@ from fluvius.data import UUID_GENF, UUID_GENR, UUID_TYPE
 from fluvius.helper.timeutil import timestamp
 
 from .exceptions import WorkflowExecutionError, WorkflowConfigurationError, StepTransitionError
-from .datadef import WorkflowStep, WorkflowStatus, StepStatus, WorkflowData, WorkflowMessage
+from .datadef import WorkflowStep, WorkflowStatus, StepStatus, WorkflowData, WorkflowMessage, WorkflowStage
 from .workflow import Workflow, Stage, Step, Role, BEGIN_STATE, FINISH_STATE, BEGIN_LABEL, FINISH_LABEL
 from .router import ActivityRouter
 
@@ -129,6 +129,8 @@ class WorkflowEngine(object):
         self._id = wf_data.id
         self._workflow = wf_data
         self._memory = {}
+        self._params = {}
+        self._stepsm = {}
         self._etag = None
         self._step_proxies = {}
         self._state_proxy = WorkflowStateProxy(self)
@@ -220,6 +222,16 @@ class WorkflowEngine(object):
         cls.__stages__ = STAGES
 
         ActivityRouter.connect_wf_events(wf_def, wf_def.Meta.key)
+
+    def gen_stages(self):
+        for key, stage in self.__stages__.items():
+            yield WorkflowStage(
+                workflow_id=self.id,
+                key=key,
+                title=stage.title,
+                order=stage.order,
+                desc=stage.desc
+            )
     
     def mutate(self, mut_name, action_name=None, step_id=None, **kwargs):
         if self._transaction_id is None:
@@ -363,7 +375,9 @@ class WorkflowEngine(object):
 
         step = stdef(
             _id=step_id,
+            index=len(self.step_id_map) + 1,
             selector=selector,
+            step_name=step_key,
             title=title or stdef.__title__,
             workflow_id=self._id,
             stm_state=BEGIN_STATE,
@@ -382,15 +396,24 @@ class WorkflowEngine(object):
         self._steps = {}
         self._stmap = {step.selector: step for step in self._steps.values()}
 
-    def _set_memory(self, step_id, **kwargs):
-        self._memory.update({
-            (step_id, key): value for key, value in kwargs.items()}
-        )
+    def _set_memory(self, _step_id = None, **kwargs):
+        if _step_id is None:
+            self._memory.update(kwargs)
+        else:
+            sid = str(_step_id)
+            self._stepsm.setdefault(sid, {})
+            self._stepsm[sid].update(kwargs)
 
-    def _get_memory(self, step_id=None):
-        return SimpleNamespace(**{
-            key: val for (sid, key), val in self._memory.items() if sid == step_id or sid is None
-        })
+    def _get_memory(self, _step_id=None):
+        data = {} | self._memory
+
+        if _step_id is not None:
+            sid = str(_step_id)
+            self._stepsm.setdefault(sid, {})
+            data |= self._stepsm[sid]
+
+        data |= self._params
+        return SimpleNamespace(**data)
 
     @property
     def status(self):
@@ -491,8 +514,7 @@ class WorkflowEngine(object):
     @workflow_action('transit_step', allow_statuses=WorkflowStatus._ACTIVE)
     def workflow_transit_step(self, step_id, to_state):
         step = self.step_id_map[step_id]
-        from_state = self._transit(step, to_state)
-        updates = self.update_step(step, stm_state=to_state, ts_transit=timestamp())
+        updates = self._transit(step, to_state)
         self.mutate('update-step', action_name='transit_step', **updates)
         return self
 
@@ -503,14 +525,14 @@ class WorkflowEngine(object):
 
         if kwargs:
             self._set_memory(step.id, **kwargs)
-            self.mutate('set-memory', action_name='add_step', data=kwargs)
+            self.mutate('set-memory', action_name='add_step', stepsm=self._stepsm)
 
         return self.get_state_proxy(step.selector)
 
     @workflow_action('memorize', allow_statuses=WorkflowStatus._ACTIVE)
     def workflow_set_memory(self, **kwargs):
-        self._set_memory(None, **kwargs)
-        self.mutate('set-memory', action_name='memorize', data=kwargs)
+        self._set_memory(**kwargs)
+        self.mutate('set-memory', action_name='memorize', memory=self._memory)
         return self
 
     @workflow_action('recall', allow_statuses=WorkflowStatus._ACTIVE)
@@ -525,7 +547,7 @@ class WorkflowEngine(object):
 
         if kwargs:
             self._set_memory(step.id, **kwargs)
-            self.mutate('set-memory', action_name='add_step', data=kwargs)
+            self.mutate('set-memory', action_name='add_step', stepsm=self._stepsm)
 
         return self.get_state_proxy(step.selector)
 
@@ -549,7 +571,7 @@ class WorkflowEngine(object):
     @step_action('memorize', allow_statuses=WorkflowStatus._ACTIVE)
     def step_set_memory(self, step_id, **kwargs):
         self._set_memory(step_id, **kwargs)
-        self.mutate('set-memory', action_name='memorize', data=kwargs)
+        self.mutate('set-memory', action_name='memorize', stepsm=self._stepsm)
         return self
 
     @step_action('recall')
@@ -558,9 +580,8 @@ class WorkflowEngine(object):
         return memory
 
     @classmethod
-    def create_workflow(cls, route_id):
+    def create_workflow(cls, route_id, params=None):
         wf_def = cls.__wf_def__
-
         wf_state = WorkflowData(
             id=UUID_GENR(),
             title=wf_def.Meta.title,
@@ -571,6 +592,11 @@ class WorkflowEngine(object):
         wf = cls(wf_state)
         wf._transaction_id = wf_state.id
         wf.mutate('create-workflow', workflow=wf_state)
+        if params:
+            wf._params = params
+            wf.mutate('set-memory', action_name='create_workflow', params=params)
+        for stage in wf.gen_stages():
+            wf.mutate('add-stage', action_name='create_workflow', data=stage)
         wf._transaction_id = None
         return wf
 

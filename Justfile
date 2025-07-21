@@ -36,6 +36,6 @@ dev:
 	  while read -t 1 -r; do :; done  # drain remaining events
 	done
 
-
-flvctl:
-	python -m flvctl
+recreate-schema MODULE:
+	./flvctl db drop-schema --force "{{MODULE}}"
+	./flvctl db create-schema "{{MODULE}}"

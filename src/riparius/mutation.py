@@ -13,7 +13,7 @@ class WorkflowMutation(WorkflowDataModel):
         key = camel_to_lower(cls.__name__)
         if key in REGISTRY:
             raise ValueError(f'Mutation already registered: {key}')
-            
+
         cls.__key__ = key
         REGISTRY[key] = cls
 
@@ -52,7 +52,9 @@ class CreateWorkflow(WorkflowMutation):
 
 
 class SetMemory(WorkflowMutation):
-    data: dict
+    params: Optional[dict] = None
+    memory: Optional[dict] = None
+    stepsm: Optional[dict] = None
 
 
 class AddParticipant(WorkflowMutation):

@@ -125,8 +125,25 @@ class Step(object):
 
 class Stage(object):
     def __init__(self, title, order=0):
-        self.__title__ = title
-        self.__order__ = order
+        self._title = title
+        self._order = order
+        self._desc = self.__doc__
+    
+    @property
+    def title(self):
+        return self._title
+    
+    @property
+    def order(self):
+        return self._order
+
+    @property
+    def desc(self):
+        return self._desc
+    
+    @property
+    def key(self):
+        return self.__key__
 
 
 class WorkflowMeta(DataModel):

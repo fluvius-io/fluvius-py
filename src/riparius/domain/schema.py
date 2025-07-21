@@ -30,7 +30,6 @@ class WorkflowSchema(WorkflowBaseSchema):
     ts_start = sa.Column(sa.DateTime(timezone=True), nullable=True)
     ts_expire = sa.Column(sa.DateTime(timezone=True), nullable=True)
     ts_finish = sa.Column(sa.DateTime(timezone=True), nullable=True)
-    ts_transit = sa.Column(sa.DateTime(timezone=True), nullable=True)
     sys_tag = sa.Column(pg.ARRAY(sa.String), nullable=True)
     usr_tag = sa.Column(pg.ARRAY(sa.String), nullable=True)
 
@@ -39,8 +38,10 @@ class WorkflowStep(WorkflowBaseSchema):
     __tablename__ = "workflow-step"
 
     workflow_id = sa.Column(pg.UUID, nullable=False)
+    index = sa.Column(sa.Integer, nullable=False)
     owner_id = sa.Column(pg.UUID, nullable=True)
     stage_id = sa.Column(pg.UUID, nullable=True)
+    selector = sa.Column(pg.UUID, nullable=True)
     stm_state = sa.Column(sa.String, nullable=False)
     step_name = sa.Column(sa.String, nullable=False)
     title = sa.Column(sa.String, nullable=False)
@@ -50,6 +51,7 @@ class WorkflowStep(WorkflowBaseSchema):
     ts_due = sa.Column(sa.DateTime(timezone=True), nullable=True)
     ts_start = sa.Column(sa.DateTime(timezone=True), nullable=True)
     ts_finish = sa.Column(sa.DateTime(timezone=True), nullable=True)
+    ts_transit = sa.Column(sa.DateTime(timezone=True), nullable=True)
 
 
 class WorkflowTrigger(WorkflowBaseSchema):
@@ -83,9 +85,9 @@ class WorkflowMemory(WorkflowBaseSchema):
     __tablename__ = "workflow-memory"
 
     workflow_id = sa.Column(pg.UUID, nullable=False)
-    step_id = sa.Column(pg.UUID, nullable=True)
-    memory_key = sa.Column(sa.String, nullable=False)
-    memory_value = sa.Column(sa.JSON, nullable=False)
+    memory = sa.Column(sa.JSON, nullable=True)
+    params = sa.Column(sa.JSON, nullable=True)
+    stepsm = sa.Column(sa.JSON, nullable=True)
 
 
 class WorkflowEvent(WorkflowBaseSchema):

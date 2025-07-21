@@ -374,7 +374,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
         return self._unwrap_result(cursor)
 
     @sqla_error_handler('L1205')
-    async def upsert(self, resource, data: list):
+    async def upsert(self, resource, data):
         # Use dialect dependent (e.g. sqlite, postgres, mysql) version of the statement
         # See: connector.py [setup_sql_satemenet]
 
@@ -382,7 +382,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
         stmt = self._async_session.insert(data_schema).values(data)
 
         # Here we assuming that all items have the same set of keys
-        set_fields = {k: getattr(stmt.excluded, k) for k in data[0].keys() if k != '_id'}
+        set_fields = {k: getattr(stmt.excluded, k) for k in data.keys() if k != '_id'}
 
         stmt = stmt.on_conflict_do_update(
             # Let's use the constraint name which was visible in the original posts error msg
@@ -394,7 +394,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
         async with self.session() as sess:
             cursor = await sess.execute(stmt)
         DEBUG_CONNECTOR and logger.info("UPSERT %d items => %r", len(data), cursor.rowcount)
-        self._check_no_item_modified(cursor, len(data))
+        self._check_no_item_modified(cursor, 1)
         return self._unwrap_result(cursor)
 
     @sqla_error_handler('L1206')

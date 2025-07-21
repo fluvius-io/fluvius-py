@@ -1,3 +1,5 @@
+import asyncio
+import pytest
 from pprint import pformat
 from types import SimpleNamespace
 from riparius import logger, config
@@ -19,6 +21,7 @@ class SampleProcess(Workflow):
         revision = 1
 
     Stage01 = Stage(title='Stage 01')
+    Stage02 = Stage(title='Stage 02')
     Role01 = Role(title="Role 01")
 
     def on_start(wf_state):
@@ -60,15 +63,18 @@ class SampleProcess(Workflow):
         yield f"{workflow.recall()}"
 
 
-def test_workflow():
+@pytest.mark.asyncio
+async def test_workflow():
     logger.info(ActivityRouter.ROUTING_TABLE)
     manager = WorkflowManager()
     evt_data = SimpleNamespace(workflow_id=wf01, step_id=st01)
     for wf in manager.process_activity('test-event', evt_data):
         assert len(wf.step_id_map) == 3
-        events, messages = wf.commit()
+        mutations, messages = wf.commit()
+        mutations = tuple(mutations)
+        logger.info("MUTATIONS: " + pformat(mutations))
+        await manager.persist_mutations(mutations)
         logger.info(pformat(wf.step_id_map))
-        logger.info("\n" + pformat(tuple(events)))
         for msg in messages:
             logger.info("\n" + pformat(msg))
 

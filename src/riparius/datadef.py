@@ -25,7 +25,6 @@ class WorkflowData(WorkflowDataModel):
     ts_start: Optional[datetime] = None
     ts_expire: Optional[datetime] = None
     ts_finish: Optional[datetime] = None
-    ts_transit: Optional[datetime] = None
 
 
 # class WorkflowBundle(WorkflowDataModel):
@@ -64,8 +63,10 @@ class WorkflowMemory(WorkflowDataModel):
 
 class WorkflowStep(WorkflowDataModel):
     id: UUID_TYPE = Field(default_factory=UUID_GENR, alias='_id')
+    index: int = 0
     selector: UUID_TYPE
     workflow_id: UUID_TYPE
+    step_name: str
     origin_step: Optional[UUID_TYPE] = None
     title: str
     stm_state: str
@@ -77,15 +78,14 @@ class WorkflowStep(WorkflowDataModel):
     ts_finish: Optional[datetime] = None
     ts_transit: Optional[datetime] = None
 
-WorkflowStep.EDITABLE_FIELDS = ('title', 'stm_state', 'status', 'message', 'label', 'ts_due', 'ts_start', 'ts_finish', 'ts_transit')
-
 
 class WorkflowStage(WorkflowDataModel):
     id: UUID_TYPE = Field(default_factory=UUID_GENR, alias='_id')
     workflow_id: UUID_TYPE
+    key: str
     title: str
     order: int = Field(default=0)
-    desc: str = Field(default=None)
+    desc: Optional[str] = None
 
 
 class WorkflowParticipant(WorkflowDataModel):

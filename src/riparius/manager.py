@@ -102,8 +102,9 @@ class WorkflowManager(object):
         
         async with self._datamgr.transaction() as tx:
             for mutenv in mutations:
+                logger.warning('Persisting: %s', str(mutenv))
                 try:
-                    await self._persist_single_mutation(tx, mutenv)
+                    await self._persist_single_mutation(self._datamgr, mutenv)
                     summary['total_processed'] += 1
                     
                     # Update counter using mutation key directly
@@ -168,7 +169,7 @@ class WorkflowManager(object):
         """Create a new workflow record."""
         wf_data = mutenv.mutation.workflow
         workflow_dict = self._map_object_to_dict(wf_data, self.WORKFLOW_FIELD_MAP)
-        await tx.insert_data('workflow_schema', workflow_dict)
+        await tx.insert_many('workflow', workflow_dict)
 
     async def _persist_update_workflow(self, tx, mutenv: MutationEnvelop):
         """Update an existing workflow record."""
@@ -176,13 +177,12 @@ class WorkflowManager(object):
         updates = self._extract_updates(mutation, self.WORKFLOW_UPDATE_FIELDS)
             
         if updates:
-            await tx.update_data('workflow_schema', mutenv.workflow_id, **updates)
+            await tx.update_one('workflow', mutenv.workflow_id, **updates)
 
     async def _persist_add_step(self, tx, mutenv: MutationEnvelop):
         """Add a new step record."""
-        step_data = mutenv.mutation.step
-        step_dict = self._map_object_to_dict(step_data, self.STEP_FIELD_MAP)
-        await tx.insert_data('workflow_step', step_dict)
+        step_data = mutenv.mutation.step.model_dump()
+        await tx.insert_many('workflow-step', step_data)
 
     async def _persist_update_step(self, tx, mutenv: MutationEnvelop):
         """Update an existing step record."""
@@ -190,22 +190,20 @@ class WorkflowManager(object):
         updates = self._extract_updates(mutation, self.STEP_UPDATE_FIELDS)
             
         if updates and mutenv.step_id:
-            await tx.update_data('workflow_step', mutenv.step_id, **updates)
+            await tx.update_one('workflow-step', mutenv.step_id, **updates)
 
     async def _persist_set_memory(self, tx, mutenv: MutationEnvelop):
         """Set workflow or step memory records."""
-        memory_data = mutenv.mutation.data
+        values = mutenv.mutation.model_dump()
         
         # Process each key-value pair in the memory data
-        for key, value in memory_data.items():
-            memory_dict = {
-                'workflow_id': mutenv.workflow_id,
-                'step_id': mutenv.step_id,
-                'memory_key': key,
-                'memory_value': value
-            }
-            # Use upsert to handle key updates
-            await tx.upsert('workflow_memory', memory_dict)
+        for key, value in values.items():
+            if value is None:
+                del values[key]
+
+        values['workflow_id'] = mutenv.workflow_id
+
+        await tx.upsert_many('workflow-memory', values)
 
     async def _persist_add_trigger(self, tx, mutenv: MutationEnvelop):
         """Add a trigger record."""
@@ -219,7 +217,7 @@ class WorkflowManager(object):
             'trigger_data': trigger.data
         }
         
-        await tx.insert_data('workflow_trigger', trigger_fields)
+        await tx.insert_many('workflow-trigger', trigger_fields)
 
     async def _persist_add_participant(self, tx, mutenv: MutationEnvelop):
         """Add a participant record."""
@@ -232,7 +230,7 @@ class WorkflowManager(object):
             'role': participant.role
         }
         
-        await tx.insert_data('workflow_participant', participant_fields)
+        await tx.insert_many('workflow-participant', participant_fields)
 
     async def _persist_del_participant(self, tx, mutenv: MutationEnvelop):
         """Remove a participant record."""
@@ -248,24 +246,18 @@ class WorkflowManager(object):
             
         from fluvius.data.query import BackendQuery
         query = BackendQuery.create(**query_conditions)
-        await tx.remove_one('workflow_participant', query)
+
+        # Find the record first, then remove it
+        record = await tx.find_one('workflow-participant', **query_conditions)
+        if record:
+            await tx.remove(record)
 
     async def _persist_add_stage(self, tx, mutenv: MutationEnvelop):
         """Add a stage record."""
-        stage_data = mutenv.mutation.data
-        
-        # Dynamic field extraction for stage data
-        stage_fields = {
-            'workflow_id': mutenv.workflow_id
-        }
-        
-        # Extract available fields from stage data
-        stage_field_names = ['key', 'title', 'desc', 'order']
-        for field_name in stage_field_names:
-            if hasattr(stage_data, field_name):
-                stage_fields[field_name] = getattr(stage_data, field_name)
-                 
-        await tx.insert_data('workflow_stage', stage_fields)
+        stage_data = mutenv.mutation.data.model_dump()
+        stage_data['workflow_id'] = mutenv.workflow_id
+
+        await tx.insert_many('workflow-stage', stage_data)
 
     @classmethod
     def register(cls, wf_cls):
