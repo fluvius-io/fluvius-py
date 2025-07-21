@@ -57,7 +57,7 @@ def validate_act_handler(act_handler):
     return act_handler
 
 
-class EventRouter(object):
+class ActivityRouter(object):
     ROUTING_TABLE = {}
 
     @classmethod

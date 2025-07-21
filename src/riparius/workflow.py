@@ -7,7 +7,7 @@ from fluvius.data import UUID_GENF, UUID_GENR,nullable, DataModel
 from fluvius.helper.registry import ClassRegistry
 from fluvius.helper import camel_to_lower
 
-from .router import EventRouter, st_connect, wf_connect, connect
+from .router import st_connect, wf_connect, connect
 from .datadef import WorkflowStep, WorkflowData, RX_STATE
 from .exceptions import WorkflowExecutionError, WorkflowConfigurationError
 
@@ -110,7 +110,7 @@ class Step(object):
         return self._data.stage
 
     @property
-    def state(self):
+    def stm_state(self):
         return self._data.stm_state
 
     @property

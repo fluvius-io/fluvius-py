@@ -13,6 +13,7 @@ class WorkflowConnector(SqlaDriver):
 class WorkflowBaseSchema(WorkflowConnector.__data_schema_base__, DomainSchema):
     __abstract__ = True
 
+
 # --- Models ---
 class WorkflowSchema(WorkflowBaseSchema):
     __tablename__ = "workflow"
@@ -29,6 +30,7 @@ class WorkflowSchema(WorkflowBaseSchema):
     ts_start = sa.Column(sa.DateTime(timezone=True), nullable=True)
     ts_expire = sa.Column(sa.DateTime(timezone=True), nullable=True)
     ts_finish = sa.Column(sa.DateTime(timezone=True), nullable=True)
+    ts_transit = sa.Column(sa.DateTime(timezone=True), nullable=True)
     sys_tag = sa.Column(pg.ARRAY(sa.String), nullable=True)
     usr_tag = sa.Column(pg.ARRAY(sa.String), nullable=True)
 
@@ -49,6 +51,16 @@ class WorkflowStep(WorkflowBaseSchema):
     ts_start = sa.Column(sa.DateTime(timezone=True), nullable=True)
     ts_finish = sa.Column(sa.DateTime(timezone=True), nullable=True)
 
+
+class WorkflowTrigger(WorkflowBaseSchema):
+    __tablename__ = "workflow-trigger"
+
+    workflow_id = sa.Column(pg.UUID, nullable=False)
+    origin_step = sa.Column(pg.UUID, nullable=True)
+    trigger_name = sa.Column(sa.String, nullable=False)
+    trigger_data = sa.Column(sa.JSON, nullable=False)
+
+
 class WorkflowStage(WorkflowBaseSchema):
     __tablename__ = "workflow-stage"
 
@@ -58,12 +70,23 @@ class WorkflowStage(WorkflowBaseSchema):
     desc = sa.Column(sa.String, nullable=True)
     order = sa.Column(sa.Integer, nullable=True)
 
+
 class WorkflowParticipant(WorkflowBaseSchema):
     __tablename__ = "workflow-participant"
 
     workflow_id = sa.Column(pg.UUID, nullable=False)
     user_id = sa.Column(pg.UUID, nullable=False)
     role = sa.Column(sa.String, nullable=False)
+
+
+class WorkflowMemory(WorkflowBaseSchema):
+    __tablename__ = "workflow-memory"
+
+    workflow_id = sa.Column(pg.UUID, nullable=False)
+    step_id = sa.Column(pg.UUID, nullable=True)
+    memory_key = sa.Column(sa.String, nullable=False)
+    memory_value = sa.Column(sa.JSON, nullable=False)
+
 
 class WorkflowEvent(WorkflowBaseSchema):
     __tablename__ = "workflow-event"
@@ -75,6 +98,7 @@ class WorkflowEvent(WorkflowBaseSchema):
     event_data = sa.Column(sa.JSON, nullable=False)
     route_id = sa.Column(sa.String, nullable=False)
     step_id = sa.Column(sa.String, nullable=False)
+
 
 class WorkflowTask(WorkflowBaseSchema):
     __tablename__ = "workflow-task"

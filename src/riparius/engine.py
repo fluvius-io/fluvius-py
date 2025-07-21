@@ -8,12 +8,11 @@ from fluvius.data import UUID_GENF, UUID_GENR, UUID_TYPE
 from fluvius.helper.timeutil import timestamp
 
 from .exceptions import WorkflowExecutionError, WorkflowConfigurationError, StepTransitionError
-from .datadef import WorkflowStep, WorkflowStatus, StepStatus
+from .datadef import WorkflowStep, WorkflowStatus, StepStatus, WorkflowData, WorkflowMessage
 from .workflow import Workflow, Stage, Step, Role, BEGIN_STATE, FINISH_STATE, BEGIN_LABEL, FINISH_LABEL
-from .router import EventRouter
-from .storage import WorkflowBackend
+from .router import ActivityRouter
 
-from . import logger
+from . import logger, mutation as m
 
 STEP_ACTION = Literal['step']
 WORKFLOW_ACTION = Literal['workflow']
@@ -41,8 +40,8 @@ class WorkflowStateProxy(object):
             if action_type == WORKFLOW_ACTION:
                 setattr(self, action_name, wf_func)
 
-def action_response(resp, **kwargs):
-    return SimpleNamespace(data=kwargs, resp=resp)
+def action_response(*mutations, response=None):
+    return SimpleNamespace(resp=response, mutations=mutations)
 
 class StepStateProxy(object):
     def __init__(self, wf_engine, selector):
@@ -96,13 +95,8 @@ def workflow_action(event_name, allow_statuses = None, unallow_statuses = None, 
             validate_transaction(self, event_name, allow_statuses, unallow_statuses)
 
             action_result = action_func(self, *args, **kwargs)
-            if action_result is None:
-                return None
-
-            self.queue_event(event_name, None, action_result.data)
             self.run_hook(hook_name, self._state_proxy)
-                
-            return action_result.resp
+            return action_result
         return wrapper
     return decorator
 
@@ -119,9 +113,8 @@ def step_action(event_name, allow_statuses = None, unallow_statuses = None, hook
             validate_transaction(self, action_func.__name__, allow_statuses, unallow_statuses)
 
             action_result = action_func(self, step_id, *args, **kwargs)
-            self.queue_event(event_name, step_id, action_result.data)
-            self.run_hook(hook_name, self._state_proxy)
-            return action_result.resp
+            self.run_hook(hook_name, step_id)
+            return action_result
         return wrapper
     return decorator
 
@@ -130,7 +123,7 @@ class WorkflowEngine(object):
     __steps__      = {}
     __stages__     = {}
     __roles__      = {}
-    __backend__    = WorkflowBackend()
+    __statemgr__    = None
 
     def __init__(self, wf_data):
         self._id = wf_data.id
@@ -139,7 +132,7 @@ class WorkflowEngine(object):
         self._etag = None
         self._step_proxies = {}
         self._state_proxy = WorkflowStateProxy(self)
-        self._evt_queue = queue.Queue()
+        self._mut_queue = queue.Queue()
         self._msg_queue = queue.Queue()
         self._transaction_id = None
     
@@ -187,7 +180,7 @@ class WorkflowEngine(object):
                 ele_cls = getattr(wf_def, attr)
 
             # Register step's external events listeners
-            EventRouter.connect_st_events(step_cls, wf_def.Meta.key, step_key)
+            ActivityRouter.connect_st_events(step_cls, wf_def.Meta.key, step_key)
 
         def define_stage(key, stage):
             if hasattr(stage, '__key__'):
@@ -226,35 +219,37 @@ class WorkflowEngine(object):
         cls.__roles__ = ROLES
         cls.__stages__ = STAGES
 
-        EventRouter.connect_wf_events(wf_def, wf_def.Meta.key)
+        ActivityRouter.connect_wf_events(wf_def, wf_def.Meta.key)
     
-    def queue_event(self, event_name, step_id, data):
-        action = WorkflowEvent(
+    def mutate(self, mut_name, action_name=None, step_id=None, **kwargs):
+        if self._transaction_id is None:
+            raise WorkflowExecutionError('P01010', f'Mutation [{mut_name}] generated outside of a transaction.')
+        
+        mut_cls = m.get_mutation(mut_name)
+
+        mutation = m.MutationEnvelop(
+            name=mut_name,
             transaction_id=self._transaction_id,
-            workflow_id=self.id,
-            workflow_key=self.key,
-            route_id=self.route_id,
+            workflow_id=self._id,
+            action=action_name or mut_name,
+            mutation=mut_cls(**kwargs),
             step_id=step_id,
-            event_name=event_name,
-            event_data=data,
         )
-        self._evt_queue.put(action)
+        self._mut_queue.put(mutation)
 
     @contextmanager
-    def transaction(self):
+    def transaction(self, transaction_id=None):
         if self._transaction_id is not None:
             raise WorkflowExecutionError('P01009', f'Transaction already started.')
 
-        if not self._evt_queue.empty():
-            raise WorkflowExecutionError('P01008', f'Transaction events are not fully processed.')
-        
-        self._transaction_id = UUID_GENR()
+        self._transaction_id = transaction_id or UUID_GENR()
         yield self._state_proxy
+        self.reconcile()
         self._transaction_id = None
     
-    def consume_events(self):
-        while not self._evt_queue.empty():
-            yield self._evt_queue.get()
+    def consume_mutations(self):
+        while not self._mut_queue.empty():
+            yield self._mut_queue.get()
 
     def consume_messages(self):
         while not self._msg_queue.empty():
@@ -279,41 +274,48 @@ class WorkflowEngine(object):
         return status
 
     def reconcile(self):
-        return {
+        updates = {
             'status': self.compute_status(),
             'progress': self.compute_progress()
         }
+        self.update_workflow(**updates)
+        self.mutate('update-workflow', action_name="reconcile", **updates)
 
     def commit(self):
-        self.update_workflow(**self.reconcile())
-        changes = self.backend.commit(self._id)
-        return changes
+        return (self.consume_mutations(), self.consume_messages())
 
     def update_step(self, step, **kwargs):
         if kwargs.get('stm_state') == FINISH_STATE:
             kwargs['status'] = StepStatus.COMPLETED
+            kwargs['ts_finish'] = timestamp()
             kwargs['label'] = FINISH_LABEL
         elif kwargs.get('stm_state') != BEGIN_STATE:
             kwargs['status'] = StepStatus.ACTIVE
 
-        if not all(k in WorkflowStep.EDITABLE_FIELDS for k in kwargs):
-            raise WorkflowExecutionError('P01108', f'Only editable fields can be modified: {WorkflowStep.EDITABLE_FIELDS}')
-
         step._data = step._data.set(**kwargs)
-        return step
+        return kwargs
 
     def update_workflow(self, **kwargs):
         self._workflow = self._workflow.set(**kwargs)
+        return kwargs
 
     def run_hook(self, handler_func, wf_context, *args, **kwargs):
         func = handler_func if callable(handler_func) else \
                 getattr(self.__wf_def__, f'on_{handler_func}', None)
-        
+
         if func is None:
             return
 
         for msg in func(wf_context, *args, **kwargs) or []:
-            self._msg_queue.put(msg)
+            wfmsg = WorkflowMessage(
+                workflow_id=self.id,
+                timestamp=timestamp(),
+                source=str(handler_func),
+                content=msg
+            )
+            self._msg_queue.put(wfmsg)
+
+
 
     def get_state_proxy(self, selector):
         if selector is None:
@@ -328,7 +330,7 @@ class WorkflowEngine(object):
         return self._step_proxies[selector]
 
     def _transit(self, step, to_state):
-        from_state = step.state
+        from_state = step.stm_state
         if to_state not in step.__states__:
             raise WorkflowExecutionError('P01004', f'Invalid step states: {to_state}. Allowed states: {step.__states__}')
 
@@ -341,16 +343,16 @@ class WorkflowEngine(object):
         if to_state in transitions:
             allowed_states, unallowed_states, transition_hook = transitions[to_state]
 
-            if allowed_states and step.state not in allowed_states:
-                raise WorkflowExecutionError('P01003', f'Transition to state [{to_state}] is limited to: {allowed_states}. Current state: {step.state}')
+            if allowed_states and step.stm_state not in allowed_states:
+                raise WorkflowExecutionError('P01003', f'Transition to state [{to_state}] is limited to: {allowed_states}. Current state: {step.stm_state}')
 
-            if unallowed_states and step.state in unallowed_states:
-                raise WorkflowExecutionError('P01003', f'Transition to state [{to_state}] is not allowed. Current state: {step.state}')
+            if unallowed_states and step.stm_state in unallowed_states:
+                raise WorkflowExecutionError('P01003', f'Transition to state [{to_state}] is not allowed. Current state: {step.stm_state}')
 
             step_proxy = self.get_state_proxy(step.selector)
             self.run_hook(transition_hook, step_proxy, from_state)
 
-        return from_state
+        return self.update_step(step, stm_state=to_state, ts_transit=timestamp())
     
     def _add_step(self, origin_step, /, step_key, selector=None, title=None):
         stdef = self.__steps__[step_key]
@@ -377,7 +379,7 @@ class WorkflowEngine(object):
         return step
 
     def _load_steps(self):
-        self._steps = {step.id: step for step in self.backend.load_steps(self._id)}
+        self._steps = {}
         self._stmap = {step.selector: step for step in self._steps.values()}
 
     def _set_memory(self, step_id, **kwargs):
@@ -407,8 +409,8 @@ class WorkflowEngine(object):
         return self._workflow.route_id
 
     @property
-    def backend(self):
-        return self.__backend__
+    def statemgr(self):
+        return self.__statemgr__
 
     @property
     def wf_data(self):
@@ -433,32 +435,39 @@ class WorkflowEngine(object):
 
     @workflow_action('start', allow_statuses=WorkflowStatus.NEW)
     def start(self):
-        self.update_workflow(status=WorkflowStatus.ACTIVE)
-        return action_response(self, status=WorkflowStatus.ACTIVE)
+        updates = self.update_workflow(status=WorkflowStatus.ACTIVE, ts_start=timestamp())
+        self.mutate('update-workflow', action_name='start', **updates)
+        return self
 
     @workflow_action('trigger', allow_statuses=WorkflowStatus._ACTIVE)
     def process_trigger(self, trigger):
         wf_context = self.get_state_proxy(trigger.selector)
+        trigger_name = trigger.handler_func if isinstance(trigger.handler_func, str) else trigger.handler_func.__name__
         self.run_hook(trigger.handler_func, wf_context, trigger.activity_data)
-        return action_response(self, activity_data=trigger.activity_data)
+        self.mutate('add-trigger', action_name='trigger', name=trigger_name, data=trigger.activity_data.__dict__)
+        return self
     
     @workflow_action('add_participant', allow_statuses=WorkflowStatus._EDITABLE)
     def add_participant(self, /, role, member_id, **kwargs):
-        return action_response(self, role=role, member_id=member_id)
+        self.mutate('add-participant', role=role, member_id=member_id)
+        return self
 
     @workflow_action('del_participant', allow_statuses=WorkflowStatus._EDITABLE)
     def del_participant(self, /, role, member_id):
-        return action_response(self, role=role, member_id=member_id)
+        self.mutate('del-participant', role=role, member_id=member_id)
+        return self
 
     @workflow_action('cancel', allow_statuses=WorkflowStatus._EDITABLE, hook_name='cancelled')
     def cancel_workflow(self):
-        self.update_workflow(status=WorkflowStatus.CANCELLED)
-        return action_response(self, status=WorkflowStatus.CANCELLED)
+        updates = self.update_workflow(status=WorkflowStatus.CANCELLED)
+        self.mutate('update-workflow', action_name='cancel', **updates)
+        return self
 
     @workflow_action('abort', allow_statuses=WorkflowStatus.DEGRADED, hook_name='aborted')
     def abort_workflow(self):
-        self.update_workflow(status=WorkflowStatus.FAILED)
-        return action_response(self, status=WorkflowStatus.FAILED)
+        updates = self.update_workflow(status=WorkflowStatus.FAILED)
+        self.mutate('update-workflow', action_name='abort', **updates)
+        return self
 
     @workflow_action('add_task', allow_statuses=WorkflowStatus._ACTIVE, hook_name='task_added')
     def add_task(self, /, origin_step, task_key, **kwargs):
@@ -468,65 +477,64 @@ class WorkflowEngine(object):
             'origin_step': origin_step,
             'title': kwargs.get('title', ''),
             'status': StepStatus.ACTIVE,
-            'state': BEGIN_STATE,
-            'display': BEGIN_LABEL,
             'workflow_id': self._id,
         }
-        return action_response(self.get_task(task_id), task=task)
+        self.mutate('add-task', action_name='add_task', task=task)
+        return self
 
     @workflow_action('cancel_task', allow_statuses=WorkflowStatus._ACTIVE, hook_name='task_cancelled')
     def cancel_task(self, task_id):
         task = self.get_task(task_id)
-        return action_response(task, status=StepStatus.CANCELLED)
+        self.mutate('update-task', action_name='cancel_task', task=task, status=StepStatus.CANCELLED)
+        return self
 
     @workflow_action('transit_step', allow_statuses=WorkflowStatus._ACTIVE)
     def workflow_transit_step(self, step_id, to_state):
         step = self.step_id_map[step_id]
         from_state = self._transit(step, to_state)
-        self.update_step(step, stm_state=to_state)
-        return action_response(None, to_state=to_state, from_state=from_state)
+        updates = self.update_step(step, stm_state=to_state, ts_transit=timestamp())
+        self.mutate('update-step', action_name='transit_step', **updates)
+        return self
 
     @workflow_action('add_step', allow_statuses=WorkflowStatus._ACTIVE)
     def workflow_add_step(self, step_key, /, selector=None, title=None, **kwargs):
         step = self._add_step(None, step_key, selector, title)
-        resp = {"step": step._data}
+        self.mutate('add-step', step=step._data, step_id=step.id)
 
         if kwargs:
             self._set_memory(step.id, **kwargs)
-            resp['memory'] = kwargs
+            self.mutate('set-memory', action_name='add_step', data=kwargs)
 
-        step_proxy = self.get_state_proxy(step.selector)
-
-        return action_response(step_proxy, **resp)
+        return self.get_state_proxy(step.selector)
 
     @workflow_action('memorize', allow_statuses=WorkflowStatus._ACTIVE)
     def workflow_set_memory(self, **kwargs):
         self._set_memory(None, **kwargs)
-        return action_response(None, **kwargs)
+        self.mutate('set-memory', action_name='memorize', data=kwargs)
+        return self
 
     @workflow_action('recall', allow_statuses=WorkflowStatus._ACTIVE)
     def workflow_get_memory(self):
         memory = self._get_memory(None)
-        return action_response(memory)
+        return self
 
     @step_action('add_step', allow_statuses=WorkflowStatus._ACTIVE)
     def step_add_step(self, step_id, step_key, /, selector=None, title=None, **kwargs):
         step = self._add_step(step_id, step_key, selector, title)
-        resp = {"step": step._data}
+        self.mutate('add-step', step=step._data, step_id=step.id)
+
         if kwargs:
             self._set_memory(step.id, **kwargs)
-            resp['memory'] = kwargs
+            self.mutate('set-memory', action_name='add_step', data=kwargs)
 
-        step_proxy = self.get_state_proxy(step.selector)
-
-        return action_response(step_proxy, **resp)
+        return self.get_state_proxy(step.selector)
 
     @step_action('transit', allow_statuses=WorkflowStatus._ACTIVE)
     def step_transit(self, step_id, to_state):
         step = self.step_id_map[step_id]
-        from_state = self._transit(step, to_state)
-        self.update_step(step, stm_state=to_state)
-        return action_response(None, to_state=to_state, from_state=from_state)
+        updates = self._transit(step, to_state)
+        self.mutate('update-step', action_name='transit', **updates)
+        return self
 
     @step_action('recover_step', allow_statuses=WorkflowStatus._ACTIVE)
     def recover_step(self, step_id):
@@ -534,16 +542,35 @@ class WorkflowEngine(object):
         if step.status != StepStatus.ERROR:
             raise WorkflowExecutionError('P01005', f'Cannot recover from a non-error status: {step.status}')
 
-        return action_response(step, status=StepStatus.ACTIVE)
+        updates = self.update_step(step, status=StepStatus.ACTIVE)
+        self.mutate('update-step', action_name='recover', **updates)
+        return self
 
     @step_action('memorize', allow_statuses=WorkflowStatus._ACTIVE)
     def step_set_memory(self, step_id, **kwargs):
         self._set_memory(step_id, **kwargs)
-        return action_response(None, **kwargs)
+        self.mutate('set-memory', action_name='memorize', data=kwargs)
+        return self
 
     @step_action('recall')
     def step_get_memory(self, step_id):
         memory = self._get_memory(step_id)
-        return action_response(memory)
+        return memory
 
+    @classmethod
+    def create_workflow(cls, route_id):
+        wf_def = cls.__wf_def__
+
+        wf_state = WorkflowData(
+            id=UUID_GENR(),
+            title=wf_def.Meta.title,
+            revision=wf_def.Meta.revision,
+            status=WorkflowStatus.NEW,
+            route_id=route_id)
+
+        wf = cls(wf_state)
+        wf._transaction_id = wf_state.id
+        wf.mutate('create-workflow', workflow=wf_state)
+        wf._transaction_id = None
+        return wf
 

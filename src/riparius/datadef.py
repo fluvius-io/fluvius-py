@@ -25,26 +25,41 @@ class WorkflowData(WorkflowDataModel):
     ts_start: Optional[datetime] = None
     ts_expire: Optional[datetime] = None
     ts_finish: Optional[datetime] = None
+    ts_transit: Optional[datetime] = None
 
 
-class WorkflowBundle(WorkflowDataModel):
-    workflow: WorkflowData
-    steps: List = Field(default_factory=list)
-    tasks: List = Field(default_factory=list)
-    roles: List = Field(default_factory=list)
-    events: List = Field(default_factory=list)
-    stages: List = Field(default_factory=list)
-    params: Dict = Field(default_factory=dict)
-    memory: Dict = Field(default_factory=dict)
-    participants: List = Field(default_factory=list)
+# class WorkflowBundle(WorkflowDataModel):
+#     workflow: WorkflowData
+#     steps: List = Field(default_factory=list)
+#     tasks: List = Field(default_factory=list)
+#     roles: List = Field(default_factory=list)
+#     events: List = Field(default_factory=list)
+#     stages: List = Field(default_factory=list)
+#     params: Dict = Field(default_factory=dict)
+#     memory: Dict = Field(default_factory=dict)
+#     participants: List = Field(default_factory=list)
 
 
 class WorkflowTask(WorkflowDataModel):
-    pass
+    workflow_id: UUID_TYPE
 
 
 class WorkflowRoles(WorkflowDataModel):
-    pass
+    workflow_id: UUID_TYPE
+
+
+class WorkflowMessage(WorkflowDataModel):
+    workflow_id: UUID_TYPE
+    timestamp: datetime
+    source: str
+    content: str
+
+
+class WorkflowMemory(WorkflowDataModel):
+    workflow_id: UUID_TYPE
+    params: dict
+    memory: dict
+    stepsm: dict # steps memory
 
 
 class WorkflowStep(WorkflowDataModel):
@@ -60,8 +75,9 @@ class WorkflowStep(WorkflowDataModel):
     ts_due: Optional[datetime] = None
     ts_start: Optional[datetime] = None
     ts_finish: Optional[datetime] = None
+    ts_transit: Optional[datetime] = None
 
-WorkflowStep.EDITABLE_FIELDS = ('title', 'stm_state', 'status', 'message', 'label')
+WorkflowStep.EDITABLE_FIELDS = ('title', 'stm_state', 'status', 'message', 'label', 'ts_due', 'ts_start', 'ts_finish', 'ts_transit')
 
 
 class WorkflowStage(WorkflowDataModel):

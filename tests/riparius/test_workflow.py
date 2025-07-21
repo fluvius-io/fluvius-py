@@ -2,7 +2,7 @@ from pprint import pformat
 from types import SimpleNamespace
 from riparius import logger, config
 from riparius.workflow import Workflow, Stage, Step, Role, st_connect, wf_connect, transition, FINISH_STATE
-from riparius.router import EventRouter
+from riparius.router import ActivityRouter
 from riparius.manager import WorkflowManager
 from fluvius.data import UUID_GENF
 
@@ -34,7 +34,6 @@ class SampleProcess(Workflow):
     class Step02b(Step, stage=Stage01):
         __title__ = "Step2B"
 
-
     class Step03(Step, title="Step 03", stage=Stage01):
         __states__ = ('TAKE', 'ME', 'TO', 'THE', 'MOON')
 
@@ -62,13 +61,14 @@ class SampleProcess(Workflow):
 
 
 def test_workflow():
-    logger.info(EventRouter.ROUTING_TABLE)
+    logger.info(ActivityRouter.ROUTING_TABLE)
     manager = WorkflowManager()
     evt_data = SimpleNamespace(workflow_id=wf01, step_id=st01)
     for wf in manager.process_activity('test-event', evt_data):
         assert len(wf.step_id_map) == 3
+        events, messages = wf.commit()
         logger.info(pformat(wf.step_id_map))
-        logger.info("\n" + pformat(wf.commit()))
-        logger.info("\n" + pformat(tuple(wf.consume_events())))
-        logger.info("\n" + pformat(tuple(wf.consume_messages())))
+        logger.info("\n" + pformat(tuple(events)))
+        for msg in messages:
+            logger.info("\n" + pformat(msg))
 
