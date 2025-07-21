@@ -515,7 +515,7 @@ class WorkflowEngine(object):
     def workflow_transit_step(self, step_id, to_state):
         step = self.step_id_map[step_id]
         updates = self._transit(step, to_state)
-        self.mutate('update-step', action_name='transit_step', **updates)
+        self.mutate('update-step', step_id=step_id, action_name='transit_step', **updates)
         return self
 
     @workflow_action('add_step', allow_statuses=WorkflowStatus._ACTIVE)
@@ -555,7 +555,7 @@ class WorkflowEngine(object):
     def step_transit(self, step_id, to_state):
         step = self.step_id_map[step_id]
         updates = self._transit(step, to_state)
-        self.mutate('update-step', action_name='transit', **updates)
+        self.mutate('update-step', step_id=step_id, action_name='transit', **updates)
         return self
 
     @step_action('recover_step', allow_statuses=WorkflowStatus._ACTIVE)
@@ -565,7 +565,7 @@ class WorkflowEngine(object):
             raise WorkflowExecutionError('P01005', f'Cannot recover from a non-error status: {step.status}')
 
         updates = self.update_step(step, status=StepStatus.ACTIVE)
-        self.mutate('update-step', action_name='recover', **updates)
+        self.mutate('update-step', step_id=step_id, action_name='recover', **updates)
         return self
 
     @step_action('memorize', allow_statuses=WorkflowStatus._ACTIVE)
