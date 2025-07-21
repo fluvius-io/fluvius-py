@@ -94,12 +94,12 @@ class WorkflowEvent(WorkflowBaseSchema):
     __tablename__ = "workflow-event"
 
     workflow_id = sa.Column(pg.UUID, nullable=False)
-    transaction_id = sa.Column(sa.String, nullable=False)
+    transaction_id = sa.Column(pg.UUID, nullable=False)
     workflow_key = sa.Column(sa.String, nullable=False)
     event_name = sa.Column(sa.String, nullable=False)
-    event_data = sa.Column(sa.JSON, nullable=False)
-    route_id = sa.Column(sa.String, nullable=False)
-    step_id = sa.Column(sa.String, nullable=False)
+    event_data = sa.Column(sa.JSON, nullable=True)
+    route_id = sa.Column(pg.UUID, nullable=False)
+    step_id = sa.Column(pg.UUID, nullable=True)
 
 
 class WorkflowTask(WorkflowBaseSchema):

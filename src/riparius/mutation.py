@@ -43,6 +43,12 @@ class AddStep(WorkflowMutation):
     step: WorkflowStep
 
 
+
+class AddEvent(WorkflowMutation):
+    event_name: str
+    event_data: dict
+
+
 class AddTrigger(WorkflowMutation):
     name: str
     data: dict
@@ -76,6 +82,9 @@ class MutationEnvelop(WorkflowDataModel):
     name: str
     workflow_id: UUID_TYPE
     step_id: Optional[UUID_TYPE] = None
+    route_id: Optional[UUID_TYPE] = None
+    workflow_key: Optional[str] = None
+    transaction_id: Optional[UUID_TYPE] = None
     action: str
     mutation: WorkflowMutation
 

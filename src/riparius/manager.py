@@ -5,7 +5,7 @@ from .engine import WorkflowEngine
 from .domain.model import WorkflowDataManager
 from .mutation import (
     MutationEnvelop, CreateWorkflow, UpdateWorkflow, AddStep, UpdateStep, 
-    SetMemory, AddTrigger, AddParticipant, DelParticipant, AddStage, REGISTRY
+    SetMemory, AddTrigger, AddEvent, AddParticipant, DelParticipant, AddStage, REGISTRY
 )
 from fluvius.data import UUID_GENR
 
@@ -102,7 +102,6 @@ class WorkflowManager(object):
         
         async with self._datamgr.transaction() as tx:
             for mutenv in mutations:
-                logger.warning('Persisting: %s', str(mutenv))
                 try:
                     await self._persist_single_mutation(self._datamgr, mutenv)
                     summary['total_processed'] += 1
@@ -128,6 +127,7 @@ class WorkflowManager(object):
             'update-step': self._persist_update_step,
             'set-memory': self._persist_set_memory,
             'add-trigger': self._persist_add_trigger,
+            'add-event': self._persist_add_event,
             'add-participant': self._persist_add_participant,
             'del-participant': self._persist_del_participant,
             'add-stage': self._persist_add_stage
@@ -258,6 +258,23 @@ class WorkflowManager(object):
         stage_data['workflow_id'] = mutenv.workflow_id
 
         await tx.insert_many('workflow-stage', stage_data)
+
+    async def _persist_add_event(self, tx, mutenv: MutationEnvelop):
+        """Add a workflow event record."""
+        event = mutenv.mutation
+        
+        # Field mapping for event data - using available data from mutation envelope
+        event_fields = {
+            'workflow_id': mutenv.workflow_id,
+            'transaction_id': mutenv.transaction_id,
+            'workflow_key': mutenv.workflow_key,
+            'event_name': event.event_name,
+            'event_data': event.event_data,
+            'route_id': mutenv.route_id,
+            'step_id': mutenv.step_id  # Pass None for nullable UUID field instead of empty string
+        }
+        
+        await tx.insert_many('workflow-event', [event_fields])
 
     @classmethod
     def register(cls, wf_cls):
