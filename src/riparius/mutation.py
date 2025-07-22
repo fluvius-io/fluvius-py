@@ -81,7 +81,7 @@ class MutationEnvelop(WorkflowDataModel):
     transaction_id: Optional[UUID_TYPE] = None
     action: str
     mutation: WorkflowMutation
-    counter: int
+    order: int
 
     @field_serializer('mutation')
     def serialize_mutation(self, mutation: 'WorkflowMutation', _info):

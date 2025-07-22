@@ -37,7 +37,7 @@ class WorkflowEvent(WorkflowDataModel):
     event_data: Optional[dict] = None
     route_id: UUID_TYPE
     step_id: Optional[UUID_TYPE] = None
-    counter: int
+    order: int
 
 class WorkflowTask(WorkflowDataModel):
     workflow_id: UUID_TYPE
@@ -87,15 +87,12 @@ class WorkflowStage(WorkflowDataModel):
     order: int = Field(default=0)
     desc: Optional[str] = None
 
-
 class WorkflowParticipant(WorkflowDataModel):
     pass
 
 
 class WorkflowParameter(WorkflowDataModel):
     pass
-
-
 
 # class WorkflowBundle(WorkflowDataModel):
 #     workflow: WorkflowData
