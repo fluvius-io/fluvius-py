@@ -70,11 +70,9 @@ async def test_workflow():
     evt_data = SimpleNamespace(workflow_id=wf01, step_id=st01)
     for wf in manager.process_activity('test-event', evt_data):
         assert len(wf.step_id_map) == 3
-        mutations, messages = wf.commit()
-        mutations = tuple(mutations)
-        logger.info("MUTATIONS: " + pformat(mutations))
-        await manager.persist_mutations(mutations)
-        logger.info(pformat(wf.step_id_map))
-        for msg in messages:
-            logger.info("\n" + pformat(msg))
+        mutations, messages, events = await manager.persist(wf)
+        # logger.info("MUTATIONS: " + pformat(mutations))
+        # logger.info("MESSAGES: " + pformat(messages))
+        # logger.info("EVENTS: " + pformat(events))
+        # logger.info(pformat(wf.step_id_map))
 

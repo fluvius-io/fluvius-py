@@ -1,11 +1,12 @@
+from fluvius.helper import timestamp
 from . import logger, config
-from .datadef import WorkflowData, WorkflowStatus
+from .datadef import WorkflowData, WorkflowStatus, WorkflowMessage, WorkflowEvent
 from .router import ActivityRouter
 from .engine import WorkflowEngine
 from .domain.model import WorkflowDataManager
 from .mutation import (
     MutationEnvelop, CreateWorkflow, UpdateWorkflow, AddStep, UpdateStep, 
-    SetMemory, AddTrigger, AddEvent, AddParticipant, DelParticipant, AddStage, REGISTRY
+    SetMemory, AddTrigger, AddParticipant, DelParticipant, AddStage, REGISTRY
 )
 from fluvius.data import UUID_GENR
 
@@ -81,12 +82,67 @@ class WorkflowManager(object):
     def load_workflow(self, workflow_key, route_id):
         if (workflow_key, route_id) not in self._running:
             wf_engine = self.__registry__[workflow_key]
-            wf = wf_engine.create_workflow(route_id)
+            wf = wf_engine.create_workflow(route_id, {"started": timestamp()})
             self._running[workflow_key, route_id] = wf
 
         return self._running[workflow_key, route_id]
+    
+    async def _log_mutation(self, tx, wf_mut: MutationEnvelop):
+        await tx.insert_many('workflow-mutation', wf_mut.model_dump())
 
-    async def persist_mutations(self, mutations: list[MutationEnvelop]):
+    async def _log_event(self, tx, wf_evt: WorkflowEvent):
+        """Add a workflow event record."""
+        logger.warning(f"Logging event: {wf_evt.model_dump()}")
+        await tx.insert_many('workflow-event', wf_evt.model_dump())
+    
+    async def _log_message(self, tx, wf_msg: WorkflowMessage):
+        """Add a workflow message record."""
+        await tx.insert_many('workflow-message', wf_msg.model_dump())
+    
+    async def persist_events(self, tx, events: list[WorkflowEvent]):
+        events = tuple(events)
+        """
+        Persist a list of WorkflowEvent objects to the database.
+        
+        Args:
+            events: List of WorkflowEvent objects to persist
+        """
+        for evt in events:
+            await self._log_event(tx, evt)
+
+        return events
+    
+    async def persist_messages(self, tx, messages: list[WorkflowMessage]):
+        """
+        Persist a list of WorkflowMessage objects to the database.
+        
+        Args:
+            messages: List of WorkflowMessage objects to persist
+        """
+        messages = tuple(messages)
+        for msg in messages:
+            await self._log_message(tx, msg)
+        
+        return messages
+    
+    async def persist_mutations(self, tx, mutations: list[MutationEnvelop]):
+        """
+        Persist a list of MutationEnvelop objects to the database.
+        
+        Args:
+            mutations: List of MutationEnvelop objects to persist
+        """
+        mutations = tuple(mutations)
+        for wf_mut in mutations:
+            try:
+                await self._log_mutation(tx, wf_mut)
+                await self._persist_single_mutation(tx, wf_mut)                    
+            except Exception as e:
+                logger.error(f"Failed to persist mutation {wf_mut.action}: {e}")
+                raise        
+        return mutations
+    
+    async def persist(self, wf: WorkflowEngine):
         """
         Persist a list of MutationEnvelop objects to the database.
         
@@ -96,27 +152,15 @@ class WorkflowManager(object):
         Returns:
             dict: Summary of persisted mutations by type
         """
-        # Initialize summary with all registered mutation keys
-        summary = {key: 0 for key in REGISTRY.keys()}
-        summary['total_processed'] = 0
-        
-        async with self._datamgr.transaction() as tx:
-            for mutenv in mutations:
-                try:
-                    await self._persist_single_mutation(self._datamgr, mutenv)
-                    summary['total_processed'] += 1
-                    
-                    # Update counter using mutation key directly
-                    mutation_key = mutenv.mutation.__key__
-                    if mutation_key in summary:
-                        summary[mutation_key] += 1
-                        
-                except Exception as e:
-                    logger.error(f"Failed to persist mutation {mutenv.action}: {e}")
-                    raise
+        mutations, messages, events = wf.commit()
 
-        logger.info(f"Persisted {summary['total_processed']} mutations: {summary}")
-        return summary
+        async with self._datamgr.transaction() as tx:
+            mutations = await self.persist_mutations(self._datamgr, mutations)
+            messages = await self.persist_messages(self._datamgr, messages)
+            events = await self.persist_events(self._datamgr, events)
+
+        logger.info(f"Persisted {len(mutations)} mutations, {len(messages)} messages, {len(events)} events")
+        return mutations, messages, events
 
     def _get_mutation_handlers(self):
         """Build dispatch table using mutation registry keys."""
@@ -127,19 +171,18 @@ class WorkflowManager(object):
             'update-step': self._persist_update_step,
             'set-memory': self._persist_set_memory,
             'add-trigger': self._persist_add_trigger,
-            'add-event': self._persist_add_event,
             'add-participant': self._persist_add_participant,
             'del-participant': self._persist_del_participant,
             'add-stage': self._persist_add_stage
         }
 
-    async def _persist_single_mutation(self, tx, mutenv: MutationEnvelop):
+    async def _persist_single_mutation(self, tx, wf_mut: MutationEnvelop):
         """Persist a single mutation to the database."""
-        mutation_key = mutenv.mutation.__key__
+        mutation_key = wf_mut.mutation.__key__
         handlers = self._get_mutation_handlers()
         
         if mutation_key in handlers:
-            await handlers[mutation_key](tx, mutenv)
+            await handlers[mutation_key](tx, wf_mut)
         else:
             logger.warning(f"Unknown mutation key: {mutation_key}")
 
@@ -165,80 +208,80 @@ class WorkflowManager(object):
                     updates[field] = value
         return updates
 
-    async def _persist_create_workflow(self, tx, mutenv: MutationEnvelop):
+    async def _persist_create_workflow(self, tx, wf_mut: MutationEnvelop):
         """Create a new workflow record."""
-        wf_data = mutenv.mutation.workflow
+        wf_data = wf_mut.mutation.workflow
         workflow_dict = self._map_object_to_dict(wf_data, self.WORKFLOW_FIELD_MAP)
         await tx.insert_many('workflow', workflow_dict)
 
-    async def _persist_update_workflow(self, tx, mutenv: MutationEnvelop):
+    async def _persist_update_workflow(self, tx, wf_mut: MutationEnvelop):
         """Update an existing workflow record."""
-        mutation = mutenv.mutation
+        mutation = wf_mut.mutation
         updates = self._extract_updates(mutation, self.WORKFLOW_UPDATE_FIELDS)
             
         if updates:
-            await tx.update_one('workflow', mutenv.workflow_id, **updates)
+            await tx.update_one('workflow', wf_mut.workflow_id, **updates)
 
-    async def _persist_add_step(self, tx, mutenv: MutationEnvelop):
+    async def _persist_add_step(self, tx, wf_mut: MutationEnvelop):
         """Add a new step record."""
-        step_data = mutenv.mutation.step.model_dump()
+        step_data = wf_mut.mutation.step.model_dump()
         await tx.insert_many('workflow-step', step_data)
 
-    async def _persist_update_step(self, tx, mutenv: MutationEnvelop):
+    async def _persist_update_step(self, tx, wf_mut: MutationEnvelop):
         """Update an existing step record."""
-        mutation = mutenv.mutation
+        mutation = wf_mut.mutation
         updates = self._extract_updates(mutation, self.STEP_UPDATE_FIELDS)
             
-        if updates and mutenv.step_id:
-            await tx.update_one('workflow-step', mutenv.step_id, **updates)
+        if updates and wf_mut.step_id:
+            await tx.update_one('workflow-step', wf_mut.step_id, **updates)
 
-    async def _persist_set_memory(self, tx, mutenv: MutationEnvelop):
+    async def _persist_set_memory(self, tx, wf_mut: MutationEnvelop):
         """Set workflow or step memory records."""
-        values = mutenv.mutation.model_dump()
+        values = wf_mut.mutation.model_dump()
         
         # Process each key-value pair in the memory data
         for key, value in values.items():
             if value is None:
                 del values[key]
 
-        values['workflow_id'] = mutenv.workflow_id
+        values['workflow_id'] = wf_mut.workflow_id
 
         await tx.upsert_many('workflow-memory', values)
 
-    async def _persist_add_trigger(self, tx, mutenv: MutationEnvelop):
+    async def _persist_add_trigger(self, tx, wf_mut: MutationEnvelop):
         """Add a trigger record."""
-        trigger = mutenv.mutation
+        trigger = wf_mut.mutation
         
         # Field mapping for trigger data
         trigger_fields = {
-            'workflow_id': mutenv.workflow_id,
-            'origin_step': mutenv.step_id,
+            'workflow_id': wf_mut.workflow_id,
+            'origin_step': wf_mut.step_id,
             'trigger_name': trigger.name,
             'trigger_data': trigger.data
         }
         
         await tx.insert_many('workflow-trigger', trigger_fields)
 
-    async def _persist_add_participant(self, tx, mutenv: MutationEnvelop):
+    async def _persist_add_participant(self, tx, wf_mut: MutationEnvelop):
         """Add a participant record."""
-        participant = mutenv.mutation
+        participant = wf_mut.mutation
         
         # Field mapping for participant data
         participant_fields = {
-            'workflow_id': mutenv.workflow_id,
+            'workflow_id': wf_mut.workflow_id,
             'user_id': participant.user_id,
             'role': participant.role
         }
         
         await tx.insert_many('workflow-participant', participant_fields)
 
-    async def _persist_del_participant(self, tx, mutenv: MutationEnvelop):
+    async def _persist_del_participant(self, tx, wf_mut: MutationEnvelop):
         """Remove a participant record."""
-        participant = mutenv.mutation
+        participant = wf_mut.mutation
         
         # Build query conditions
         query_conditions = {
-            'workflow_id': mutenv.workflow_id
+            'workflow_id': wf_mut.workflow_id
         }
         
         if participant.user_id:
@@ -252,29 +295,12 @@ class WorkflowManager(object):
         if record:
             await tx.remove(record)
 
-    async def _persist_add_stage(self, tx, mutenv: MutationEnvelop):
+    async def _persist_add_stage(self, tx, wf_mut: MutationEnvelop):
         """Add a stage record."""
-        stage_data = mutenv.mutation.data.model_dump()
-        stage_data['workflow_id'] = mutenv.workflow_id
+        stage_data = wf_mut.mutation.data.model_dump()
+        stage_data['workflow_id'] = wf_mut.workflow_id
 
         await tx.insert_many('workflow-stage', stage_data)
-
-    async def _persist_add_event(self, tx, mutenv: MutationEnvelop):
-        """Add a workflow event record."""
-        event = mutenv.mutation
-        
-        # Field mapping for event data - using available data from mutation envelope
-        event_fields = {
-            'workflow_id': mutenv.workflow_id,
-            'transaction_id': mutenv.transaction_id,
-            'workflow_key': mutenv.workflow_key,
-            'event_name': event.event_name,
-            'event_data': event.event_data,
-            'route_id': mutenv.route_id,
-            'step_id': mutenv.step_id  # Pass None for nullable UUID field instead of empty string
-        }
-        
-        await tx.insert_many('workflow-event', [event_fields])
 
     @classmethod
     def register(cls, wf_cls):

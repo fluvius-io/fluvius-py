@@ -9,6 +9,7 @@ from .status import WorkflowStatus, StepStatus
 
 RX_STATE = re.compile(r'^[A-Z][A-Z\d_]*$')
 
+
 class WorkflowDataModel(DataModel):
     """Base class for all workflow data models."""
     pass
@@ -27,17 +28,16 @@ class WorkflowData(WorkflowDataModel):
     ts_finish: Optional[datetime] = None
 
 
-# class WorkflowBundle(WorkflowDataModel):
-#     workflow: WorkflowData
-#     steps: List = Field(default_factory=list)
-#     tasks: List = Field(default_factory=list)
-#     roles: List = Field(default_factory=list)
-#     events: List = Field(default_factory=list)
-#     stages: List = Field(default_factory=list)
-#     params: Dict = Field(default_factory=dict)
-#     memory: Dict = Field(default_factory=dict)
-#     participants: List = Field(default_factory=list)
-
+class WorkflowEvent(WorkflowDataModel):
+    workflow_id: UUID_TYPE
+    transaction_id: UUID_TYPE
+    workflow_key: str
+    event_name: str
+    event_args: Optional[tuple] = None
+    event_data: Optional[dict] = None
+    route_id: UUID_TYPE
+    step_id: Optional[UUID_TYPE] = None
+    counter: int
 
 class WorkflowTask(WorkflowDataModel):
     workflow_id: UUID_TYPE
@@ -56,9 +56,9 @@ class WorkflowMessage(WorkflowDataModel):
 
 class WorkflowMemory(WorkflowDataModel):
     workflow_id: UUID_TYPE
-    params: dict
-    memory: dict
-    stepsm: dict # steps memory
+    params: Optional[dict] = None
+    memory: Optional[dict] = None
+    stepsm: Optional[dict] = None # steps memory
 
 
 class WorkflowStep(WorkflowDataModel):
@@ -94,4 +94,17 @@ class WorkflowParticipant(WorkflowDataModel):
 
 class WorkflowParameter(WorkflowDataModel):
     pass
+
+
+
+# class WorkflowBundle(WorkflowDataModel):
+#     workflow: WorkflowData
+#     steps: List = Field(default_factory=list)
+#     tasks: List = Field(default_factory=list)
+#     roles: List = Field(default_factory=list)
+#     events: List = Field(default_factory=list)
+#     stages: List = Field(default_factory=list)
+#     params: Dict = Field(default_factory=dict)
+#     memory: Dict = Field(default_factory=dict)
+#     participants: List = Field(default_factory=list)
 

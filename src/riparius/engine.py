@@ -7,10 +7,10 @@ from typing import Callable, Literal, Optional
 from types import SimpleNamespace
 from functools import partial, wraps
 from fluvius.data import UUID_GENF, UUID_GENR, UUID_TYPE
-from fluvius.helper.timeutil import timestamp
+from fluvius.helper import timestamp, consume_queue
 
 from .exceptions import WorkflowExecutionError, WorkflowConfigurationError, StepTransitionError
-from .datadef import WorkflowStep, WorkflowStatus, StepStatus, WorkflowData, WorkflowMessage, WorkflowStage
+from .datadef import WorkflowStep, WorkflowStatus, StepStatus, WorkflowData, WorkflowMessage, WorkflowStage, WorkflowEvent
 from .workflow import Workflow, Stage, Step, Role, BEGIN_STATE, FINISH_STATE, BEGIN_LABEL, FINISH_LABEL
 from .router import ActivityRouter
 
@@ -18,7 +18,6 @@ from . import logger, mutation as m
 
 STEP_ACTION = Literal['step']
 WORKFLOW_ACTION = Literal['workflow']
-
 
 @dataclass
 class ActionContext(object):
@@ -93,12 +92,11 @@ def workflow_action(event_name, allow_statuses = None, unallow_statuses = None, 
         @wraps(action_func)
         def wrapper(self, *args, **kwargs):
             validate_transaction(self, event_name, allow_statuses, unallow_statuses)
-
             self._action_context.append(ActionContext(event_name, args, kwargs, step_id=None))
             action_result = action_func(self, *args, **kwargs)
             self.run_hook(hook_name, self._state_proxy)
             self.reconcile()
-            self.mutate('add-event', event_name=event_name, event_data=kwargs)
+            self.log_event(event_name, *args, **kwargs)
             self._action_context.pop()
             return action_result
         return wrapper
@@ -120,7 +118,7 @@ def step_action(event_name, allow_statuses = None, unallow_statuses = None, hook
             action_result = action_func(self, step_id, *args, **kwargs)
             self.run_hook(hook_name, step_id)
             self.reconcile()
-            self.mutate('add-event', event_name=event_name, event_data=kwargs)
+            self.log_event(event_name, kwargs | {'_args': args})
             self._action_context.pop()
             return action_result
         return wrapper
@@ -144,8 +142,10 @@ class WorkflowEngine(object):
         self._state_proxy = WorkflowStateProxy(self)
         self._mut_queue = queue.Queue()
         self._msg_queue = queue.Queue()
+        self._evt_queue = queue.Queue()
         self._transaction_id = None
         self._action_context = collections.deque()
+        self._counter = 0
     
     def __init_subclass__(cls, wf_def):
         if not issubclass(wf_def, Workflow):
@@ -241,13 +241,30 @@ class WorkflowEngine(object):
                 order=stage.order,
                 desc=stage.desc
             )
-    
+    def log_event(self, event_name, *args, **kwargs):        
+        self._evt_queue.put(WorkflowEvent(
+            workflow_id=self.id,
+            transaction_id=self._transaction_id,
+            workflow_key=self.key,
+            event_name=event_name,
+            event_args=args if args else None,
+            event_data=kwargs if kwargs else None,
+            route_id=self.route_id,
+            step_id=self._action_context[-1].step_id,
+            # event order is the last mutation counter
+            order=self._counter
+        ))
+
     def mutate(self, mut_name, _step_id=None, **kwargs):
         if self._transaction_id is None:
             raise WorkflowExecutionError('P01010', f'Mutation [{mut_name}] generated outside of a transaction.')
         
         act_ctx = self._action_context[-1]        
         mut_cls = m.get_mutation(mut_name)
+        self._counter += 1
+
+        if mut_name == 'update-workflow':
+            logger.warning(f"Updating workflow {self.id} with status => {kwargs}")
 
         mutation = m.MutationEnvelop(
             name=mut_name,
@@ -258,6 +275,7 @@ class WorkflowEngine(object):
             action=act_ctx.action_name,
             mutation=mut_cls(**kwargs),
             step_id=act_ctx.step_id,
+            order=self._counter
         )
         self._mut_queue.put(mutation)
 
@@ -270,39 +288,49 @@ class WorkflowEngine(object):
         yield self._state_proxy
         self._transaction_id = None
     
-    def consume_mutations(self):
-        while not self._mut_queue.empty():
-            yield self._mut_queue.get()
-
-    def consume_messages(self):
-        while not self._msg_queue.empty():
-            yield self._msg_queue.get()
-
-    def compute_progress(self):
-        steps = tuple(self.step_id_map.values())
+    def compute_progress(self, steps):
         active_steps = len([s for s in steps if s.data.status not in StepStatus._FINISHED])
         total_steps = float(len(steps) or 1.0)
         return (total_steps - active_steps)/total_steps
 
-    def compute_status(self):
-        steps = tuple(self.step_id_map.values())
+    def compute_status(self, steps):
         step_statuses = [s for s in steps if s.data.status]
         if StepStatus.ERROR in step_statuses:
-            status = WorkflowStatus.DEGRADED
-        elif len(step_statuses) > 0 and all(s in StepStatus._FINISHED for s in step_statuses):
-            status = WorkflowStatus.COMPLETED
+            return WorkflowStatus.DEGRADED
+        
+        if len(step_statuses) > 0 and all(s in StepStatus._FINISHED for s in step_statuses):
+            return WorkflowStatus.COMPLETED
+        
+        return None
             
-        return self._workflow.status
-
     def reconcile(self):
-        updates = {
-            'status': self.compute_status(),
-            'progress': self.compute_progress()
-        }
-        self._update_workflow(**updates)
+        updates = {}
+        steps = tuple(self.step_id_map.values())
+        if not steps:
+            return None
+
+        status = self.compute_status(steps) 
+        progress = self.compute_progress(steps)
+
+        if status is not None and status != self._workflow.status:
+            if status == WorkflowStatus.NEW:
+                raise WorkflowExecutionError('P01005', f'Workflow {self.id} is in new status. Cannot reconcile.')
+            updates['status'] = status
+
+        if progress != self._workflow.progress:
+            updates['progress'] = progress
+
+        if updates:
+            self._update_workflow(**updates)
+        
+        return updates
 
     def commit(self):
-        return (self.consume_mutations(), self.consume_messages())
+        return (
+            tuple(consume_queue(self._mut_queue)), 
+            tuple(consume_queue(self._msg_queue)), 
+            tuple(consume_queue(self._evt_queue))
+        )
 
     def _update_step(self, step, **kwargs):
         if kwargs.get('stm_state') == FINISH_STATE:
@@ -317,6 +345,10 @@ class WorkflowEngine(object):
         return kwargs
 
     def _update_workflow(self, **kwargs):
+        status = kwargs.get('status')
+        if status and status != WorkflowStatus.ACTIVE:
+            raise WorkflowExecutionError('P01005', f'Workflow {status} is not allowed to be updated.')
+
         self._workflow = self._workflow.set(**kwargs)
         self.mutate('update-workflow', **kwargs)
         return kwargs
@@ -405,14 +437,17 @@ class WorkflowEngine(object):
         self._stmap = {step.selector: step for step in self._steps.values()}
 
     def _set_memory(self, _step_id = None, **kwargs):
+        if not kwargs:
+            return
+        
         if _step_id is None:
             self._memory.update(kwargs)
-            self.mutate('set-memory', stepsm=self._stepsm)
+            self.mutate('set-memory', memory=self._memory)
         else:
             sid = str(_step_id)
             self._stepsm.setdefault(sid, {})
             self._stepsm[sid].update(kwargs)
-            self.mutate('set-memory', memory=self._memory)
+            self.mutate('set-memory', stepsm=self._stepsm)
 
     def _get_memory(self, _step_id=None):
         data = {} | self._memory
@@ -527,10 +562,7 @@ class WorkflowEngine(object):
     @workflow_action('add_step', allow_statuses=WorkflowStatus._ACTIVE)
     def workflow_add_step(self, step_key, /, selector=None, title=None, **kwargs):
         step = self._add_step(None, step_key, selector, title)
-
-        if kwargs:
-            self._set_memory(step.id, **kwargs)
-
+        self._set_memory(step.id, **kwargs)
         return self.get_state_proxy(step.selector)
 
     @workflow_action('memorize', allow_statuses=WorkflowStatus._ACTIVE)
@@ -546,10 +578,7 @@ class WorkflowEngine(object):
     @step_action('add_step', allow_statuses=WorkflowStatus._ACTIVE)
     def step_add_step(self, step_id, step_key, /, selector=None, title=None, **kwargs):
         step = self._add_step(step_id, step_key, selector, title)
-
-        if kwargs:
-            self._set_memory(step.id, **kwargs)
-
+        self._set_memory(step.id, **kwargs)
         return self.get_state_proxy(step.selector)
 
     @step_action('transit', allow_statuses=WorkflowStatus._ACTIVE)
@@ -586,7 +615,7 @@ class WorkflowEngine(object):
         return memory
     
     @workflow_action('create')
-    def create(self, route_id, params=None):
+    def create(self, route_id, params):
         self.mutate('create-workflow', workflow=self._workflow)
 
         if params:

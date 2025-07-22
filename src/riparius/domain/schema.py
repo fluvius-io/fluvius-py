@@ -1,6 +1,6 @@
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pg
-from fluvius.data import DomainSchema, SqlaDriver, DataAccessManager
+from fluvius.data import DomainSchema, SqlaDriver, DataAccessManager, FluviusJSONField
 from ..status import StepStatus, TaskStatus, WorkflowStatus
 
 
@@ -60,7 +60,7 @@ class WorkflowTrigger(WorkflowBaseSchema):
     workflow_id = sa.Column(pg.UUID, nullable=False)
     origin_step = sa.Column(pg.UUID, nullable=True)
     trigger_name = sa.Column(sa.String, nullable=False)
-    trigger_data = sa.Column(sa.JSON, nullable=False)
+    trigger_data = sa.Column(FluviusJSONField, nullable=False)
 
 
 class WorkflowStage(WorkflowBaseSchema):
@@ -85,9 +85,32 @@ class WorkflowMemory(WorkflowBaseSchema):
     __tablename__ = "workflow-memory"
 
     workflow_id = sa.Column(pg.UUID, nullable=False)
-    memory = sa.Column(sa.JSON, nullable=True)
-    params = sa.Column(sa.JSON, nullable=True)
-    stepsm = sa.Column(sa.JSON, nullable=True)
+    memory = sa.Column(FluviusJSONField, nullable=True)
+    params = sa.Column(FluviusJSONField, nullable=True)
+    stepsm = sa.Column(FluviusJSONField, nullable=True)
+
+
+class WorkflowMutation(WorkflowBaseSchema):
+    __tablename__ = "workflow-mutation"
+
+    name = sa.Column(sa.String, nullable=False)
+    transaction_id = sa.Column(pg.UUID, nullable=False)
+    workflow_id = sa.Column(pg.UUID, nullable=False)
+    workflow_key = sa.Column(sa.String, nullable=False)
+    route_id = sa.Column(pg.UUID, nullable=False)
+    action = sa.Column(sa.String, nullable=False)
+    mutation = sa.Column(FluviusJSONField, nullable=False)
+    step_id = sa.Column(pg.UUID, nullable=True)
+    order = sa.Column(sa.Integer, nullable=False)
+
+
+class WorkflowMessage(WorkflowBaseSchema):
+    __tablename__ = "workflow-message"
+
+    workflow_id = sa.Column(pg.UUID, nullable=False)
+    timestamp = sa.Column(sa.DateTime(timezone=True), nullable=False)
+    source = sa.Column(sa.String, nullable=False)
+    content = sa.Column(sa.String, nullable=False)
 
 
 class WorkflowEvent(WorkflowBaseSchema):
@@ -97,9 +120,11 @@ class WorkflowEvent(WorkflowBaseSchema):
     transaction_id = sa.Column(pg.UUID, nullable=False)
     workflow_key = sa.Column(sa.String, nullable=False)
     event_name = sa.Column(sa.String, nullable=False)
-    event_data = sa.Column(sa.JSON, nullable=True)
+    event_args = sa.Column(FluviusJSONField, nullable=True)
+    event_data = sa.Column(FluviusJSONField, nullable=True)
     route_id = sa.Column(pg.UUID, nullable=False)
     step_id = sa.Column(pg.UUID, nullable=True)
+    order = sa.Column(sa.Integer, nullable=False)
 
 
 class WorkflowTask(WorkflowBaseSchema):

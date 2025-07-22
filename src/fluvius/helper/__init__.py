@@ -14,6 +14,8 @@ from typing import Dict, List, Optional, Pattern, Tuple, Union
 from fluvius.error import AssertionFailed
 from fluvius import logger
 
+from .timeutil import timestamp
+
 
 RX_DELIMITER_SPLITTER = re.compile(r"[\.#]")
 RX_LOWERCASE_DASH = re.compile(r'^[a-z][a-z_\-\d]*[a-z\d]$')

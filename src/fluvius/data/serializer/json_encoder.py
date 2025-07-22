@@ -1,4 +1,5 @@
 import uuid
+from types import SimpleNamespace
 from dataclasses import is_dataclass, asdict
 
 from base64 import encodebytes
@@ -36,7 +37,7 @@ class FluviusJSONEncoder(JSONEncoder):
         if isinstance(obj, SqlaDataSchema):
             return obj.serialize()
 
-        if isinstance(obj, BlankModel):
+        if isinstance(obj, SimpleNamespace):
             return obj.__dict__
 
         if isinstance(obj, DataModel):
@@ -61,5 +62,8 @@ class FluviusJSONEncoder(JSONEncoder):
         if isinstance(obj, bytes):
             # @TODO: Clarify the use case here.
             return encodebytes(obj).decode(BYTES_DECODER)
+        
+        if callable(obj):
+            return obj.__name__
 
         return super(FluviusJSONEncoder, self).default(obj)

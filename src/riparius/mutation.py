@@ -1,7 +1,7 @@
 from .datadef import WorkflowDataModel, WorkflowStep, WorkflowData, WorkflowParticipant, WorkflowStatus, StepStatus, WorkflowStage, WorkflowMemory
 from datetime import datetime
 from typing import Optional
-from pydantic import Field
+from pydantic import Field, field_serializer
 from uuid import UUID as UUID_TYPE
 from fluvius.helper import camel_to_lower
 from fluvius import logger
@@ -30,9 +30,9 @@ class UpdateStep(WorkflowMutation):
 
 
 class UpdateWorkflow(WorkflowMutation):
-    status: WorkflowStatus = Field(default=WorkflowStatus.NEW)
-    progress: float = Field(default=0.0)
-    etag: str = Field(default=None)
+    status: Optional[WorkflowStatus] = None
+    progress: Optional[float] = None
+    etag: Optional[str] = None
     ts_start: Optional[datetime] = None
     ts_expire: Optional[datetime] = None
     ts_finish: Optional[datetime] = None
@@ -41,12 +41,6 @@ class UpdateWorkflow(WorkflowMutation):
 
 class AddStep(WorkflowMutation):
     step: WorkflowStep
-
-
-
-class AddEvent(WorkflowMutation):
-    event_name: str
-    event_data: dict
 
 
 class AddTrigger(WorkflowMutation):
@@ -87,6 +81,14 @@ class MutationEnvelop(WorkflowDataModel):
     transaction_id: Optional[UUID_TYPE] = None
     action: str
     mutation: WorkflowMutation
+    counter: int
+
+    @field_serializer('mutation')
+    def serialize_mutation(self, mutation: 'WorkflowMutation', _info):
+        """Serialize mutation using its actual subclass type."""
+        if hasattr(mutation, 'model_dump'):
+            return mutation.model_dump()
+        return mutation.__dict__ if hasattr(mutation, '__dict__') else str(mutation)
 
 def get_mutation(mut_name):
     return REGISTRY[mut_name]
