@@ -352,6 +352,8 @@ class WorkflowRunner(object):
     def run_hook(self, handler_func, wf_context, *args, **kwargs):
         func = handler_func if callable(handler_func) else \
                 getattr(self.__wf_def__, f'on_{handler_func}', None)
+        
+        source = handler_func if isinstance(handler_func, str) else handler_func.__qualname__
 
         if func is None:
             return
@@ -360,7 +362,7 @@ class WorkflowRunner(object):
             wfmsg = WorkflowMessage(
                 workflow_id=self.id,
                 timestamp=timestamp(),
-                source=str(handler_func),
+                source=source,
                 content=msg
             )
             self._msg_queue.put(wfmsg)
@@ -579,7 +581,7 @@ class WorkflowRunner(object):
     @workflow_action('recall', allow_statuses=WorkflowStatus._ACTIVE)
     def workflow_get_memory(self):
         memory = self._get_memory(None)
-        return self
+        return memory
 
     @step_action('add_step', allow_statuses=WorkflowStatus._ACTIVE)
     def step_add_step(self, step_id, step_key, /, selector=None, title=None, **kwargs):

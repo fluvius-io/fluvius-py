@@ -48,7 +48,7 @@ class SampleProcess(Workflow):
             s2.transit(FINISH_STATE)
             assert state._id == s1._data.origin_step and s2._data.origin_step == state._id
             yield f"test_event_step ACTION! #2 {s1} & {s2} => {event}"
-            yield f"{state.recall()}"
+            yield f"MEMORY: {state.recall()}"
 
         @transition('TAKE')
         def to_TAKE(state, cur_state):
@@ -58,7 +58,7 @@ class SampleProcess(Workflow):
     def test_event(workflow, trigger_data):
         workflow.memorize(test_key="workflow value 2")
         yield f"test_event ACTION! #1: {trigger_data}"
-        yield f"{workflow.recall()}"
+        yield f"MEMORY: {workflow.recall()}"
 
 
 @pytest.mark.asyncio
