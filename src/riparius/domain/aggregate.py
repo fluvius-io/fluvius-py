@@ -1,10 +1,13 @@
 from fluvius.domain.aggregate import Aggregate
 from fluvius.data import UUID_GENR, timestamp
 from ..status import WorkflowStatus, StepStatus
+from ..engine.manager import WorkflowManager
 
 
 class WorkflowAggregate(Aggregate):
     """Aggregate for workflow domain operations"""
+
+    manager = WorkflowManager()
 
     async def do__create_workflow(self, data):
         """Create a new workflow"""

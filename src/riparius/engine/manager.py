@@ -17,38 +17,10 @@ class WorkflowManager(object):
     __datamgr__ = WorkflowDataManager
     __registry__ = {}
 
-    # Field mappings for database operations
-    WORKFLOW_FIELD_MAP = {
-        'id': '_id',
-        'title': 'title',
-        'revision': 'revison',  # Note: matches schema typo
-        'route_id': 'route_id',
-        'status': 'status',
-        'progress': 'progress',
-        'ts_start': 'ts_start',
-        'ts_expire': 'ts_expire',
-        'ts_finish': 'ts_finish',
-        'ts_transit': 'ts_transit'
-    }
-
     WORKFLOW_UPDATE_FIELDS = [
         'status', 'progress', 'etag', 'ts_start', 
         'ts_expire', 'ts_finish', 'ts_transit'
     ]
-
-    STEP_FIELD_MAP = {
-        'id': '_id',
-        'workflow_id': 'workflow_id',
-        'origin_step': 'origin_step',
-        'stm_state': 'stm_state',
-        'selector': 'step_name',  # Using selector as step_name
-        'title': 'title',
-        'status': 'status',
-        'label': 'label',
-        'ts_due': 'ts_due',
-        'ts_start': 'ts_start',
-        'ts_finish': 'ts_finish'
-    }
 
     STEP_UPDATE_FIELDS = [
         'title', 'stm_state', 'message', 'status', 'label',
@@ -93,7 +65,6 @@ class WorkflowManager(object):
 
     async def _log_event(self, tx, wf_evt: WorkflowEvent):
         """Add a workflow event record."""
-        logger.warning(f"Logging event: {wf_evt.model_dump()}")
         await tx.insert_many('workflow-event', wf_evt.model_dump())
     
     async def _log_message(self, tx, wf_msg: WorkflowMessage):
@@ -212,13 +183,12 @@ class WorkflowManager(object):
     async def _persist_create_workflow(self, tx, wf_mut: MutationEnvelop):
         """Create a new workflow record."""
         wf_data = wf_mut.mutation.workflow
-        workflow_dict = self._map_object_to_dict(wf_data, self.WORKFLOW_FIELD_MAP)
+        workflow_dict = wf_data.model_dump()
         await tx.insert_many('workflow', workflow_dict)
 
     async def _persist_update_workflow(self, tx, wf_mut: MutationEnvelop):
         """Update an existing workflow record."""
-        mutation = wf_mut.mutation
-        updates = self._extract_updates(mutation, self.WORKFLOW_UPDATE_FIELDS)
+        updates = wf_mut.mutation.model_dump(exclude_none=True)
             
         if updates:
             await tx.update_one('workflow', wf_mut.workflow_id, **updates)
@@ -230,10 +200,8 @@ class WorkflowManager(object):
 
     async def _persist_update_step(self, tx, wf_mut: MutationEnvelop):
         """Update an existing step record."""
-        mutation = wf_mut.mutation
-        updates = self._extract_updates(mutation, self.STEP_UPDATE_FIELDS)
-            
-        if updates and wf_mut.step_id:
+        updates = wf_mut.mutation.model_dump(exclude_none=True)            
+        if updates:
             await tx.update_one('workflow-step', wf_mut.step_id, **updates)
 
     async def _persist_set_memory(self, tx, wf_mut: MutationEnvelop):

@@ -20,8 +20,8 @@ class WorkflowSchema(WorkflowBaseSchema):
 
     owner_id = sa.Column(pg.UUID, nullable=True)
     company_id = sa.Column(sa.String, nullable=True)
-    revison = sa.Column(sa.Integer, nullable=False)
-    route_id = sa.Column(sa.String, nullable=False)
+    revision = sa.Column(sa.Integer, nullable=False)
+    route_id = sa.Column(sa.UUID, nullable=False)
     title = sa.Column(sa.String, nullable=True)
     desc = sa.Column(sa.String, nullable=True)
     note = sa.Column(sa.String, nullable=True)

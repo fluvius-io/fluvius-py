@@ -9,7 +9,7 @@ from ..status import WorkflowStatus, StepStatus
 class CreateWorkflowData(DataModel):
     """Data for creating a new workflow"""
     title: str
-    revision: Optional[int] = 1
+    workflow_key: str
     route_id: UUID_TYPE
     params: Optional[Dict[str, Any]] = None
 
@@ -17,9 +17,11 @@ class CreateWorkflowData(DataModel):
 class UpdateWorkflowData(DataModel):
     """Data for updating workflow properties"""
     title: Optional[str] = None
-    description: Optional[str] = None
+    desc: Optional[str] = None
+    note: Optional[str] = None
     owner_id: Optional[UUID_TYPE] = None
     company_id: Optional[str] = None
+
 
 class AddParticipantData(DataModel):
     """Data for adding workflow participant"""

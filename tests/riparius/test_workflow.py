@@ -63,7 +63,6 @@ class SampleProcess(Workflow):
 
 @pytest.mark.asyncio
 async def test_workflow():
-    logger.info(ActivityRouter.ROUTING_TABLE)
     manager = WorkflowManager()
     evt_data = SimpleNamespace(workflow_id=wf01, step_id=st01)
     for wf in manager.process_activity('test-event', evt_data):

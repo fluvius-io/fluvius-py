@@ -1,7 +1,7 @@
 from .domain import WorkflowDomain
 from .aggregate import WorkflowAggregate
-from .model import WorkflowDataManager
 from .query import WorkflowQueryManager
+from ..model import WorkflowDataManager
 from . import command, datadef
 
 __all__ = [

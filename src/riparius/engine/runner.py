@@ -263,9 +263,6 @@ class WorkflowRunner(object):
         mut_cls = m.get_mutation(mut_name)
         self._counter += 1
 
-        if mut_name == 'update-workflow':
-            logger.warning(f"Updating workflow {self.id} with status => {kwargs}")
-
         mutation = m.MutationEnvelop(
             name=mut_name,
             transaction_id=self._transaction_id,
