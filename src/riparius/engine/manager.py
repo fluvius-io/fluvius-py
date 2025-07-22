@@ -1,9 +1,10 @@
 from fluvius.helper import timestamp
-from . import logger, config
+from .. import logger, config
+from ..model import WorkflowDataManager
+
 from .datadef import WorkflowData, WorkflowStatus, WorkflowMessage, WorkflowEvent
 from .router import ActivityRouter
-from .engine import WorkflowEngine
-from .domain.model import WorkflowDataManager
+from .runner import WorkflowRunner
 from .mutation import (
     MutationEnvelop, CreateWorkflow, UpdateWorkflow, AddStep, UpdateStep, 
     SetMemory, AddTrigger, AddParticipant, DelParticipant, AddStage, REGISTRY
@@ -12,7 +13,7 @@ from fluvius.data import UUID_GENR
 
 class WorkflowManager(object):
     __router__ = ActivityRouter
-    __engine__ = WorkflowEngine
+    __runner__ = WorkflowRunner
     __datamgr__ = WorkflowDataManager
     __registry__ = {}
 
@@ -60,10 +61,10 @@ class WorkflowManager(object):
 
     def __init_subclass__(cls, router, engine):
         assert issubclass(router, ActivityRouter), f"Invalid event router {router}"
-        assert issubclass(engine, WorkflowEngine), f"Invalid workflow engine {engine}"
+        assert issubclass(engine, WorkflowRunner), f"Invalid workflow engine {engine}"
 
         cls.__router__ = router
-        cls.__engine__ = engine
+        cls.__runner__ = engine
         cls.__registry__ = {}
 
     def process_activity(self, activity_name, activity_data):
@@ -142,7 +143,7 @@ class WorkflowManager(object):
                 raise        
         return mutations
     
-    async def persist(self, wf: WorkflowEngine):
+    async def persist(self, wf: WorkflowRunner):
         """
         Persist a list of MutationEnvelop objects to the database.
         
@@ -308,6 +309,6 @@ class WorkflowManager(object):
         if workflow_key in cls.__registry__:
             raise ValueError(f'Worfklow already registered: {workflow_key}')
 
-        cls.__registry__[workflow_key] = type(f'WFE_{wf_cls.__name__}', (cls.__engine__, ), {}, wf_def=wf_cls)
+        cls.__registry__[workflow_key] = type(f'WFE_{wf_cls.__name__}', (cls.__runner__, ), {}, wf_def=wf_cls)
         logger.info('Registered workflow: %s', workflow_key)
 

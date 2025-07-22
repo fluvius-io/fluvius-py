@@ -3,9 +3,7 @@ import pytest
 from pprint import pformat
 from types import SimpleNamespace
 from riparius import logger, config
-from riparius.workflow import Workflow, Stage, Step, Role, st_connect, wf_connect, transition, FINISH_STATE
-from riparius.router import ActivityRouter
-from riparius.manager import WorkflowManager
+from riparius import Workflow, Stage, Step, Role, st_connect, wf_connect, transition, FINISH_STATE, ActivityRouter, WorkflowManager
 from fluvius.data import UUID_GENF
 
 

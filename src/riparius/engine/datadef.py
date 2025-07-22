@@ -5,7 +5,7 @@ from enum import Enum
 from types import SimpleNamespace
 from typing import List, Dict, Optional, Callable
 from fluvius.data import DataModel, Field, UUID_GENF, UUID_GENR, UUID_TYPE
-from .status import WorkflowStatus, StepStatus
+from ..status import WorkflowStatus, StepStatus
 
 RX_STATE = re.compile(r'^[A-Z][A-Z\d_]*$')
 

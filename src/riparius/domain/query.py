@@ -1,8 +1,8 @@
 from fluvius.query import DomainQueryManager, QueryResource
 from fluvius.query.field import StringField, UUIDField, DatetimeField, FloatField, EnumField
 from fluvius.data import UUID_TYPE
-from .model import WorkflowDataManager
 from .domain import WorkflowDomain
+from ..model import WorkflowDataManager
 from ..status import WorkflowStatus, StepStatus
 
 

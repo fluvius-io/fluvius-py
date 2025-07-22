@@ -125,7 +125,7 @@ def step_action(event_name, allow_statuses = None, unallow_statuses = None, hook
     return decorator
 
 
-class WorkflowEngine(object):
+class WorkflowRunner(object):
     __steps__      = {}
     __stages__     = {}
     __roles__      = {}

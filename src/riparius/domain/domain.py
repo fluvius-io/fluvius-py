@@ -1,6 +1,6 @@
 from fluvius.domain.domain import Domain
 from .aggregate import WorkflowAggregate
-from .model import WorkflowDataManager
+from ..model import WorkflowDataManager
 
 
 class WorkflowDomain(Domain):

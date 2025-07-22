@@ -1,7 +1,7 @@
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pg
-from fluvius.data import DomainSchema, SqlaDriver, DataAccessManager, FluviusJSONField
-from ..status import StepStatus, TaskStatus, WorkflowStatus
+from fluvius.data import DomainSchema, SqlaDriver, FluviusJSONField
+from .status import StepStatus, TaskStatus, WorkflowStatus
 
 
 # --- Connector and Base Schema ---
