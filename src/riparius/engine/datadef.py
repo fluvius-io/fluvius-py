@@ -32,11 +32,9 @@ class WorkflowData(WorkflowDataModel):
 class WorkflowEvent(WorkflowDataModel):
     workflow_id: UUID_TYPE
     transaction_id: UUID_TYPE
-    workflow_key: str
     event_name: str
     event_args: Optional[tuple] = None
     event_data: Optional[dict] = None
-    route_id: UUID_TYPE
     step_id: Optional[UUID_TYPE] = None
     order: int
 

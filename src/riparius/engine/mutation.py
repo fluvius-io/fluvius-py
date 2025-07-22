@@ -73,8 +73,6 @@ class MutationEnvelop(WorkflowDataModel):
     name: str
     workflow_id: UUID_TYPE
     step_id: Optional[UUID_TYPE] = None
-    route_id: Optional[UUID_TYPE] = None
-    workflow_key: Optional[str] = None
     transaction_id: Optional[UUID_TYPE] = None
     action: str
     mutation: WorkflowMutation

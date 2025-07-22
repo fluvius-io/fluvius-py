@@ -95,7 +95,10 @@ def workflow_action(event_name, allow_statuses = None, unallow_statuses = None, 
             self._action_context.append(ActionContext(event_name, args, kwargs, step_id=None))
             action_result = action_func(self, *args, **kwargs)
             self.run_hook(hook_name, self._state_proxy)
-            self.reconcile()
+
+            if event_name == 'start' and len(self.step_id_map) == 0:
+                raise WorkflowConfigurationError('P01005', f'Workflow {self.key} has no steps after started.')
+            
             self.log_event(event_name, *args, **kwargs)
             self._action_context.pop()
             return action_result
@@ -245,11 +248,9 @@ class WorkflowRunner(object):
         self._evt_queue.put(WorkflowEvent(
             workflow_id=self.id,
             transaction_id=self._transaction_id,
-            workflow_key=self.key,
             event_name=event_name,
             event_args=args if args else None,
             event_data=kwargs if kwargs else None,
-            route_id=self.route_id,
             step_id=self._action_context[-1].step_id,
             # event order is the last mutation counter
             order=self._counter
@@ -267,8 +268,6 @@ class WorkflowRunner(object):
             name=mut_name,
             transaction_id=self._transaction_id,
             workflow_id=self._id,
-            workflow_key=self.key,
-            route_id=self.route_id,
             action=act_ctx.action_name,
             mutation=mut_cls(**kwargs),
             step_id=act_ctx.step_id,

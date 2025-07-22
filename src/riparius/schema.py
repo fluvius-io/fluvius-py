@@ -88,8 +88,6 @@ class WorkflowMutation(WorkflowBaseSchema):
     name = sa.Column(sa.String, nullable=False)
     transaction_id = sa.Column(pg.UUID, nullable=False)
     workflow_id = sa.Column(pg.UUID, sa.ForeignKey('workflow-manager.workflow._id', ondelete='CASCADE', onupdate='CASCADE'), nullable=False)
-    workflow_key = sa.Column(sa.String, nullable=False)
-    route_id = sa.Column(pg.UUID, nullable=False)
     action = sa.Column(sa.String, nullable=False)
     mutation = sa.Column(FluviusJSONField, nullable=False)
     step_id = sa.Column(pg.UUID, nullable=True)
@@ -110,11 +108,9 @@ class WorkflowEvent(WorkflowBaseSchema):
 
     workflow_id = sa.Column(pg.UUID, sa.ForeignKey('workflow-manager.workflow._id', ondelete='CASCADE', onupdate='CASCADE'), nullable=False)
     transaction_id = sa.Column(pg.UUID, nullable=False)
-    workflow_key = sa.Column(sa.String, nullable=False)
     event_name = sa.Column(sa.String, nullable=False)
     event_args = sa.Column(FluviusJSONField, nullable=True)
     event_data = sa.Column(FluviusJSONField, nullable=True)
-    route_id = sa.Column(pg.UUID, nullable=False)
     step_id = sa.Column(pg.UUID, nullable=True)
     order = sa.Column(sa.Integer, nullable=False)
 
