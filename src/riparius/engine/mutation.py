@@ -43,15 +43,12 @@ class AddStep(WorkflowMutation):
     step: WorkflowStep
 
 
-class AddTrigger(WorkflowMutation):
-    name: str
-    data: dict
-
 class CreateWorkflow(WorkflowMutation):
     workflow: WorkflowData
 
 
 class SetMemory(WorkflowMutation):
+    _id: UUID_TYPE
     params: Optional[dict] = None
     memory: Optional[dict] = None
     stepsm: Optional[dict] = None

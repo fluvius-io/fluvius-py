@@ -21,6 +21,7 @@ class WorkflowData(WorkflowDataModel):
     namespace: str = Field(default=None)
     route_id: UUID_TYPE = Field(default_factory=UUID_GENR)
     status: WorkflowStatus = Field(default=WorkflowStatus.NEW)
+    paused: Optional[WorkflowStatus] = None
     progress: float = Field(default=0.0)
     etag: str = Field(default=None)
     ts_start: Optional[datetime] = None
@@ -65,8 +66,9 @@ class WorkflowStep(WorkflowDataModel):
     id: UUID_TYPE = Field(default_factory=UUID_GENR, alias='_id')
     index: int = 0
     selector: UUID_TYPE
+    workflow_stage: str
     workflow_id: UUID_TYPE
-    step_name: str
+    step_key: str
     origin_step: Optional[UUID_TYPE] = None
     title: str
     stm_state: str

@@ -41,7 +41,8 @@ class WorkflowStatus(enum.Enum):
     NEW         = "NEW"         # no step created, workflow not yet active
     ACTIVE      = "ACTIVE"      # all step is either active or finished
     DEGRADED    = "DEGRADED"    # there is a one or more error steps
-
+    
+    PAUSED      = "PAUSED"      # workflow is paused
     FAILED      = "FAILED"      # there is an unrecoverable error
     COMPLETED   = "COMPLETED"   # all steps finished
     CANCELLED   = "CANCELLED"   # user cancelled workflow without any error

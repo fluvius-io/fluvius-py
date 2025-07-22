@@ -6,26 +6,16 @@ from .datadef import WorkflowData, WorkflowStatus, WorkflowMessage, WorkflowEven
 from .router import ActivityRouter
 from .runner import WorkflowRunner
 from .mutation import (
-    MutationEnvelop, CreateWorkflow, UpdateWorkflow, AddStep, UpdateStep, 
-    SetMemory, AddTrigger, AddParticipant, DelParticipant, AddStage, REGISTRY
+    MutationEnvelop,
+    get_mutation
 )
-from fluvius.data import UUID_GENR
+from fluvius.data import UUID_GENF
 
 class WorkflowManager(object):
     __router__ = ActivityRouter
     __runner__ = WorkflowRunner
     __datamgr__ = WorkflowDataManager
     __registry__ = {}
-
-    WORKFLOW_UPDATE_FIELDS = [
-        'status', 'progress', 'etag', 'ts_start', 
-        'ts_expire', 'ts_finish', 'ts_transit'
-    ]
-
-    STEP_UPDATE_FIELDS = [
-        'title', 'stm_state', 'message', 'status', 'label',
-        'ts_due', 'ts_start', 'ts_finish', 'ts_transit'
-    ]
 
     def __init__(self):
         self._running = {}
@@ -42,10 +32,10 @@ class WorkflowManager(object):
     def process_activity(self, activity_name, activity_data):
         for trigger in self.route_activity(activity_name, activity_data):
             wf = self.load_workflow(trigger.workflow_key, trigger.route_id)
-            with wf.transaction() as wf_proxy:
+            with wf.transaction():
                 if wf.status == WorkflowStatus.NEW:
-                    wf_proxy.start()
-                wf_proxy.trigger(trigger)
+                    wf.start()
+                wf.trigger(trigger)
 
             yield wf
 
@@ -107,8 +97,8 @@ class WorkflowManager(object):
         mutations = tuple(mutations)
         for wf_mut in mutations:
             try:
-                await self._log_mutation(tx, wf_mut)
                 await self._persist_single_mutation(tx, wf_mut)                    
+                await self._log_mutation(tx, wf_mut)
             except Exception as e:
                 logger.error(f"Failed to persist mutation {wf_mut.action}: {e}")
                 raise        
@@ -142,7 +132,6 @@ class WorkflowManager(object):
             'add-step': self._persist_add_step,
             'update-step': self._persist_update_step,
             'set-memory': self._persist_set_memory,
-            'add-trigger': self._persist_add_trigger,
             'add-participant': self._persist_add_participant,
             'del-participant': self._persist_del_participant,
             'add-stage': self._persist_add_stage
@@ -206,30 +195,10 @@ class WorkflowManager(object):
 
     async def _persist_set_memory(self, tx, wf_mut: MutationEnvelop):
         """Set workflow or step memory records."""
-        values = wf_mut.mutation.model_dump()
-        
-        # Process each key-value pair in the memory data
-        for key, value in values.items():
-            if value is None:
-                del values[key]
-
+        values = wf_mut.mutation.model_dump(exclude_none=True)
+        values['_id'] = wf_mut.workflow_id
         values['workflow_id'] = wf_mut.workflow_id
-
         await tx.upsert_many('workflow-memory', values)
-
-    async def _persist_add_trigger(self, tx, wf_mut: MutationEnvelop):
-        """Add a trigger record."""
-        trigger = wf_mut.mutation
-        
-        # Field mapping for trigger data
-        trigger_fields = {
-            'workflow_id': wf_mut.workflow_id,
-            'origin_step': wf_mut.step_id,
-            'trigger_name': trigger.name,
-            'trigger_data': trigger.data
-        }
-        
-        await tx.insert_many('workflow-trigger', trigger_fields)
 
     async def _persist_add_participant(self, tx, wf_mut: MutationEnvelop):
         """Add a participant record."""

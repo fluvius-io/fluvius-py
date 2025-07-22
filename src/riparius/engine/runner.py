@@ -35,8 +35,8 @@ class WorkflowStateProxy(object):
             if not hasattr(wf_func, '__action__'):
                 continue
 
-            action_type, action_name = wf_func.__action__
-            if action_type == WORKFLOW_ACTION:
+            action_type, action_name, external = wf_func.__action__
+            if action_type == WORKFLOW_ACTION and not external:
                 setattr(self, action_name, wf_func)
 
 def action_response(*mutations, response=None):
@@ -53,7 +53,7 @@ class StepStateProxy(object):
             if not hasattr(wf_func, '__action__'):
                 continue
 
-            action_type, action_name = wf_func.__action__
+            action_type, action_name, _ = wf_func.__action__
             if action_type == STEP_ACTION:
                 setattr(self, action_name, partial(wf_func, step_id))
 
@@ -81,13 +81,13 @@ def validate_transaction(wf, action_name, allowed, unallowed):
         raise WorkflowExecutionError('P01004', f'Unable to perform action [{action_name}] at workflow status [{wf.status}]')
 
 
-def workflow_action(event_name, allow_statuses = None, unallow_statuses = None, hook_name = None):
+def workflow_action(event_name, allow_statuses = None, unallow_statuses = None, hook_name = None, external=False):
     allow_statuses = validate_statuses(allow_statuses)
     unallow_statuses = validate_statuses(unallow_statuses)
     hook_name = hook_name or event_name
 
     def decorator(action_func):
-        action_func.__action__ = (WORKFLOW_ACTION, event_name)
+        action_func.__action__ = (WORKFLOW_ACTION, event_name, external)
 
         @wraps(action_func)
         def wrapper(self, *args, **kwargs):
@@ -109,7 +109,7 @@ def step_action(event_name, allow_statuses = None, unallow_statuses = None, hook
     hook_name = hook_name or event_name
 
     def decorator(action_func):
-        action_func.__action__ = (STEP_ACTION, event_name)
+        action_func.__action__ = (STEP_ACTION, event_name, False)
         @wraps(action_func)
         def wrapper(self, step_id, *args, **kwargs):
             validate_transaction(self, action_func.__name__, allow_statuses, unallow_statuses)
@@ -414,14 +414,14 @@ class WorkflowRunner(object):
             _id=step_id,
             index=len(self.step_id_map) + 1,
             selector=selector,
-            step_name=step_key,
+            step_key=step_key,
             title=title or stdef.__title__,
             workflow_id=self._id,
             stm_state=BEGIN_STATE,
             origin_step=origin_step,
             label=BEGIN_LABEL,
             status=StepStatus.ACTIVE,
-            stage=stdef.__stage__,
+            workflow_stage=stdef.__stage__,
         )
 
         self.selector_map[step.selector] = step
@@ -439,12 +439,12 @@ class WorkflowRunner(object):
         
         if _step_id is None:
             self._memory.update(kwargs)
-            self.mutate('set-memory', memory=self._memory)
+            self.mutate('set-memory', _id=self._id, memory=self._memory)
         else:
             sid = str(_step_id)
             self._stepsm.setdefault(sid, {})
             self._stepsm[sid].update(kwargs)
-            self.mutate('set-memory', stepsm=self._stepsm)
+            self.mutate('set-memory', _id=self._id, stepsm=self._stepsm)
 
     def _get_memory(self, _step_id=None):
         data = {} | self._memory
@@ -498,25 +498,24 @@ class WorkflowRunner(object):
     def get_task(self, task_id):
         return None
 
-    @workflow_action('start', allow_statuses=WorkflowStatus.NEW)
+    @workflow_action('start', allow_statuses=WorkflowStatus.NEW, external=True)
     def start(self):
         self._update_workflow(status=WorkflowStatus.ACTIVE, ts_start=timestamp())
         return self
 
-    @workflow_action('trigger', allow_statuses=WorkflowStatus._ACTIVE)
-    def process_trigger(self, trigger):
+    @workflow_action('trigger', allow_statuses=WorkflowStatus._ACTIVE, external=True)
+    def trigger(self, trigger):
         wf_context = self.get_state_proxy(trigger.selector)
         trigger_name = trigger.handler_func if isinstance(trigger.handler_func, str) else trigger.handler_func.__name__
         self.run_hook(trigger.handler_func, wf_context, trigger.activity_data)
-        self.mutate('add-trigger', action_name='trigger', name=trigger_name, data=trigger.activity_data.__dict__)
         return self
     
-    @workflow_action('add_participant', allow_statuses=WorkflowStatus._EDITABLE)
+    @workflow_action('add_participant', allow_statuses=WorkflowStatus._EDITABLE, external=True)
     def add_participant(self, /, role, member_id, **kwargs):
         self.mutate('add-participant', role=role, member_id=member_id)
         return self
 
-    @workflow_action('del_participant', allow_statuses=WorkflowStatus._EDITABLE)
+    @workflow_action('del_participant', allow_statuses=WorkflowStatus._EDITABLE, external=True)
     def del_participant(self, /, role, member_id):
         self.mutate('del-participant', role=role, member_id=member_id)
         return self
@@ -530,6 +529,17 @@ class WorkflowRunner(object):
     def abort_workflow(self):
         self._update_workflow(status=WorkflowStatus.FAILED)
         return self
+    
+    @workflow_action('pause', allow_statuses=WorkflowStatus.ACTIVE, hook_name='paused')
+    def pause_workflow(self):
+        self._update_workflow(status=WorkflowStatus.PAUSED, paused=self.status)
+        return self
+
+    @workflow_action('resume', allow_statuses=WorkflowStatus.PAUSED, hook_name='resumed')
+    def resume_workflow(self):
+        self._update_workflow(status=self._workflow.paused, paused=None)
+        return self
+
 
     @workflow_action('add_task', allow_statuses=WorkflowStatus._ACTIVE, hook_name='task_added')
     def add_task(self, /, origin_step, task_key, **kwargs):
@@ -611,8 +621,8 @@ class WorkflowRunner(object):
         memory = self._get_memory(step_id)
         return memory
     
-    @workflow_action('create')
-    def create(self, route_id, params):
+    @workflow_action('create', external=True)
+    def create(self, params):
         self.mutate('create-workflow', workflow=self._workflow)
 
         if params:
@@ -633,7 +643,7 @@ class WorkflowRunner(object):
 
         wf = cls(wf_state)
         with wf.transaction(wf_state.id):
-            wf.create(route_id, params)
+            wf.create(params)
 
         return wf
 
