@@ -353,8 +353,6 @@ class WorkflowRunner(object):
         func = handler_func if callable(handler_func) else \
                 getattr(self.__wf_def__, f'on_{handler_func}', None)
         
-        source = handler_func if isinstance(handler_func, str) else handler_func.__qualname__
-
         if func is None:
             return
 
@@ -362,7 +360,7 @@ class WorkflowRunner(object):
             wfmsg = WorkflowMessage(
                 workflow_id=self.id,
                 timestamp=timestamp(),
-                source=source,
+                source=func.__qualname__,
                 content=msg
             )
             self._msg_queue.put(wfmsg)
