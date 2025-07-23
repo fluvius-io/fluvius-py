@@ -3,7 +3,7 @@ import re
 
 from fluvius.query.helper import SCOPING_SIGN, SCOPING_SEP, PATH_QUERY_SIGN
 
-SCOPE_SELECTOR = f"{SCOPING_SIGN}{{scope}}"
+SCOPE_SELECTOR = "{scope}"
 PATH_QUERY_SELECTOR = f"{PATH_QUERY_SIGN}{{path_query}}"
 
 

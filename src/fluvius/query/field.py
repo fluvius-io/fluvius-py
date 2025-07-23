@@ -96,3 +96,10 @@ def IntegerField(title, **kwargs):
 def NumberField(title, **kwargs):
     return QueryField(title=title, preset="number", **kwargs)
 
+
+def DictField(title, **kwargs):
+    return QueryField(title=title, preset="none", **kwargs)
+
+
+def ListField(title, **kwargs):
+    return QueryField(title=title, preset="none", **kwargs)

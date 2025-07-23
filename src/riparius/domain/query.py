@@ -1,9 +1,13 @@
 from fluvius.query import DomainQueryManager, QueryResource
-from fluvius.query.field import StringField, UUIDField, DatetimeField, FloatField, EnumField
-from fluvius.data import UUID_TYPE
+from fluvius.query.field import StringField, UUIDField, DatetimeField, FloatField, EnumField, PrimaryID, IntegerField, ListField, DictField   
+from fluvius.data import UUID_TYPE, DataModel
 from .domain import WorkflowDomain
 from ..model import WorkflowDataManager
 from ..status import WorkflowStatus, StepStatus
+
+class WorkflowScope(DataModel):
+    __default_key__ = 'workflow_id'
+    workflow_id: UUID_TYPE
 
 
 class WorkflowQueryManager(DomainQueryManager):
@@ -25,15 +29,37 @@ class WorkflowQuery(QueryResource):
     class Meta(QueryResource.Meta):
         description = "List and search workflow instances"
 
-    id: UUID_TYPE = UUIDField("Workflow ID", identifier=True)
+    id: UUID_TYPE = PrimaryID("Workflow ID")
     title: str = StringField("Workflow Title")
+    revision: int = IntegerField("Workflow Revision")
+    route_id: UUID_TYPE = UUIDField("Route ID")
     status: str = EnumField("Workflow Status")
     progress: float = FloatField("Completion Progress")
     route_id: UUID_TYPE = UUIDField("Route ID")
     ts_start: str = DatetimeField("Start Time")
+    ts_expire: str = DatetimeField("Expire Time")
     ts_finish: str = DatetimeField("Finish Time")
-    created: str = DatetimeField("Created")
-    updated: str = DatetimeField("Updated")
+
+@resource('workflow-embed')
+class WorkflowFullQuery(QueryResource):
+    """Query workflows and their properties"""
+
+    class Meta(QueryResource.Meta):
+        description = "List and search workflow instances"
+        backend_model = "_workflow"
+
+    id: UUID_TYPE = PrimaryID("Workflow ID")
+    title: str = StringField("Workflow Title")
+    revision: int = IntegerField("Workflow Revision")
+    route_id: UUID_TYPE = UUIDField("Route ID")
+    status: str = EnumField("Workflow Status")
+    progress: float = FloatField("Completion Progress")
+    route_id: UUID_TYPE = UUIDField("Route ID")
+    ts_start: str = DatetimeField("Start Time")
+    ts_expire: str = DatetimeField("Expire Time")
+    ts_finish: str = DatetimeField("Finish Time")
+    stages: list = ListField("Stages")
+    output: dict = DictField("Output")
 
 
 @resource('workflow-step')
@@ -42,10 +68,12 @@ class WorkflowStepQuery(QueryResource):
 
     class Meta(QueryResource.Meta):
         description = "List and search workflow steps"
+        scope_required = WorkflowScope
 
-    id: UUID_TYPE = UUIDField("Step ID", identifier=True)
+    id: UUID_TYPE = PrimaryID("Step ID")
     workflow_id: UUID_TYPE = UUIDField("Workflow ID")
-    title: str = StringField("Step Title")
+    index: int = IntegerField("Step Index")
+    stage_key: str = StringField("Stage Key")
     step_name: str = StringField("Step Name")
     status: str = EnumField("Step Status")
     stm_state: str = StringField("State Machine State")
@@ -53,8 +81,6 @@ class WorkflowStepQuery(QueryResource):
     origin_step: UUID_TYPE = UUIDField("Origin Step ID")
     ts_start: str = DatetimeField("Start Time")
     ts_finish: str = DatetimeField("Finish Time")
-    created: str = DatetimeField("Created")
-    updated: str = DatetimeField("Updated")
 
 
 @resource('workflow-participant')
@@ -64,11 +90,10 @@ class WorkflowParticipantQuery(QueryResource):
     class Meta(QueryResource.Meta):
         description = "List workflow participants and their roles"
 
-    id: UUID_TYPE = UUIDField("Participant ID", identifier=True)
+    id: UUID_TYPE = PrimaryID("Participant ID")
     workflow_id: UUID_TYPE = UUIDField("Workflow ID")
     user_id: UUID_TYPE = UUIDField("User ID")
     role: str = StringField("Participant Role")
-    created: str = DatetimeField("Created")
 
 
 @resource('workflow-stage')
@@ -78,14 +103,9 @@ class WorkflowStageQuery(QueryResource):
     class Meta(QueryResource.Meta):
         description = "List workflow stages and their progress"
 
-    id: UUID_TYPE = UUIDField("Stage ID", identifier=True)
+    id: UUID_TYPE = PrimaryID("Stage ID")
     workflow_id: UUID_TYPE = UUIDField("Workflow ID")
     stage_name: str = StringField("Stage Name")
     stage_type: str = StringField("Stage Type")
-    status: str = EnumField("Stage Status")
-    sequence: float = FloatField("Stage Sequence")
-    description: str = StringField("Stage Description")
-    ts_start: str = DatetimeField("Start Time")
-    ts_finish: str = DatetimeField("Finish Time")
-    created: str = DatetimeField("Created")
-    updated: str = DatetimeField("Updated") 
+    order: int = IntegerField("Stage Order")
+    desc: str = StringField("Stage Description")

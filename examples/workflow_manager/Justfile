@@ -37,7 +37,7 @@ run:
 # Run with auto-reload
 dev:
     @echo "🔥 Starting development server with auto-reload..."
-    uvicorn workflow_manager.main:app --reload --host 0.0.0.0 --port 8000
+    uvicorn workflow_manager.main:app --reload --reload-dir ./ --reload-dir ../../src --host 0.0.0.0 --port 8000
 
 # Run tests
 test:

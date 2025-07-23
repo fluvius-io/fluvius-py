@@ -12,7 +12,7 @@ from typing import List, Optional, Type, Union
 
 from fluvius.helper import select_value
 from fluvius.data import UUID_TYPE, UUID_GENR, logger, timestamp, config
-from fluvius.data.helper import serialize_mapping
+from fluvius.data.helper import serialize_mapping, generate_etag
 from fluvius.data.data_driver import DataDriver
 from fluvius.data.data_model import DataModel, BlankModel
 from fluvius.data.query import BackendQuery
@@ -327,12 +327,14 @@ class DataAccessManager(DataAccessManagerBase):
     async def invalidate(self, record: DataModel):
         model_name = self.lookup_record_model(record)
         query = BackendQuery.create(identifier=record._id, etag=record._etag)
-        return await self.connector.update_one(model_name, query, _deleted=timestamp(), _updated=timestamp())
+        etag = generate_etag(record)
+        return await self.connector.update_one(model_name, query, _deleted=timestamp(), _updated=timestamp(), _etag=etag)
 
     async def update(self, record: DataModel, /, **updates):
         model_name = self.lookup_record_model(record)
         q = BackendQuery.create(identifier=record._id, etag=record._etag)
-        return await self.connector.update_one(model_name, q, **updates, _updated=timestamp())
+        etag = generate_etag(record)
+        return await self.connector.update_one(model_name, q, _updated=timestamp(), _etag=etag, **updates)
 
     async def remove(self, record: DataModel):
         model_name = self.lookup_record_model(record)
@@ -345,25 +347,38 @@ class DataAccessManager(DataAccessManagerBase):
         result = await self.connector.insert(model_name, data)
         return result
 
-    async def upsert(self, model_name, values: dict):
-        return await self.connector.upsert(model_name, [values])
+    async def upsert(self, model_name, record: DataModel):
+        data = self._serialize(model_name, record)
+        updt = timestamp()
+        data['_updated'] = updt
+        data['_etag'] = generate_etag(data)
+        return await self.connector.upsert(model_name, data)
     
     async def insert_many(self, model_name: str, *records: list[dict]):
-        for record in records:
-            await self.connector.insert(model_name, record)
+        updt = timestamp()
+        for data in records:
+            data['_updated'] = updt
+            data['_etag'] = generate_etag(data)
+            await self.connector.insert(model_name, data)
 
     async def upsert_many(self, model_name: str, *records: list[dict]):
-        for record in records:
-            await self.connector.upsert(model_name, record)
+        updt = timestamp()
+        for data in records:
+            data['_updated'] = updt
+            data['_etag'] = generate_etag(data)
+            await self.connector.upsert(model_name, data)
 
     async def invalidate_one(self, model_name: str, identifier: UUID_TYPE, etag=None, /, **updates):
         q = BackendQuery.create(identifier=identifier, etag=etag)
-        updates['_deleted'] = timestamp()
-        return await self.connector.update_one(model_name, q, **updates, _updated=timestamp())
+        updt = timestamp()
+        etag = generate_etag(updates)
+        return await self.connector.update_one(model_name, q, _updated=updt, _deleted=updt, _etag=etag, **updates)
 
     async def update_one(self, model_name: str, identifier: UUID_TYPE, etag=None, /, **updates):
         query = BackendQuery.create(identifier=identifier, etag=etag)
-        return await self.connector.update_one(model_name, query, **updates, _updated=timestamp())
+        updt = timestamp()
+        etag = generate_etag(updates)
+        return await self.connector.update_one(model_name, query, _updated=updt, _etag=etag, **updates)
 
 class ReadonlyDataManagerProxy(object):
     def __init__(self, data_manager):

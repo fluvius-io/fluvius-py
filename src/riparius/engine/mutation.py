@@ -52,6 +52,7 @@ class SetMemory(WorkflowMutation):
     params: Optional[dict] = None
     memory: Optional[dict] = None
     stepsm: Optional[dict] = None
+    output: Optional[dict] = None
 
 
 class AddParticipant(WorkflowMutation):

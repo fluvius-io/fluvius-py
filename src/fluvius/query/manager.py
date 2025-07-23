@@ -178,7 +178,7 @@ class QueryManager(object):
         policy_scope=None
     ):
         """ Convert from the frontend query to the backend query """
-        scope   = policy_scope
+        scope   = (fe_query.scope or {}) | (policy_scope or {})
         query   = query_resource.process_query(fe_query.user_query, fe_query.path_query)
         limit   = fe_query.limit
         offset  = (fe_query.page - 1) * fe_query.limit

@@ -18,24 +18,24 @@ class SampleProcess(Workflow):
         title = "Sample Process"
         revision = 1
 
-    Stage01 = Stage(title='Stage 01')
-    Stage02 = Stage(title='Stage 02')
+    Stage01 = Stage('Stage 01')
+    Stage02 = Stage('Stage 02')
     Role01 = Role(title="Role 01")
 
     def on_start(wf_state):
         step3 = wf_state.add_step('Step03', selector=st01)
         step3.transit('MOON')
 
-    class Step01(Step, title='Step 03', stage=Stage01):
+    class Step01(Step, name='Step 03', stage=Stage01):
         pass
 
-    class Step02(Step, title="step-02a", stage=Stage01):
+    class Step02(Step, name="step-02a", stage=Stage01):
         pass
 
     class Step02b(Step, stage=Stage01):
-        __title__ = "Step2B"
+        __step_name__ = "Step2B"
 
-    class Step03(Step, title="Step 03", stage=Stage01):
+    class Step03(Step, name="Step 03", stage=Stage01):
         __states__ = ('TAKE', 'ME', 'TO', 'THE', 'MOON')
 
         @st_connect('test-event')
@@ -57,6 +57,7 @@ class SampleProcess(Workflow):
     @wf_connect('test-event')
     def test_event(workflow, trigger_data):
         workflow.memorize(test_key="workflow value 2")
+        workflow.output(message='SUCCESS!')
         yield f"test_event ACTION! #1: {trigger_data}"
         yield f"MEMORY: {workflow.recall()}"
 

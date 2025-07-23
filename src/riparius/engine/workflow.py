@@ -41,9 +41,10 @@ def validate_step_states(states):
 
 class Step(object):
     __states__ = tuple()
+    __stage__ = None
 
-    def __init_subclass__(cls, title=None, stage=None, states=None):
-        cls.__title__ = title or cls.__title__
+    def __init_subclass__(cls, name=None, stage=None, states=None):
+        cls.__step_name__ = name or cls.__name__
         cls.__stage__ = stage or cls.__stage__
 
         cls.__states__ =  (BEGIN_STATE, FINISH_STATE) + validate_step_states(
@@ -52,7 +53,7 @@ class Step(object):
 
         cls.__transitions__ = {}
 
-        assert cls.__title__ is not None
+        assert cls.__step_name__ is not None
         assert cls.__stage__ is not None
         assert isinstance(cls.__states__, tuple)
 
@@ -102,12 +103,12 @@ class Step(object):
         return self._data.selector
 
     @property
-    def title(self):
-        return self._data.title
+    def step_name(self):
+        return self._data.step_name
 
     @property
-    def stage(self):
-        return self._data.stage
+    def stage_key(self):
+        return self._data.stage_key
 
     @property
     def stm_state(self):
@@ -122,17 +123,21 @@ class Step(object):
         return self._data.display
 
 
-
 class Stage(object):
-    def __init__(self, title, order=0):
-        self._title = title
+    def __init__(self, name, type="general", order=0):
+        self._name = name
+        self._type = type
         self._order = order
-        self._desc = self.__doc__
+        self._desc = self.__class__.__doc__
     
     @property
-    def title(self):
-        return self._title
+    def name(self):
+        return self._name
     
+    @property
+    def type(self):
+        return self._type
+
     @property
     def order(self):
         return self._order

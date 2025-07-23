@@ -1,10 +1,7 @@
-import os
 import re
 import json
 import jsonurl_py
-from typing import Optional, List, Dict, Any, Tuple, Union
-
-from . import config
+from typing import Optional, List, Dict
 
 SCOPING_SIGN = ':'
 SCOPING_SEP = '='
@@ -18,19 +15,22 @@ def scope_decoder(scoping_stmt, scope_schema=None):
     permission system to generate a scoping query for the dataset
     and also to to check if user have access to the base resource.
 
-    /:domain_sid_value:key=value:.../
+    /domain_sid_value:key=value:.../
     => {
         "domain_sid": "domain_sid_value",
         "key": "value"
     }
 
-    /:399291-3838183-1838318-38182/dafadsf/...
+    /399291-3838183-1838318-38182/dafadsf/...
     '''
+
     if not scoping_stmt:
         return None
+    
+    default_key = getattr(scope_schema, '__default_key__', 'domain_sid') if scope_schema else 'domain_sid'
 
-    def _parse():
-        for part in scoping_stmt.split(SCOPING_SIGN):
+    def _parse(stmt):
+        for part in stmt.split(SCOPING_SIGN):
             part = part.strip()
 
             if not part:
@@ -42,20 +42,20 @@ def scope_decoder(scoping_stmt, scope_schema=None):
 
             if sep == '' and value == '':
                 value = key
-                key = 'domain_sid'
+                key = default_key
             elif key == '':
-                key = 'domain_sid'
+                key = default_key
 
             yield (key, value)
 
-    scope_value = dict(_parse())
+    scope_value = dict(_parse(scoping_stmt))
     if not scope_value:
         return None
 
     if scope_schema:
         return scope_schema(**scope_value).model_dump()
 
-    return scope_schema
+    return scope_value
 
 
 def list_decoder(data: Optional[str]) -> Optional[List[str]]:

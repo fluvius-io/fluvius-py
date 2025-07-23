@@ -1,7 +1,7 @@
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pg
 from fluvius.data import DomainSchema, SqlaDriver, FluviusJSONField
-from .status import StepStatus, TaskStatus, WorkflowStatus
+from .status import StepStatus, TaskStatus, WorkflowStatus, StageStatus
 from . import config
 
 DB_SCHEMA = config.CQRS_RESOURCE_SCHEMA
@@ -32,6 +32,7 @@ class WorkflowSchema(WorkflowBaseSchema):
 
     owner_id = sa.Column(pg.UUID, nullable=True)
     company_id = sa.Column(sa.String, nullable=True)
+    workflow_key = sa.Column(sa.String, nullable=False)
     revision = sa.Column(sa.Integer, nullable=False)
     route_id = sa.Column(sa.UUID, nullable=False)
     title = sa.Column(sa.String, nullable=True)
@@ -47,17 +48,44 @@ class WorkflowSchema(WorkflowBaseSchema):
     usr_tag = sa.Column(pg.ARRAY(sa.String), nullable=True)
 
 
+class WorkflowFullSchema(WorkflowBaseSchema):
+    __tablename__ = "_workflow"
+    __external__ = True    
+    # __table_args__ = {'info': {'is_view': True}}
+
+    owner_id = sa.Column(pg.UUID, nullable=True)
+    company_id = sa.Column(sa.String, nullable=True)
+    revision = sa.Column(sa.Integer, nullable=False)
+    route_id = sa.Column(sa.UUID, nullable=False)
+    title = sa.Column(sa.String, nullable=True)
+    desc = sa.Column(sa.String, nullable=True)
+    note = sa.Column(sa.String, nullable=True)
+    status = sa.Column(sa.Enum(WorkflowStatus, name="workflow_status"), nullable=False)
+    paused = sa.Column(sa.Enum(WorkflowStatus, name="workflow_status"), nullable=True)
+    output = sa.Column(pg.JSONB, nullable=True)
+    stages = sa.Column(pg.JSONB, nullable=True)
+    stepsm = sa.Column(pg.JSONB, nullable=True)
+    params = sa.Column(pg.JSONB, nullable=True)
+    memory = sa.Column(pg.JSONB, nullable=True)
+    progress = sa.Column(sa.Float, default=0.0)
+    ts_start = sa.Column(sa.DateTime(timezone=True), nullable=True)
+    ts_expire = sa.Column(sa.DateTime(timezone=True), nullable=True)
+    ts_finish = sa.Column(sa.DateTime(timezone=True), nullable=True)
+    sys_tag = sa.Column(pg.ARRAY(sa.String), nullable=True)
+    usr_tag = sa.Column(pg.ARRAY(sa.String), nullable=True)
+
+
 class WorkflowStep(WorkflowBaseSchema):
     __tablename__ = "workflow-step"
 
     workflow_id = sa.Column(pg.UUID, workflow_fk('fk_workflow_step_workflow_id'), nullable=False)
-    workflow_stage = sa.Column(sa.String, nullable=True)
+    stage_key = sa.Column(sa.String, nullable=True)
     index = sa.Column(sa.Integer, nullable=False)
     owner_id = sa.Column(pg.UUID, nullable=True)
     selector = sa.Column(pg.UUID, nullable=True)
     stm_state = sa.Column(sa.String, nullable=False)
     step_key = sa.Column(sa.String, nullable=False)
-    title = sa.Column(sa.String, nullable=False)
+    step_name = sa.Column(sa.String, nullable=False)
     origin_step = sa.Column(pg.UUID, nullable=True)
     status = sa.Column(sa.Enum(StepStatus, name="step_status"), nullable=False)
     label = sa.Column(sa.String, nullable=True)
@@ -72,9 +100,11 @@ class WorkflowStage(WorkflowBaseSchema):
 
     workflow_id = sa.Column(pg.UUID, workflow_fk('fk_workflow_stage_workflow_id'), nullable=False)
     key = sa.Column(sa.String, nullable=True)
-    title = sa.Column(sa.String, nullable=True)
+    stage_name = sa.Column(sa.String, nullable=True)
+    stage_type = sa.Column(sa.String, nullable=True)
     desc = sa.Column(sa.String, nullable=True)
     order = sa.Column(sa.Integer, nullable=True)
+    status = sa.Column(sa.Enum(StageStatus, name="stage_status"), nullable=False)
 
 
 class WorkflowParticipant(WorkflowBaseSchema):
@@ -89,9 +119,10 @@ class WorkflowMemory(WorkflowBaseSchema):
     __tablename__ = "workflow-memory"
 
     workflow_id = sa.Column(pg.UUID, workflow_fk('fk_workflow_memory_workflow_id'), unique=True, nullable=False)
-    memory = sa.Column(FluviusJSONField, nullable=True)
-    params = sa.Column(FluviusJSONField, nullable=True)
     stepsm = sa.Column(FluviusJSONField, nullable=True)
+    params = sa.Column(FluviusJSONField, nullable=True)
+    memory = sa.Column(FluviusJSONField, nullable=True)
+    output = sa.Column(FluviusJSONField, nullable=True)
 
 
 class WorkflowMutation(WorkflowBaseSchema):
@@ -147,11 +178,16 @@ SELECT
   wm.stepsm,
   wm.params,
   wm.memory,
+  wm.output,
   jsonb_agg(
     jsonb_build_object(
       '_id', ws._id,
-      'title', ws.title,
-      'key', ws.key
+      'key', ws.key,
+      'desc', ws.desc,
+      'stage_name', ws.stage_name,
+      'stage_type', ws.stage_type,
+      'order', ws.order,
+      'status', ws.status
     )
   ) AS stages
 FROM "{DB_SCHEMA}"."workflow" wf

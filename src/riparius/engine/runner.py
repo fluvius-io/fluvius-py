@@ -140,6 +140,7 @@ class WorkflowRunner(object):
         self._memory = {}
         self._params = {}
         self._stepsm = {}
+        self._output = {}
         self._etag = None
         self._step_proxies = {}
         self._state_proxy = WorkflowStateProxy(self)
@@ -180,18 +181,15 @@ class WorkflowRunner(object):
 
         def define_step(step_cls, step_key):
             stage = step_cls.__stage__
+            stage_key = step_cls.__stage_key__ = stage.__key__
 
             if step_key in STEPS:
                 raise WorkflowConfigurationError('P01101', 'Step already registered [%s]' % step_cls)
 
-            if stage.__key__ not in STAGES:
-                raise WorkflowConfigurationError('P01102', 'Stage [%s] is not defined for workflow [%s]' % (stage, cls.__key__))
+            if stage_key not in STAGES:
+                raise WorkflowConfigurationError('P01102', 'Stage [%s] is not defined for workflow [%s]' % (stage_key, cls.__key__))
 
-            step_cls.__stage__ = stage.__key__
             STEPS[step_key] = step_cls
-
-            for attr in dir(wf_def):
-                ele_cls = getattr(wf_def, attr)
 
             # Register step's external events listeners
             ActivityRouter.connect_st_events(step_cls, wf_def.Meta.key, step_key)
@@ -240,7 +238,8 @@ class WorkflowRunner(object):
             yield WorkflowStage(
                 workflow_id=self.id,
                 key=key,
-                title=stage.title,
+                stage_name=stage.name,
+                stage_type=stage.type,
                 order=stage.order,
                 desc=stage.desc
             )
@@ -414,13 +413,14 @@ class WorkflowRunner(object):
             index=len(self.step_id_map) + 1,
             selector=selector,
             step_key=step_key,
-            title=title or stdef.__title__,
+            step_name=title or stdef.__step_name__,
             workflow_id=self._id,
             stm_state=BEGIN_STATE,
             origin_step=origin_step,
             label=BEGIN_LABEL,
             status=StepStatus.ACTIVE,
-            workflow_stage=stdef.__stage__,
+            ts_start=timestamp(),
+            stage_key=stdef.__stage_key__,
         )
 
         self.selector_map[step.selector] = step
@@ -432,19 +432,29 @@ class WorkflowRunner(object):
         self._steps = {}
         self._stmap = {step.selector: step for step in self._steps.values()}
 
-    def _set_memory(self, _step_id = None, **kwargs):
+    def _set_memory(self, **kwargs):
         if not kwargs:
             return
         
-        if _step_id is None:
-            self._memory.update(kwargs)
-            self.mutate('set-memory', _id=self._id, memory=self._memory)
-        else:
-            sid = str(_step_id)
-            self._stepsm.setdefault(sid, {})
-            self._stepsm[sid].update(kwargs)
-            self.mutate('set-memory', _id=self._id, stepsm=self._stepsm)
+        self._memory.update(kwargs)
+        self.mutate('set-memory', _id=self._id, memory=self._memory)
+    
+    def _set_step_memory(self, _step_id, **kwargs):
+        if not kwargs:
+            return
+        
+        sid = str(_step_id)
+        self._stepsm.setdefault(sid, {})
+        self._stepsm[sid].update(kwargs)
+        self.mutate('set-memory', _id=self._id, stepsm=self._stepsm)
+    
+    def _set_output(self, **kwargs):
+        if not kwargs:
+            return
 
+        self._output.update(kwargs)
+        self.mutate('set-memory', _id=self._id, output=self._output)
+    
     def _get_memory(self, _step_id=None):
         data = {} | self._memory
 
@@ -539,7 +549,6 @@ class WorkflowRunner(object):
         self._update_workflow(status=self._workflow.paused, paused=None)
         return self
 
-
     @workflow_action('add_task', allow_statuses=WorkflowStatus._ACTIVE, hook_name='task_added')
     def add_task(self, /, origin_step, task_key, **kwargs):
         task_id = UUID_GENF(task_key, self._id)
@@ -568,13 +577,19 @@ class WorkflowRunner(object):
     @workflow_action('add_step', allow_statuses=WorkflowStatus._ACTIVE)
     def workflow_add_step(self, step_key, /, selector=None, title=None, **kwargs):
         step = self._add_step(None, step_key, selector, title)
-        self._set_memory(step.id, **kwargs)
+        self._set_step_memory(step.id, **kwargs)
         return self.get_state_proxy(step.selector)
 
     @workflow_action('memorize', allow_statuses=WorkflowStatus._ACTIVE)
     def workflow_set_memory(self, **kwargs):
         self._set_memory(**kwargs)
         return self
+
+    @workflow_action('output', allow_statuses=WorkflowStatus._EDITABLE)
+    def workflow_output(self, **kwargs):
+        self._set_output(**kwargs)
+        return self
+
 
     @workflow_action('recall', allow_statuses=WorkflowStatus._ACTIVE)
     def workflow_get_memory(self):
@@ -584,7 +599,7 @@ class WorkflowRunner(object):
     @step_action('add_step', allow_statuses=WorkflowStatus._ACTIVE)
     def step_add_step(self, step_id, step_key, /, selector=None, title=None, **kwargs):
         step = self._add_step(step_id, step_key, selector, title)
-        self._set_memory(step.id, **kwargs)
+        self._set_step_memory(step.id, **kwargs)
         return self.get_state_proxy(step.selector)
 
     @step_action('transit', allow_statuses=WorkflowStatus._ACTIVE)
@@ -612,7 +627,7 @@ class WorkflowRunner(object):
 
     @step_action('memorize', allow_statuses=WorkflowStatus._ACTIVE)
     def step_set_memory(self, step_id, **kwargs):
-        self._set_memory(step_id, **kwargs)
+        self._set_step_memory(step_id, **kwargs)
         return self
 
     @step_action('recall')
@@ -637,6 +652,7 @@ class WorkflowRunner(object):
             id=UUID_GENR(),
             title=wf_def.Meta.title,
             revision=wf_def.Meta.revision,
+            workflow_key=wf_def.Meta.key,
             status=WorkflowStatus.NEW,
             route_id=route_id)
 

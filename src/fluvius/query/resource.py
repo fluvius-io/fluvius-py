@@ -127,6 +127,7 @@ class QueryResource(BaseModel):
 
         mapped_include = tuple(fmap.get(f, f) for f in include)
         mapped_exclude = tuple(fmap.get(f, f) for f in exclude)
+    
         return mapped_include, mapped_exclude
 
     @classmethod

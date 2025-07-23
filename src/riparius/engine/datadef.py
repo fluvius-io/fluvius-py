@@ -5,7 +5,7 @@ from enum import Enum
 from types import SimpleNamespace
 from typing import List, Dict, Optional, Callable
 from fluvius.data import DataModel, Field, UUID_GENF, UUID_GENR, UUID_TYPE
-from ..status import WorkflowStatus, StepStatus
+from ..status import WorkflowStatus, StepStatus, StageStatus    
 
 RX_STATE = re.compile(r'^[A-Z][A-Z\d_]*$')
 
@@ -18,6 +18,7 @@ class WorkflowData(WorkflowDataModel):
     id: UUID_TYPE = Field(default_factory=UUID_GENR, alias='_id')
     title: str
     revision: int = Field(default=0)
+    workflow_key: str
     namespace: str = Field(default=None)
     route_id: UUID_TYPE = Field(default_factory=UUID_GENR)
     status: WorkflowStatus = Field(default=WorkflowStatus.NEW)
@@ -58,17 +59,18 @@ class WorkflowMemory(WorkflowDataModel):
     params: Optional[dict] = None
     memory: Optional[dict] = None
     stepsm: Optional[dict] = None # steps memory
+    output: Optional[dict] = None 
 
 
 class WorkflowStep(WorkflowDataModel):
     id: UUID_TYPE = Field(default_factory=UUID_GENR, alias='_id')
     index: int = 0
     selector: UUID_TYPE
-    workflow_stage: str
     workflow_id: UUID_TYPE
     step_key: str
+    stage_key: str
     origin_step: Optional[UUID_TYPE] = None
-    title: str
+    step_name: str
     stm_state: str
     message: Optional[str] = None
     status: StepStatus = Field(default=StepStatus.ACTIVE)
@@ -83,9 +85,11 @@ class WorkflowStage(WorkflowDataModel):
     id: UUID_TYPE = Field(default_factory=UUID_GENR, alias='_id')
     workflow_id: UUID_TYPE
     key: str
-    title: str
+    stage_name: str
+    stage_type: str
     order: int = Field(default=0)
     desc: Optional[str] = None
+    status: StageStatus = Field(default=StageStatus.ACTIVE)
 
 class WorkflowParticipant(WorkflowDataModel):
     pass

@@ -215,7 +215,6 @@ class QueryBuilder(object):
         include = query.include or data_schema.__table__.columns.keys()
         exclude = query.exclude
         alias = query.alias or {}
-
         fields = tuple(self._field(data_schema, k, alias.get(k)) for k in include if k not in exclude)
 
         sql = select(*fields)

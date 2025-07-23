@@ -1,5 +1,4 @@
-import os
-import json
+import re
 from functools import wraps, partial
 
 from pipe import Pipe
@@ -39,9 +38,6 @@ def register_resource_endpoints(app, query_manager, query_resource):
 
         if not scope_schema and scope:
             raise BadRequestError('Q01-00383', f'Scoping is not allowed for resource: {query_resource}')
-
-        if not query_params:
-            query_params = QueryParams()
 
         fe_query = FrontendQuery.from_query_params(query_params, scope=scope, scope_schema=scope_schema, path_query=path_query)
 
@@ -89,20 +85,21 @@ def register_resource_endpoints(app, query_manager, query_resource):
             @endpoint(
                 SCOPE_SELECTOR, PATH_QUERY_SELECTOR, "", **list_params
                 )  # "" for trailing slash
-            async def query_resource_scoped(request: Request, path_query: Annotated[str, Path()], scope: str):
+            async def query_resource_scoped(request: Request, path_query: Annotated[str, Path()], scope:  Annotated[str, Path()]):
                 return await resource_query(request, None, path_query, scope)
 
             @endpoint(SCOPE_SELECTOR, "", **list_params)  # "" for trailing slash
-            async def query_resource_scoped_json(request: Request, query_params: Annotated[QueryParams, Query()], scope: str):
+            async def query_resource_scoped_json(request: Request, query_params: Annotated[QueryParams, Query()], scope: Annotated[str, Path()]):
                 return await resource_query(request, query_params, None, scope)
+            
+        if not meta.scope_required:
+            @endpoint(PATH_QUERY_SELECTOR, "", **list_params)
+            async def query_resource_json(request: Request, path_query: Annotated[str, Path()], query_params: Annotated[QueryParams, Query()]):
+                return await resource_query(request, query_params, path_query, None)
 
-        @endpoint(PATH_QUERY_SELECTOR, "", **list_params)
-        async def query_resource_json(request: Request, path_query: Annotated[str, Path()], query_params: Annotated[QueryParams, Query()]):
-            return await resource_query(request, query_params, path_query, None)
-
-        @endpoint("", **list_params) # Trailing slash
-        async def query_resource_default(request: Request, query_params: Annotated[QueryParams, Query()]):
-            return await resource_query(request, query_params, None, None)
+            @endpoint("", **list_params) # Trailing slash
+            async def query_resource_default(request: Request, query_params: Annotated[QueryParams, Query()]):
+                return await resource_query(request, query_params, None, None)
 
     if meta.allow_meta_view:
         @endpoint(base=f"/_meta{base_uri}", summary=f"Query Metadata [{meta.name}]", tags=["Metadata"])
@@ -119,14 +116,16 @@ def register_resource_endpoints(app, query_manager, query_resource):
             summary=f"{meta.name} (Item)",
             description=meta.desc,
             response_model=ItemResultSchema)
-        @endpoint("{identifier}", **item_params)
-        async def query_item_default(request: Request, identifier: Annotated[str, Path()]):
-            item = await item_query(request, identifier)
-            return item
+        
+        if not meta.scope_required:
+            @endpoint("{identifier}", **item_params)
+            async def query_item_default(request: Request, identifier: Annotated[str, Path()]):
+                item = await item_query(request, identifier)
+                return item
 
         if scope_schema:
             @endpoint(SCOPE_SELECTOR, "{identifier}", **item_params)
-            async def query_item_scoped(request: Request, identifier: Annotated[str, Path()], scope: str):
+            async def query_item_scoped(request: Request, identifier: Annotated[str, Path()], scope: Annotated[str, Path()]):
                 return query_resource(**(await item_query(request, identifier, scope=scope)).__dict__)
 
 
@@ -166,11 +165,12 @@ def register_query_manager(app, qm_cls):
 @Pipe
 def configure_query_manager(app, *query_managers):
     @app.get(uri("/_meta/_echo", SCOPE_SELECTOR, PATH_QUERY_SELECTOR, "{identifier}"), tags=["Metadata"])
-    async def query_echo(query_params: Annotated[QueryParams, Query()], scope, path_query, identifier):
+    async def query_echo(query_params: Annotated[QueryParams, Query()], scope: Annotated[str, Path()], path_query: Annotated[str, Path()], identifier: Annotated[str, Path()]):
         """
         This endpoint can be used to inspect how the url search params being parsed into structure query for the backend.
 
         E.g:
+        ```json
         $ curl "http://localhost:8000/_meta/_echo/:abc%3A38182/~xyz%3Atuv/12838383812?limit=25&page=1&select=abcdef%2Cghijkl&sort=abc.desc%2Cxyz.asc&query=%7B%22abcdef%22%3A%22ghijkl%22%7D" | jq
         {
           "identifier": "12838383812",
@@ -201,6 +201,7 @@ def configure_query_manager(app, *query_managers):
             "query": "{\"abcdef\":\"ghijkl\"}"
           }
         }
+        ```
         """
 
         fe_query = FrontendQuery.from_query_params(query_params, scope=scope, path_query=path_query)
