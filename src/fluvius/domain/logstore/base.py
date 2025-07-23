@@ -11,7 +11,8 @@ DEBUG_LOG = config.DEBUG
 class DomainLogStore(object):
     __config__ = SimpleNamespace
 
-    def __init__(self, **config):
+    def __init__(self, app, **config):
+        self._app = app
         self._config = self.validate_config(config)
 
     def validate_config(self, config):

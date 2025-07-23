@@ -2,17 +2,29 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pg
 from fluvius.data import DomainSchema, SqlaDriver, FluviusJSONField
 from .status import StepStatus, TaskStatus, WorkflowStatus
+from . import config
 
+DB_SCHEMA = config.CQRS_RESOURCE_SCHEMA
+DB_DSN = config.DB_DSN
 
 # --- Connector and Base Schema ---
 class WorkflowConnector(SqlaDriver):
-    __db_dsn__ = "postgresql+asyncpg://fluvius_test@localhost/fluvius_test"
-    __schema__ = "workflow-manager"
+    __db_dsn__ = DB_DSN
+    __schema__ = DB_SCHEMA
 
 
 class WorkflowBaseSchema(WorkflowConnector.__data_schema_base__, DomainSchema):
     __abstract__ = True
 
+# Function to create foreign key references to workflow table
+def workflow_fk(constraint_name):
+    """Create a foreign key reference to the workflow table"""
+    return sa.ForeignKey(
+        f'{DB_SCHEMA}.workflow._id', 
+        ondelete='CASCADE', 
+        onupdate='CASCADE',
+        name=constraint_name
+    )
 
 # --- Models ---
 class WorkflowSchema(WorkflowBaseSchema):
@@ -38,7 +50,7 @@ class WorkflowSchema(WorkflowBaseSchema):
 class WorkflowStep(WorkflowBaseSchema):
     __tablename__ = "workflow-step"
 
-    workflow_id = sa.Column(pg.UUID, sa.ForeignKey('workflow-manager.workflow._id', ondelete='CASCADE', onupdate='CASCADE'), nullable=False)
+    workflow_id = sa.Column(pg.UUID, workflow_fk('fk_workflow_step_workflow_id'), nullable=False)
     workflow_stage = sa.Column(sa.String, nullable=True)
     index = sa.Column(sa.Integer, nullable=False)
     owner_id = sa.Column(pg.UUID, nullable=True)
@@ -58,7 +70,7 @@ class WorkflowStep(WorkflowBaseSchema):
 class WorkflowStage(WorkflowBaseSchema):
     __tablename__ = "workflow-stage"
 
-    workflow_id = sa.Column(pg.UUID, sa.ForeignKey('workflow-manager.workflow._id', ondelete='CASCADE', onupdate='CASCADE'), nullable=False)
+    workflow_id = sa.Column(pg.UUID, workflow_fk('fk_workflow_stage_workflow_id'), nullable=False)
     key = sa.Column(sa.String, nullable=True)
     title = sa.Column(sa.String, nullable=True)
     desc = sa.Column(sa.String, nullable=True)
@@ -68,7 +80,7 @@ class WorkflowStage(WorkflowBaseSchema):
 class WorkflowParticipant(WorkflowBaseSchema):
     __tablename__ = "workflow-participant"
 
-    workflow_id = sa.Column(pg.UUID, sa.ForeignKey('workflow-manager.workflow._id', ondelete='CASCADE', onupdate='CASCADE'), nullable=False)
+    workflow_id = sa.Column(pg.UUID, workflow_fk('fk_workflow_participant_workflow_id'), nullable=False)
     user_id = sa.Column(pg.UUID, nullable=False)
     role = sa.Column(sa.String, nullable=False)
 
@@ -76,7 +88,7 @@ class WorkflowParticipant(WorkflowBaseSchema):
 class WorkflowMemory(WorkflowBaseSchema):
     __tablename__ = "workflow-memory"
 
-    workflow_id = sa.Column(pg.UUID, sa.ForeignKey('workflow-manager.workflow._id', ondelete='CASCADE', onupdate='CASCADE'), unique=True, nullable=False)
+    workflow_id = sa.Column(pg.UUID, workflow_fk('fk_workflow_memory_workflow_id'), unique=True, nullable=False)
     memory = sa.Column(FluviusJSONField, nullable=True)
     params = sa.Column(FluviusJSONField, nullable=True)
     stepsm = sa.Column(FluviusJSONField, nullable=True)
@@ -87,7 +99,7 @@ class WorkflowMutation(WorkflowBaseSchema):
 
     name = sa.Column(sa.String, nullable=False)
     transaction_id = sa.Column(pg.UUID, nullable=False)
-    workflow_id = sa.Column(pg.UUID, sa.ForeignKey('workflow-manager.workflow._id', ondelete='CASCADE', onupdate='CASCADE'), nullable=False)
+    workflow_id = sa.Column(pg.UUID, workflow_fk('fk_workflow_mutation_workflow_id'), nullable=False)
     action = sa.Column(sa.String, nullable=False)
     mutation = sa.Column(FluviusJSONField, nullable=False)
     step_id = sa.Column(pg.UUID, nullable=True)
@@ -97,7 +109,7 @@ class WorkflowMutation(WorkflowBaseSchema):
 class WorkflowMessage(WorkflowBaseSchema):
     __tablename__ = "workflow-message"
 
-    workflow_id = sa.Column(pg.UUID, sa.ForeignKey('workflow-manager.workflow._id', ondelete='CASCADE', onupdate='CASCADE'), nullable=False)
+    workflow_id = sa.Column(pg.UUID, workflow_fk('fk_workflow_message_workflow_id'), nullable=False)
     timestamp = sa.Column(sa.DateTime(timezone=True), nullable=False)
     source = sa.Column(sa.String, nullable=False)
     content = sa.Column(sa.String, nullable=False)
@@ -106,7 +118,7 @@ class WorkflowMessage(WorkflowBaseSchema):
 class WorkflowEvent(WorkflowBaseSchema):
     __tablename__ = "workflow-event"
 
-    workflow_id = sa.Column(pg.UUID, sa.ForeignKey('workflow-manager.workflow._id', ondelete='CASCADE', onupdate='CASCADE'), nullable=False)
+    workflow_id = sa.Column(pg.UUID, workflow_fk('fk_workflow_event_workflow_id'), nullable=False)
     transaction_id = sa.Column(pg.UUID, nullable=False)
     event_name = sa.Column(sa.String, nullable=False)
     event_args = sa.Column(FluviusJSONField, nullable=True)
@@ -118,7 +130,7 @@ class WorkflowEvent(WorkflowBaseSchema):
 class WorkflowTask(WorkflowBaseSchema):
     __tablename__ = "workflow-task"
 
-    workflow_id = sa.Column(pg.UUID, sa.ForeignKey('workflow-manager.workflow._id', ondelete='CASCADE', onupdate='CASCADE'), nullable=False)
+    workflow_id = sa.Column(pg.UUID, workflow_fk('fk_workflow_task_workflow_id'), nullable=False)
     step_id = sa.Column(sa.String, nullable=False)
     ts_expire = sa.Column(sa.DateTime(timezone=True), nullable=True)
     ts_start = sa.Column(sa.DateTime(timezone=True), nullable=True)
@@ -128,14 +140,8 @@ class WorkflowTask(WorkflowBaseSchema):
     desc = sa.Column(sa.String, nullable=True)
 
 
-from sqlalchemy import (
-    create_engine, Column, Integer, String, ForeignKey,
-    event, DDL, MetaData, select, text
-)
-
-
-create_view_workflow = DDL('''
-CREATE OR REPLACE VIEW "workflow-manager"."_workflow" AS
+create_view_workflow = sa.DDL(f'''
+CREATE OR REPLACE VIEW "{DB_SCHEMA}"."_workflow" AS
 SELECT
   wf.*,
   wm.stepsm,
@@ -148,12 +154,12 @@ SELECT
       'key', ws.key
     )
   ) AS stages
-FROM "workflow-manager"."workflow" wf
-LEFT JOIN "workflow-manager"."workflow-stage" ws ON ws.workflow_id = wf._id
-LEFT JOIN "workflow-manager"."workflow-memory" wm ON wm._id = wf._id
+FROM "{DB_SCHEMA}"."workflow" wf
+LEFT JOIN "{DB_SCHEMA}"."workflow-stage" ws ON ws.workflow_id = wf._id
+LEFT JOIN "{DB_SCHEMA}"."workflow-memory" wm ON wm._id = wf._id
 GROUP BY wf._id, wm._id;
 ''')
 
-drop_view_workflow = DDL(f"DROP VIEW IF EXISTS _workflow;")
-event.listen(WorkflowBaseSchema.metadata, "before_drop", drop_view_workflow)
-event.listen(WorkflowBaseSchema.metadata, "after_create", create_view_workflow)
+drop_view_workflow = sa.DDL(f'''DROP VIEW IF EXISTS "{DB_SCHEMA}"._workflow;''')
+sa.event.listen(WorkflowBaseSchema.metadata, "before_drop", drop_view_workflow)
+sa.event.listen(WorkflowBaseSchema.metadata, "after_create", create_view_workflow)

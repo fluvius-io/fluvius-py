@@ -1,13 +1,12 @@
-from fluvius.domain.domain import Domain
-from account_transaction import context, aggregate, resource
+from fluvius.domain import Domain
+from .aggregate import TransactionAggregate
 
 
 class TransactionManagerDomain(Domain):
-    __namespace__ = 'transman'
-    __aggregate__ = aggregate.TransactionAggregate
+    __aggregate__ = TransactionAggregate
 
-    def __init__(self, ctx: context.SanicContext, **kwargs):
-        if not isinstance(ctx, context.SanicContext):
-            raise ValueError('TransactionManagerDomain only works on SanicContext')
-
-        super(TransactionManagerDomain, self).__init__(ctx, **kwargs)
+    class Meta:
+        revision = 1
+        tags = ["banking", "transactions", "finance"]
+        title = "Banking Transaction Domain"
+        description = "Domain for managing bank account transactions, transfers, and financial operations"

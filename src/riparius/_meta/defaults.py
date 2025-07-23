@@ -1,3 +1,4 @@
 MAX_MUTATIONS = 50
-CQRS_DOMAIN_NAMESPACE = "fluvius.workflow"
-CQRS_RESOURCE_SCHEMA = "fluvius--process"
+DB_DSN = "postgresql+asyncpg://fluvius_test@localhost/fluvius_test"
+CQRS_DOMAIN_NAMESPACE = "riparius.workflow"
+CQRS_RESOURCE_SCHEMA = "riparius-workflow"

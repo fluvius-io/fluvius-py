@@ -1,5 +1,5 @@
 from .cfg import config, logger
-from . import aggregate, command, event, response
+from . import aggregate, command, event, response, domain, datadef
 
 
 __all__ = [
@@ -7,6 +7,8 @@ __all__ = [
     "command",
     "event",
     "response",
+    "domain",
+    "datadef",
     "config",
     "logger"
 ]

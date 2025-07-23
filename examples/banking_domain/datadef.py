@@ -1,53 +1,34 @@
-from fluvius.data import UUID_TYPE
-from fluvius.domain.command import CommandData
-from fluvius.domain.event import EventData
-from fluvius.domain.record import field
+from fluvius.data import UUID_TYPE, DataModel
+from typing import Optional
 
 
-class DepositMoneyData(CommandData):
-    amount = field(type=int, mandatory=True)
-
-    class Meta:
-        descriptions = {
-            "amount": "Amount of money you want to deposit",
-        }
-        examples = {
-            "amount": 10,
-        }
+class AccountUpdateEventData(DataModel):
+    """Event data for account balance updates"""
+    balance: int
 
 
-class WithdrawMoneyData(CommandData):
-    amount = field(type=int, mandatory=True)
-
-    class Meta:
-        descriptions = {
-            "amount": "Amount of money you want to withdraw",
-        }
-        examples = {
-            "amount": 10,
-        }
+class TransferMoneyEventData(DataModel):
+    """Event data for money transfers between accounts"""
+    source_account_id: UUID_TYPE
+    destination_account_id: UUID_TYPE
+    amount: int
 
 
-class TransferMoneyData(CommandData):
-    recipient = field(type=UUID_TYPE, mandatory=True)
-    amount = field(type=int, mandatory=True)
-
-    class Meta:
-        descriptions = {
-            "recipient": "ID of recipient",
-            "amount": "Amount of money you want to transfer"
-        }
-        examples = {
-            "recipient": "57454D60-D56E-4CFF-9C43-BDE82C4038A0",
-            "amount": 10,
-        }
+class BankAccountData(DataModel):
+    """Bank account data model"""
+    account_number: str
+    balance: int = 0
+    account_type: str = "checking"
+    owner_id: UUID_TYPE
+    status: str = "active"
 
 
-class AccountUpdateEventData(EventData):
-    balance = field(type=int)
-
-
-class TransferMoneyEventData(EventData):
-    source_account_id = field(type=UUID_TYPE, mandatory=True)
-    destination_account_id = field(type=UUID_TYPE, mandatory=True)
-    amount = field(type=int, mandatory=True)
+class TransactionHistoryData(DataModel):
+    """Transaction history data model"""
+    transaction_id: UUID_TYPE
+    account_id: UUID_TYPE
+    transaction_type: str  # deposit, withdrawal, transfer
+    amount: int
+    description: Optional[str] = None
+    timestamp: str
+    reference_id: Optional[UUID_TYPE] = None  # For transfer operations

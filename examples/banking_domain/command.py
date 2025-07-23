@@ -1,72 +1,99 @@
-from banking_domain.domain import TransactionManagerDomain
-from fluvius.domain.command import Command
-from fluvius.domain.record import field
-from .datadef import (
-    DepositMoneyData, WithdrawMoneyData, TransferMoneyData
-)
+from fluvius.data import serialize_mapping, DataModel, UUID_TYPE
+from .domain import TransactionManagerDomain
+from typing import Optional
+
+Command = TransactionManagerDomain.Command
 
 
-_entity = TransactionManagerDomain.entity
-_command_processor = TransactionManagerDomain.command_processor
-
-
-@_entity
 class WithdrawMoney(Command):
-    data = field(type=WithdrawMoneyData, mandatory=True)
+    """Withdraw money from bank account"""
 
-    class Meta(Command.Meta):
-        tags = ["transaction"]
-        resource = "bank-account"
-        description = "Withdraw money"
+    class Meta:
+        key = 'withdraw-money'
+        name = 'Withdraw Money'
+        resources = ("bank-account",)
+        tags = ["transaction", "withdrawal"]
+        auth_required = True
+        description = "Withdraw money from bank account"
+
+    class Data(DataModel):
+        amount: int
+
+        class Config:
+            schema_extra = {
+                "examples": [{"amount": 100}],
+                "description": "Amount of money to withdraw"
+            }
+
+    async def _process(self, agg, stm, payload):
+        result = await agg.withdraw_money(payload)
+        yield agg.create_response(
+            serialize_mapping({'status': 'money-withdrew', 'amount': payload.amount}),
+            _type="transaction-response"
+        )
 
 
-@_entity
 class DepositMoney(Command):
-    data = field(type=DepositMoneyData, mandatory=True)
+    """Deposit money to bank account"""
 
-    class Meta(Command.Meta):
-        tags = ["transaction"]
-        resource = "bank-account"
-        description = "Deposit money"
+    class Meta:
+        key = 'deposit-money'
+        name = 'Deposit Money'
+        resources = ("bank-account",)
+        tags = ["transaction", "deposit"]
+        auth_required = True
+        description = "Deposit money to bank account"
+
+    class Data(DataModel):
+        amount: int
+
+        class Config:
+            schema_extra = {
+                "examples": [{"amount": 100}],
+                "description": "Amount of money to deposit"
+            }
+
+    async def _process(self, agg, stm, payload):
+        result = await agg.deposit_money(payload)
+        yield agg.create_response(
+            serialize_mapping({'status': 'money-deposited', 'amount': payload.amount}),
+            _type="transaction-response"
+        )
 
 
-@_entity
 class TransferMoney(Command):
-    data = field(type=TransferMoneyData, mandatory=True)
+    """Transfer money between bank accounts"""
 
-    class Meta(Command.Meta):
-        tags = ["transaction"]
-        resource = "bank-account"
-        description = "Transfer money"
+    class Meta:
+        key = 'transfer-money'
+        name = 'Transfer Money'
+        resources = ("bank-account",)
+        tags = ["transaction", "transfer"]
+        auth_required = True
+        description = "Transfer money to another bank account"
 
+    class Data(DataModel):
+        recipient: UUID_TYPE
+        amount: int
 
-@_command_processor(WithdrawMoney)
-async def handle_withdraw_money(aggproxy, cmd):
-    yield await aggproxy.withdraw_money(cmd.data)
-    yield await aggproxy.create_response(
-        'general-response',
-        cmd,
-        data={'resp': 'money-withdrew'}
-    )
+        class Config:
+            schema_extra = {
+                "examples": [{
+                    "recipient": "57454D60-D56E-4CFF-9C43-BDE82C4038A0",
+                    "amount": 100
+                }],
+                "description": "Transfer money to recipient account"
+            }
 
-
-@_command_processor(DepositMoney)
-async def handle_deposit_money(aggproxy, cmd):
-    yield await aggproxy.deposit_money(cmd.data)
-    yield await aggproxy.create_response(
-        'general-response',
-        cmd,
-        data={'resp': 'money-deposited'}
-    )
-
-
-@_command_processor(TransferMoney)
-async def handle_transfer_money(aggproxy, cmd):
-    # if you want to do anything with aggroot, use this
-    # aggroot = aggproxy.fetch_aggroot()
-    yield await aggproxy.transfer_money(cmd.data)
-    yield await aggproxy.create_response(
-        'general-response',
-        cmd,
-        data={'resp': 'money-transferred'}
-    )
+    async def _process(self, agg, stm, payload):
+        # Fetch aggroot if needed for additional logic
+        # aggroot = await agg.fetch_aggroot()
+        result = await agg.transfer_money(payload)
+        yield agg.create_response(
+            serialize_mapping({
+                'status': 'money-transferred',
+                'amount': payload.amount,
+                'recipient': str(payload.recipient)
+            }),
+            _type="transaction-response"
+        )
