@@ -9,17 +9,16 @@ class DomainManager(object):
     __blacklisted_commands__ = tuple()
     __whitelisted_commands__ = tuple()
 
-    @classmethod
-    def register_domain(cls, *domain_classes, whitelist=tuple(), blacklist=tuple()):
+    def register_domain(self, *domain_classes, whitelist=tuple(), blacklist=tuple()):
         for domain_spec in domain_classes:
             domain_cls = load_class(domain_spec, base_class=Domain)
-            if domain_spec in cls.__domains__:
+            if domain_spec in self.__domains__:
                 raise RuntimeError(f'Domain already registered with domain manager: {domain_spec}')
 
-            cls.__domains__ += (domain_cls,)
+            self.__domains__ += (domain_cls,)
 
-        cls.__blacklisted_commands__ += blacklist
-        cls.__whitelisted_commands__ += whitelist
+        self.__blacklisted_commands__ += blacklist
+        self.__whitelisted_commands__ += whitelist
 
 
     def initialize_domains(self, app):
@@ -34,7 +33,7 @@ class DomainManager(object):
         self._domains = tuple(_validate())
         return self._domains
 
-    def enumerate_domain_commands(self, domain):
+    def _enumerate_command_handlers(self, domain):
         for cmd_cls, cmd_key, fq_name in domain.enumerate_command():
             # Never list blacklisted commands
             if fq_name in self.__blacklisted_commands__:
@@ -44,7 +43,8 @@ class DomainManager(object):
                 fq_name in self.__whitelisted_commands__): # Always list whitelisted commands, except they are blacklisted
                 yield domain, cmd_cls, cmd_key, fq_name
 
+
     def enumerate_commands(self):
         for domain in self._domains:
-            yield from self.enumerate_domain_commands(domain)
+            yield from self._enumerate_command_handlers(domain)
 

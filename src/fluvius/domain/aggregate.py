@@ -64,7 +64,7 @@ def action(evt_key=None, resources=None):
             if resource_spec is not None and self._aggroot.resource not in resource_spec:
                 raise ForbiddenError("D100-001", f'Action is not allowed on resource: {self._aggroot.resource}')
 
-            evt_data = await func(self, self.statemgr, *args, **evt_args)
+            evt_data = await func(self, *args, **evt_args)
 
             if evt_key is not None:
                 self.create_event(evt_key, evt_args, evt_data)

@@ -1,4 +1,4 @@
-from fluvius.domain.aggregate import Aggregate
+from fluvius.domain.aggregate import Aggregate, action
 from fluvius.data import timestamp
 from . import logger
 
@@ -20,7 +20,8 @@ class UserAggregate(Aggregate):
 
         return self.__oauth_client__
 
-    async def do__execute_actions(self, user_id, actions):
+    @action("user-action-executed", resources="user")
+    async def execute_actions(self, user_id, actions):
         """Execute specified actions for a user"""
         user = await self.fetch_aggroot()
         
@@ -37,7 +38,8 @@ class UserAggregate(Aggregate):
             data={'actions': actions, 'timestamp': timestamp()}
         )
 
-    async def do__deactivate(self, user_id):
+    @action("user-deactivated", resources="user")
+    async def deactivate(self, user_id):
         """Deactivate a user account"""
         user = await self.fetch_aggroot()
         
@@ -54,7 +56,8 @@ class UserAggregate(Aggregate):
             data={'deactivated_at': timestamp()}
         )
 
-    async def do__reconcile(self, user_id):
+    @action("user-reconciled", resources="user")
+    async def reconcile(self, user_id):
         """Reconcile user account data"""
         user = await self.fetch_aggroot()
         
@@ -70,7 +73,8 @@ class UserAggregate(Aggregate):
             data={'reconciled_at': timestamp()}
         )
 
-    async def do__remove_totp(self, user_id):
+    @action("user-totp-removed", resources="user")
+    async def remove_totp(self, user_id):
         """Remove TOTP authentication from user"""
         user = await self.fetch_aggroot()
         

@@ -228,7 +228,9 @@ class FluviusMockProfileProvider(FluviusAuthProfileProvider):
         return self.TEMPLATE | data
 
 @Pipe
-def configure_authentication(app, config=config, base_path="/auth"):
+def configure_authentication(app, config=config, base_path="/auth", auth_profile_provider=None):
+    auth_profile_provider = auth_profile_provider or config.AUTH_PROFILE_PROVIDER
+
     def api(*paths, method=app.get):
         return method(uri(base_path, *paths), tags=["Authentication"])
 
@@ -250,7 +252,7 @@ def configure_authentication(app, config=config, base_path="/auth"):
             redirect_uri=config.DEFAULT_CALLBACK_URI,
         )
 
-        app.add_middleware(FluviusAuthMiddleware, auth_profile_provider=config.AUTH_PROFILE_PROVIDER)
+        app.add_middleware(FluviusAuthMiddleware, auth_profile_provider=auth_profile_provider)
         app.add_middleware(
             SessionMiddleware,
             secret_key=config.APPLICATION_SECRET_KEY,

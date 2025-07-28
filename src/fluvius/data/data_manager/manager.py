@@ -167,10 +167,13 @@ class DataAccessManagerBase(object):
         return self
 
     @asynccontextmanager
-    async def transaction(self, *args, **kwargs):
-        async with self.connector.transaction(*args, **kwargs) as transaction:
+    async def transaction(self, *args, _writeable=False):
+        async with self.connector.transaction(*args) as transaction:
             self._transaction = transaction
-            yield self._proxy
+            if _writeable:
+                yield self
+            else:
+                yield self._proxy
             self._transaction = None
 
     async def flush(self):

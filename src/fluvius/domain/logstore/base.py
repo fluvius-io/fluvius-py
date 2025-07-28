@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from types import SimpleNamespace
 
 from fluvius.domain import logger, config
@@ -23,6 +24,10 @@ class DomainLogStore(object):
 
     def reset(self):
         pass
+
+    @asynccontextmanager
+    async def transaction(self, context):
+        yield self
 
     async def commit(self):
         raise NotImplementedError("DomainLogStore.commit")

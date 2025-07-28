@@ -52,7 +52,7 @@ class DomainContext(DomainEntityRecord):
     source = field(type=(str, type(None)), initial=lambda: None)
     timestamp = field(type=datetime, initial=timestamp)
     headers = field(type=dict, initial=dict)
-    iam_roles = field(type=nullable(list), initial=None)
+    iam_roles = field(type=nullable(tuple), initial=None)
     organization_id = field(type=nullable(UUID_TYPE), factory=identifier_factory, initial=None)
     profile_id = field(type=nullable(UUID_TYPE), factory=identifier_factory, initial=None)
     user_id = field(type=nullable(UUID_TYPE), factory=identifier_factory, initial=None)

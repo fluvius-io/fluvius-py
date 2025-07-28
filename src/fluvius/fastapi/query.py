@@ -129,7 +129,7 @@ def register_resource_endpoints(app, query_manager, query_resource):
                 return query_resource(**(await item_query(request, identifier, scope=scope)).__dict__)
 
 
-def regsitery_manager_endpoints(app, query_manager):
+def register_manager_endpoints(app, query_manager):
 
     def endpoint(path, method=app.get, authorization=True, **kwargs):
         api_path = f"/{query_manager.Meta.prefix}{path}"
@@ -158,9 +158,11 @@ def regsitery_manager_endpoints(app, query_manager):
 def register_query_manager(app, qm_cls):
     query_manager = qm_cls(app)
 
-    regsitery_manager_endpoints(app, query_manager)
+    register_manager_endpoints(app, query_manager)
     for _, query_resource in query_manager.resource_registry.items():
         register_resource_endpoints(app, query_manager, query_resource)
+    
+    return app
 
 @Pipe
 def configure_query_manager(app, *query_managers):

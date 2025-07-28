@@ -94,22 +94,22 @@ class QueryManager(object):
 
         return fe_query
 
-    async def query_resource(self, query_identifier: str, fe_query: FrontendQuery, auth_ctx: Optional[AuthorizationContext]=None):
+    async def query_resource(self, auth_ctx: Optional[AuthorizationContext], query_identifier: str, fe_query: FrontendQuery):
         query_resource = self.lookup_query_resource(query_identifier)
 
         fe_query = self.validate_fe_query(query_resource, fe_query)
-        pl_scope = await self.authorize_by_policy(query_resource, fe_query, auth_ctx=auth_ctx)
-        be_query = self.construct_backend_query(query_resource, fe_query, auth_ctx=auth_ctx, policy_scope=pl_scope)
-        data, meta = await self.execute_query(query_resource, be_query, meta={}, auth_ctx=auth_ctx)
+        pl_scope = await self.authorize_by_policy(auth_ctx, query_resource, fe_query)
+        be_query = self.construct_backend_query(auth_ctx, query_resource, fe_query, policy_scope=pl_scope)
+        data, meta = await self.execute_query(query_resource, be_query, meta={})
 
         return self.process_result(data, meta)
 
-    async def query_item(self, query_identifier: str, item_identifier, fe_query: FrontendQuery, auth_ctx: Optional[AuthorizationContext]=None):
+    async def query_item(self, auth_ctx: Optional[AuthorizationContext], query_identifier: str, item_identifier, fe_query: FrontendQuery):
         query_resource = self.lookup_query_resource(query_identifier)
         fe_query = self.validate_fe_query(query_resource, fe_query)
-        pl_scope = await self.authorize_by_policy(query_resource, fe_query, item_identifier, auth_ctx=auth_ctx)
-        be_query = self.construct_backend_query(query_resource, fe_query, item_identifier, auth_ctx=auth_ctx, policy_scope=pl_scope)
-        data, meta = await self.execute_query(query_resource, be_query, auth_ctx=auth_ctx)
+        pl_scope = await self.authorize_by_policy(auth_ctx, query_resource, fe_query, item_identifier)
+        be_query = self.construct_backend_query(auth_ctx, query_resource, fe_query, item_identifier, policy_scope=pl_scope)
+        data, meta = await self.execute_query(query_resource, be_query)
 
         result, _ = self.process_result(data, meta)
 
@@ -123,7 +123,7 @@ class QueryManager(object):
         handler = MethodType(func, self)
         return handler(**kwargs)
 
-    async def authorize_by_policy(self, query_resource, fe_query, identifier=None, auth_ctx=None):
+    async def authorize_by_policy(self, auth_ctx: Optional[AuthorizationContext], query_resource, fe_query, identifier=None):
         qmeta = query_resource.Meta
         base_scope = query_resource.base_query(auth_ctx, fe_query.scope)
 
@@ -171,10 +171,10 @@ class QueryManager(object):
             raise InternalServerError('Q4031215', f"Interal Error: {e}")
 
     def construct_backend_query(self,
+        auth_ctx: Optional[AuthorizationContext],
         query_resource: QueryResource,
         fe_query: FrontendQuery, /,
         identifier=None,
-        auth_ctx: Optional[AuthorizationContext]=None,
         policy_scope=None
     ):
         """ Convert from the frontend query to the backend query """
@@ -201,11 +201,11 @@ class QueryManager(object):
 
     async def execute_query(
         self,
-        query_resource: str,
+        query_resource: QueryResource,
         backend_query: BackendQuery,
         /,
         meta: Optional[Dict] = None,
-        auth_ctx: Optional[AuthorizationContext]=None):
+    ):
         """ Execute the backend query with the state manager and return """
         raise NotImplementedError('QueryResource.execute_query')
 

@@ -1,39 +1,61 @@
-# import pytest
-# import tempfile
-# import sqlite3
-# from fluvius.data import UUID_GENF
-# from fluvius.data.storage.sqlalchemy import db
-# from riparius import WorkflowDAL, logger
+from riparius import Workflow, Stage, Step, Role, st_connect, wf_connect, transition, FINISH_STATE
+from fluvius.data import UUID_GENF
 
 
-# class test_cfg:
-#     TEST_URI = "docker-socket+ssh://mussel-07"
-#     DEPLOYMENT_NAME_01 = "test-deploy-0a"
-#     DEPLOYMENT_ID_01 = UUID_GENF(DEPLOYMENT_NAME_01)
-#     DEPLOYMENT_NAME_02 = "test-deploy-0b"
-#     DEPLOYMENT_ID_02 = UUID_GENF(DEPLOYMENT_NAME_02)
-#     DEPLOYMENT_NAME_03 = "test-deploy-0c"
-#     DEPLOYMENT_ID_03 = UUID_GENF(DEPLOYMENT_NAME_03)
+st01 = UUID_GENF('100')
+wf01 = UUID_GENF('101')
 
 
-# @pytest.fixture(scope='session')
-# async def wfdal():
-#     with tempfile.NamedTemporaryFile(suffix='.sqlite') as tf:
-#         filepath = tf.name
-#     uri = f"sqlite+aiosqlite:///{filepath}"
-#     with sqlite3.connect(filepath):
-#         pass
+class SampleProcess(Workflow):
+    ''' Sample workflow description ... '''
 
-#     logger.warning('Created SQLITE: %s', filepath)
+    class Meta:
+        title = "Sample Process"
+        revision = 1
 
-#     _wfdal = WorkflowDAL.set_storage_backend('sqlalchemy')
+    Stage01 = Stage('Stage 01', desc="Iam great")
+    Stage02 = Stage('Stage 02', desc="Iam bigger")
+    Role01 = Role(title="Role 01")
 
-#     await db.begin_worker_session(uri)
-#     async with db.begin() as conn:
-#         await conn.run_sync(db.Model.metadata.drop_all)
-#         await conn.run_sync(db.Model.metadata.create_all)
+    def on_start(wf_state):
+        step3 = wf_state.add_step('Step03', selector=st01)
+        step3.transit('MOON')
 
-#     yield _wfdal
+    class Step01(Step, name='Step 03', stage=Stage01):
+        """ This is a sample step. 2-X """
+        pass
 
-#     await db.end_worker_session()
-#
+    class Step02(Step, name="step-02a", stage=Stage01):
+        """ This is a sample step. 2-X """
+        pass
+
+    class Step02b(Step, stage=Stage01):
+        """ This is a sample step. 2-B """
+        __step_name__ = "Step2B"
+
+    class Step03(Step, name="Step 03", stage=Stage01):
+        __states__ = ('TAKE', 'ME', 'TO', 'THE', 'MOON')
+
+        @st_connect('test-event')
+        def test_event_step(state, event):
+            state.memorize(test_step_key="value")
+            s1 = state.add_step('Step02b', test_key_02="value")
+            s2 = state.add_step('Step02', test_key_02=str(s1._id))
+            state.transit('TAKE')
+            s1.transit(FINISH_STATE)
+            s2.transit(FINISH_STATE)
+            assert state._id == s1._data.origin_step and s2._data.origin_step == state._id
+            yield f"test_event_step ACTION! #2 {s1} & {s2} => {event}"
+            yield f"MEMORY: {state.recall()}"
+
+        @transition('TAKE')
+        def to_TAKE(state, cur_state):
+            yield f'TRANSITIONING TO TAKE: {state._id} => {cur_state}'
+
+    @wf_connect('test-event')
+    def test_event(workflow, trigger_data):
+        workflow.memorize(test_key="workflow value 2")
+        workflow.output(message='SUCCESS!')
+        workflow.output(file='contract/contract-final-v2.pdf')
+        yield f"test_event ACTION! #1: {trigger_data}"
+        yield f"MEMORY: {workflow.recall()}"

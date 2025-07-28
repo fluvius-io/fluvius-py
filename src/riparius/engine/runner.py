@@ -647,11 +647,12 @@ class WorkflowRunner(object):
             self._add_stage(stage)
 
     @classmethod
-    def create_workflow(cls, route_id, params=None):
+    def create_workflow(cls, route_id, params=None, title=None, id=None):
         wf_def = cls.__wf_def__
+
         wf_state = WorkflowData(
-            id=UUID_GENR(),
-            title=wf_def.Meta.title,
+            id=id or UUID_GENR(),
+            title=title or wf_def.Meta.title,
             revision=wf_def.Meta.revision,
             workflow_key=wf_def.Meta.key,
             status=WorkflowStatus.NEW,

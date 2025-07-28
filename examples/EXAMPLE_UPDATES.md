@@ -88,9 +88,9 @@ from fluvius.domain.aggregate import Aggregate
 
 #### **✅ `aggregate.py`**  
 - **Updated base class** from `ObjectAggregate` to `Aggregate`
-- **Modernized aggregate methods** to use state manager
+- **Modernized aggregate methods** to use state manager and @action decorators
 - **Added proper event creation** with structured data
-- **Added new method** `do__remove_totp`
+- **Added new method** `remove_totp` with @action decorator
 
 #### **✅ `datadef.py` (New)**
 - **Created modern data models** using `DataModel`

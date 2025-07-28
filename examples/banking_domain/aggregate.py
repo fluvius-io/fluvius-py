@@ -1,4 +1,4 @@
-from fluvius.domain.aggregate import Aggregate
+from fluvius.domain.aggregate import Aggregate, action
 from fluvius.data import timestamp
 from .datadef import AccountUpdateEventData, TransferMoneyEventData
 
@@ -6,7 +6,8 @@ from .datadef import AccountUpdateEventData, TransferMoneyEventData
 class TransactionAggregate(Aggregate):
     """Aggregate for handling banking transactions"""
 
-    async def do__withdraw_money(self, data):
+    @action("money-withdrawn", resources="account")
+    async def withdraw_money(self, data):
         """Process money withdrawal from account"""
         account = await self.fetch_aggroot()
         
@@ -26,7 +27,8 @@ class TransactionAggregate(Aggregate):
             data=event_data.model_dump()
         )
 
-    async def do__deposit_money(self, data):
+    @action("money-deposited", resources="account")
+    async def deposit_money(self, data):
         """Process money deposit to account"""
         account = await self.fetch_aggroot()
         new_balance = account.balance + data.amount
@@ -42,7 +44,8 @@ class TransactionAggregate(Aggregate):
             data=event_data.model_dump()
         )
 
-    async def do__transfer_money(self, data):
+    @action("money-transferred", resources="account")
+    async def transfer_money(self, data):
         """Process money transfer between accounts"""
         account = await self.fetch_aggroot()
         

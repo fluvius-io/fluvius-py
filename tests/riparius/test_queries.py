@@ -24,6 +24,8 @@ PROFILE = {
     "email": "davidlee@adaptive-bits.com",
 }
 
+NAMESPACE = "process"
+
 # Test App Setup
 @pytest.fixture(scope="module")
 def test_app():
@@ -66,12 +68,12 @@ class TestWorkflowQueries:
 
     def test_workflow_query_basic(self, client):
         """Test basic workflow query without parameters"""
-        response = client.get("/riparius-workflow.workflow/")
+        response = client.get(f"/{NAMESPACE}.workflow/")
         
         assert response.status_code == 200
         data = response.json()
         assert "data" in data
-        assert "meta" in data
+        assert "pagination" in data
         assert isinstance(data["data"], list)
 
     def test_workflow_query_with_parameters(self, client):
@@ -82,10 +84,10 @@ class TestWorkflowQueries:
             "query": json.dumps({"status": "active"})
         }
         
-        response = client.get("/riparius-workflow.workflow/", params=query_params)
+        response = client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
-        assert response.status_code == 200
         data = response.json()
+        assert response.status_code == 200, f"Invalid response: {data}"
         assert "data" in data
         assert "meta" in data
         assert len(data["data"]) <= 10  # Respects size limit
@@ -97,7 +99,7 @@ class TestWorkflowQueries:
             "size": 5
         }
         
-        response = client.get("/riparius-workflow.workflow/", params=search_params)
+        response = client.get(f"/{NAMESPACE}.workflow/", params=search_params)
         
         assert response.status_code == 200
         data = response.json()
@@ -118,7 +120,7 @@ class TestWorkflowQueries:
             "size": 20
         }
         
-        response = client.get("/riparius-workflow.workflow/", params=query_params)
+        response = client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
         assert response.status_code == 200
         data = response.json()
@@ -127,7 +129,7 @@ class TestWorkflowQueries:
 
     def test_workflow_embed_query(self, client):
         """Test workflow embed query (full workflow data)"""
-        response = client.get("/riparius-workflow.workflow-embed/")
+        response = client.get(f"/{NAMESPACE}.workflow-embed/")
         
         assert response.status_code == 200
         data = response.json()
@@ -138,7 +140,7 @@ class TestWorkflowQueries:
     def test_workflow_step_query(self, client, workflow_id):
         """Test workflow step query with scoping"""
         # Test with scoped workflow ID
-        response = client.get(f"/riparius-workflow.workflow-step/~workflow_id={workflow_id}/")
+        response = client.get(f"/{NAMESPACE}.workflow-step/~workflow_id={workflow_id}/")
         
         assert response.status_code == 200
         data = response.json()
@@ -154,7 +156,7 @@ class TestWorkflowQueries:
         }
         
         response = client.get(
-            f"/riparius-workflow.workflow-step/~workflow_id={workflow_id}/", 
+            f"/{NAMESPACE}.workflow-step/~workflow_id={workflow_id}/",
             params=query_params
         )
         
@@ -165,7 +167,7 @@ class TestWorkflowQueries:
 
     def test_workflow_participant_query(self, client, workflow_id):
         """Test workflow participant query"""
-        response = client.get(f"/riparius-workflow.workflow-participant/~workflow_id={workflow_id}/")
+        response = client.get(f"/{NAMESPACE}.workflow-participant/~workflow_id={workflow_id}/")
         
         assert response.status_code == 200
         data = response.json()
@@ -181,7 +183,7 @@ class TestWorkflowQueries:
         }
         
         response = client.get(
-            f"/riparius-workflow.workflow-participant/~workflow_id={workflow_id}/", 
+            f"/{NAMESPACE}.workflow-participant/~workflow_id={workflow_id}/",
             params=query_params
         )
         
@@ -192,7 +194,7 @@ class TestWorkflowQueries:
 
     def test_workflow_stage_query(self, client, workflow_id):
         """Test workflow stage query"""
-        response = client.get(f"/riparius-workflow.workflow-stage/~workflow_id={workflow_id}/")
+        response = client.get(f"/{NAMESPACE}.workflow-stage/~workflow_id={workflow_id}/")
         
         assert response.status_code == 200
         data = response.json()
@@ -208,7 +210,7 @@ class TestWorkflowQueries:
         }
         
         response = client.get(
-            f"/riparius-workflow.workflow-stage/~workflow_id={workflow_id}/", 
+            f"/{NAMESPACE}.workflow-stage/~workflow_id={workflow_id}/",
             params=query_params
         )
         
@@ -228,7 +230,7 @@ class TestQueryPagination:
             "page": 1
         }
         
-        response = client.get("/riparius-workflow.workflow/", params=query_params)
+        response = client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
         assert response.status_code == 200
         data = response.json()
@@ -243,7 +245,7 @@ class TestQueryPagination:
             "page": 2
         }
         
-        response = client.get("/riparius-workflow.workflow/", params=query_params)
+        response = client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
         assert response.status_code == 200
         data = response.json()
@@ -257,7 +259,7 @@ class TestQueryPagination:
             "page": 1
         }
         
-        response = client.get("/riparius-workflow.workflow/", params=query_params)
+        response = client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
         assert response.status_code == 200
         data = response.json()
@@ -274,7 +276,7 @@ class TestQuerySorting:
             "size": 10
         }
         
-        response = client.get("/riparius-workflow.workflow/", params=query_params)
+        response = client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
         assert response.status_code == 200
         data = response.json()
@@ -287,7 +289,7 @@ class TestQuerySorting:
             "size": 10
         }
         
-        response = client.get("/riparius-workflow.workflow/", params=query_params)
+        response = client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
         assert response.status_code == 200
         data = response.json()
@@ -300,7 +302,7 @@ class TestQuerySorting:
             "size": 10
         }
         
-        response = client.get("/riparius-workflow.workflow/", params=query_params)
+        response = client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
         assert response.status_code == 200
         data = response.json()
@@ -316,7 +318,7 @@ class TestQueryValidation:
             "query": "invalid json"
         }
         
-        response = client.get("/riparius-workflow.workflow/", params=query_params)
+        response = client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
         # Should either return 400 or handle gracefully
         assert response.status_code in [400, 422, 200]
@@ -328,7 +330,7 @@ class TestQueryValidation:
             "size": 10
         }
         
-        response = client.get("/riparius-workflow.workflow/", params=query_params)
+        response = client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
         # Should handle gracefully or return error
         assert response.status_code in [400, 422, 200]
@@ -340,7 +342,7 @@ class TestQueryValidation:
             "page": 1
         }
         
-        response = client.get("/riparius-workflow.workflow/", params=query_params)
+        response = client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
         # Should handle gracefully or return error
         assert response.status_code in [400, 422, 200]
@@ -348,7 +350,7 @@ class TestQueryValidation:
     def test_missing_required_scope(self, client):
         """Test scoped query without required scope parameter"""
         # Workflow step query requires workflow_id scope
-        response = client.get("/riparius-workflow.workflow-step/")
+        response = client.get(f"/{NAMESPACE}.workflow-step/")
         
         # Should return error for missing scope
         assert response.status_code in [400, 422]
@@ -364,7 +366,7 @@ class TestQueryFieldFiltering:
             "size": 10
         }
         
-        response = client.get("/riparius-workflow.workflow/", params=query_params)
+        response = client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
         assert response.status_code == 200
         data = response.json()
@@ -377,7 +379,7 @@ class TestQueryFieldFiltering:
             "size": 10
         }
         
-        response = client.get("/riparius-workflow.workflow/", params=query_params)
+        response = client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
         assert response.status_code == 200
         data = response.json()
@@ -407,7 +409,7 @@ class TestQueryFieldFiltering:
         }
         
         response = client.get(
-            f"/riparius-workflow.workflow-step/~workflow_id={workflow_id}/", 
+            f"/{NAMESPACE}.workflow-step/~workflow_id={workflow_id}/",
             params=query_params
         )
         
@@ -421,7 +423,7 @@ class TestQueryMetadata:
 
     def test_query_manager_metadata(self, client):
         """Test query manager metadata endpoint"""
-        response = client.get("/_meta/query/riparius-workflow/")
+        response = client.get(f"/_meta/{NAMESPACE}/")
         
         # This endpoint may or may not exist depending on implementation
         # Just test that it doesn't crash
@@ -430,7 +432,7 @@ class TestQueryMetadata:
     def test_query_resource_schema(self, client):
         """Test individual query resource schemas"""
         # Test if schema information is available
-        response = client.get("/_meta/riparius-workflow/")
+        response = client.get(f"/_meta/{NAMESPACE}/")
         
         assert response.status_code == 200
         # Basic metadata should be available

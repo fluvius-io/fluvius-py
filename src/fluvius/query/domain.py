@@ -48,11 +48,11 @@ class DomainQueryManager(QueryManager):
 
     async def execute_query(
         self,
-        query_resource: str,
+        query_resource: QueryResource,
         backend_query: BackendQuery,
         /,
         meta: Optional[Dict] = None,
-        auth_ctx: Optional[AuthorizationContext]=None):
+    ):
         """ Execute the backend query with the state manager and return """
         resource = query_resource.backend_model()
 

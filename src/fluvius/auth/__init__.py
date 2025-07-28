@@ -28,6 +28,11 @@ class KeycloakTokenPayload(DataModel):
     realm_access: dict
     resource_access: dict
 
+    @property
+    def id(self):
+        return self.sub
+
+
 
 class SessionProfile(DataModel):
     id: UUID

@@ -18,3 +18,7 @@ class WorkflowDomain(Domain):
 
     def __init__(self, app=None, **kwargs):
         super(WorkflowDomain, self).__init__(app, **kwargs) 
+
+
+class WorkflowResponse(WorkflowDomain.Response):
+    pass

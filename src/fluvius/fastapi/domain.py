@@ -21,18 +21,26 @@ from .helper import uri, SCOPE_SELECTOR
 
 class FastAPIDomainManager(DomainManager):
     def __init__(self, app):
-        self.initialize_domains(app)
-        def setup_domain(domain):
+        super().__init__()
+        self._app = app
+    
+    @property
+    def app(self):
+        return self._app
+
+    def setup_domain_endpoints(self):
+        self.initialize_domains(self.app)
+        def _setup_domain(domain):
             metadata_uri = f"/_meta/{domain.__namespace__}/"
             cmd_details = {
-                cmd['id']: cmd for cmd in
+                cmd['key']: cmd for cmd in
                 (
-                    register_command_handler(app, *params)
-                    for params in self.enumerate_domain_commands(domain)
+                    register_command_handler(self.app, *params)
+                    for params in self._enumerate_command_handlers(domain)
                 ) if cmd is not None
             }
 
-            @app.get(metadata_uri, summary=f"Domain Metadata [{domain.Meta.name}]", tags=['Metadata'])
+            @self.app.get(metadata_uri, summary=f"Domain Metadata [{domain.Meta.name}]", tags=['Metadata'])
             async def domain_metadata(request: Request):
                 return domain.metadata(commands = cmd_details)
 
@@ -47,15 +55,21 @@ class FastAPIDomainManager(DomainManager):
             }
 
 
-        tags = [setup_domain(domain) for domain in self._domains]
-        app.openapi_tags = app.openapi_tags or []
-        app.openapi_tags.extend(tags)
+        tags = [_setup_domain(domain) for domain in self._domains]
+        self.app.openapi_tags = self.app.openapi_tags or []
+        self.app.openapi_tags.extend(tags)
 
 
     @classmethod
     def setup_app(cls, app, *domains, **kwargs):
-        cls.register_domain(*domains, **kwargs)
-        return cls(app)
+        if hasattr(app.state, 'domain_manager'):
+            raise RuntimeError("Domain manager already initialized")
+        
+        manager = cls(app)
+        manager.register_domain(*domains, **kwargs)
+        manager.setup_domain_endpoints()
+        app.state.domain_manager = manager
+        return app
 
 
 def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
@@ -170,7 +184,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
 
 
     cmd_metadata ={
-        "id": cmd_cls.Meta.key,
+        "key": cmd_cls.Meta.key,
         "name": cmd_cls.Meta.name,
         "description": cmd_cls.Meta.desc,
         "schema": cmd_cls.Data.model_json_schema(),

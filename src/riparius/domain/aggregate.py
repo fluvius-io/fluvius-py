@@ -1,4 +1,4 @@
-from fluvius.domain.aggregate import Aggregate
+from fluvius.domain.aggregate import Aggregate, action
 from fluvius.data import UUID_GENR, timestamp
 from ..status import WorkflowStatus, StepStatus
 from ..engine.manager import WorkflowManager
@@ -7,26 +7,23 @@ from ..engine.manager import WorkflowManager
 class WorkflowAggregate(Aggregate):
     """Aggregate for workflow domain operations"""
 
-    manager = WorkflowManager()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Let WorkflowManager create its own WorkflowDataManager instance
+        # to avoid async loop conflicts with domain state manager
+        self.wfmgr = WorkflowManager(self.statemgr)
 
-    async def do__create_workflow(self, data):
+    @action("workflow-created", resources="workflow")
+    async def create_workflow(self, data):
         """Create a new workflow"""
-        workflow_id = UUID_GENR()
-        
-        # Create workflow using state manager
-        workflow_data = {
-            'id': workflow_id,
-            'title': data.title,
-            'status': WorkflowStatus.NEW,
-            'route_id': data.route_id,
-            'revision': data.revision or 1,
-            'params': data.params or {}
-        }
-        
-        workflow = await self.create_workflow(workflow_data, _id=workflow_id)
-        return workflow
+        workflow = self.wfmgr.create_workflow(
+            data.workflow_key, data.route_id, data.params, title=data.title
+        )
+        await self.wfmgr.commit_workflow(workflow)
+        return workflow._workflow.model_dump(exclude_none=True)
 
-    async def do__update_workflow(self, data):
+    @action("workflow-updated", resources="workflow")
+    async def update_workflow(self, data):
         """Update workflow properties"""
         workflow = await self.fetch_aggroot()
         
@@ -40,7 +37,8 @@ class WorkflowAggregate(Aggregate):
         updated_workflow = await self.statemgr.update(workflow, **changes)
         return updated_workflow
 
-    async def do__add_participant(self, data):
+    @action("participant-added", resources="workflow")
+    async def add_participant(self, data):
         """Add a participant to the workflow"""
         workflow = await self.fetch_aggroot()
         
@@ -57,7 +55,8 @@ class WorkflowAggregate(Aggregate):
         participant = await self.statemgr.create('workflow-participant', participant_data)
         return participant
 
-    async def do__remove_participant(self, data):
+    @action("participant-removed", resources="workflow")
+    async def remove_participant(self, data):
         """Remove a participant from the workflow"""
         workflow = await self.fetch_aggroot()
         
@@ -74,7 +73,8 @@ class WorkflowAggregate(Aggregate):
         
         return {"status": "participant_removed", "user_id": data.user_id}
 
-    async def do__process_activity(self, data):
+    @action("activity-processed", resources="workflow")
+    async def process_activity(self, data):
         """Process workflow activity"""
         workflow = await self.fetch_aggroot()
         
@@ -84,21 +84,24 @@ class WorkflowAggregate(Aggregate):
         # Implementation for processing workflow activity
         return {"status": "activity_processed", "activity_type": data.activity_type}
 
-    async def do__add_role(self, data):
+    @action("role-added", resources="workflow")
+    async def add_role(self, data):
         """Add a role to workflow"""
         workflow = await self.fetch_aggroot()
         
         # Implementation for adding role
         return {"status": "role_added", "role_name": data.role_name}
 
-    async def do__remove_role(self, data):
+    @action("role-removed", resources="workflow")
+    async def remove_role(self, data):
         """Remove a role from workflow"""
         workflow = await self.fetch_aggroot()
         
         # Implementation for removing role
         return {"status": "role_removed", "role_name": data.role_name}
 
-    async def do__start_workflow(self, data):
+    @action("workflow-started", resources="workflow")
+    async def start_workflow(self, data):
         """Start a workflow"""
         workflow = await self.fetch_aggroot()
         
@@ -108,7 +111,8 @@ class WorkflowAggregate(Aggregate):
         # Implementation for starting workflow
         return {"status": "started"}
 
-    async def do__cancel_workflow(self, data):
+    @action("workflow-cancelled", resources="workflow")
+    async def cancel_workflow(self, data):
         """Cancel a workflow"""
         workflow = await self.fetch_aggroot()
         
@@ -118,21 +122,24 @@ class WorkflowAggregate(Aggregate):
         # Implementation for canceling workflow
         return {"status": "cancelled", "reason": data.reason}
 
-    async def do__ignore_step(self, data):
+    @action("step-ignored", resources="workflow")
+    async def ignore_step(self, data):
         """Ignore a workflow step"""
         workflow = await self.fetch_aggroot()
         
         # Implementation for ignoring step
         return {"status": "step_ignored", "step_id": data.step_id}
 
-    async def do__cancel_step(self, data):
+    @action("step-cancelled", resources="workflow")
+    async def cancel_step(self, data):
         """Cancel a workflow step"""
         workflow = await self.fetch_aggroot()
         
         # Implementation for canceling step
         return {"status": "step_cancelled", "step_id": data.step_id}
 
-    async def do__abort_workflow(self, data):
+    @action("workflow-aborted", resources="workflow")
+    async def abort_workflow(self, data):
         """Abort a workflow"""
         workflow = await self.fetch_aggroot()
         
@@ -142,7 +149,8 @@ class WorkflowAggregate(Aggregate):
         # Implementation for aborting workflow
         return {"status": "aborted", "reason": data.reason}
 
-    async def do__inject_event(self, data):
+    @action("event-injected", resources="workflow")
+    async def inject_event(self, data):
         """Inject an event into the workflow"""
         workflow = await self.fetch_aggroot()
         
@@ -161,7 +169,8 @@ class WorkflowAggregate(Aggregate):
         
         return event_result
 
-    async def do__send_trigger(self, data):
+    @action("trigger-sent", resources="workflow")
+    async def send_trigger(self, data):
         """Send a trigger to the workflow"""
         workflow = await self.fetch_aggroot()
         

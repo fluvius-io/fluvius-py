@@ -14,12 +14,13 @@ from fluvius.data import UUID_GENF
 class WorkflowManager(object):
     __router__ = ActivityRouter
     __runner__ = WorkflowRunner
-    __datamgr__ = WorkflowDataManager
     __registry__ = {}
 
-    def __init__(self):
+    def __init__(self, datamgr=None):
         self._running = {}
-        self._datamgr = self.__datamgr__(self)
+        self._datamgr = datamgr or WorkflowDataManager(self)
+
+        assert isinstance(self._datamgr, WorkflowDataManager), "Workflow manager requires WorkflowDataManager"
 
     def __init_subclass__(cls, router, engine):
         assert issubclass(router, ActivityRouter), f"Invalid event router {router}"
@@ -41,6 +42,12 @@ class WorkflowManager(object):
 
     def route_event(self, event_name, event_data):
         return self.__router__.route_event(event_name, event_data)
+    
+    def create_workflow(self, workflow_key, route_id, params, title=None, id=None):
+        wf_engine = self.__registry__[workflow_key]
+        wf = wf_engine.create_workflow(route_id, params, title=title, id=id)
+        self._running[workflow_key, route_id] = wf
+        return wf
 
     def load_workflow(self, workflow_key, route_id):
         if (workflow_key, route_id) not in self._running:
@@ -104,7 +111,7 @@ class WorkflowManager(object):
                 raise        
         return mutations
     
-    async def persist(self, wf: WorkflowRunner):
+    async def persist(self, tx, wf: WorkflowRunner):
         """
         Persist a list of MutationEnvelop objects to the database.
         
@@ -116,10 +123,9 @@ class WorkflowManager(object):
         """
         mutations, messages, activities = wf.commit()
 
-        async with self._datamgr.transaction() as tx:
-            mutations = await self.persist_mutations(self._datamgr, mutations)
-            messages = await self.persist_messages(self._datamgr, messages)
-            activities = await self.persist_activities(self._datamgr, activities)
+        mutations = await self.persist_mutations(tx, mutations)
+        messages = await self.persist_messages(tx, messages)
+        activities = await self.persist_activities(tx, activities)
 
         logger.info(f"Persisted {len(mutations)} mutations, {len(messages)} messages, {len(activities)} events")
         return mutations, messages, activities
@@ -248,4 +254,17 @@ class WorkflowManager(object):
 
         cls.__registry__[workflow_key] = type(f'WFE_{wf_cls.__name__}', (cls.__runner__, ), {}, wf_def=wf_cls)
         logger.info('Registered workflow: %s', workflow_key)
+    
+
+    async def commit_all_running(self):
+        async with self._datamgr.transaction(_writeable=True) as tx:
+            for wf in self._running.values():
+                await self.persist(tx, wf)
+    
+
+    async def commit_workflow(self, wf: WorkflowRunner):
+        async with self._datamgr.transaction(_writeable=True) as tx:
+            await self.persist(tx, wf)
+
+        return wf
 
