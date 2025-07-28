@@ -5,7 +5,7 @@ import json
 from authlib.integrations.starlette_client import OAuth
 from authlib.jose import jwt, JsonWebKey
 from authlib.jose.util import extract_header
-from fastapi import Request, Depends, HTTPException
+from fastapi import Request, Depends, HTTPException, Response
 from fastapi.responses import RedirectResponse
 from functools import wraps
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -13,14 +13,14 @@ from starlette.middleware.sessions import SessionMiddleware
 from types import SimpleNamespace
 
 
-from fluvius.error import BadRequestError
+from fluvius.error import UnauthorizedError
 from fluvius.data import DataModel
-from fluvius.auth import AuthorizationContext
+from fluvius.auth import AuthorizationContext, KeycloakTokenPayload, SessionProfile, SessionOrganization
 
 from pydantic import AnyUrl, EmailStr
 from uuid import UUID
 from pipe import Pipe
-from typing import Literal, Optional
+from typing import Literal, Optional, Awaitable, Callable
 from urllib.parse import urlparse
 
 from .setup import on_startup
@@ -90,53 +90,13 @@ def validate_direct_url(url: str, default: str) -> str:
 
     return default
 
-class KeycloakTokenPayload(DataModel):
-    exp: int
-    iat: int
-    auth_time: int
-    jti: UUID
-    iss: AnyUrl
-    aud: str
-    sub: UUID
-    typ: Literal["ID"]
-    azp: str
-    nonce: str
-    session_state: UUID
-    at_hash: str
-    acr: Optional[str] = None
-    sid: UUID
-    email_verified: bool
-    name: str
-    preferred_username: str
-    given_name: str
-    family_name: str
-    email: EmailStr
-    realm_access: dict
-    resource_access: dict
-
-
 class FluviusAuthMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, auth_profile_provider):
         super().__init__(app)
         provider_cls = FluviusAuthProfileProvider.get(auth_profile_provider)
-        self._auth_provider = provider_cls(app)
+        self.get_auth_context = provider_cls(app).get_auth_context
 
-    async def get_auth_context(self, request):
-        # You can optionally decode and validate the token here
-        if not (id_token := request.cookies.get("id_token")):
-            return None
-
-        try:
-            user_claims = request.session.get("user")
-            if not user_claims:
-                return None
-        except (KeyError, ValueError):
-            return None
-
-        return await self._auth_provider.get_auth_context(user_claims)
-
-
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         try:
             request.state.auth_context = await self.get_auth_context(request)
         except Exception as e:
@@ -150,19 +110,17 @@ class FluviusAuthMiddleware(BaseHTTPMiddleware):
 
         return response
 
-
-
-_REGISTRY = {}
-
 class FluviusAuthProfileProvider(object):
+    _REGISTRY = {}
+
     def __init_subclass__(cls):
         super().__init_subclass__()
 
         key = cls.__name__
-        if key in _REGISTRY:
-            raise ValueError(f'Auth Profile Provider is already registered: {key} => {_REGISTRY[key]}')
+        if key in FluviusAuthProfileProvider._REGISTRY:
+            raise ValueError(f'Auth Profile Provider is already registered: {key} => {FluviusAuthProfileProvider._REGISTRY[key]}')
 
-        _REGISTRY[key] = cls
+        FluviusAuthProfileProvider._REGISTRY[key] = cls
         DEVELOPER_MODE and logger.info('Registered Auth Profile Provider: %s', cls.__name__)
 
     @classmethod
@@ -171,7 +129,7 @@ class FluviusAuthProfileProvider(object):
             return FluviusAuthProfileProvider
 
         try:
-            return _REGISTRY[key]
+            return FluviusAuthProfileProvider._REGISTRY[key]
         except KeyError:
             raise ValueError(f'Auth Profile Provider is not valid: {key}. Available: {list(_REGISTRY.keys())}')
 
@@ -181,20 +139,40 @@ class FluviusAuthProfileProvider(object):
 
     def authorize_claims(self, claims_token: dict) -> KeycloakTokenPayload:
         return KeycloakTokenPayload(**claims_token)
+    
+    def get_auth_token(self, request: Request) -> Optional[str]:
+        # You can optionally decode and validate the token here
+        if not (id_token := request.cookies.get("id_token")):
+            return None
 
-    async def get_auth_context(self, claims_token):
-        auth_user = self.authorize_claims(claims_token)
+        return request.session.get("user")
+
+    async def get_auth_context(self, request: Request) -> Optional[AuthorizationContext]:
+        try:
+            auth_token = self.get_auth_token(request)
+            if not auth_token:
+                return None
+            auth_user = self.authorize_claims(auth_token)
+        except (KeyError, ValueError):
+            raise UnauthorizedError("Q4031216", "Authorization Failed: Missing or invalid  claims token")
+
         return await self.setup_context(auth_user)
 
     async def setup_context(self, auth_user: KeycloakTokenPayload) -> AuthorizationContext:
-        profile = SimpleNamespace(
-            _id=auth_user.jti,
+        profile = SessionProfile(
+            id=auth_user.jti,
             name=auth_user.name,
-            roles=('user', 'staff', 'provider')
+            family_name=auth_user.family_name,
+            given_name=auth_user.given_name,
+            email=auth_user.email,
+            username=auth_user.preferred_username,
+            roles=('user', 'staff', 'provider'),
+            org_id=auth_user.sub,
+            usr_id=auth_user.sid
         )
 
-        organization = SimpleNamespace(
-            _id=auth_user.sub,
+        organization = SessionOrganization(
+            id=auth_user.sub,
             name=auth_user.family_name
         )
         iamroles = ('sysadmin', 'operator')
@@ -207,6 +185,47 @@ class FluviusAuthProfileProvider(object):
             organization = organization,
             iamroles = iamroles
         )
+
+
+class FluviusMockProfileProvider(FluviusAuthProfileProvider):
+    TEMPLATE = {
+        "exp": 1753419182,
+        "iat": 1753418882,
+        "auth_time": 1753418870,
+        "jti": "1badb45d-34cd-42ba-8585-8ff5a5b707d3",
+        "iss": "https://id.adaptive-bits.com/auth/realms/dev-1.fluvius.io",
+        "aud": "sample_app",
+        "sub": "44d2f8cb-0d46-4323-95b9-c5b4bdbf6205",
+        "typ": "ID",
+        "azp": "sample_app",
+        "nonce": "Ggeg9O9qcHthA1idx8nE",
+        "session_state": "8889f832-1d59-4886-8f08-1d613c793d38",
+        "at_hash": "51a1KP4pfSKNiBA6K0Du1g",
+        "acr": "0",
+        "sid": "8889f832-1d59-4886-8f08-1d613c793d38",
+        "email_verified": True,
+        "name": "John Doe",
+        "preferred_username": "johndoe",
+        "given_name": "John",
+        "family_name": "Doe",
+        "email": "johndoe@adaptive-bits.com",
+        "realm_access": {
+            "roles": [
+            "default-roles-dev-1.fluvius.io",
+            "offline_access",
+            "uma_authorization"
+            ]
+        },
+        "resource_access": {
+            "account": {
+            "roles": ["manage-account", "manage-account-links", "view-profile"]
+            }
+        }
+    }
+
+    def get_auth_token(self, request: Request) -> Optional[str]:
+        data = json.loads(request.headers.get("Authorization").split("MockAuth ")[1])
+        return self.TEMPLATE | data
 
 @Pipe
 def configure_authentication(app, config=config, base_path="/auth"):
@@ -330,7 +349,7 @@ def configure_authentication(app, config=config, base_path="/auth"):
         return {
             "message": f"OK",
             "context": request.state.auth_context,
-            "headers": dict(request.headers)
+            "headers": dict(request.headers) | {"cookie": "<redacted>"}
         }
 
     @api("info")

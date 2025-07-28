@@ -44,7 +44,7 @@ def register_resource_endpoints(app, query_manager, query_resource):
         if meta.scope_required and not fe_query.scope:
             raise ForbiddenError('Q01-49939', f"Scoping is required for resource: {query_resource}")
 
-        data, page = await query_manager.query_resource(query_id, fe_query, auth_ctx=auth_ctx)
+        data, page = await query_manager.query_resource(auth_ctx, query_id, fe_query)
         return {
             'data': data,
             'pagination': page
@@ -60,7 +60,7 @@ def register_resource_endpoints(app, query_manager, query_resource):
         if meta.scope_required and not fe_query.scope:
             raise ForbiddenError('Q01-49939', f"Scoping is required for resource: {query_resource}")
 
-        return await query_manager.query_item(query_id, item_identifier, fe_query, auth_ctx=auth_ctx)
+        return await query_manager.query_item(auth_ctx, query_id, item_identifier, fe_query)
 
     def endpoint(*paths, method=app.get, base=base_uri, auth={}, **kwargs):
         api_path = uri(base, *paths)
