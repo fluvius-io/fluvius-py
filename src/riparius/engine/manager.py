@@ -2,7 +2,7 @@ from fluvius.helper import timestamp
 from .. import logger, config
 from ..model import WorkflowDataManager
 
-from .datadef import WorkflowData, WorkflowStatus, WorkflowMessage, WorkflowEvent
+from .datadef import WorkflowData, WorkflowStatus, WorkflowMessage, WorkflowActivity
 from .router import ActivityRouter
 from .runner import WorkflowRunner
 from .mutation import (
@@ -29,8 +29,8 @@ class WorkflowManager(object):
         cls.__runner__ = engine
         cls.__registry__ = {}
 
-    def process_activity(self, activity_name, activity_data):
-        for trigger in self.route_activity(activity_name, activity_data):
+    def process_event(self, event_name, event_data):
+        for trigger in self.route_event(event_name, event_data):
             wf = self.load_workflow(trigger.workflow_key, trigger.route_id)
             with wf.transaction():
                 if wf.status == WorkflowStatus.NEW:
@@ -39,8 +39,8 @@ class WorkflowManager(object):
 
             yield wf
 
-    def route_activity(self, activity_name, activity_data):
-        return self.__router__.route_activity(activity_name, activity_data)
+    def route_event(self, event_name, event_data):
+        return self.__router__.route_event(event_name, event_data)
 
     def load_workflow(self, workflow_key, route_id):
         if (workflow_key, route_id) not in self._running:
@@ -53,26 +53,26 @@ class WorkflowManager(object):
     async def _log_mutation(self, tx, wf_mut: MutationEnvelop):
         await tx.insert_many('workflow-mutation', wf_mut.model_dump())
 
-    async def _log_event(self, tx, wf_evt: WorkflowEvent):
+    async def _log_activity(self, tx, wf_act: WorkflowActivity):
         """Add a workflow event record."""
-        await tx.insert_many('workflow-event', wf_evt.model_dump())
+        await tx.insert_many('workflow-activity', wf_act.model_dump())
     
     async def _log_message(self, tx, wf_msg: WorkflowMessage):
         """Add a workflow message record."""
         await tx.insert_many('workflow-message', wf_msg.model_dump())
     
-    async def persist_events(self, tx, events: list[WorkflowEvent]):
-        events = tuple(events)
+    async def persist_activities(self, tx, activities: list[WorkflowActivity]):
+        activities = tuple(activities)
         """
-        Persist a list of WorkflowEvent objects to the database.
+        Persist a list of WorkflowActivity objects to the database.
         
         Args:
-            events: List of WorkflowEvent objects to persist
+            activities: List of WorkflowActivity objects to persist
         """
-        for evt in events:
-            await self._log_event(tx, evt)
+        for act in activities:
+            await self._log_activity(tx, act)
 
-        return events
+        return activities
     
     async def persist_messages(self, tx, messages: list[WorkflowMessage]):
         """
@@ -114,15 +114,15 @@ class WorkflowManager(object):
         Returns:
             dict: Summary of persisted mutations by type
         """
-        mutations, messages, events = wf.commit()
+        mutations, messages, activities = wf.commit()
 
         async with self._datamgr.transaction() as tx:
             mutations = await self.persist_mutations(self._datamgr, mutations)
             messages = await self.persist_messages(self._datamgr, messages)
-            events = await self.persist_events(self._datamgr, events)
+            activities = await self.persist_activities(self._datamgr, activities)
 
-        logger.info(f"Persisted {len(mutations)} mutations, {len(messages)} messages, {len(events)} events")
-        return mutations, messages, events
+        logger.info(f"Persisted {len(mutations)} mutations, {len(messages)} messages, {len(activities)} events")
+        return mutations, messages, activities
 
     def _get_mutation_handlers(self):
         """Build dispatch table using mutation registry keys."""

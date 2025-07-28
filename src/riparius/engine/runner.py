@@ -10,7 +10,7 @@ from fluvius.data import UUID_GENF, UUID_GENR, UUID_TYPE
 from fluvius.helper import timestamp, consume_queue
 
 from .exceptions import WorkflowExecutionError, WorkflowConfigurationError, StepTransitionError
-from .datadef import WorkflowStep, WorkflowStatus, StepStatus, WorkflowData, WorkflowMessage, WorkflowStage, WorkflowEvent
+from .datadef import WorkflowStep, WorkflowStatus, StepStatus, WorkflowData, WorkflowMessage, WorkflowStage, WorkflowActivity
 from .workflow import Workflow, Stage, Step, Role, BEGIN_STATE, FINISH_STATE, BEGIN_LABEL, FINISH_LABEL
 from .router import ActivityRouter
 
@@ -81,47 +81,47 @@ def validate_transaction(wf, action_name, allowed, unallowed):
         raise WorkflowExecutionError('P01004', f'Unable to perform action [{action_name}] at workflow status [{wf.status}]')
 
 
-def workflow_action(event_name, allow_statuses = None, unallow_statuses = None, hook_name = None, external=False):
+def workflow_action(activity_name, allow_statuses = None, unallow_statuses = None, hook_name = None, external=False):
     allow_statuses = validate_statuses(allow_statuses)
     unallow_statuses = validate_statuses(unallow_statuses)
-    hook_name = hook_name or event_name
+    hook_name = hook_name or activity_name
 
     def decorator(action_func):
-        action_func.__action__ = (WORKFLOW_ACTION, event_name, external)
+        action_func.__action__ = (WORKFLOW_ACTION, activity_name, external)
 
         @wraps(action_func)
         def wrapper(self, *args, **kwargs):
-            validate_transaction(self, event_name, allow_statuses, unallow_statuses)
-            self._action_context.append(ActionContext(event_name, args, kwargs, step_id=None))
+            validate_transaction(self, activity_name, allow_statuses, unallow_statuses)
+            self._action_context.append(ActionContext(activity_name, args, kwargs, step_id=None))
             action_result = action_func(self, *args, **kwargs)
             self.run_hook(hook_name, self._state_proxy)
 
-            if event_name == 'start' and len(self.step_id_map) == 0:
+            if activity_name == 'start' and len(self.step_id_map) == 0:
                 raise WorkflowConfigurationError('P01005', f'Workflow {self.key} has no steps after started.')
             
-            self.log_event(event_name, *args, **kwargs)
+            self.log_activity(activity_name, *args, **kwargs)
             self._action_context.pop()
             return action_result
         return wrapper
     return decorator
 
 
-def step_action(event_name, allow_statuses = None, unallow_statuses = None, hook_name = None):
+def step_action(activity_name, allow_statuses = None, unallow_statuses = None, hook_name = None):
     allow_statuses = validate_statuses(allow_statuses)
     unallow_statuses = validate_statuses(unallow_statuses)
-    hook_name = hook_name or event_name
+    hook_name = hook_name or activity_name
 
     def decorator(action_func):
-        action_func.__action__ = (STEP_ACTION, event_name, False)
+        action_func.__action__ = (STEP_ACTION, activity_name, False)
         @wraps(action_func)
         def wrapper(self, step_id, *args, **kwargs):
             validate_transaction(self, action_func.__name__, allow_statuses, unallow_statuses)
 
-            self._action_context.append(ActionContext(event_name, args, kwargs, step_id=step_id))
+            self._action_context.append(ActionContext(activity_name, args, kwargs, step_id=step_id))
             action_result = action_func(self, step_id, *args, **kwargs)
             self.run_hook(hook_name, step_id)
             self.reconcile()
-            self.log_event(event_name, kwargs | {'_args': args})
+            self.log_activity(activity_name, kwargs | {'_args': args})
             self._action_context.pop()
             return action_result
         return wrapper
@@ -146,7 +146,7 @@ class WorkflowRunner(object):
         self._state_proxy = WorkflowStateProxy(self)
         self._mut_queue = queue.Queue()
         self._msg_queue = queue.Queue()
-        self._evt_queue = queue.Queue()
+        self._act_queue = queue.Queue()
         self._transaction_id = None
         self._action_context = collections.deque()
         self._counter = 0
@@ -243,13 +243,14 @@ class WorkflowRunner(object):
                 order=stage.order,
                 desc=stage.desc
             )
-    def log_event(self, event_name, *args, **kwargs):        
-        self._evt_queue.put(WorkflowEvent(
+
+    def log_activity(self, activity_name, *args, **kwargs):        
+        self._act_queue.put(WorkflowActivity(
             workflow_id=self.id,
             transaction_id=self._transaction_id,
-            event_name=event_name,
-            event_args=args if args else None,
-            event_data=kwargs if kwargs else None,
+            activity_name=activity_name,
+            activity_args=args if args else None,
+            activity_data=kwargs if kwargs else None,
             step_id=self._action_context[-1].step_id,
             # event order is the last mutation counter
             order=self._counter
@@ -324,7 +325,7 @@ class WorkflowRunner(object):
         return (
             tuple(consume_queue(self._mut_queue)), 
             tuple(consume_queue(self._msg_queue)), 
-            tuple(consume_queue(self._evt_queue))
+            tuple(consume_queue(self._act_queue))
         )
 
     def _update_step(self, step, **kwargs):
@@ -414,6 +415,7 @@ class WorkflowRunner(object):
             selector=selector,
             step_key=step_key,
             step_name=title or stdef.__step_name__,
+            desc=stdef.__doc__,
             workflow_id=self._id,
             stm_state=BEGIN_STATE,
             origin_step=origin_step,
@@ -515,13 +517,12 @@ class WorkflowRunner(object):
     @workflow_action('trigger', allow_statuses=WorkflowStatus._ACTIVE, external=True)
     def trigger(self, trigger):
         wf_context = self.get_state_proxy(trigger.selector)
-        trigger_name = trigger.handler_func if isinstance(trigger.handler_func, str) else trigger.handler_func.__name__
-        self.run_hook(trigger.handler_func, wf_context, trigger.activity_data)
+        self.run_hook(trigger.handler_func, wf_context, trigger.event_data)
         return self
     
     @workflow_action('add_participant', allow_statuses=WorkflowStatus._EDITABLE, external=True)
     def add_participant(self, /, role, member_id, **kwargs):
-        self.mutate('add-participant', role=role, member_id=member_id)
+        self.mutate('add-participant', role=role, member_id=member_id, **kwargs)
         return self
 
     @workflow_action('del_participant', allow_statuses=WorkflowStatus._EDITABLE, external=True)

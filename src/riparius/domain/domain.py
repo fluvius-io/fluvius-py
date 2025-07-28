@@ -14,7 +14,7 @@ class WorkflowDomain(Domain):
         name = "Workflow Management"
         description = "Domain for managing workflow processes, steps, and participants"
         tags = ["workflow"]
-        prefix = "workflow"
+        prefix = config.CQRS_DOMAIN_NAMESPACE
 
     def __init__(self, app=None, **kwargs):
         super(WorkflowDomain, self).__init__(app, **kwargs) 

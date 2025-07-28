@@ -18,8 +18,8 @@ class SampleProcess(Workflow):
         title = "Sample Process"
         revision = 1
 
-    Stage01 = Stage('Stage 01')
-    Stage02 = Stage('Stage 02')
+    Stage01 = Stage('Stage 01', desc="Iam great")
+    Stage02 = Stage('Stage 02', desc="Iam bigger")
     Role01 = Role(title="Role 01")
 
     def on_start(wf_state):
@@ -27,12 +27,15 @@ class SampleProcess(Workflow):
         step3.transit('MOON')
 
     class Step01(Step, name='Step 03', stage=Stage01):
+        """ This is a sample step. 2-X """
         pass
 
     class Step02(Step, name="step-02a", stage=Stage01):
+        """ This is a sample step. 2-X """
         pass
 
     class Step02b(Step, stage=Stage01):
+        """ This is a sample step. 2-B """
         __step_name__ = "Step2B"
 
     class Step03(Step, name="Step 03", stage=Stage01):
@@ -58,6 +61,7 @@ class SampleProcess(Workflow):
     def test_event(workflow, trigger_data):
         workflow.memorize(test_key="workflow value 2")
         workflow.output(message='SUCCESS!')
+        workflow.output(file='contract/contract-final-v2.pdf')
         yield f"test_event ACTION! #1: {trigger_data}"
         yield f"MEMORY: {workflow.recall()}"
 
@@ -66,7 +70,7 @@ class SampleProcess(Workflow):
 async def test_workflow():
     manager = WorkflowManager()
     evt_data = SimpleNamespace(workflow_id=wf01, step_id=st01)
-    for wf in manager.process_activity('test-event', evt_data):
+    for wf in manager.process_event('test-event', evt_data):
         assert len(wf.step_id_map) == 3  # 3 steps created
         mutations, messages, events = await manager.persist(wf)
 

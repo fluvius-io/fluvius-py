@@ -30,12 +30,13 @@ class WorkflowData(WorkflowDataModel):
     ts_finish: Optional[datetime] = None
 
 
-class WorkflowEvent(WorkflowDataModel):
+class WorkflowActivity(WorkflowDataModel):
+    ''' Workflow Activity is internal event that generate mutations and mutates the workflow state. '''
     workflow_id: UUID_TYPE
     transaction_id: UUID_TYPE
-    event_name: str
-    event_args: Optional[tuple] = None
-    event_data: Optional[dict] = None
+    activity_name: str
+    activity_args: Optional[tuple] = None
+    activity_data: Optional[dict] = None
     step_id: Optional[UUID_TYPE] = None
     order: int
 
@@ -69,6 +70,7 @@ class WorkflowStep(WorkflowDataModel):
     workflow_id: UUID_TYPE
     step_key: str
     stage_key: str
+    desc: Optional[str] = None
     origin_step: Optional[UUID_TYPE] = None
     step_name: str
     stm_state: str

@@ -42,3 +42,7 @@ recreate-schema MODULE:
 
 create-schema MODULE:
 	./flvctl db create-schema "{{MODULE}}"
+
+drop-schema MODULE:
+	./flvctl db drop-schema "{{MODULE}}"
+	

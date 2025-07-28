@@ -140,4 +140,42 @@ class WorkflowAggregate(Aggregate):
             raise ValueError("Cannot abort completed workflow")
         
         # Implementation for aborting workflow
-        return {"status": "aborted", "reason": data.reason} 
+        return {"status": "aborted", "reason": data.reason}
+
+    async def do__inject_event(self, data):
+        """Inject an event into the workflow"""
+        workflow = await self.fetch_aggroot()
+        
+        if workflow.status not in [WorkflowStatus.NEW, WorkflowStatus.ACTIVE]:
+            raise ValueError(f"Cannot inject event into workflow in status {workflow.status}")
+        
+        # Implementation for injecting event
+        event_result = {
+            "status": "event_injected",
+            "event_type": data.event_type,
+            "workflow_id": workflow.id,
+            "target_step_id": data.target_step_id,
+            "priority": data.priority,
+            "timestamp": timestamp()
+        }
+        
+        return event_result
+
+    async def do__send_trigger(self, data):
+        """Send a trigger to the workflow"""
+        workflow = await self.fetch_aggroot()
+        
+        if workflow.status not in [WorkflowStatus.NEW, WorkflowStatus.ACTIVE]:
+            raise ValueError(f"Cannot send trigger to workflow in status {workflow.status}")
+        
+        # Implementation for sending trigger
+        trigger_result = {
+            "status": "trigger_sent",
+            "trigger_type": data.trigger_type,
+            "workflow_id": workflow.id,
+            "target_id": data.target_id,
+            "delay_seconds": data.delay_seconds,
+            "timestamp": timestamp()
+        }
+        
+        return trigger_result 

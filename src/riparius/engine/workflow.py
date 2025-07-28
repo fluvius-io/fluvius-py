@@ -124,11 +124,11 @@ class Step(object):
 
 
 class Stage(object):
-    def __init__(self, name, type="general", order=0):
+    def __init__(self, name, type="general", order=0, desc=None):
         self._name = name
         self._type = type
         self._order = order
-        self._desc = self.__class__.__doc__
+        self._desc = desc
     
     @property
     def name(self):

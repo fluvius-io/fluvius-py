@@ -23,7 +23,7 @@ def workflow_fk(constraint_name):
         f'{DB_SCHEMA}.workflow._id', 
         ondelete='CASCADE', 
         onupdate='CASCADE',
-        name=constraint_name
+        name=f'fk_workflow_{constraint_name}'
     )
 
 # --- Models ---
@@ -55,6 +55,7 @@ class WorkflowFullSchema(WorkflowBaseSchema):
 
     owner_id = sa.Column(pg.UUID, nullable=True)
     company_id = sa.Column(sa.String, nullable=True)
+    workflow_key = sa.Column(sa.String, nullable=False)
     revision = sa.Column(sa.Integer, nullable=False)
     route_id = sa.Column(sa.UUID, nullable=False)
     title = sa.Column(sa.String, nullable=True)
@@ -78,12 +79,13 @@ class WorkflowFullSchema(WorkflowBaseSchema):
 class WorkflowStep(WorkflowBaseSchema):
     __tablename__ = "workflow-step"
 
-    workflow_id = sa.Column(pg.UUID, workflow_fk('fk_workflow_step_workflow_id'), nullable=False)
+    workflow_id = sa.Column(pg.UUID, workflow_fk('step_workflow_id'), nullable=False)
     stage_key = sa.Column(sa.String, nullable=True)
     index = sa.Column(sa.Integer, nullable=False)
     owner_id = sa.Column(pg.UUID, nullable=True)
     selector = sa.Column(pg.UUID, nullable=True)
     stm_state = sa.Column(sa.String, nullable=False)
+    desc = sa.Column(sa.String, nullable=True)
     step_key = sa.Column(sa.String, nullable=False)
     step_name = sa.Column(sa.String, nullable=False)
     origin_step = sa.Column(pg.UUID, nullable=True)
@@ -98,7 +100,7 @@ class WorkflowStep(WorkflowBaseSchema):
 class WorkflowStage(WorkflowBaseSchema):
     __tablename__ = "workflow-stage"
 
-    workflow_id = sa.Column(pg.UUID, workflow_fk('fk_workflow_stage_workflow_id'), nullable=False)
+    workflow_id = sa.Column(pg.UUID, workflow_fk('stage_workflow_id'), nullable=False)
     key = sa.Column(sa.String, nullable=True)
     stage_name = sa.Column(sa.String, nullable=True)
     stage_type = sa.Column(sa.String, nullable=True)
@@ -110,7 +112,7 @@ class WorkflowStage(WorkflowBaseSchema):
 class WorkflowParticipant(WorkflowBaseSchema):
     __tablename__ = "workflow-participant"
 
-    workflow_id = sa.Column(pg.UUID, workflow_fk('fk_workflow_participant_workflow_id'), nullable=False)
+    workflow_id = sa.Column(pg.UUID, workflow_fk('participant_workflow_id'), nullable=False)
     user_id = sa.Column(pg.UUID, nullable=False)
     role = sa.Column(sa.String, nullable=False)
 
@@ -118,7 +120,7 @@ class WorkflowParticipant(WorkflowBaseSchema):
 class WorkflowMemory(WorkflowBaseSchema):
     __tablename__ = "workflow-memory"
 
-    workflow_id = sa.Column(pg.UUID, workflow_fk('fk_workflow_memory_workflow_id'), unique=True, nullable=False)
+    workflow_id = sa.Column(pg.UUID, workflow_fk('memory_workflow_id'), unique=True, nullable=False)
     stepsm = sa.Column(FluviusJSONField, nullable=True)
     params = sa.Column(FluviusJSONField, nullable=True)
     memory = sa.Column(FluviusJSONField, nullable=True)
@@ -130,7 +132,7 @@ class WorkflowMutation(WorkflowBaseSchema):
 
     name = sa.Column(sa.String, nullable=False)
     transaction_id = sa.Column(pg.UUID, nullable=False)
-    workflow_id = sa.Column(pg.UUID, workflow_fk('fk_workflow_mutation_workflow_id'), nullable=False)
+    workflow_id = sa.Column(pg.UUID, workflow_fk('mutation_workflow_id'), nullable=False)
     action = sa.Column(sa.String, nullable=False)
     mutation = sa.Column(FluviusJSONField, nullable=False)
     step_id = sa.Column(pg.UUID, nullable=True)
@@ -140,20 +142,20 @@ class WorkflowMutation(WorkflowBaseSchema):
 class WorkflowMessage(WorkflowBaseSchema):
     __tablename__ = "workflow-message"
 
-    workflow_id = sa.Column(pg.UUID, workflow_fk('fk_workflow_message_workflow_id'), nullable=False)
+    workflow_id = sa.Column(pg.UUID, workflow_fk('message_workflow_id'), nullable=False)
     timestamp = sa.Column(sa.DateTime(timezone=True), nullable=False)
     source = sa.Column(sa.String, nullable=False)
     content = sa.Column(sa.String, nullable=False)
 
 
-class WorkflowEvent(WorkflowBaseSchema):
-    __tablename__ = "workflow-event"
+class WorkflowActivity(WorkflowBaseSchema):
+    __tablename__ = "workflow-activity"
 
-    workflow_id = sa.Column(pg.UUID, workflow_fk('fk_workflow_event_workflow_id'), nullable=False)
+    workflow_id = sa.Column(pg.UUID, workflow_fk('activity_workflow_id'), nullable=False)
     transaction_id = sa.Column(pg.UUID, nullable=False)
-    event_name = sa.Column(sa.String, nullable=False)
-    event_args = sa.Column(FluviusJSONField, nullable=True)
-    event_data = sa.Column(FluviusJSONField, nullable=True)
+    activity_name = sa.Column(sa.String, nullable=False)
+    activity_args = sa.Column(FluviusJSONField, nullable=True)
+    activity_data = sa.Column(FluviusJSONField, nullable=True)
     step_id = sa.Column(pg.UUID, nullable=True)
     order = sa.Column(sa.Integer, nullable=False)
 
@@ -161,7 +163,7 @@ class WorkflowEvent(WorkflowBaseSchema):
 class WorkflowTask(WorkflowBaseSchema):
     __tablename__ = "workflow-task"
 
-    workflow_id = sa.Column(pg.UUID, workflow_fk('fk_workflow_task_workflow_id'), nullable=False)
+    workflow_id = sa.Column(pg.UUID, workflow_fk('task_workflow_id'), nullable=False)
     step_id = sa.Column(sa.String, nullable=False)
     ts_expire = sa.Column(sa.DateTime(timezone=True), nullable=True)
     ts_start = sa.Column(sa.DateTime(timezone=True), nullable=True)

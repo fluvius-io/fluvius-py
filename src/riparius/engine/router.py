@@ -18,8 +18,8 @@ class ActivityHandler(object):
 @dataclass
 class WorkflowTrigger(object):
     id: UUID_TYPE
-    activity_name: str
-    activity_data: SimpleNamespace
+    event_name: str
+    event_data: SimpleNamespace
     route_id: UUID_TYPE
     selector: str
     workflow_key: str
@@ -71,12 +71,12 @@ class ActivityRouter(object):
             logger.warning('Event has multiple handlers [%d]: %s @ %s', _count, act_name, act_handler.workflow_key)
 
     @classmethod
-    def route_activity(cls, act_name, act_data):
-        if act_name not in cls.ROUTING_TABLE:
+    def route_event(cls, evt_name, evt_data):
+        if evt_name not in cls.ROUTING_TABLE:
             raise NotFoundError('P01881', 'Activity not found')
 
-        for entry in cls.ROUTING_TABLE[act_name]:
-            act_route = entry.routing_func(act_data)
+        for entry in cls.ROUTING_TABLE[evt_name]:
+            act_route = entry.routing_func(evt_data)
             if act_route is None:
                 continue
 
@@ -87,8 +87,8 @@ class ActivityRouter(object):
 
             yield WorkflowTrigger(
                 id=UUID_GENR(),
-                activity_name=act_name,
-                activity_data=act_data,
+                event_name=evt_name,
+                event_data=evt_data,
                 route_id=route,
                 selector=selector,
                 workflow_key=entry.workflow_key,

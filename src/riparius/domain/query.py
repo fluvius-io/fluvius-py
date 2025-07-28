@@ -31,6 +31,7 @@ class WorkflowQuery(QueryResource):
 
     id: UUID_TYPE = PrimaryID("Workflow ID")
     title: str = StringField("Workflow Title")
+    workflow_key: str = StringField("Workflow Key")
     revision: int = IntegerField("Workflow Revision")
     route_id: UUID_TYPE = UUIDField("Route ID")
     status: str = EnumField("Workflow Status")
@@ -50,16 +51,17 @@ class WorkflowFullQuery(QueryResource):
 
     id: UUID_TYPE = PrimaryID("Workflow ID")
     title: str = StringField("Workflow Title")
+    workflow_key: str = StringField("Workflow Key")
     revision: int = IntegerField("Workflow Revision")
     route_id: UUID_TYPE = UUIDField("Route ID")
     status: str = EnumField("Workflow Status")
     progress: float = FloatField("Completion Progress")
     route_id: UUID_TYPE = UUIDField("Route ID")
     ts_start: str = DatetimeField("Start Time")
-    ts_expire: str = DatetimeField("Expire Time")
-    ts_finish: str = DatetimeField("Finish Time")
-    stages: list = ListField("Stages")
-    output: dict = DictField("Output")
+    ts_expire: str = DatetimeField("Expire Time", hidden=True)
+    ts_finish: str = DatetimeField("Finish Time", hidden=True)
+    stages: list = ListField("Stages", hidden=True)
+    output: dict = DictField("Output", hidden=True)
 
 
 @resource('workflow-step')
@@ -75,6 +77,7 @@ class WorkflowStepQuery(QueryResource):
     index: int = IntegerField("Step Index")
     stage_key: str = StringField("Stage Key")
     step_name: str = StringField("Step Name")
+    desc: str = StringField("Step Description")
     status: str = EnumField("Step Status")
     stm_state: str = StringField("State Machine State")
     label: str = StringField("Step Label")
@@ -89,6 +92,7 @@ class WorkflowParticipantQuery(QueryResource):
 
     class Meta(QueryResource.Meta):
         description = "List workflow participants and their roles"
+        scope_required = WorkflowScope
 
     id: UUID_TYPE = PrimaryID("Participant ID")
     workflow_id: UUID_TYPE = UUIDField("Workflow ID")
@@ -102,6 +106,7 @@ class WorkflowStageQuery(QueryResource):
 
     class Meta(QueryResource.Meta):
         description = "List workflow stages and their progress"
+        scope_required = WorkflowScope
 
     id: UUID_TYPE = PrimaryID("Stage ID")
     workflow_id: UUID_TYPE = UUIDField("Workflow ID")

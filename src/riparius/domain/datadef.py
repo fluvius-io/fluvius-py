@@ -79,4 +79,20 @@ class AbortWorkflowData(DataModel):
     reason: Optional[str] = None
 
 
+class InjectEventData(DataModel):
+    """Data for injecting an event into the workflow"""
+    event_type: str
+    event_data: Optional[Dict[str, Any]] = None
+    target_step_id: Optional[UUID_TYPE] = None
+    priority: Optional[int] = None
+
+
+class SendTriggerData(DataModel):
+    """Data for sending a trigger to the workflow"""
+    trigger_type: str
+    trigger_data: Optional[Dict[str, Any]] = None
+    target_id: Optional[UUID_TYPE] = None
+    delay_seconds: Optional[int] = None
+
+
  

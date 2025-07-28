@@ -3,7 +3,8 @@ from .domain import WorkflowDomain
 from .datadef import (
     CreateWorkflowData, UpdateWorkflowData, AddParticipantData, RemoveParticipantData,
     ProcessActivityData, AddRoleData, RemoveRoleData, StartWorkflowData,
-    CancelWorkflowData, IgnoreStepData, CancelStepData, AbortWorkflowData
+    CancelWorkflowData, IgnoreStepData, CancelStepData, AbortWorkflowData,
+    InjectEventData, SendTriggerData
 )
 
 Command = WorkflowDomain.Command
@@ -223,4 +224,40 @@ class AbortWorkflow(Command):
 
     async def _process(self, agg, stm, payload):
         result = await agg.abort_workflow(payload)
-        yield agg.create_response(serialize_mapping(result), _type="workflow-response") 
+        yield agg.create_response(serialize_mapping(result), _type="workflow-response")
+
+
+class InjectEvent(Command):
+    """Inject an event into the workflow"""
+
+    class Meta:
+        key = 'inject-event'
+        name = 'Inject Event'
+        resources = ("workflow",)
+        tags = ["workflow", "event", "inject"]
+        auth_required = True
+        description = "Inject an event into the workflow execution"
+
+    Data = InjectEventData
+
+    async def _process(self, agg, stm, payload):
+        result = await agg.inject_event(payload)
+        yield agg.create_response(serialize_mapping(result), _type="event-response")
+
+
+class SendTrigger(Command):
+    """Send a trigger to the workflow"""
+
+    class Meta:
+        key = 'send-trigger'
+        name = 'Send Trigger'
+        resources = ("workflow",)
+        tags = ["workflow", "trigger", "send"]
+        auth_required = True
+        description = "Send a trigger to the workflow for external events"
+
+    Data = SendTriggerData
+
+    async def _process(self, agg, stm, payload):
+        result = await agg.send_trigger(payload)
+        yield agg.create_response(serialize_mapping(result), _type="trigger-response") 
