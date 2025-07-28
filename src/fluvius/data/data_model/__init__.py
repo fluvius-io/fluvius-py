@@ -56,4 +56,7 @@ class BlankModel(SimpleNamespace):
         return object.replace(self, **kwargs)
 
     def serialize(self):
+        if isinstance(self, dict):
+            return self
+
         return self.__dict__
