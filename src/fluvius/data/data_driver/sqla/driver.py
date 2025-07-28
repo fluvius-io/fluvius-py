@@ -1,11 +1,10 @@
 import asyncpg
 import importlib
+from asyncio import current_task
 import sqlalchemy as sa
 from functools import wraps
 
-from asyncio import current_task
 from contextlib import asynccontextmanager
-from contextvars import ContextVar
 from pypika.queries import QueryBuilder as PikaQueryBuilder
 from types import SimpleNamespace
 from typing import cast
@@ -17,15 +16,15 @@ from fluvius.data.query import BackendQuery
 from fluvius.data.serializer import serialize_json
 from fluvius.data.data_driver import DataDriver
 
-from sqlalchemy import Column, Integer, String, DateTime, create_engine, exc, text
+from sqlalchemy import exc
 from sqlalchemy.sql import func, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.engine.url import URL, make_url
 from sqlalchemy.ext.asyncio import (
-    async_scoped_session,
     create_async_engine,
-    async_sessionmaker
-)
+    async_sessionmaker,
+    async_scoped_session
+)   
 
 from .schema import create_data_schema_base, SqlaDataSchema
 from .query import QueryBuilder
@@ -116,22 +115,22 @@ def sqla_error_handler(code_prefix):
     return decorator
 
 
-class _AsyncSessionConnection(object):
+class _AsyncSessionConfiguration(object):
     def __init__(self, config, **kwargs):
         self._config = config or kwargs
-        self._async_engine, self._session = self.set_bind(bind_dsn=self._config, loop=None, echo=False, **kwargs)
+        self._async_engine, self._async_sessionmaker = self.set_bind(bind_dsn=self._config, loop=None, echo=False, **kwargs)
 
-    def session(self):
+    def make_session(self):
         if not hasattr(self, "_async_engine"):
             raise ValueError('AsyncSession connection is not established.')
 
-        return self._session()
+        return self._async_sessionmaker()
 
     async def connection(self):
         if hasattr(self, "_connection") and not self._connection.closed:
             return self._connection
 
-        self._connection = await self._session.connection()
+        self._connection = await self._async_sessionmaker.connection()
         return self._connection
 
     def _setup_sql_statement(self, dialect):
@@ -161,17 +160,20 @@ class _AsyncSessionConnection(object):
         )
 
         self._setup_sql_statement(engine.dialect.name)
-        session = async_scoped_session(
-            session_factory=async_sessionmaker(
-                bind=engine ,
-                expire_on_commit=False,
-                autoflush=True,
-                autobegin=True
-            ),
+        sessionmaker = async_sessionmaker(
+            bind=engine,
+            expire_on_commit=False,
+            autoflush=True,
+            autobegin=True
+        )
+
+        scoped_session = async_scoped_session(
+            session_factory=sessionmaker,
             scopefunc=current_task
         )
 
-        return engine, session
+        return engine, scoped_session
+
 
     async def dispose(self):
         if self._async_engine is None:
@@ -185,38 +187,26 @@ class SqlaDriver(DataDriver, QueryBuilder):
     __db_dsn__ = None
     __data_schema_base__ = SqlaDataSchema
 
-    def __init__(self, db_dsn=None, **kwargs):
-        dsn = db_dsn if db_dsn else self.__db_dsn__
-        if dsn is None:
-            raise ValueError(f'No database DSN provided to: {self}')
-
-        self.set_dsn(dsn)
-
+    def __init__(self, **kwargs):
+        self._active_session = None
         DEBUG_CONNECTOR and logger.info(f'[{self.__class__.__name__}] setup with DSN: {self.dsn}')
 
     def __init_subclass__(cls):
         cls.__data_schema_registry__ = {}
         cls.__data_schema_base__ = create_data_schema_base(cls)
-
-    def session(self):
-        return self._async_session.session()
-
-    def connection(self):
-        return self._async_session.connection()
+        dsn = cls.__db_dsn__
+        if dsn is None:
+            raise ValueError(f'No database DSN provided to: {cls}')
+        cls._session_configuration = _AsyncSessionConfiguration(dsn)
 
     @property
     def dsn(self):
-        return self._dsn
+        return self.__db_dsn__
 
-    def set_dsn(self, db_dsn):
-        self._dsn = db_dsn
-        self._async_session = _AsyncSessionConnection(db_dsn)
-        return self._dsn
 
-    async def disconnect(self):
-        async_session = self._async_session
-        # if async_session.connected:
-        await async_session.dispose()
+    # async def disconnect(self):
+    #     async_connection = self._async_connection
+    #     await async_connection.dispose()
 
     @classmethod
     def validate_data_schema(cls, schema_model):
@@ -241,17 +231,28 @@ class SqlaDriver(DataDriver, QueryBuilder):
         return cursor
 
     @asynccontextmanager
-    async def transaction(self, *args, **kwargs):
-        async with self.session() as async_session_transaction:
+    async def transaction(self, *args, reuse_session=True):
+        if self.active_session is not None:
+            logger.warning('Nested transaction detected: %s', self.active_session)
+            yield self.active_session
+            return
+
+        async with self._session_configuration.make_session() as async_session:
+            self._active_session = async_session
             try:
-                yield async_session_transaction
-                await async_session_transaction.commit()
+                yield async_session
             except ItemNotFoundError:
                 raise
             except Exception:
                 logger.exception('[E15201] Error during database transaction. Rolling back ...')
-                await async_session_transaction.rollback()
+                await async_session.rollback()
                 raise
+            finally:
+                self._active_session = None
+
+    @property
+    def active_session(self):
+        return self._active_session
 
     @sqla_error_handler('L1207')
     async def find_all(self, resource, query: BackendQuery):
@@ -289,13 +290,13 @@ class SqlaDriver(DataDriver, QueryBuilder):
         }
         Output: List(list of fields is selected)
         '''
+
         total_items = -1
         data_schema = self.lookup_data_schema(resource)
         return_meta = isinstance(meta, dict)
 
-        async with self.session() as sess:
-            stmt = self.build_select(data_schema, query)
-
+        stmt = self.build_select(data_schema, query)
+        async with self.transaction() as sess:
             if return_meta:
                 total_items = await self.query_count(sess, stmt)
 
@@ -326,9 +327,9 @@ class SqlaDriver(DataDriver, QueryBuilder):
     @sqla_error_handler('L1201')
     async def find_one(self, resource, query: BackendQuery):
         data_schema = self.lookup_data_schema(resource)
+        sess = self.active_session
         stmt = self.build_select(data_schema, query)
-        async with self.session() as sess:
-            cursor = await sess.execute(stmt)
+        cursor = await sess.execute(stmt)
         DEBUG_CONNECTOR and logger.info("\n[FIND_ONE] %r\n=> [RESOURCE] %s\n=> [QUERY] %s items", query, resource, cursor)
 
         return cursor.mappings().one()
@@ -340,8 +341,8 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
         data_schema = self.lookup_data_schema(resource)
         stmt = self.build_update(data_schema, query, updates)
-        async with self.session() as sess:
-            cursor = await sess.execute(stmt)
+        sess = self.active_session
+        cursor = await sess.execute(stmt)
         self._check_no_item_modified(cursor, 1, query)
         return self._unwrap_result(cursor)
 
@@ -353,17 +354,17 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
         ''' @TODO: Add etag checking for batch items '''
         stmt = self.build_delete(data_schema, query)
-        async with self.session() as sess:
-            cursor = await sess.execute(stmt)
+        sess = self.active_session
+        cursor = await sess.execute(stmt)
         self._check_no_item_modified(cursor, 1, query)
         return self._unwrap_result(cursor)
 
     @sqla_error_handler('L1204')
-    async def insert(self, resource, values: (dict, list)):
+    async def insert(self, resource, values: dict | list):
         data_schema = self.lookup_data_schema(resource)
         stmt = self.build_insert(data_schema, values)
-        async with self.session() as sess:
-            cursor = await sess.execute(stmt)
+        sess = self.active_session
+        cursor = await sess.execute(stmt)
 
         expect = len(values) if isinstance(values, (list, tuple)) else 1
         self._check_no_item_modified(cursor, expect)
@@ -379,7 +380,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
         # See: connector.py [setup_sql_satemenet]
 
         data_schema = self.lookup_data_schema(resource)
-        stmt = self._async_session.insert(data_schema).values(data)
+        stmt = self._session_configuration.insert(data_schema).values(data)
 
         # Here we assuming that all items have the same set of keys
         set_fields = {k: getattr(stmt.excluded, k) for k in data.keys() if k != '_id'}
@@ -391,8 +392,8 @@ class SqlaDriver(DataDriver, QueryBuilder):
             set_=set_fields
         )
 
-        async with self.session() as sess:
-            cursor = await sess.execute(stmt)
+        sess = self.active_session
+        cursor = await sess.execute(stmt)
         DEBUG_CONNECTOR and logger.info("UPSERT %d items => %r", len(data), cursor.rowcount)
         self._check_no_item_modified(cursor, 1)
         return self._unwrap_result(cursor)

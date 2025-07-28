@@ -1,10 +1,10 @@
-"""Test FastAPI queries for WorkflowQueryManager using HTTPX AsyncClient"""
+"""Test FastAPI queries for WorkflowQueryManager"""
 
 import asyncio
 import pytest
 import json
 from fastapi import FastAPI
-from httpx import AsyncClient, ASGITransport
+from fastapi.testclient import TestClient
 from fluvius.data import UUID_GENF
 from fluvius.fastapi import (
     create_app,
@@ -28,16 +28,9 @@ PROFILE = {
 
 NAMESPACE = "process"
 
+
 # Test App Setup
-@pytest.fixture(scope="session")
-def event_loop():
-    """Create an instance of the default event loop for the test session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
-
-
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="class")
 def test_app():
     """Create test FastAPI app with WorkflowQueryManager"""
     logger.info('Creating test app ...')
@@ -48,16 +41,11 @@ def test_app():
     return app
 
 
-@pytest.fixture(scope="session")
-async def async_client(test_app):
-    """Create async test client"""
-    logger.info('Creating async test client ...')
-    headers = {"Authorization": f"MockAuth {json.dumps(PROFILE)}"}
-
-    # Use ASGITransport to connect AsyncClient to FastAPI app
-    transport = ASGITransport(app=test_app)
-    async with AsyncClient(transport=transport, base_url="http://testserver", headers=headers) as client:
-        yield client
+@pytest.fixture(scope="class")
+def client(test_app):
+    """Create test client"""
+    logger.info('Creating test client ...')
+    return TestClient(test_app, headers={"Authorization": f"MockAuth {json.dumps(PROFILE)}"})
 
 
 # Test Data
@@ -83,10 +71,9 @@ def step_id():
 class TestWorkflowQueries:
     """Test workflow query endpoints"""
 
-    @pytest.mark.asyncio
-    async def test_workflow_query_basic(self, async_client):
+    def test_workflow_query_basic(self, client):
         """Test basic workflow query without parameters"""
-        response = await async_client.get(f"/{NAMESPACE}.workflow/")
+        response = client.get(f"/{NAMESPACE}.workflow/")
         
         data = response.json()
         assert response.status_code == 200, f"Invalid response: {data}"
@@ -94,8 +81,8 @@ class TestWorkflowQueries:
         assert "pagination" in data
         assert isinstance(data["data"], list)
 
-    @pytest.mark.asyncio
-    async def test_workflow_query_with_parameters(self, async_client):
+
+    def test_workflow_query_with_parameters(self, client):
         """Test workflow query with query parameters"""
         query_params = {
             "size": 10,
@@ -103,7 +90,7 @@ class TestWorkflowQueries:
             "query": json.dumps({"status": "ACTIVE"})
         }
         
-        response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
+        response = client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
         data = response.json()
         assert response.status_code == 200, f"Invalid response: {data}"
@@ -111,23 +98,21 @@ class TestWorkflowQueries:
         assert "pagination" in data
         assert len(data["data"]) <= 10  # Respects size limit
 
-    @pytest.mark.asyncio
-    async def test_workflow_query_with_search(self, async_client):
+    def test_workflow_query_with_search(self, client):
         """Test workflow query with search parameters"""
         search_params = {
             "q": json.dumps({"title!has": "test"}),
             "size": 5
         }
         
-        response = await async_client.get(f"/{NAMESPACE}.workflow/", params=search_params)
+        response = client.get(f"/{NAMESPACE}.workflow/", params=search_params)
         
         assert response.status_code == 200
         data = response.json()
         assert "data" in data
         assert "pagination" in data
 
-    @pytest.mark.asyncio
-    async def test_workflow_query_with_complex_filter(self, async_client):
+    def test_workflow_query_with_complex_filter(self, client):
         """Test workflow query with complex filter conditions"""
         complex_query = {
             "!or": [
@@ -141,17 +126,16 @@ class TestWorkflowQueries:
             "size": 20
         }
         
-        response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
+        response = client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
         assert response.status_code == 200
         data = response.json()
         assert "data" in data
         assert "pagination" in data
 
-    @pytest.mark.asyncio
-    async def test_workflow_embed_query(self, async_client):
+    def test_workflow_embed_query(self, client):
         """Test workflow embed query (full workflow data)"""
-        response = await async_client.get(f"/{NAMESPACE}.workflow-embed/")
+        response = client.get(f"/{NAMESPACE}.workflow-embed/")
         
         assert response.status_code == 200
         data = response.json()
@@ -159,11 +143,10 @@ class TestWorkflowQueries:
         assert "pagination" in data
         assert isinstance(data["data"], list)
 
-    @pytest.mark.asyncio
-    async def test_workflow_step_query(self, async_client, workflow_id):
+    def test_workflow_step_query(self, client, workflow_id):
         """Test workflow step query with scoping"""
         # Test with scoped workflow ID
-        response = await async_client.get(f"/{NAMESPACE}.workflow-step/workflow_id={workflow_id}/")
+        response = client.get(f"/{NAMESPACE}.workflow-step/workflow_id={workflow_id}/")
         
         data = response.json()
         assert response.status_code == 200, f"Invalid data {data}"
@@ -171,15 +154,14 @@ class TestWorkflowQueries:
         assert "pagination" in data
         assert isinstance(data["data"], list)
 
-    @pytest.mark.asyncio
-    async def test_workflow_step_query_with_filters(self, async_client, workflow_id):
+    def test_workflow_step_query_with_filters(self, client, workflow_id):
         """Test workflow step query with additional filters"""
         query_params = {
             "query": json.dumps({"status": "ACTIVE"}),
             "size": 10
         }
         
-        response = await async_client.get(
+        response = client.get(
             f"/{NAMESPACE}.workflow-step/workflow_id={workflow_id}/",
             params=query_params
         )
@@ -189,10 +171,9 @@ class TestWorkflowQueries:
         assert "data" in data
         assert "pagination" in data
 
-    @pytest.mark.asyncio
-    async def test_workflow_participant_query(self, async_client, workflow_id):
+    def test_workflow_participant_query(self, client, workflow_id):
         """Test workflow participant query"""
-        response = await async_client.get(f"/{NAMESPACE}.workflow-participant/workflow_id={workflow_id}/")
+        response = client.get(f"/{NAMESPACE}.workflow-participant/workflow_id={workflow_id}/")
         
         assert response.status_code == 200
         data = response.json()
@@ -200,15 +181,14 @@ class TestWorkflowQueries:
         assert "pagination" in data
         assert isinstance(data["data"], list)
 
-    @pytest.mark.asyncio
-    async def test_workflow_participant_query_with_role_filter(self, async_client, workflow_id):
+    def test_workflow_participant_query_with_role_filter(self, client, workflow_id):
         """Test workflow participant query with role filter"""
         query_params = {
             "query": json.dumps({"role": "reviewer"}),
             "size": 5
         }
         
-        response = await async_client.get(
+        response = client.get(
             f"/{NAMESPACE}.workflow-participant/workflow_id={workflow_id}/",
             params=query_params
         )
@@ -218,10 +198,9 @@ class TestWorkflowQueries:
         assert "data" in data
         assert "pagination" in data
 
-    @pytest.mark.asyncio
-    async def test_workflow_stage_query(self, async_client, workflow_id):
+    def test_workflow_stage_query(self, client, workflow_id):
         """Test workflow stage query"""
-        response = await async_client.get(f"/{NAMESPACE}.workflow-stage/workflow_id={workflow_id}/")
+        response = client.get(f"/{NAMESPACE}.workflow-stage/workflow_id={workflow_id}/")
         
         assert response.status_code == 200
         data = response.json()
@@ -229,15 +208,14 @@ class TestWorkflowQueries:
         assert "pagination" in data
         assert isinstance(data["data"], list)
 
-    @pytest.mark.asyncio
-    async def test_workflow_stage_query_with_order_filter(self, async_client, workflow_id):
+    def test_workflow_stage_query_with_order_filter(self, client, workflow_id):
         """Test workflow stage query with order filter"""
         query_params = {
             "query": json.dumps({"order!gte": 1}),
             "sort": "order"
         }
         
-        response = await async_client.get(
+        response = client.get(
             f"/{NAMESPACE}.workflow-stage/workflow_id={workflow_id}/",
             params=query_params
         )
@@ -251,15 +229,14 @@ class TestWorkflowQueries:
 class TestQueryPagination:
     """Test query pagination functionality"""
 
-    @pytest.mark.asyncio
-    async def test_pagination_first_page(self, async_client):
+    def test_pagination_first_page(self, client):
         """Test first page of workflow query"""
         query_params = {
             "limit": 3,
             "page": 1
         }
         
-        response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
+        response = client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
         assert response.status_code == 200
         data = response.json()
@@ -267,30 +244,28 @@ class TestQueryPagination:
         assert "pagination" in data
         assert data["pagination"]["page"] == 1
 
-    @pytest.mark.asyncio
-    async def test_pagination_second_page(self, async_client):
+    def test_pagination_second_page(self, client):
         """Test second page of workflow query"""
         query_params = {
             "limit": 3,
             "page": 2
         }
         
-        response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
+        response = client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
         assert response.status_code == 200
         data = response.json()
         assert "pagination" in data
         assert data["pagination"]["page"] == 2
 
-    @pytest.mark.asyncio
-    async def test_large_page_size(self, async_client):
+    def test_large_page_size(self, client):
         """Test query with large page size"""
         query_params = {
             "size": 100,
             "page": 1
         }
         
-        response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
+        response = client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
         assert response.status_code == 200
         data = response.json()
@@ -300,43 +275,40 @@ class TestQueryPagination:
 class TestQuerySorting:
     """Test query sorting functionality"""
 
-    @pytest.mark.asyncio
-    async def test_sort_by_title(self, async_client):
+    def test_sort_by_title(self, client):
         """Test sorting workflows by title"""
         query_params = {
             "sort": "title",
             "size": 10
         }
         
-        response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
+        response = client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
         assert response.status_code == 200
         data = response.json()
         assert "data" in data
 
-    @pytest.mark.asyncio
-    async def test_sort_by_creation_time(self, async_client):
+    def test_sort_by_creation_time(self, client):
         """Test sorting workflows by creation time"""
         query_params = {
             "sort": "ts_start.desc",  # Descending order
             "size": 10
         }
         
-        response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
+        response = client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
         assert response.status_code == 200
         data = response.json()
         assert "data" in data
 
-    @pytest.mark.asyncio
-    async def test_multiple_sort_fields(self, async_client):
+    def test_multiple_sort_fields(self, client):
         """Test sorting by multiple fields"""
         query_params = {
             "sort": "status,title",
             "size": 10
         }
         
-        response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
+        response = client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
         assert response.status_code == 200
         data = response.json()
@@ -346,49 +318,45 @@ class TestQuerySorting:
 class TestQueryValidation:
     """Test query validation and error handling"""
 
-    @pytest.mark.asyncio
-    async def test_invalid_json_query(self, async_client):
+    def test_invalid_json_query(self, client):
         """Test query with invalid JSON"""
         query_params = {
             "query": "invalid json"
         }
         
-        response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
+        response = client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
         # Should either return 400 or handle gracefully
         assert response.status_code in [400, 422, 200]
 
-    @pytest.mark.asyncio
-    async def test_invalid_page_number(self, async_client):
+    def test_invalid_page_number(self, client):
         """Test query with invalid page number"""
         query_params = {
             "page": -1,
             "size": 10
         }
         
-        response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
+        response = client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
         # Should handle gracefully or return error
         assert response.status_code in [400, 422, 200, 500]
 
-    @pytest.mark.asyncio
-    async def test_invalid_size_parameter(self, async_client):
+    def test_invalid_size_parameter(self, client):
         """Test query with invalid size parameter"""
         query_params = {
             "size": -5,
             "page": 1
         }
         
-        response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
+        response = client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
         # Should handle gracefully or return error
         assert response.status_code in [400, 422, 200]
 
-    @pytest.mark.asyncio
-    async def test_missing_required_scope(self, async_client):
+    def test_missing_required_scope(self, client):
         """Test scoped query without required scope parameter"""
         # Workflow step query requires workflow_id scope
-        response = await async_client.get(f"/{NAMESPACE}.workflow-step/")
+        response = client.get(f"/{NAMESPACE}.workflow-step/")
         
         # Should return error for missing scope
         assert response.status_code in [400, 422, 404]
@@ -397,36 +365,33 @@ class TestQueryValidation:
 class TestQueryFieldFiltering:
     """Test field-specific filtering in queries"""
 
-    @pytest.mark.asyncio
-    async def test_filter_by_workflow_status(self, async_client):
+    def test_filter_by_workflow_status(self, client):
         """Test filtering workflows by status"""
         query_params = {
             "query": json.dumps({"status": "ACTIVE"}),
             "size": 10
         }
         
-        response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
+        response = client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
         assert response.status_code == 200
         data = response.json()
         assert "data" in data
 
-    @pytest.mark.asyncio
-    async def test_filter_by_title_has(self, async_client):
+    def test_filter_by_title_has(self, client):
         """Test filtering workflows by title containing text"""
         query_params = {
             "query": json.dumps({"title!has": "test"}),
             "size": 10
         }
         
-        response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
+        response = client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
         assert response.status_code == 200
         data = response.json()
         assert "data" in data
 
-    @pytest.mark.asyncio
-    async def test_filter_by_date_range(self, async_client):
+    def test_filter_by_date_range(self, client):
         """Test filtering workflows by date range"""
         query_params = {
             "query": json.dumps({
@@ -436,21 +401,20 @@ class TestQueryFieldFiltering:
             "size": 10
         }
         
-        response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
+        response = client.get("/riparius-workflow.workflow/", params=query_params)
         
         assert response.status_code == 200
         data = response.json()
         assert "data" in data
 
-    @pytest.mark.asyncio
-    async def test_filter_step_by_status(self, async_client, workflow_id):
+    def test_filter_step_by_status(self, client, workflow_id):
         """Test filtering workflow steps by status"""
         query_params = {
             "query": json.dumps({"status": "PENDING"}),
             "size": 10
         }
         
-        response = await async_client.get(
+        response = client.get(
             f"/{NAMESPACE}.workflow-step/workflow_id={workflow_id}/",
             params=query_params
         )
@@ -463,20 +427,18 @@ class TestQueryFieldFiltering:
 class TestQueryMetadata:
     """Test query metadata and schema information"""
 
-    @pytest.mark.asyncio
-    async def test_query_manager_metadata(self, async_client):
+    def test_query_manager_metadata(self, client):
         """Test query manager metadata endpoint"""
-        response = await async_client.get(f"/_meta/{NAMESPACE}/")
+        response = client.get(f"/_meta/{NAMESPACE}/")
         
         # This endpoint may or may not exist depending on implementation
         # Just test that it doesn't crash
         assert response.status_code in [200, 404]
 
-    @pytest.mark.asyncio
-    async def test_query_resource_schema(self, async_client):
+    def test_query_resource_schema(self, client):
         """Test individual query resource schemas"""
         # Test if schema information is available
-        response = await async_client.get(f"/_meta/{NAMESPACE}/")
+        response = client.get(f"/_meta/{NAMESPACE}/")
         
         assert response.status_code == 200
         # Basic metadata should be available

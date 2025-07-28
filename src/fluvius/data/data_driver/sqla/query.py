@@ -62,19 +62,21 @@ FIELD_OPERATOR = {
         "ov": custom_op("&&"),
         "notin": lambda col, vals: col.notin_(vals),
         "ilike": ilike_op,
+        "has": ilike_op,
     },
     OPERATOR_SEP_NEGATE: {
         "gt": le,
         "gte": lt,
         "eq": ne,
         "ne": eq,
+        "lte": gt,
         "lt": ge,
         "le": gt,
         "notin": in_op,
         "cs": contains_op,
         "ov": custom_op("&&"),
         "in": lambda col, vals: col.notin_(vals),
-        "ilike": ilike_op,
+        "has": ilike_op,
     }
 }
 

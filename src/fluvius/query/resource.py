@@ -142,10 +142,12 @@ class QueryResource(BaseModel):
                 sort = sort.split('.')
                 if len(sort) == 1:
                     dr = "asc"
-                    fn = sort
+                    fn = sort[0]
                 else:
                     fn, dr = sort
 
+                if isinstance(fn, list):
+                    raise ValueError('INVALID: %s' % str(sorts))
                 yield (fmap.get(fn, fn), dr)
 
         return tuple(gen(sorts or cls._default_order))

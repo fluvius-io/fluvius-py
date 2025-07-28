@@ -130,7 +130,7 @@ class UUIDFilterPreset(FilterPreset, name="uuid"):
 
 
 class StringFilterPreset(FilterPreset, name="string"):
-    ilike = Filter("Contains", "string", default=True)
+    has = Filter("Contains", "string", default=True)
     eq = Filter("Equals", "string")
     ne = Filter("Not Equals", "string")
 

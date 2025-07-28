@@ -2,6 +2,7 @@ import re
 import json
 import jsonurl_py
 from typing import Optional, List, Dict
+from fluvius.error import BadRequestError
 
 SCOPING_SIGN = ':'
 SCOPING_SEP = '='
