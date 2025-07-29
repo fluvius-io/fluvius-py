@@ -324,6 +324,7 @@ class DataAccessManager(DataAccessManagerBase):
     async def query(self, model_name: str, q=None, return_meta=None, **query) -> List[DataModel]:
         """ Query with offset and limits """
         q = BackendQuery.create(q, **query)
+        logger.info('QUERY: %s', q)
         data = await self.connector.query(model_name, q, return_meta)
         return self._wrap_list(model_name, data)
 

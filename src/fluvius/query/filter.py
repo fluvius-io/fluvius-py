@@ -3,7 +3,7 @@ from collections import namedtuple
 from fluvius.constant import QUERY_OPERATOR_SEP, OPERATOR_SEP_NEGATE, RX_PARAM_SPLIT, DEFAULT_OPERATOR, DEFAULT_DELETED_FIELD
 from fluvius.data.query import process_query_statement, QueryExpression
 from fluvius.error import BadRequestError
-from fluvius.helper import assert_
+from fluvius.helper import assert_, str_to_datetime
 from pydantic import BaseModel, field_validator, Field as PydanticField
 from types import SimpleNamespace
 from typing import Optional, List, Dict, Any, Tuple, Callable
@@ -113,6 +113,9 @@ class Filter(BaseModel):
         return self.model_copy(update=dict(field=field, selector=selector))
 
     def expression(self, mode: str, value: Any) -> QueryExpression:
+        if self.validator:
+            value = self.validator(value)
+
         return QueryExpression(*self.selector, mode, value)
 
 
@@ -165,13 +168,25 @@ class BooleanFilterPreset(FilterPreset, name="boolean"):
     ne = Filter("Not Equals", dtype="boolean", input="boolean")
 
 
+def validate_datetime_range(values: list[str]):
+    if isinstance(values, str):
+        values = values.split(',')
+
+    start, end = values
+    start = str_to_datetime(start)
+    end = str_to_datetime(end)
+    if start > end:
+        raise ValueError("Start date must be before end date")
+    
+    return start, end
+
 class DatetimeFilterPreset(FilterPreset, name="datetime"):
-    eq = Filter("Equals", dtype="datetime", input="datetime", default=True)
-    gt = Filter("Greater than", dtype="datetime", input="datetime")
-    lt = Filter("Less than", dtype="datetime", input="datetime")
-    lte = Filter("Less or Equals", dtype="datetime", input="datetime")
-    gte = Filter("Greater or Equals", dtype="datetime", input="datetime")
-    between = Filter("Between", dtype="timerange", input="timerange")
+    eq = Filter("Equals", dtype="datetime", input="datetime", default=True, validator=str_to_datetime)
+    gt = Filter("Greater than", dtype="datetime", input="datetime", validator=str_to_datetime)
+    lt = Filter("Less than", dtype="datetime", input="datetime", validator=str_to_datetime)
+    lte = Filter("Less or Equals", dtype="datetime", input="datetime", validator=str_to_datetime)
+    gte = Filter("Greater or Equals", dtype="datetime", input="datetime", validator=str_to_datetime)
+    between = Filter("Between", dtype="timerange", input="timerange", validator=validate_datetime_range)
 
 
 class EnumFilterPreset(FilterPreset, name="enum"):

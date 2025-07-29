@@ -9,7 +9,7 @@ st01 = UUID_GENF('100')
 wf01 = UUID_GENF('101') 
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="session")
 async def test_workflow():
     manager = WorkflowManager()
     evt_data = SimpleNamespace(workflow_id=wf01, step_id=st01)

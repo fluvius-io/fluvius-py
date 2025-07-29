@@ -9,7 +9,7 @@ from pypika.queries import QueryBuilder as PikaQueryBuilder
 from types import SimpleNamespace
 from typing import cast
 
-from fluvius.error import InternalServerError
+from fluvius.error import BadRequestError, InternalServerError
 from fluvius.data import logger, config
 from fluvius.data.exceptions import ItemNotFoundError, UnprocessableError, NoItemModifiedError
 from fluvius.data.query import BackendQuery
@@ -88,17 +88,31 @@ def sqla_error_handler(code_prefix):
                     str(e.orig)
                 )
             except exc.ProgrammingError as e:
+                if e.orig.pgcode == '42883':
+                    raise BadRequestError(
+                        f"{code_prefix}.04.01",
+                        "Undefined function error.",
+                        str(e.orig)
+                    )
+
                 raise InternalServerError(
                     f"{code_prefix}.04",
-                    "There was a syntax or structure error in the database query.",
+                    f"There was a syntax or structure error in the database query. [{e.orig.pgcode}]",
                     str(e.orig)
                 )
             except exc.DBAPIError as e:
-                raise InternalServerError(
-                    f"{code_prefix}.05",
-                    "A database driver error occurred.",
-                    str(e.orig)
-                )
+                if e.orig.pgcode == '2201X':
+                    raise BadRequestError(
+                        f"{code_prefix}.05.01",
+                        f"Invalid row count in result offset clause [{e.orig.pgcode}].",
+                        str(e.orig)
+                    )
+                else:
+                    raise InternalServerError(
+                        f"{code_prefix}.05",
+                        f"A DBAPIError error occurred [{e.orig.pgcode}]",
+                        str(e.orig)
+                    )
             except exc.NoResultFound as e:
                 raise ItemNotFoundError(
                     f"{code_prefix}.06",
@@ -244,7 +258,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
             except ItemNotFoundError:
                 raise
             except Exception:
-                logger.exception('[E15201] Error during database transaction. Rolling back ...')
+                # logger.exception('[E15201] Error during database transaction. Rolling back ...')
                 await async_session.rollback()
                 raise
             finally:

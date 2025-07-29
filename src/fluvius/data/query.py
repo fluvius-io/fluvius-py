@@ -59,7 +59,7 @@ def process_query_statement(statements, expr_schema=None, allowed_composites=('a
 
                     yield QueryExpression(*op_stmt, value)
         except KeyError as e:
-            raise BadRequestError("Q01-3939", f'Cannot locate operator: {e} => {expr_schema}')
+            raise BadRequestError("Q01-3939", f'Cannot locate operator: {e}')
 
     return QueryStatement(_process(statements))
 

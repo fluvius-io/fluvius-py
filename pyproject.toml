@@ -1,5 +1,8 @@
+# NOTE: Use pytest.ini instead, asyncio_default_fixture_loop_scope is not pick up by pytest-asyncio here
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+
+# Use a separate pytest.ini just for this setting, even if you prefer pyproject.toml for most things ...
 asyncio_default_fixture_loop_scope = "session"
 
 

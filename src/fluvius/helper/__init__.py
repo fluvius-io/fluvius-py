@@ -14,7 +14,7 @@ from typing import Dict, List, Optional, Pattern, Tuple, Union
 from fluvius.error import AssertionFailed
 from fluvius import logger
 
-from .timeutil import timestamp
+from .timeutil import timestamp, str_to_datetime
 
 
 RX_DELIMITER_SPLITTER = re.compile(r"[\.#]")

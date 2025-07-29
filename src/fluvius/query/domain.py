@@ -1,10 +1,7 @@
-import sqlalchemy
 from typing import Optional, Dict
 
-from fluvius.auth import AuthorizationContext
 from fluvius.data import UUID_TYPE, BackendQuery
-from fluvius.error import InternalServerError
-
+from fluvius.data.data_driver.sqla.driver import sqla_error_handler
 from datetime import datetime
 
 from .resource import QueryResource
@@ -46,6 +43,7 @@ class DomainQueryManager(QueryManager):
     def policymgr(self):
         return self._policymgr
 
+    @sqla_error_handler('Q1103')
     async def execute_query(
         self,
         query_resource: QueryResource,
@@ -55,19 +53,5 @@ class DomainQueryManager(QueryManager):
     ):
         """ Execute the backend query with the state manager and return """
         resource = query_resource.backend_model()
-
-        try:
-            data = await self.data_manager.query(resource, backend_query, return_meta=meta)
-        except (
-            sqlalchemy.exc.ProgrammingError,
-            sqlalchemy.exc.DBAPIError
-        ) as e:
-            details = None if not config.DEVELOPER_MODE else {
-                "pgcode": getattr(e.orig, 'pgcode', None),
-                "statement": e.statement,
-                "params": e.params,
-            }
-
-            raise InternalServerError("Q101-501", f"Query Error [{getattr(e.orig, 'pgcode', None)}]: {e.orig}", details)
-
+        data = await self.data_manager.query(resource, backend_query, return_meta=meta)
         return data, meta
