@@ -1,6 +1,4 @@
-import inspect
 import secrets
-import datetime
 from collections.abc import Mapping
 
 from pyrsistent import PClass
@@ -8,6 +6,7 @@ from pyrsistent import PClass
 from fluvius.data.identifier import identifier_factory  # noqa
 from fluvius.helper.timeutil import timestamp
 from fluvius.data.data_model import DataModel, BlankModel
+from types import SimpleNamespace
 
 
 NONE_TYPE = type(None)
@@ -31,7 +30,7 @@ def serialize_mapping(data):
     if isinstance(data, DataModel):
         return data.model_dump()
 
-    if isinstance(data, BlankModel):
+    if isinstance(data, (BlankModel, SimpleNamespace)):
         return data.__dict__
 
     if isinstance(data, PClass):

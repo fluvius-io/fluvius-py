@@ -72,30 +72,30 @@ def sqla_error_handler(code_prefix):
             except asyncpg.exceptions.UniqueViolationError as e:
                 raise UnprocessableError(
                     f"{code_prefix}.01",
-                    "Duplicate entry detected. Record must be unique.",
+                    f"Duplicate entry detected. Record must be unique. [{e.orig.pgcode}]",
                     str(e.orig)
                 )
             except exc.IntegrityError as e:
                 raise UnprocessableError(
                     f"{code_prefix}.02",
-                    "Integrity constraint violated. Please check your input.",
+                    f"Integrity constraint violated. Please check your input. [{e.orig.pgcode}]",
                     str(e.orig)
                 )
             except exc.OperationalError as e:
-                raise InternalServerError(
+                raise UnprocessableError(
                     f"{code_prefix}.03",
-                    "The database is currently unreachable. Please try again later.",
+                    f"The database is currently unreachable. Please try again later. [{e.orig.pgcode}]",
                     str(e.orig)
                 )
             except exc.ProgrammingError as e:
                 if e.orig.pgcode == '42883':
                     raise BadRequestError(
                         f"{code_prefix}.04.01",
-                        "Undefined function error.",
+                        "Undefined function error [42883]. Values must be in correct format.",
                         str(e.orig)
                     )
 
-                raise InternalServerError(
+                raise UnprocessableError(
                     f"{code_prefix}.04",
                     f"There was a syntax or structure error in the database query. [{e.orig.pgcode}]",
                     str(e.orig)
@@ -108,7 +108,7 @@ def sqla_error_handler(code_prefix):
                         str(e.orig)
                     )
                 else:
-                    raise InternalServerError(
+                    raise UnprocessableError(
                         f"{code_prefix}.05",
                         f"A DBAPIError error occurred [{e.orig.pgcode}]",
                         str(e.orig)
@@ -116,14 +116,14 @@ def sqla_error_handler(code_prefix):
             except exc.NoResultFound as e:
                 raise ItemNotFoundError(
                     f"{code_prefix}.06",
-                    f"Item Not Found Error: {str(e)}",
-                    getattr(e, "orig", str(e))
+                    f"Item Not Found: {str(e)}",
+                    getattr(e, "orig", None)
                 )
             except exc.SQLAlchemyError as e:
-                raise InternalServerError(
+                raise UnprocessableError(
                     f"{code_prefix}.07",
                     "An unexpected database error occurred while processing your request.",
-                    getattr(e, "orig", str(e))
+                    getattr(e, "orig", None)
                 )
         return wrapper
     return decorator
@@ -216,11 +216,6 @@ class SqlaDriver(DataDriver, QueryBuilder):
     @property
     def dsn(self):
         return self.__db_dsn__
-
-
-    # async def disconnect(self):
-    #     async_connection = self._async_connection
-    #     await async_connection.dispose()
 
     @classmethod
     def validate_data_schema(cls, schema_model):

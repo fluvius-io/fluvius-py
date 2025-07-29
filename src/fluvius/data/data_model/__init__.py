@@ -14,7 +14,7 @@ def _create(cls, data=None, defaults=None, **kwargs):
 
     if isinstance(data, dict):
         base.update(data)
-    elif isinstance(data, (BlankModel, type)):
+    elif isinstance(data, (type, SimpleNamespace)):
         base.update(data.__dict__)
     elif isinstance(data, BaseModel):
         base.update(data.model_dump())

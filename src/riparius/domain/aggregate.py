@@ -25,40 +25,38 @@ class WorkflowAggregate(Aggregate):
     @action("workflow-updated", resources="workflow")
     async def update_workflow(self, data):
         """Update workflow properties"""
-        workflow = await self.fetch_aggroot()
-        
+
         # Build changes dictionary from provided data
         changes = data.model_dump(exclude_none=True)
-
         if not changes:
             raise ValueError("No changes provided for workflow update")
 
         # Update workflow using state manager
-        updated_workflow = await self.statemgr.update(workflow, **changes)
+        updated_workflow = await self.statemgr.update(self.rootobj, **changes)
         return updated_workflow
 
     @action("participant-added", resources="workflow")
     async def add_participant(self, data):
         """Add a participant to the workflow"""
-        workflow = await self.fetch_aggroot()
+        workflow = self.rootobj
         
         if workflow.status not in [WorkflowStatus.NEW, WorkflowStatus.ACTIVE]:
             raise ValueError(f"Cannot add participant to workflow in status {workflow.status}")
 
         # Create participant record
         participant_data = {
-            'workflow_id': workflow.id,
+            'workflow_id': workflow._id,
             'user_id': data.user_id,
             'role': data.role
         }
         
-        participant = await self.statemgr.create('workflow-participant', participant_data)
+        participant = self.statemgr.create('workflow-participant', participant_data)
         return participant
 
     @action("participant-removed", resources="workflow")
     async def remove_participant(self, data):
         """Remove a participant from the workflow"""
-        workflow = await self.fetch_aggroot()
+        workflow = self.rootobj
         
         if workflow.status not in [WorkflowStatus.NEW, WorkflowStatus.ACTIVE]:
             raise ValueError(f"Cannot remove participant from workflow in status {workflow.status}")
@@ -76,7 +74,7 @@ class WorkflowAggregate(Aggregate):
     @action("activity-processed", resources="workflow")
     async def process_activity(self, data):
         """Process workflow activity"""
-        workflow = await self.fetch_aggroot()
+        workflow = self.rootobj
         
         if workflow.status != WorkflowStatus.NEW:
             raise ValueError(f"Cannot process activity for workflow in status {workflow.status}")
@@ -87,7 +85,7 @@ class WorkflowAggregate(Aggregate):
     @action("role-added", resources="workflow")
     async def add_role(self, data):
         """Add a role to workflow"""
-        workflow = await self.fetch_aggroot()
+        workflow = self.rootobj
         
         # Implementation for adding role
         return {"status": "role_added", "role_name": data.role_name}
@@ -95,7 +93,7 @@ class WorkflowAggregate(Aggregate):
     @action("role-removed", resources="workflow")
     async def remove_role(self, data):
         """Remove a role from workflow"""
-        workflow = await self.fetch_aggroot()
+        workflow = self.rootobj
         
         # Implementation for removing role
         return {"status": "role_removed", "role_name": data.role_name}
@@ -103,7 +101,7 @@ class WorkflowAggregate(Aggregate):
     @action("workflow-started", resources="workflow")
     async def start_workflow(self, data):
         """Start a workflow"""
-        workflow = await self.fetch_aggroot()
+        workflow = self.rootobj
         
         if workflow.status != WorkflowStatus.NEW:
             raise ValueError(f"Cannot start workflow in status {workflow.status}")
@@ -114,7 +112,7 @@ class WorkflowAggregate(Aggregate):
     @action("workflow-cancelled", resources="workflow")
     async def cancel_workflow(self, data):
         """Cancel a workflow"""
-        workflow = await self.fetch_aggroot()
+        workflow = self.rootobj
         
         if workflow.status not in [WorkflowStatus.NEW, WorkflowStatus.ACTIVE]:
             raise ValueError(f"Cannot cancel workflow in status {workflow.status}")
@@ -125,7 +123,7 @@ class WorkflowAggregate(Aggregate):
     @action("step-ignored", resources="workflow")
     async def ignore_step(self, data):
         """Ignore a workflow step"""
-        workflow = await self.fetch_aggroot()
+        workflow = self.rootobj
         
         # Implementation for ignoring step
         return {"status": "step_ignored", "step_id": data.step_id}
@@ -133,7 +131,7 @@ class WorkflowAggregate(Aggregate):
     @action("step-cancelled", resources="workflow")
     async def cancel_step(self, data):
         """Cancel a workflow step"""
-        workflow = await self.fetch_aggroot()
+        workflow = self.rootobj
         
         # Implementation for canceling step
         return {"status": "step_cancelled", "step_id": data.step_id}
@@ -141,7 +139,7 @@ class WorkflowAggregate(Aggregate):
     @action("workflow-aborted", resources="workflow")
     async def abort_workflow(self, data):
         """Abort a workflow"""
-        workflow = await self.fetch_aggroot()
+        workflow = self.rootobj
         
         if workflow.status == WorkflowStatus.COMPLETED:
             raise ValueError("Cannot abort completed workflow")
@@ -152,7 +150,7 @@ class WorkflowAggregate(Aggregate):
     @action("event-injected", resources="workflow")
     async def inject_event(self, data):
         """Inject an event into the workflow"""
-        workflow = await self.fetch_aggroot()
+        workflow = self.rootobj
         
         if workflow.status not in [WorkflowStatus.NEW, WorkflowStatus.ACTIVE]:
             raise ValueError(f"Cannot inject event into workflow in status {workflow.status}")
@@ -172,7 +170,7 @@ class WorkflowAggregate(Aggregate):
     @action("trigger-sent", resources="workflow")
     async def send_trigger(self, data):
         """Send a trigger to the workflow"""
-        workflow = await self.fetch_aggroot()
+        workflow = self.rootobj
         
         if workflow.status not in [WorkflowStatus.NEW, WorkflowStatus.ACTIVE]:
             raise ValueError(f"Cannot send trigger to workflow in status {workflow.status}")
