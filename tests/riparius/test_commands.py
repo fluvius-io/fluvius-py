@@ -6,6 +6,7 @@ import json
 from fastapi import FastAPI
 from httpx import AsyncClient, ASGITransport
 from fluvius.data import UUID_GENF
+from fluvius.data.serializer.json_encoder import FluviusJSONEncoder
 from fluvius.fastapi import (
     create_app,
     configure_authentication,
@@ -27,6 +28,20 @@ PROFILE = {
     "email": "bobbylee@adaptive-bits.com",
 }
 
+# Custom AsyncClient with FluviusJSONEncoder
+class FluviusAsyncClient(AsyncClient):
+    """AsyncClient that uses FluviusJSONEncoder for JSON serialization"""
+    
+    async def request(self, method, url, **kwargs):
+        # If json data is provided, serialize it with FluviusJSONEncoder
+        if 'json' in kwargs:
+            kwargs['content'] = json.dumps(kwargs.pop('json'), cls=FluviusJSONEncoder)
+            kwargs['headers'] = kwargs.get('headers') or {}
+            kwargs['headers'].setdefault('Content-Type', 'application/json')
+        
+        return await super().request(method, url, **kwargs)
+
+
 # Test App Setup
 @pytest.fixture(scope="module")
 def test_app():
@@ -41,13 +56,12 @@ def test_app():
 
 @pytest.fixture(scope="module")
 async def async_client(test_app):
-    """Create async test client"""
-    logger.info('Creating async test client ...')
+    """Create async test client with FluviusJSONEncoder"""
     headers = {"Authorization": f"MockAuth {json.dumps(PROFILE)}"}
     
     # Use ASGITransport to connect AsyncClient to FastAPI app
     transport = ASGITransport(app=test_app)
-    async with AsyncClient(transport=transport, base_url="http://testserver", headers=headers) as client:
+    async with FluviusAsyncClient(transport=transport, base_url="http://testserver", headers=headers) as client:
         yield client
 
 
@@ -81,7 +95,7 @@ async def workflow_created_id(async_client, route_id):
     payload = {
         "title": "Test Workflow",
         "workflow_key": "sample-process",
-        "route_id": str(route_id),
+        "route_id": route_id,
         "params": {"test_param": "test_value"}
     }
     
@@ -105,7 +119,7 @@ class TestWorkflowCommands:
         payload = {
             "title": "Test Workflow",
             "workflow_key": "sample-process",
-            "route_id": str(route_id),
+            "route_id": route_id,
             "params": {"test_param": "test_value"}
         }
         
@@ -145,7 +159,7 @@ class TestWorkflowCommands:
         workflow_created_id = workflow_ids.wf01
         """Test add participant command"""
         payload = {
-            "user_id": str(user_id),
+            "user_id": user_id,
             "role": "reviewer"
         }
         
@@ -163,7 +177,7 @@ class TestWorkflowCommands:
         workflow_id = workflow_ids.wf01
         """Test remove participant command"""
         payload = {
-            "user_id": str(user_id),
+            "user_id": user_id,
             "role": "reviewer"
         }
         
@@ -269,7 +283,7 @@ class TestWorkflowCommands:
         workflow_id = workflow_ids.wf01
         """Test ignore step command"""
         payload = {
-            "step_id": str(step_id),
+            "step_id": step_id,
             "reason": "Step not required for this case"
         }
         
@@ -324,7 +338,7 @@ class TestWorkflowCommands:
         payload = {
             "event_type": "external_approval",
             "event_data": {"source": "external_system", "approval_id": "ext-001"},
-            "target_step_id": str(step_id),
+            "target_step_id": step_id,
             "priority": 1
         }
         
@@ -348,7 +362,7 @@ class TestWorkflowCommands:
         payload = {
             "trigger_type": "time_based",
             "trigger_data": {"schedule": "daily", "time": "09:00"},
-            "target_id": str(workflow_id),
+            "target_id": workflow_id,
             "delay_seconds": 300
         }
         
