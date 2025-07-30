@@ -1,6 +1,5 @@
 """Test FastAPI queries for WorkflowQueryManager using HTTPX AsyncClient"""
 
-import asyncio
 import pytest
 import json
 from httpx import ASGITransport
@@ -14,7 +13,7 @@ from fluvius.fastapi import (
 from riparius.domain import WorkflowDomain, WorkflowQueryManager
 from riparius import logger
 
-from .conftest import FluviusAsyncClient
+import conftest
 
 PROFILE = {
     "jti": "ffffffff-34cd-42ba-8585-8ff5a5b707d3",
@@ -28,14 +27,6 @@ PROFILE = {
 }
 
 NAMESPACE = "process"
-
-# # Test App Setup
-# @pytest.fixture(scope="module")
-# def event_loop():
-#     """Create an instance of the default event loop for the test session."""
-#     loop = asyncio.get_event_loop_policy().new_event_loop()
-#     yield loop
-#     loop.close()
 
 
 @pytest.fixture(scope="module")
@@ -57,7 +48,7 @@ async def async_client(test_app):
 
     # Use ASGITransport to connect AsyncClient to FastAPI app
     transport = ASGITransport(app=test_app)
-    async with FluviusAsyncClient(transport=transport, base_url="http://testserver", headers=headers) as client:
+    async with conftest.FluviusAsyncClient(transport=transport, base_url="http://testserver", headers=headers) as client:
         yield client
 
 
@@ -80,268 +71,268 @@ def step_id():
     return UUID_GENF("test-step-query-001")
 
 
-# # Query Tests
-# class TestWorkflowQueries:
-#     """Test workflow query endpoints"""
+# Query Tests
+class TestWorkflowQueries:
+    """Test workflow query endpoints"""
 
-#     @pytest.mark.asyncio(loop_scope="module")
-#     async def test_workflow_query_basic(self, async_client):
-#         """Test basic workflow query without parameters"""
-#         response = await async_client.get(f"/{NAMESPACE}.workflow/")
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_workflow_query_basic(self, async_client):
+        """Test basic workflow query without parameters"""
+        response = await async_client.get(f"/{NAMESPACE}.workflow/")
         
-#         data = response.json()
-#         assert response.status_code == 200, f"Invalid response: {data}"
-#         assert "data" in data
-#         assert "pagination" in data
-#         assert isinstance(data["data"], list)
+        data = response.json()
+        assert response.status_code == 200, f"Invalid response: {data}"
+        assert "data" in data
+        assert "pagination" in data
+        assert isinstance(data["data"], list)
 
-#     @pytest.mark.asyncio(loop_scope="module")
-#     async def test_workflow_query_with_parameters(self, async_client):
-#         """Test workflow query with query parameters"""
-#         query_params = {
-#             "size": 10,
-#             "page": 1,
-#             "query": json.dumps({"status": "ACTIVE"})
-#         }
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_workflow_query_with_parameters(self, async_client):
+        """Test workflow query with query parameters"""
+        query_params = {
+            "limit": 10,
+            "page": 1,
+            "query": json.dumps({"status": "ACTIVE"})
+        }
         
-#         response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
+        response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
-#         data = response.json()
-#         assert response.status_code == 200, f"Invalid response: {data}"
-#         assert "data" in data
-#         assert "pagination" in data
-#         assert len(data["data"]) <= 10  # Respects size limit
+        data = response.json()
+        assert response.status_code == 200, f"Invalid response: {data}"
+        assert "data" in data
+        assert "pagination" in data
+        assert len(data["data"]) <= 10  # Respects size limit
 
-#     @pytest.mark.asyncio(loop_scope="module")
-#     async def test_workflow_query_with_search(self, async_client):
-#         """Test workflow query with search parameters"""
-#         search_params = {
-#             "q": json.dumps({"title!has": "test"}),
-#             "size": 5
-#         }
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_workflow_query_with_search(self, async_client):
+        """Test workflow query with search parameters"""
+        search_params = {
+            "q": json.dumps({"title!has": "test"}),
+            "limit": 5
+        }
         
-#         response = await async_client.get(f"/{NAMESPACE}.workflow/", params=search_params)
+        response = await async_client.get(f"/{NAMESPACE}.workflow/", params=search_params)
         
-#         assert response.status_code == 200
-#         data = response.json()
-#         assert "data" in data
-#         assert "pagination" in data
+        assert response.status_code == 200
+        data = response.json()
+        assert "data" in data
+        assert "pagination" in data
 
-#     @pytest.mark.asyncio(loop_scope="module")
-#     async def test_workflow_query_with_complex_filter(self, async_client):
-#         """Test workflow query with complex filter conditions"""
-#         complex_query = {
-#             "!or": [
-#                 {"status": "ACTIVE"},
-#                 {"status": "PAUSED"}
-#             ]
-#         }
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_workflow_query_with_complex_filter(self, async_client):
+        """Test workflow query with complex filter conditions"""
+        complex_query = {
+            "!or": [
+                {"status": "ACTIVE"},
+                {"status": "PAUSED"}
+            ]
+        }
         
-#         query_params = {
-#             "query": json.dumps(complex_query),
-#             "size": 20
-#         }
+        query_params = {
+            "query": json.dumps(complex_query),
+            "limit": 20
+        }
         
-#         response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
+        response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
-#         assert response.status_code == 200
-#         data = response.json()
-#         assert "data" in data
-#         assert "pagination" in data
+        assert response.status_code == 200
+        data = response.json()
+        assert "data" in data
+        assert "pagination" in data
 
-#     @pytest.mark.asyncio(loop_scope="module")
-#     async def test_workflow_embed_query(self, async_client):
-#         """Test workflow embed query (full workflow data)"""
-#         response = await async_client.get(f"/{NAMESPACE}.workflow-embed/")
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_workflow_embed_query(self, async_client):
+        """Test workflow embed query (full workflow data)"""
+        response = await async_client.get(f"/{NAMESPACE}.workflow-embed/")
         
-#         assert response.status_code == 200
-#         data = response.json()
-#         assert "data" in data
-#         assert "pagination" in data
-#         assert isinstance(data["data"], list)
+        assert response.status_code == 200
+        data = response.json()
+        assert "data" in data
+        assert "pagination" in data
+        assert isinstance(data["data"], list)
 
-#     @pytest.mark.asyncio(loop_scope="module")
-#     async def test_workflow_step_query(self, async_client, workflow_id):
-#         """Test workflow step query with scoping"""
-#         # Test with scoped workflow ID
-#         response = await async_client.get(f"/{NAMESPACE}.workflow-step/workflow_id={workflow_id}/")
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_workflow_step_query(self, async_client, workflow_id):
+        """Test workflow step query with scoping"""
+        # Test with scoped workflow ID
+        response = await async_client.get(f"/{NAMESPACE}.workflow-step/workflow_id={workflow_id}/")
         
-#         data = response.json()
-#         assert response.status_code == 200, f"Invalid data {data}"
-#         assert "data" in data
-#         assert "pagination" in data
-#         assert isinstance(data["data"], list)
+        data = response.json()
+        assert response.status_code == 200, f"Invalid data {data}"
+        assert "data" in data
+        assert "pagination" in data
+        assert isinstance(data["data"], list)
 
-#     @pytest.mark.asyncio(loop_scope="module")
-#     async def test_workflow_step_query_with_filters(self, async_client, workflow_id):
-#         """Test workflow step query with additional filters"""
-#         query_params = {
-#             "query": json.dumps({"status": "ACTIVE"}),
-#             "size": 10
-#         }
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_workflow_step_query_with_filters(self, async_client, workflow_id):
+        """Test workflow step query with additional filters"""
+        query_params = {
+            "query": json.dumps({"status": "ACTIVE"}),
+            "limit": 10
+        }
         
-#         response = await async_client.get(
-#             f"/{NAMESPACE}.workflow-step/workflow_id={workflow_id}/",
-#             params=query_params
-#         )
+        response = await async_client.get(
+            f"/{NAMESPACE}.workflow-step/workflow_id={workflow_id}/",
+            params=query_params
+        )
         
-#         assert response.status_code == 200
-#         data = response.json()
-#         assert "data" in data
-#         assert "pagination" in data
+        assert response.status_code == 200
+        data = response.json()
+        assert "data" in data
+        assert "pagination" in data
 
-#     @pytest.mark.asyncio(loop_scope="module")
-#     async def test_workflow_participant_query(self, async_client, workflow_id):
-#         """Test workflow participant query"""
-#         response = await async_client.get(f"/{NAMESPACE}.workflow-participant/workflow_id={workflow_id}/")
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_workflow_participant_query(self, async_client, workflow_id):
+        """Test workflow participant query"""
+        response = await async_client.get(f"/{NAMESPACE}.workflow-participant/workflow_id={workflow_id}/")
         
-#         assert response.status_code == 200
-#         data = response.json()
-#         assert "data" in data
-#         assert "pagination" in data
-#         assert isinstance(data["data"], list)
+        assert response.status_code == 200
+        data = response.json()
+        assert "data" in data
+        assert "pagination" in data
+        assert isinstance(data["data"], list)
 
-#     @pytest.mark.asyncio(loop_scope="module")
-#     async def test_workflow_participant_query_with_role_filter(self, async_client, workflow_id):
-#         """Test workflow participant query with role filter"""
-#         query_params = {
-#             "query": json.dumps({"role": "reviewer"}),
-#             "size": 5
-#         }
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_workflow_participant_query_with_role_filter(self, async_client, workflow_id):
+        """Test workflow participant query with role filter"""
+        query_params = {
+            "query": json.dumps({"role": "reviewer"}),
+            "limit": 5
+        }
         
-#         response = await async_client.get(
-#             f"/{NAMESPACE}.workflow-participant/workflow_id={workflow_id}/",
-#             params=query_params
-#         )
+        response = await async_client.get(
+            f"/{NAMESPACE}.workflow-participant/workflow_id={workflow_id}/",
+            params=query_params
+        )
         
-#         assert response.status_code == 200
-#         data = response.json()
-#         assert "data" in data
-#         assert "pagination" in data
+        assert response.status_code == 200
+        data = response.json()
+        assert "data" in data
+        assert "pagination" in data
 
-#     @pytest.mark.asyncio(loop_scope="module")
-#     async def test_workflow_stage_query(self, async_client, workflow_id):
-#         """Test workflow stage query"""
-#         response = await async_client.get(f"/{NAMESPACE}.workflow-stage/workflow_id={workflow_id}/")
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_workflow_stage_query(self, async_client, workflow_id):
+        """Test workflow stage query"""
+        response = await async_client.get(f"/{NAMESPACE}.workflow-stage/workflow_id={workflow_id}/")
         
-#         assert response.status_code == 200
-#         data = response.json()
-#         assert "data" in data
-#         assert "pagination" in data
-#         assert isinstance(data["data"], list)
+        assert response.status_code == 200
+        data = response.json()
+        assert "data" in data
+        assert "pagination" in data
+        assert isinstance(data["data"], list)
 
-#     @pytest.mark.asyncio(loop_scope="module")
-#     async def test_workflow_stage_query_with_order_filter(self, async_client, workflow_id):
-#         """Test workflow stage query with order filter"""
-#         query_params = {
-#             "query": json.dumps({"order!gte": 1}),
-#             "sort": "order"
-#         }
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_workflow_stage_query_with_order_filter(self, async_client, workflow_id):
+        """Test workflow stage query with order filter"""
+        query_params = {
+            "query": json.dumps({"order!gte": 1}),
+            "sort": "order"
+        }
         
-#         response = await async_client.get(
-#             f"/{NAMESPACE}.workflow-stage/workflow_id={workflow_id}/",
-#             params=query_params
-#         )
+        response = await async_client.get(
+            f"/{NAMESPACE}.workflow-stage/workflow_id={workflow_id}/",
+            params=query_params
+        )
         
-#         data = response.json()
-#         assert response.status_code == 200, f"Invalid data: {data}"
-#         assert "data" in data
-#         assert "pagination" in data
-
-
-# class TestQueryPagination:
-#     """Test query pagination functionality"""
-
-#     @pytest.mark.asyncio(loop_scope="module")
-#     async def test_pagination_first_page(self, async_client):
-#         """Test first page of workflow query"""
-#         query_params = {
-#             "limit": 3,
-#             "page": 1
-#         }
-        
-#         response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
-        
-#         assert response.status_code == 200
-#         data = response.json()
-#         assert len(data["data"]) <= 3
-#         assert "pagination" in data
-#         assert data["pagination"]["page"] == 1
-
-#     @pytest.mark.asyncio(loop_scope="module")
-#     async def test_pagination_second_page(self, async_client):
-#         """Test second page of workflow query"""
-#         query_params = {
-#             "limit": 3,
-#             "page": 2
-#         }
-        
-#         response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
-        
-#         assert response.status_code == 200
-#         data = response.json()
-#         assert "pagination" in data
-#         assert data["pagination"]["page"] == 2
-
-#     @pytest.mark.asyncio(loop_scope="module")
-#     async def test_large_page_size(self, async_client):
-#         """Test query with large page size"""
-#         query_params = {
-#             "size": 100,
-#             "page": 1
-#         }
-        
-#         response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
-        
-#         assert response.status_code == 200
-#         data = response.json()
-#         assert len(data["data"]) <= 100
+        data = response.json()
+        assert response.status_code == 200, f"Invalid data: {data}"
+        assert "data" in data
+        assert "pagination" in data
 
 
-# class TestQuerySorting:
-#     """Test query sorting functionality"""
+class TestQueryPagination:
+    """Test query pagination functionality"""
 
-#     @pytest.mark.asyncio(loop_scope="module")
-#     async def test_sort_by_title(self, async_client):
-#         """Test sorting workflows by title"""
-#         query_params = {
-#             "sort": "title",
-#             "size": 10
-#         }
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_pagination_first_page(self, async_client):
+        """Test first page of workflow query"""
+        query_params = {
+            "limit": 3,
+            "page": 1
+        }
         
-#         response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
+        response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
-#         assert response.status_code == 200
-#         data = response.json()
-#         assert "data" in data
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["data"]) <= 3
+        assert "pagination" in data
+        assert data["pagination"]["page"] == 1
 
-#     @pytest.mark.asyncio(loop_scope="module")
-#     async def test_sort_by_creation_time(self, async_client):
-#         """Test sorting workflows by creation time"""
-#         query_params = {
-#             "sort": "ts_start.desc",  # Descending order
-#             "size": 10
-#         }
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_pagination_second_page(self, async_client):
+        """Test second page of workflow query"""
+        query_params = {
+            "limit": 3,
+            "page": 2
+        }
         
-#         response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
+        response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
-#         assert response.status_code == 200
-#         data = response.json()
-#         assert "data" in data
+        assert response.status_code == 200
+        data = response.json()
+        assert "pagination" in data
+        assert data["pagination"]["page"] == 2
 
-#     @pytest.mark.asyncio(loop_scope="module")
-#     async def test_multiple_sort_fields(self, async_client):
-#         """Test sorting by multiple fields"""
-#         query_params = {
-#             "sort": "status,title",
-#             "size": 10
-#         }
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_large_page_size(self, async_client):
+        """Test query with large page size"""
+        query_params = {
+            "limit": 100,
+            "page": 1
+        }
         
-#         response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
+        response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
         
-#         assert response.status_code == 200
-#         data = response.json()
-#         assert "data" in data
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["data"]) <= 100
+
+
+class TestQuerySorting:
+    """Test query sorting functionality"""
+
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_sort_by_title(self, async_client):
+        """Test sorting workflows by title"""
+        query_params = {
+            "sort": "title",
+            "limit": 10
+        }
+        
+        response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "data" in data
+
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_sort_by_creation_time(self, async_client):
+        """Test sorting workflows by creation time"""
+        query_params = {
+            "sort": "ts_start.desc",  # Descending order
+            "limit": 10
+        }
+        
+        response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "data" in data
+
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_multiple_sort_fields(self, async_client):
+        """Test sorting by multiple fields"""
+        query_params = {
+            "sort": "status,title",
+            "limit": 10
+        }
+        
+        response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "data" in data
 
 
 class TestQueryValidation:
@@ -364,7 +355,7 @@ class TestQueryValidation:
         """Test query with invalid page number"""
         query_params = {
             "page": -1,
-            "size": 10
+            "limit": 10
         }
         
         response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
@@ -376,7 +367,7 @@ class TestQueryValidation:
     async def test_invalid_size_parameter(self, async_client):
         """Test query with invalid size parameter"""
         query_params = {
-            "size": -5,
+            "limit": -5,
             "page": 1
         }
         
@@ -403,7 +394,7 @@ class TestQueryFieldFiltering:
         """Test filtering workflows by status"""
         query_params = {
             "query": json.dumps({"status": "ACTIVE"}),
-            "size": 10
+            "limit": 10
         }
         
         response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
@@ -417,7 +408,7 @@ class TestQueryFieldFiltering:
         """Test filtering workflows by title containing text"""
         query_params = {
             "query": json.dumps({"title!has": "test"}),
-            "size": 10
+            "limit": 10
         }
         
         response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
@@ -434,7 +425,7 @@ class TestQueryFieldFiltering:
                 "ts_start!gte": "2024-01-01T00:00:00.000000Z",
                 "ts_start!lte": "2024-12-31T23:59:59.999999Z"
             }),
-            "size": 10
+            "limit": 10
         }
         
         response = await async_client.get(f"/{NAMESPACE}.workflow/", params=query_params)
@@ -448,7 +439,7 @@ class TestQueryFieldFiltering:
         """Test filtering workflow steps by status"""
         query_params = {
             "query": json.dumps({"status": "COMPLETED"}),
-            "size": 10
+            "limit": 10
         }
         
         response = await async_client.get(

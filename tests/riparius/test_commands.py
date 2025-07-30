@@ -14,7 +14,7 @@ from riparius.domain import WorkflowDomain, WorkflowQueryManager
 from riparius import logger
 from types import SimpleNamespace
 
-from .conftest import FluviusAsyncClient
+import conftest
 
 PROFILE = {
     "jti": "cccccccc-34cd-42ba-8585-8ff5a5b707d3",
@@ -49,7 +49,7 @@ async def async_client(test_app):
     
     # Use ASGITransport to connect AsyncClient to FastAPI app
     transport = ASGITransport(app=test_app)
-    async with FluviusAsyncClient(transport=transport, base_url="http://testserver", headers=headers) as client:
+    async with conftest.FluviusAsyncClient(transport=transport, base_url="http://testserver", headers=headers) as client:
         yield client
 
 
