@@ -465,8 +465,8 @@ class TestQueryFieldFiltering:
         )
 
         data = response.json()
-        assert response.status_code == 200, f"Invalid data: {data}"
-        assert "data" in data
+        assert response.status_code == 422, f"Invalid data: {data}"
+        assert "errcode" in data
 
 
 class TestQueryMetadata:
