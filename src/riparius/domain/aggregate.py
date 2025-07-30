@@ -62,10 +62,10 @@ class WorkflowAggregate(Aggregate):
             raise ValueError(f"Cannot remove participant from workflow in status {workflow.status}")
 
         # Find and remove participant
-        participant = await self.statemgr.fetch('workflow-participant', 
-                                               workflow_id=workflow.id, 
+        participant = await self.statemgr.find_one('workflow-participant', where=dict(
+                                               workflow_id=workflow._id,
                                                user_id=data.user_id,
-                                               role=data.role if data.role else None)
+                                               role=data.role if data.role else None))
         if participant:
             await self.statemgr.delete(participant)
         
@@ -159,7 +159,7 @@ class WorkflowAggregate(Aggregate):
         event_result = {
             "status": "event_injected",
             "event_type": data.event_type,
-            "workflow_id": workflow.id,
+            "workflow_id": workflow._id,
             "target_step_id": data.target_step_id,
             "priority": data.priority,
             "timestamp": timestamp()
@@ -179,7 +179,7 @@ class WorkflowAggregate(Aggregate):
         trigger_result = {
             "status": "trigger_sent",
             "trigger_type": data.trigger_type,
-            "workflow_id": workflow.id,
+            "workflow_id": workflow._id,
             "target_id": data.target_id,
             "delay_seconds": data.delay_seconds,
             "timestamp": timestamp()

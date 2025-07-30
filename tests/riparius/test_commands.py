@@ -14,6 +14,7 @@ from fluvius.fastapi import (
 )
 from riparius.domain import WorkflowDomain, WorkflowQueryManager
 from riparius import logger
+from types import SimpleNamespace
 
 PROFILE = {
     "jti": "cccccccc-34cd-42ba-8585-8ff5a5b707d3",
@@ -54,8 +55,7 @@ async def async_client(test_app):
 @pytest.fixture(scope="module")
 def workflow_ids():
     """Generate test workflow ID"""
-    return []
-
+    return SimpleNamespace()
 
 @pytest.fixture(scope="module")
 def route_id():
@@ -119,11 +119,11 @@ class TestWorkflowCommands:
         assert response.status_code == 200
         assert data["status"] == "OK"
         assert "data" in data
-        workflow_ids.append(data["data"]["workflow-response"]["_id"])
+        workflow_ids.wf01 = data["data"]["workflow-response"]["_id"]
 
     @pytest.mark.asyncio(loop_scope="module")
     async def test_update_workflow(self, async_client, workflow_ids):
-        workflow_created_id = workflow_ids[0]
+        workflow_created_id = workflow_ids.wf01
         """Test update workflow command"""
         payload = {
             "title": "Updated Workflow Title",
@@ -142,7 +142,7 @@ class TestWorkflowCommands:
 
     @pytest.mark.asyncio(loop_scope="module")
     async def test_add_participant(self, async_client, workflow_ids, user_id):
-        workflow_created_id = workflow_ids[0]
+        workflow_created_id = workflow_ids.wf01
         """Test add participant command"""
         payload = {
             "user_id": str(user_id),
@@ -158,254 +158,273 @@ class TestWorkflowCommands:
         data = response.json()
         assert data["status"] == "OK"
 
-#     @pytest.mark.asyncio(loop_scope="module")
-#     async def test_remove_participant(self, async_client, workflow_id, user_id):
-#         """Test remove participant command"""
-#         payload = {
-#             "user_id": str(user_id),
-#             "role": "reviewer"
-#         }
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_remove_participant(self, async_client, workflow_ids, user_id):
+        workflow_id = workflow_ids.wf01
+        """Test remove participant command"""
+        payload = {
+            "user_id": str(user_id),
+            "role": "reviewer"
+        }
         
-#         response = await async_client.post(
-#             f"/process:remove-participant/workflow/{workflow_id}",
-#             json=payload
-#         )
+        response = await async_client.post(
+            f"/process:remove-participant/workflow/{workflow_id}",
+            json=payload
+        )
         
-#         assert response.status_code == 200
-#         data = response.json()
-#         assert data["status"] == "OK"
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "OK"
 
-#     @pytest.mark.asyncio(loop_scope="module")
-#     async def test_process_activity(self, async_client, workflow_id):
-#         """Test process activity command"""
-#         payload = {
-#             "activity_type": "approval",
-#             "params": {"decision": "approved"}
-#         }
-        
-#         response = await async_client.post(
-#             f"/process:process-activity/workflow/{workflow_id}",
-#             json=payload
-#         )
-        
-#         assert response.status_code == 200
-#         data = response.json()
-#         assert data["status"] == "OK"
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_process_activity(self, async_client, workflow_ids):
+        """Test process activity command"""
+        workflow_id = workflow_ids.wf01
 
-#     @pytest.mark.asyncio(loop_scope="module")
-#     async def test_add_role(self, async_client, workflow_id):
-#         """Test add role command"""
-#         payload = {
-#             "role_name": "approver",
-#             "permissions": ["read", "approve", "comment"]
-#         }
+        payload = {
+            "activity_type": "approval",
+            "params": {"decision": "approved"}
+        }
         
-#         response = await async_client.post(
-#             f"/process:add-role/workflow/{workflow_id}",
-#             json=payload
-#         )
+        response = await async_client.post(
+            f"/process:process-activity/workflow/{workflow_id}",
+            json=payload
+        )
         
-#         assert response.status_code == 200
-#         data = response.json()
-#         assert data["status"] == "OK"
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "OK"
 
-#     @pytest.mark.asyncio(loop_scope="module")
-#     async def test_remove_role(self, async_client, workflow_id):
-#         """Test remove role command"""
-#         payload = {
-#             "role_name": "approver"
-#         }
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_add_role(self, async_client, workflow_ids):
+        workflow_id = workflow_ids.wf01
+        """Test add role command"""
+        payload = {
+            "role_name": "approver",
+            "permissions": ["read", "approve", "comment"]
+        }
         
-#         response = await async_client.post(
-#             f"/process:remove-role/workflow/{workflow_id}",
-#             json=payload
-#         )
+        response = await async_client.post(
+            f"/process:add-role/workflow/{workflow_id}",
+            json=payload
+        )
         
-#         assert response.status_code == 200
-#         data = response.json()
-#         assert data["status"] == "OK"
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "OK"
 
-#     @pytest.mark.asyncio(loop_scope="module")
-#     async def test_start_workflow(self, async_client, workflow_id):
-#         """Test start workflow command"""
-#         payload = {
-#             "start_params": {"initial_state": "ready"}
-#         }
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_remove_role(self, async_client, workflow_ids):
+        workflow_id = workflow_ids.wf01
+        """Test remove role command"""
+        payload = {
+            "role_name": "approver"
+        }
         
-#         response = await async_client.post(
-#             f"/process:start-workflow/workflow/{workflow_id}",
-#             json=payload
-#         )
+        response = await async_client.post(
+            f"/process:remove-role/workflow/{workflow_id}",
+            json=payload
+        )
         
-#         assert response.status_code == 200
-#         data = response.json()
-#         assert data["status"] == "OK"
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "OK"
 
-#     @pytest.mark.asyncio(loop_scope="module")
-#     async def test_cancel_workflow(self, async_client, workflow_id):
-#         """Test cancel workflow command"""
-#         payload = {
-#             "reason": "User requested cancellation"
-#         }
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_start_workflow(self, async_client, workflow_ids):
+        workflow_id = workflow_ids.wf01
+        """Test start workflow command"""
+        payload = {
+            "start_params": {"initial_state": "ready"}
+        }
         
-#         response = await async_client.post(
-#             f"/process:cancel-workflow/workflow/{workflow_id}",
-#             json=payload
-#         )
+        response = await async_client.post(
+            f"/process:start-workflow/workflow/{workflow_id}",
+            json=payload
+        )
         
-#         assert response.status_code == 200
-#         data = response.json()
-#         assert data["status"] == "OK"
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "OK"
 
-#     @pytest.mark.asyncio(loop_scope="module")
-#     async def test_ignore_step(self, async_client, workflow_id, step_id):
-#         """Test ignore step command"""
-#         payload = {
-#             "step_id": str(step_id),
-#             "reason": "Step not required for this case"
-#         }
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_cancel_workflow(self, async_client, workflow_ids):
+        workflow_id = workflow_ids.wf01
+        """Test cancel workflow command"""
+        payload = {
+            "reason": "User requested cancellation"
+        }
         
-#         response = await async_client.post(
-#             f"/process:ignore-step/workflow/{workflow_id}",
-#             json=payload
-#         )
+        response = await async_client.post(
+            f"/process:cancel-workflow/workflow/{workflow_id}",
+            json=payload
+        )
         
-#         assert response.status_code == 200
-#         data = response.json()
-#         assert data["status"] == "OK"
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "OK"
 
-#     @pytest.mark.asyncio(loop_scope="module")
-#     async def test_cancel_step(self, async_client, workflow_id, step_id):
-#         """Test cancel step command"""
-#         payload = {
-#             "step_id": str(step_id),
-#             "reason": "Step cannot be completed"
-#         }
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_ignore_step(self, async_client, workflow_ids, step_id):
+        workflow_id = workflow_ids.wf01
+        """Test ignore step command"""
+        payload = {
+            "step_id": str(step_id),
+            "reason": "Step not required for this case"
+        }
         
-#         response = await async_client.post(
-#             f"/process:cancel-step/workflow/{workflow_id}",
-#             json=payload
-#         )
+        response = await async_client.post(
+            f"/process:ignore-step/workflow/{workflow_id}",
+            json=payload
+        )
         
-#         assert response.status_code == 200
-#         data = response.json()
-#         assert data["status"] == "OK"
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "OK"
 
-#     @pytest.mark.asyncio(loop_scope="module")
-#     async def test_abort_workflow(self, async_client, workflow_id):
-#         """Test abort workflow command"""
-#         payload = {
-#             "reason": "Critical error occurred"
-#         }
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_cancel_step(self, async_client, workflow_ids, step_id):
+        workflow_id = workflow_ids.wf01
+        """Test cancel step command"""
+        payload = {
+            "step_id": str(step_id),
+            "reason": "Step cannot be completed"
+        }
         
-#         response = await async_client.post(
-#             f"/process:abort-workflow/workflow/{workflow_id}",
-#             json=payload
-#         )
+        response = await async_client.post(
+            f"/process:cancel-step/workflow/{workflow_id}",
+            json=payload
+        )
         
-#         assert response.status_code == 200
-#         data = response.json()
-#         assert data["status"] == "OK"
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "OK"
 
-#     @pytest.mark.asyncio(loop_scope="module")
-#     async def test_inject_event(self, async_client, workflow_id, step_id):
-#         """Test inject event command"""
-#         payload = {
-#             "event_type": "external_approval",
-#             "event_data": {"source": "external_system", "approval_id": "ext-001"},
-#             "target_step_id": str(step_id),
-#             "priority": 1
-#         }
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_abort_workflow(self, async_client, workflow_ids):
+        workflow_id = workflow_ids.wf01
+        """Test abort workflow command"""
+        payload = {
+            "reason": "Critical error occurred"
+        }
         
-#         response = await async_client.post(
-#             f"/process:inject-event/workflow/{workflow_id}",
-#             json=payload
-#         )
+        response = await async_client.post(
+            f"/process:abort-workflow/workflow/{workflow_id}",
+            json=payload
+        )
         
-#         assert response.status_code == 200
-#         data = response.json()
-#         assert data["status"] == "OK"
-#         # Verify event injection response
-#         event_response = data["data"][0]  # First response item
-#         assert event_response["event_type"] == "external_approval"
-#         assert event_response["status"] == "event_injected"
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "OK"
 
-#     @pytest.mark.asyncio(loop_scope="module")
-#     async def test_send_trigger(self, async_client, workflow_id):
-#         """Test send trigger command"""
-#         payload = {
-#             "trigger_type": "time_based",
-#             "trigger_data": {"schedule": "daily", "time": "09:00"},
-#             "target_id": str(workflow_id),
-#             "delay_seconds": 300
-#         }
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_inject_event(self, async_client, workflow_ids, step_id):
+        workflow_id = workflow_ids.wf01
+        """Test inject event command"""
+        payload = {
+            "event_type": "external_approval",
+            "event_data": {"source": "external_system", "approval_id": "ext-001"},
+            "target_step_id": str(step_id),
+            "priority": 1
+        }
         
-#         response = await async_client.post(
-#             f"/process:send-trigger/workflow/{workflow_id}",
-#             json=payload
-#         )
+        response = await async_client.post(
+            f"/process:inject-event/workflow/{workflow_id}",
+            json=payload
+        )
         
-#         assert response.status_code == 200
-#         data = response.json()
-#         assert data["status"] == "OK"
-#         # Verify trigger response
-#         trigger_response = data["data"][0]  # First response item
-#         assert trigger_response["trigger_type"] == "time_based"
-#         assert trigger_response["status"] == "trigger_sent"
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "OK"
+        # Verify event injection response
+        event_response = data["data"]['workflow-response']  # First response item
+        assert event_response["event_type"] == "external_approval"
+        assert event_response["status"] == "event_injected"
+
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_send_trigger(self, async_client, workflow_ids):
+        """Test send trigger command"""
+        workflow_id = workflow_ids.wf01
+        payload = {
+            "trigger_type": "time_based",
+            "trigger_data": {"schedule": "daily", "time": "09:00"},
+            "target_id": str(workflow_id),
+            "delay_seconds": 300
+        }
+        
+        response = await async_client.post(
+            f"/process:send-trigger/workflow/{workflow_id}",
+            json=payload
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "OK"
+        # Verify trigger response
+        trigger_response = data["data"]['workflow-response']  # First response item
+        assert trigger_response["trigger_type"] == "time_based"
+        assert trigger_response["status"] == "trigger_sent"
 
 
-# class TestCommandValidation:
-#     """Test command validation and error handling"""
+class TestCommandValidation:
+    """Test command validation and error handling"""
 
-#     def test_create_workflow_missing_required_fields(self, client):
-#         """Test create workflow with missing required fields"""
-#         payload = {
-#             "title": "Test Workflow"
-#             # Missing workflow_key and route_id
-#         }
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_create_workflow_missing_required_fields(self, async_client):
+        """Test create workflow with missing required fields"""
+        payload = {
+            "title": "Test Workflow"
+            # Missing workflow_key and route_id
+        }
         
-#         response = client.post(
-#             "/process:create-workflow/workflow/:new",
-#             json=payload
-#         )
+        response = await async_client.post(
+            "/process:create-workflow/workflow/:new",
+            json=payload
+        )
         
-#         assert response.status_code == 422  # Validation error
+        assert response.status_code == 422  # Validation error
 
-#     def test_inject_event_missing_event_type(self, client, workflow_id):
-#         """Test inject event with missing event type"""
-#         payload = {
-#             "event_data": {"test": "data"}
-#             # Missing event_type
-#         }
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_inject_event_missing_event_type(self, async_client, workflow_ids):
+        workflow_id = workflow_ids.wf01
+        """Test inject event with missing event type"""
+        payload = {
+            "event_data": {"test": "data"}
+            # Missing event_type
+        }
         
-#         response = client.post(
-#             f"/{NAMESPACE}:inject-event/workflow/{workflow_id}",
-#             json=payload
-#         )
+        response = await async_client.post(
+            f"/{NAMESPACE}:inject-event/workflow/{workflow_id}",
+            json=payload
+        )
         
-#         assert response.status_code == 422  # Validation error
+        assert response.status_code == 422  # Validation error
 
-#     def test_send_trigger_missing_trigger_type(self, client, workflow_id):
-#         """Test send trigger with missing trigger type"""
-#         payload = {
-#             "trigger_data": {"test": "data"}
-#             # Missing trigger_type
-#         }
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_send_trigger_missing_trigger_type(self, async_client, workflow_ids):
+        """Test send trigger with missing trigger type"""
+        workflow_id = workflow_ids.wf01
+
+        payload = {
+            "trigger_data": {"test": "data"}
+            # Missing trigger_type
+        }
         
-#         response = client.post(
-#             f"/{NAMESPACE}:send-trigger/workflow/{str(workflow_id)}",
-#             json=payload
-#         )
+        response = await async_client.post(
+            f"/{NAMESPACE}:send-trigger/workflow/{str(workflow_id)}",
+            json=payload
+        )
         
-#         assert response.status_code == 422  # Validation error
+        assert response.status_code == 422  # Validation error
 
 
 class TestDomainMetadata:
     """Test domain metadata endpoints"""
 
-    def test_domain_metadata(self, client):
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_domain_metadata(self, async_client):
         """Test workflow domain metadata endpoint"""
-        response = client.get(f"/_meta/{NAMESPACE}/")
+        response = await async_client.get(f"/_meta/{NAMESPACE}/")
         
         assert response.status_code == 200
         data = response.json()
@@ -417,9 +436,10 @@ class TestDomainMetadata:
         assert "inject-event" in command_keys
         assert "send-trigger" in command_keys
 
-    def test_application_metadata(self, client):
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_application_metadata(self, async_client):
         """Test application metadata endpoint"""
-        response = client.get("/_meta")
+        response = await async_client.get("/_meta")
         
         assert response.status_code == 200
         data = response.json()

@@ -242,7 +242,7 @@ class InjectEvent(Command):
 
     async def _process(self, agg, stm, payload):
         result = await agg.inject_event(payload)
-        yield agg.create_response(serialize_mapping(result), _type="event-response")
+        yield agg.create_response(serialize_mapping(result), _type="workflow-response")
 
 
 class SendTrigger(Command):
@@ -260,4 +260,4 @@ class SendTrigger(Command):
 
     async def _process(self, agg, stm, payload):
         result = await agg.send_trigger(payload)
-        yield agg.create_response(serialize_mapping(result), _type="trigger-response") 
+        yield agg.create_response(serialize_mapping(result), _type="workflow-response")

@@ -12,9 +12,10 @@ DEBUG_LOG = config.DEBUG
 class DomainLogStore(object):
     __config__ = SimpleNamespace
 
-    def __init__(self, app, **config):
+    def __init__(self, app, showlog=False, **config):
         self._app = app
         self._config = self.validate_config(config)
+        self._showlog = showlog
 
     def validate_config(self, config):
         if isinstance(config, self.__config__):
@@ -33,7 +34,7 @@ class DomainLogStore(object):
         raise NotImplementedError("DomainLogStore.commit")
 
     async def _add_entry(self, resource, entry):
-        logger.info('[DOMAIN LOG] %s => %s', resource, entry)
+        self._showlog and logger.info('[DOMAIN LOG] %s => %s', resource, entry)
         return entry
 
     async def add_activity(self, activity):

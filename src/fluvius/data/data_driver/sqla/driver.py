@@ -204,14 +204,15 @@ class SqlaDriver(DataDriver, QueryBuilder):
     def __init__(self, **kwargs):
         self._active_session = None
         DEBUG_CONNECTOR and logger.info(f'[{self.__class__.__name__}] setup with DSN: {self.dsn}')
+        dsn = self.__db_dsn__
+        if dsn is None:
+            raise ValueError(f'No database DSN provided to: {self.__class__}')
+        self._session_configuration = _AsyncSessionConfiguration(dsn)
+
 
     def __init_subclass__(cls):
         cls.__data_schema_registry__ = {}
         cls.__data_schema_base__ = create_data_schema_base(cls)
-        dsn = cls.__db_dsn__
-        if dsn is None:
-            raise ValueError(f'No database DSN provided to: {cls}')
-        cls._session_configuration = _AsyncSessionConfiguration(dsn)
 
     @property
     def dsn(self):
