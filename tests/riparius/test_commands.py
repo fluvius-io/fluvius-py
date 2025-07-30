@@ -1,12 +1,9 @@
 """Test FastAPI commands for WorkflowDomain using HTTPX AsyncClient"""
 
-import asyncio
 import pytest
 import json
-from fastapi import FastAPI
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport
 from fluvius.data import UUID_GENF
-from fluvius.data.serializer.json_encoder import FluviusJSONEncoder
 from fluvius.fastapi import (
     create_app,
     configure_authentication,
@@ -16,6 +13,8 @@ from fluvius.fastapi import (
 from riparius.domain import WorkflowDomain, WorkflowQueryManager
 from riparius import logger
 from types import SimpleNamespace
+
+from .conftest import FluviusAsyncClient
 
 PROFILE = {
     "jti": "cccccccc-34cd-42ba-8585-8ff5a5b707d3",
@@ -28,18 +27,7 @@ PROFILE = {
     "email": "bobbylee@adaptive-bits.com",
 }
 
-# Custom AsyncClient with FluviusJSONEncoder
-class FluviusAsyncClient(AsyncClient):
-    """AsyncClient that uses FluviusJSONEncoder for JSON serialization"""
-    
-    async def request(self, method, url, **kwargs):
-        # If json data is provided, serialize it with FluviusJSONEncoder
-        if 'json' in kwargs:
-            kwargs['content'] = json.dumps(kwargs.pop('json'), cls=FluviusJSONEncoder)
-            kwargs['headers'] = kwargs.get('headers') or {}
-            kwargs['headers'].setdefault('Content-Type', 'application/json')
-        
-        return await super().request(method, url, **kwargs)
+
 
 
 # Test App Setup
@@ -129,7 +117,7 @@ class TestWorkflowCommands:
         )
         
         data = response.json()
-        logger.info("DTA: %s", data)
+        logger.info("WORKFLOW CREATED: %s", data)
         assert response.status_code == 200
         assert data["status"] == "OK"
         assert "data" in data

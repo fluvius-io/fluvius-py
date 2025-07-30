@@ -1,13 +1,13 @@
-import pytest
-import asyncio
+
 import json
 
-from fluvius import logger
 from fluvius.data import UUID_GENF
 from fluvius.fastapi.auth import FluviusAuthProfileProvider
 from riparius import Workflow, Stage, Step, Role, st_connect, wf_connect, transition, FINISH_STATE
 
 from typing import Optional
+from httpx import AsyncClient
+from fluvius.data.serializer.json_encoder import FluviusJSONEncoder
 from fastapi import Request
 
 
@@ -118,3 +118,18 @@ class FluviusMockProfileProvider(FluviusAuthProfileProvider):
             return self.TEMPLATE | data
         except json.JSONDecodeError:
             raise ValueError("Invalid JSON in authorization header")
+
+
+# Custom AsyncClient with FluviusJSONEncoder
+class FluviusAsyncClient(AsyncClient):
+    """AsyncClient that uses FluviusJSONEncoder for JSON serialization"""
+    
+    async def request(self, method, url, **kwargs):
+        # If json data is provided, serialize it with FluviusJSONEncoder
+        if 'json' in kwargs:
+            kwargs['content'] = json.dumps(kwargs.pop('json'), cls=FluviusJSONEncoder)
+            kwargs['headers'] = kwargs.get('headers') or {}
+            kwargs['headers'].setdefault('Content-Type', 'application/json')
+        
+        return await super().request(method, url, **kwargs)
+

@@ -3,8 +3,7 @@
 import asyncio
 import pytest
 import json
-from fastapi import FastAPI
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport
 from fluvius.data import UUID_GENF
 from fluvius.fastapi import (
     create_app,
@@ -14,6 +13,8 @@ from fluvius.fastapi import (
 )
 from riparius.domain import WorkflowDomain, WorkflowQueryManager
 from riparius import logger
+
+from .conftest import FluviusAsyncClient
 
 PROFILE = {
     "jti": "ffffffff-34cd-42ba-8585-8ff5a5b707d3",
@@ -56,7 +57,7 @@ async def async_client(test_app):
 
     # Use ASGITransport to connect AsyncClient to FastAPI app
     transport = ASGITransport(app=test_app)
-    async with AsyncClient(transport=transport, base_url="http://testserver", headers=headers) as client:
+    async with FluviusAsyncClient(transport=transport, base_url="http://testserver", headers=headers) as client:
         yield client
 
 
