@@ -443,12 +443,29 @@ class TestQueryFieldFiltering:
         }
         
         response = await async_client.get(
-            f"/{NAMESPACE}.workflow-step/workflow_id={workflow_id}/",
+            f"/{NAMESPACE}.workflow-step/{workflow_id}/",
             params=query_params
         )
         
         assert response.status_code == 200
         data = response.json()
+        assert "data" in data
+
+    @pytest.mark.asyncio(loop_scope="module")
+    async def test_invalid_without_scope(self, async_client, workflow_id):
+        """Test filtering workflow steps by status"""
+        query_params = {
+            "query": json.dumps({"status": "COMPLETED"}),
+            "limit": 10
+        }
+
+        response = await async_client.get(
+            f"/{NAMESPACE}.workflow-step/incorrect_scope={workflow_id}/",
+            params=query_params
+        )
+
+        data = response.json()
+        assert response.status_code == 200, f"Invalid data: {data}"
         assert "data" in data
 
 

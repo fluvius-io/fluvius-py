@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import ResponseValidationError
+from pydantic import ValidationError
 
 from . import config, logger
 
@@ -40,7 +41,7 @@ def setup_error_handler(app: FastAPI) -> FastAPI:
     DEVELOPER_MODE = config.DEVELOPER_MODE
 
     @app.exception_handler(FluviusException)
-    async def app_exception_handler(request: Request, exc: FluviusException):
+    async def fluvius_exception_handler(request: Request, exc: FluviusException):
         content = exc.content
 
         if DEVELOPER_MODE:
@@ -51,12 +52,43 @@ def setup_error_handler(app: FastAPI) -> FastAPI:
             status_code=exc.status_code,
             content=content
         )
+    
+    @app.exception_handler(ValidationError)
+    async def validation_error_exception_handler(request: Request, exc: ValidationError):
+        content = {
+            "errcode": "A422.01",
+            "details": exc.errors(),
+            "message": str(exc),
+        }
+        
+        if DEVELOPER_MODE:
+            content['traceback'] = traceback.format_exc()
+
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content=content
+        )
 
     @app.exception_handler(ValueError)
-    async def app_exception_handler(request: Request, exc: ValueError):
+    async def value_error_exception_handler(request: Request, exc: ValueError):
         content = {
             "message": str(exc),
-            "errcode": "A00422",
+            "errcode": "A400.01",
+        }
+
+        if DEVELOPER_MODE:
+            content['traceback'] = traceback.format_exc()
+
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=content
+        )
+
+    @app.exception_handler(RuntimeError)
+    async def runtime_error_exception_handler(request: Request, exc: RuntimeError):
+        content = {
+            "message": str(exc),
+            "errcode": "A422.02",
         }
 
         if DEVELOPER_MODE:
@@ -67,27 +99,12 @@ def setup_error_handler(app: FastAPI) -> FastAPI:
             content=content
         )
 
-    @app.exception_handler(RuntimeError)
-    async def app_exception_handler(request: Request, exc: RuntimeError):
-        content = {
-            "message": str(exc),
-            "errcode": "A00500",
-        }
-
-        if DEVELOPER_MODE:
-            content['traceback'] = traceback.format_exc()
-
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content=content
-        )
-
     @app.exception_handler(ResponseValidationError)
     async def response_validation_exception_handler(request: Request, exc: ResponseValidationError):
         logger.error(f"Response validation failed: {exc}")
         content = {
             "message": "Internal Server Error - Response Validation Failed",
-            "errcode": "A01500",
+            "errcode": "A500.02",
             "details": str(exc.errors()),
         }
 
