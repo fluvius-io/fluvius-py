@@ -37,18 +37,19 @@ def connect(act_name, router):
 
     return decorator
 
-def st_connect(act_name):
-    def step_route(act):
-        return (act.workflow_id, act.step_id)
+def _step_route_func(evt):
+    return (evt.resource_id, evt.resource_name, evt.step_selector)
 
-    return connect(act_name, step_route)
+def _workflow_route_func(evt):
+    return (evt.resource_id, evt.resource_name, None)
 
 
-def wf_connect(act_name):
-    def workflow_route(evt):
-        return (evt.workflow_id, None)
+def st_connect(act_name, route_func=None):
+    return connect(act_name, route_func or _step_route_func)
 
-    return connect(act_name, workflow_route)
+
+def wf_connect(act_name, route_func=None):
+    return connect(act_name, route_func or _workflow_route_func)
 
 
 def validate_act_handler(act_handler):
@@ -81,17 +82,18 @@ class ActivityRouter(object):
             if act_route is None:
                 continue
 
-            route, selector = act_route
+            resource_id, resource_name, step_selector = act_route
 
-            if (entry.step_key is None) != (selector is None):
+            if (entry.step_key is None) != (step_selector is None):
                 raise ValueError("Step event must be routed to a specific step, and vice versa.")
 
             yield WorkflowTrigger(
                 id=UUID_GENR(),
                 event_name=evt_name,
                 event_data=evt_data,
-                resource_id=route,
-                selector=selector,
+                resource_id=resource_id,
+                resource_name=resource_name,
+                selector=step_selector,
                 wfdef_key=entry.wfdef_key,
                 step_key=entry.step_key,
                 handler_func=entry.handler_func

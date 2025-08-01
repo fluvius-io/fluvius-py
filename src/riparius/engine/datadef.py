@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from typing import List, Dict, Optional, Callable
 from fluvius.data import DataModel, Field, UUID_GENF, UUID_GENR, UUID_TYPE
 from ..status import WorkflowStatus, StepStatus, StageStatus    
+from ..model import WorkflowDataManager
 
 RX_STATE = re.compile(r'^[A-Z][A-Z\d_]*$')
 
@@ -13,27 +14,6 @@ RX_STATE = re.compile(r'^[A-Z][A-Z\d_]*$')
 class WorkflowDataModel(DataModel):
     """Base class for all workflow data models."""
     pass
-
-class WorkflowData(WorkflowDataModel):
-    id: UUID_TYPE = Field(default_factory=UUID_GENR, alias='_id')
-    title: str
-    wfdef_key: str
-    wfdef_rev: int = Field(default=0)
-    namespace: str = Field(default=None)
-    resource_id: UUID_TYPE = Field(default_factory=UUID_GENR)
-    resource_name: Optional[str] = None
-    status: WorkflowStatus = Field(default=WorkflowStatus.NEW)
-    paused: Optional[WorkflowStatus] = None
-    progress: float = Field(default=0.0)
-    etag: str = Field(default=None, alias='_etag')
-    ts_start: Optional[datetime] = None
-    ts_expire: Optional[datetime] = None
-    ts_finish: Optional[datetime] = None
-    params: dict = {}
-    memory: dict = {}
-    stepsm: dict = {} # steps memory
-    output: dict = {}
-
 
 class WorkflowActivity(WorkflowDataModel):
     ''' Workflow Activity is internal event that generate mutations and mutates the workflow state. '''
@@ -90,21 +70,33 @@ class WorkflowStage(WorkflowDataModel):
     desc: Optional[str] = None
     status: StageStatus = Field(default=StageStatus.ACTIVE)
 
+
+@WorkflowDataManager.register_model('_workflow')
+class WorkflowData(WorkflowDataModel):
+    id: UUID_TYPE = Field(default_factory=UUID_GENR, alias='_id')
+    title: str
+    wfdef_key: str
+    wfdef_rev: int = Field(default=0)
+    namespace: str = Field(default=None)
+    resource_id: UUID_TYPE = Field(default_factory=UUID_GENR)
+    resource_name: Optional[str] = None
+    status: WorkflowStatus = Field(default=WorkflowStatus.NEW)
+    paused: Optional[WorkflowStatus] = None
+    progress: float = Field(default=0.0)
+    etag: str = Field(default=None, alias='_etag')
+    ts_start: Optional[datetime] = None
+    ts_expire: Optional[datetime] = None
+    ts_finish: Optional[datetime] = None
+
+    # Embedded fields
+    stages: list[WorkflowStage] = Field(default=[], exclude=True)
+    steps: list[WorkflowStep] = Field(default=[], exclude=True)
+    params: Optional[dict] = Field(default={}, exclude=True)
+    memory: Optional[dict] = Field(default={}, exclude=True)
+    stepsm: Optional[dict] = Field(default={}, exclude=True)
+    output: Optional[dict] = Field(default={}, exclude=True)
+
+
 class WorkflowParticipant(WorkflowDataModel):
     pass
-
-
-class WorkflowParameter(WorkflowDataModel):
-    pass
-
-# class WorkflowBundle(WorkflowDataModel):
-#     workflow: WorkflowData
-#     steps: List = Field(default_factory=list)
-#     tasks: List = Field(default_factory=list)
-#     roles: List = Field(default_factory=list)
-#     events: List = Field(default_factory=list)
-#     stages: List = Field(default_factory=list)
-#     params: Dict = Field(default_factory=dict)
-#     memory: Dict = Field(default_factory=dict)
-#     participants: List = Field(default_factory=list)
 

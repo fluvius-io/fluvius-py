@@ -72,8 +72,11 @@ class Step(object):
             cls.__transitions__[to_state] = allowed_origins, unallowed_origins, func
 
 
-    def __init__(self, **data):
-        self._data = WorkflowStep(**data)
+    def __init__(self, step_data):
+        if not isinstance(step_data, WorkflowStep):
+            raise ValueError(f'Invalid step data: {step_data}')
+
+        self._data = step_data
 
     @property
     def id(self):

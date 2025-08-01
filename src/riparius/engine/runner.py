@@ -146,14 +146,14 @@ class WorkflowRunner(object):
         self._output = wf_data.output or {}
         self._etag = None
         self._step_proxies = {}
-        self._state_proxy = WorkflowStateProxy(self)
+        self._load_steps(wf_data.steps)
         self._mut_queue = queue.Queue()
         self._msg_queue = queue.Queue()
         self._act_queue = queue.Queue()
         self._transaction_id = None
         self._action_context = collections.deque()
         self._counter = 0
-        self._load_steps(wf_data.steps)
+        self._state_proxy = WorkflowStateProxy(self)
     
     def __init_subclass__(cls, wf_def):
         if not issubclass(wf_def, Workflow):
@@ -413,7 +413,7 @@ class WorkflowRunner(object):
         if selector in self.selector_map:
             raise WorkflowExecutionError('P01107', f'Selector value already allocated to another step [{selector or step_key}]')
 
-        step = stdef(
+        step_data = WorkflowStep(
             _id=step_id,
             index=len(self.step_id_map) + 1,
             title=title or stdef.__title__,
@@ -428,15 +428,25 @@ class WorkflowRunner(object):
             ts_start=timestamp(),
             stage_key=stdef.__stage_key__,
         )
-
-        self.selector_map[step.selector] = step
-        self.step_id_map[step.id] = step
+        step = self._create_step(step_data)
         self.mutate('add-step', step=step._data, step_id=step.id)
         return step
 
-    def _load_steps(self, steps: dict={}):
-        self._steps = steps
-        self._stmap = {step.selector: step for step in self._steps.values()}
+    def _create_step(self, step_data):
+        stdef = self.__steps__[step_data.step_key]
+        step = stdef(step_data)
+
+        self.selector_map[step.selector] =  step
+        self.step_id_map[step.id] = step
+        return step
+
+
+    def _load_steps(self, steps: list):
+        self._steps = {}
+        self._stmap = {}
+
+        for step_data in steps:
+            self._create_step(step_data)
 
     def _set_memory(self, **kwargs):
         if not kwargs:
@@ -498,16 +508,10 @@ class WorkflowRunner(object):
 
     @property
     def step_id_map(self):
-        if not hasattr(self, '_steps'):
-            self._load_steps()
-
         return self._steps
 
     @property
     def selector_map(self):
-        if not hasattr(self, '_stmap'):
-            self._load_steps()
-
         return self._stmap
 
     def get_task(self, task_id):
@@ -662,7 +666,8 @@ class WorkflowRunner(object):
             status=WorkflowStatus.NEW,
             resource_name=resource_name,
             resource_id=resource_id,
-            params=params)
+            params=params
+        )
 
         wf = cls(wf_state)
         with wf.transaction(wf_state.id):

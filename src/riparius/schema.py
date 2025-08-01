@@ -17,20 +17,21 @@ class WorkflowBaseSchema(WorkflowConnector.__data_schema_base__, DomainSchema):
     __abstract__ = True
 
 # Function to create foreign key references to workflow table
-def workflow_fk(constraint_name):
+def workflow_fk(constraint_name, **kwargs):
     """Create a foreign key reference to the workflow table"""
-    return sa.ForeignKey(
-        f'{DB_SCHEMA}.workflow._id', 
-        ondelete='CASCADE', 
+    return sa.Column(pg.UUID, sa.ForeignKey(
+        f'{DB_SCHEMA}.workflow._id',
+        ondelete='CASCADE',
         onupdate='CASCADE',
         name=f'fk_workflow_{constraint_name}'
-    )
+    ), nullable=False, **kwargs)
 
 # --- Models ---
 class WorkflowSchema(WorkflowBaseSchema):
     __tablename__ = "workflow"
     __table_args__ = (
-        UniqueConstraint('resource_id', 'resource_name', 'wfdef_key', name='wf_resource_resource_id'),
+        sa.UniqueConstraint('resource_id', 'resource_name', 'wfdef_key', name='wf_resource_resource_id'),
+        WorkflowBaseSchema.__table_args__
     )
 
     owner_id = sa.Column(pg.UUID, nullable=True)
@@ -54,8 +55,8 @@ class WorkflowSchema(WorkflowBaseSchema):
 
 class WorkflowFullSchema(WorkflowBaseSchema):
     __tablename__ = "_workflow"
-    __external__ = True    
-    # __table_args__ = {'info': {'is_view': True}}
+    __external__ = True
+    __table_args__ = WorkflowBaseSchema.__table_args__ | {'info': {'is_view': True}}
 
     owner_id = sa.Column(pg.UUID, nullable=True)
     company_id = sa.Column(sa.String, nullable=True)
@@ -89,7 +90,7 @@ class WorkflowStep(WorkflowBaseSchema):
     title = sa.Column(sa.String, nullable=False)
     desc = sa.Column(sa.String, nullable=True)
     index = sa.Column(sa.Integer, nullable=False)
-    workflow_id = sa.Column(pg.UUID, workflow_fk('step_workflow_id'), nullable=False)
+    workflow_id = workflow_fk("step_workflow_id")
     step_key = sa.Column(sa.String, nullable=False)
     stage_key = sa.Column(sa.String, nullable=True)
     owner_id = sa.Column(pg.UUID, nullable=True)
@@ -106,7 +107,7 @@ class WorkflowStep(WorkflowBaseSchema):
 class WorkflowStage(WorkflowBaseSchema):
     __tablename__ = "workflow-stage"
 
-    workflow_id = sa.Column(pg.UUID, workflow_fk('stage_workflow_id'), nullable=False)
+    workflow_id = workflow_fk("stage_workflow_id")
     key = sa.Column(sa.String, nullable=True)
     stage_name = sa.Column(sa.String, nullable=True)
     stage_type = sa.Column(sa.String, nullable=True)
@@ -118,7 +119,7 @@ class WorkflowStage(WorkflowBaseSchema):
 class WorkflowParticipant(WorkflowBaseSchema):
     __tablename__ = "workflow-participant"
 
-    workflow_id = sa.Column(pg.UUID, workflow_fk('participant_workflow_id'), nullable=False)
+    workflow_id = workflow_fk("participant_workflow_id")
     user_id = sa.Column(pg.UUID, nullable=False)
     role = sa.Column(sa.String, nullable=False)
 
@@ -126,7 +127,7 @@ class WorkflowParticipant(WorkflowBaseSchema):
 class WorkflowMemory(WorkflowBaseSchema):
     __tablename__ = "workflow-memory"
 
-    workflow_id = sa.Column(pg.UUID, workflow_fk('memory_workflow_id'), unique=True, nullable=False)
+    workflow_id = workflow_fk("memory_workflow_id", unique=True)
     stepsm = sa.Column(FluviusJSONField, nullable=True)
     params = sa.Column(FluviusJSONField, nullable=True)
     memory = sa.Column(FluviusJSONField, nullable=True)
@@ -136,9 +137,9 @@ class WorkflowMemory(WorkflowBaseSchema):
 class WorkflowMutation(WorkflowBaseSchema):
     __tablename__ = "workflow-mutation"
 
+    workflow_id = workflow_fk("mutation_workflow_id")
     name = sa.Column(sa.String, nullable=False)
     transaction_id = sa.Column(pg.UUID, nullable=False)
-    workflow_id = sa.Column(pg.UUID, workflow_fk('mutation_workflow_id'), nullable=False)
     action = sa.Column(sa.String, nullable=False)
     mutation = sa.Column(FluviusJSONField, nullable=False)
     step_id = sa.Column(pg.UUID, nullable=True)
@@ -148,7 +149,7 @@ class WorkflowMutation(WorkflowBaseSchema):
 class WorkflowMessage(WorkflowBaseSchema):
     __tablename__ = "workflow-message"
 
-    workflow_id = sa.Column(pg.UUID, workflow_fk('message_workflow_id'), nullable=False)
+    workflow_id = workflow_fk("message_workflow_id")
     timestamp = sa.Column(sa.DateTime(timezone=True), nullable=False)
     source = sa.Column(sa.String, nullable=False)
     content = sa.Column(sa.String, nullable=False)
@@ -157,7 +158,7 @@ class WorkflowMessage(WorkflowBaseSchema):
 class WorkflowActivity(WorkflowBaseSchema):
     __tablename__ = "workflow-activity"
 
-    workflow_id = sa.Column(pg.UUID, workflow_fk('activity_workflow_id'), nullable=False)
+    workflow_id = workflow_fk("activity_workflow_id")
     transaction_id = sa.Column(pg.UUID, nullable=False)
     activity_name = sa.Column(sa.String, nullable=False)
     activity_args = sa.Column(FluviusJSONField, nullable=True)
@@ -169,7 +170,7 @@ class WorkflowActivity(WorkflowBaseSchema):
 class WorkflowTask(WorkflowBaseSchema):
     __tablename__ = "workflow-task"
 
-    workflow_id = sa.Column(pg.UUID, workflow_fk('task_workflow_id'), nullable=False)
+    workflow_id = workflow_fk("task_workflow_id")
     step_id = sa.Column(sa.String, nullable=False)
     ts_expire = sa.Column(sa.DateTime(timezone=True), nullable=True)
     ts_start = sa.Column(sa.DateTime(timezone=True), nullable=True)
@@ -189,27 +190,33 @@ SELECT
   wm.output,
   jsonb_agg(
     jsonb_build_object(
-      'id', ws._id,
+      '_id', ws._id,
       'key', ws.key,
       'desc', ws.desc,
+      'workflow_id', ws.workflow_id,
       'stage_name', ws.stage_name,
       'stage_type', ws.stage_type,
       'order', ws.order,
       'status', ws.status
     )
   ) AS stages,
-  jsonb_agg(
-    jsonb_build_object(
-      'id', st._id,
-      'step_key', st.step_key,
-      'stage_key', st.stage_key,
-      'desc', st.desc,
-      'name', st.name,
-      'stm_state', st.stm_state,
-      'stm_label', st.stm_label,
-      'status', st.status
-    )
-  ) AS steps
+  COALESCE(
+      jsonb_agg(
+        jsonb_build_object(
+          '_id', st._id,
+          'desc', st.desc,
+          'title', st.title,
+          'step_key', st.step_key,
+          'stage_key', st.stage_key,
+          'workflow_id', st.workflow_id,
+          'selector', st.selector,
+          'stm_state', st.stm_state,
+          'stm_label', st.stm_label,
+          'status', st.status
+        )
+      ) FILTER (WHERE st._id IS NOT NULL),
+      '[]'::jsonb
+   ) AS steps
 FROM "{DB_SCHEMA}"."workflow" wf
 LEFT JOIN "{DB_SCHEMA}"."workflow-stage" ws ON ws.workflow_id = wf._id
 LEFT JOIN "{DB_SCHEMA}"."workflow-step" st ON st.workflow_id = wf._id

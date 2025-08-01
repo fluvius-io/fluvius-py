@@ -337,12 +337,12 @@ class SqlaDriver(DataDriver, QueryBuilder):
     @sqla_error_handler('L1201')
     async def find_one(self, resource, query: BackendQuery):
         data_schema = self.lookup_data_schema(resource)
-        sess = self.active_session
-        stmt = self.build_select(data_schema, query)
-        cursor = await sess.execute(stmt)
-        DEBUG_CONNECTOR and logger.info("\n[FIND_ONE] %r\n=> [RESOURCE] %s\n=> [QUERY] %s items", query, resource, cursor)
+        async with self.transaction() as sess:
+            stmt = self.build_select(data_schema, query)
+            cursor = await sess.execute(stmt)
+            DEBUG_CONNECTOR and logger.info("\n[FIND_ONE] %r\n=> [RESOURCE] %s\n=> [QUERY] %s items", query, resource, cursor)
 
-        return cursor.mappings().one()
+            return cursor.mappings().one()
 
     @sqla_error_handler('L1202')
     async def update_one(self, resource, query, **updates):

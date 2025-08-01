@@ -30,12 +30,15 @@ class WorkflowManager(object):
         cls.__runner__ = engine
         cls.__registry__ = {}
 
-    def process_event(self, event_name, event_data):
+    async def process_event(self, event_name, event_data):
         for trigger in self.route_event(event_name, event_data):
-            wf = self.load_workflow(trigger.wfdef_key, trigger.resource_id)
+            wf = await self.load_workflow(
+                trigger.wfdef_key,
+                trigger.resource_name,
+                trigger.resource_id
+            )
+
             with wf.transaction():
-                if wf.status == WorkflowStatus.NEW:
-                    wf.start()
                 wf.trigger(trigger)
 
             yield wf
@@ -45,26 +48,25 @@ class WorkflowManager(object):
     
     def create_workflow(self, wfdef_key, resource_name, resource_id, params=None, title=None):
         wf_engine = self.__registry__[wfdef_key]
-        params = params or {}
-
-        wf = wf_engine.create_workflow(resource_name, resource_id, params, title=title, id=id)
+        wf = wf_engine.create_workflow(resource_name, resource_id, params or {}, title=title)
         self._running[wfdef_key, resource_id] = wf
         return wf
 
-    def load_workflow(self, wfdef_key, resource_name, resource_id):
+    async def load_workflow(self, wfdef_key, resource_name, resource_id):
         if not resource_id:
             raise ValueError('Invalid workflow resource: {resource}:{resource_id}')
+
         if (wfdef_key, resource_name, resource_id) not in self._running:
             wf_engine = self.__registry__[wfdef_key]
-            wf_data = self._datamgr.find_one('_workflow',
+            wf_data = await self._datamgr.find_one('_workflow', where=dict(
                 wfdef_key=wfdef_key,
                 resource_name=resource_name,
                 resource_id=resource_id
-            )
+            ))
             wf = wf_engine(wf_data)
             self._running[wfdef_key, resource_name, resource_id] = wf
 
-        return self._running[wfdef_key, resource, resource_id]
+        return self._running[wfdef_key, resource_name, resource_id]
 
 
     def load_workflow_by_id(self, wfdef_key, workflow_id):
@@ -276,7 +278,7 @@ class WorkflowManager(object):
         logger.info('Registered workflow: %s', wfdef_key)
     
 
-    async def commit_all_running(self):
+    async def commit(self):
         async with self._datamgr.transaction(_writeable=True) as tx:
             for wf in self._running.values():
                 await self.persist(tx, wf)

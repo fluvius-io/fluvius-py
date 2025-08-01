@@ -11,7 +11,7 @@ from fluvius.data.serializer.json_encoder import FluviusJSONEncoder
 from fastapi import Request
 
 # Test Data 
-st01 = UUID_GENF('100')
+st01 = UUID_GENF('S101')
 wf01 = UUID_GENF('101')
 
 
