@@ -29,12 +29,16 @@ def workflow_fk(constraint_name):
 # --- Models ---
 class WorkflowSchema(WorkflowBaseSchema):
     __tablename__ = "workflow"
+    __table_args__ = (
+        UniqueConstraint('resource_id', 'resource_name', 'wfdef_key', name='wf_resource_resource_id'),
+    )
 
     owner_id = sa.Column(pg.UUID, nullable=True)
     company_id = sa.Column(sa.String, nullable=True)
-    workflow_key = sa.Column(sa.String, nullable=False)
-    revision = sa.Column(sa.Integer, nullable=False)
-    route_id = sa.Column(sa.UUID, nullable=False)
+    wfdef_key = sa.Column(sa.String, nullable=False)
+    wfdef_rev = sa.Column(sa.Integer, nullable=False)
+    resource_id = sa.Column(sa.UUID, nullable=False)
+    resource_name = sa.Column(sa.String, nullable=True)
     title = sa.Column(sa.String, nullable=True)
     desc = sa.Column(sa.String, nullable=True)
     note = sa.Column(sa.String, nullable=True)
@@ -55,9 +59,11 @@ class WorkflowFullSchema(WorkflowBaseSchema):
 
     owner_id = sa.Column(pg.UUID, nullable=True)
     company_id = sa.Column(sa.String, nullable=True)
-    workflow_key = sa.Column(sa.String, nullable=False)
-    revision = sa.Column(sa.Integer, nullable=False)
-    route_id = sa.Column(sa.UUID, nullable=False)
+    wfdef_key = sa.Column(sa.String, nullable=False)
+    wfdef_rev = sa.Column(sa.Integer, nullable=False)
+    resource_id = sa.Column(sa.UUID, nullable=False)
+    resource_name = sa.Column(sa.String, nullable=True)
+    steps = sa.Column(pg.JSONB, nullable=True)
     title = sa.Column(sa.String, nullable=True)
     desc = sa.Column(sa.String, nullable=True)
     note = sa.Column(sa.String, nullable=True)
@@ -79,18 +85,18 @@ class WorkflowFullSchema(WorkflowBaseSchema):
 class WorkflowStep(WorkflowBaseSchema):
     __tablename__ = "workflow-step"
 
-    workflow_id = sa.Column(pg.UUID, workflow_fk('step_workflow_id'), nullable=False)
-    stage_key = sa.Column(sa.String, nullable=True)
+    status = sa.Column(sa.Enum(StepStatus, name="step_status"), nullable=False)
+    title = sa.Column(sa.String, nullable=False)
+    desc = sa.Column(sa.String, nullable=True)
     index = sa.Column(sa.Integer, nullable=False)
+    workflow_id = sa.Column(pg.UUID, workflow_fk('step_workflow_id'), nullable=False)
+    step_key = sa.Column(sa.String, nullable=False)
+    stage_key = sa.Column(sa.String, nullable=True)
     owner_id = sa.Column(pg.UUID, nullable=True)
     selector = sa.Column(pg.UUID, nullable=True)
     stm_state = sa.Column(sa.String, nullable=False)
-    desc = sa.Column(sa.String, nullable=True)
-    step_key = sa.Column(sa.String, nullable=False)
-    step_name = sa.Column(sa.String, nullable=False)
+    stm_label = sa.Column(sa.String, nullable=True)
     origin_step = sa.Column(pg.UUID, nullable=True)
-    status = sa.Column(sa.Enum(StepStatus, name="step_status"), nullable=False)
-    label = sa.Column(sa.String, nullable=True)
     ts_due = sa.Column(sa.DateTime(timezone=True), nullable=True)
     ts_start = sa.Column(sa.DateTime(timezone=True), nullable=True)
     ts_finish = sa.Column(sa.DateTime(timezone=True), nullable=True)
@@ -183,7 +189,7 @@ SELECT
   wm.output,
   jsonb_agg(
     jsonb_build_object(
-      '_id', ws._id,
+      'id', ws._id,
       'key', ws.key,
       'desc', ws.desc,
       'stage_name', ws.stage_name,
@@ -191,9 +197,22 @@ SELECT
       'order', ws.order,
       'status', ws.status
     )
-  ) AS stages
+  ) AS stages,
+  jsonb_agg(
+    jsonb_build_object(
+      'id', st._id,
+      'step_key', st.step_key,
+      'stage_key', st.stage_key,
+      'desc', st.desc,
+      'name', st.name,
+      'stm_state', st.stm_state,
+      'stm_label', st.stm_label,
+      'status', st.status
+    )
+  ) AS steps
 FROM "{DB_SCHEMA}"."workflow" wf
 LEFT JOIN "{DB_SCHEMA}"."workflow-stage" ws ON ws.workflow_id = wf._id
+LEFT JOIN "{DB_SCHEMA}"."workflow-step" st ON st.workflow_id = wf._id
 LEFT JOIN "{DB_SCHEMA}"."workflow-memory" wm ON wm._id = wf._id
 GROUP BY wf._id, wm._id;
 ''')

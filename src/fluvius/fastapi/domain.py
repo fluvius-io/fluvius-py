@@ -100,7 +100,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
 
     async def _command_handler(
         request: Request,
-        payload: PayloadType,
+        payload: PayloadType,  # type: ignore
         resource: str,
         identifier: Optional[UUID_TYPE] = None,
         scope: Optional[dict] = None
@@ -157,7 +157,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
         )
         async def command_handler(
             request: Request,
-            payload: PayloadType,
+            payload: PayloadType,  # type: ignore
             resource: Annotated[str, Path(description=cmd_cls.Meta.resource_desc)],
             identifier: Optional[UUID_TYPE] = None,
         ):
@@ -174,7 +174,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
         )
         async def scoped_command_handler(
             request: Request,
-            payload: PayloadType,
+            payload: PayloadType,  # type: ignore
             resource: Annotated[str, Path(description=cmd_cls.Meta.resource_desc)],
             scoping: Annotated[str, Path(description=f"Resource scoping: `{', '.join(scope_keys)}`. E.g. `domain_sid~H9cNmGXLEc8NWcZzSThA9S`")],
             identifier: Annotated[UUID_TYPE, Path(description="Resource identifier")],

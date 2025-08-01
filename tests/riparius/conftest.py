@@ -40,7 +40,7 @@ class SampleProcess(Workflow):
 
     class Step02b(Step, stage=Stage01):
         """ This is a sample step. 2-B """
-        __step_name__ = "Step2B"
+        __title__ = "Step2B"
 
     class Step03(Step, name="Step 03", stage=Stage01):
         __states__ = ('TAKE', 'ME', 'TO', 'THE', 'MOON')

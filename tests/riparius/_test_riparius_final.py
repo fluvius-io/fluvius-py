@@ -36,7 +36,7 @@ class TestRipariusWorkflowSystem:
         # The actual key is kebab-case, not snake_case
         assert TestWorkflow.__key__ == 'test-workflow'
 
-    def test_custom_workflow_key(self):
+    def test_custom_wfdef_key(self):
         """Test workflow with custom key"""
         class CustomWorkflow(Workflow, title='Custom Workflow', revision=1):
             __key__ = 'my_custom_key'
@@ -107,9 +107,9 @@ class TestRipariusWorkflowSystem:
         wf_handler = wf_handlers[0]
         step_handler = step_handlers[0]
         
-        assert wf_handler.workflow_key == 'event-workflow'
+        assert wf_handler.wfdef_key == 'event-workflow'
         assert wf_handler.step_key is None
-        assert step_handler.workflow_key == 'event-workflow'
+        assert step_handler.wfdef_key == 'event-workflow'
         assert step_handler.step_key == 'EventStep'
 
     def test_data_structures(self):

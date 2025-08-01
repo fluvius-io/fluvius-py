@@ -17,17 +17,22 @@ class WorkflowDataModel(DataModel):
 class WorkflowData(WorkflowDataModel):
     id: UUID_TYPE = Field(default_factory=UUID_GENR, alias='_id')
     title: str
-    revision: int = Field(default=0)
-    workflow_key: str
+    wfdef_key: str
+    wfdef_rev: int = Field(default=0)
     namespace: str = Field(default=None)
-    route_id: UUID_TYPE = Field(default_factory=UUID_GENR)
+    resource_id: UUID_TYPE = Field(default_factory=UUID_GENR)
+    resource_name: Optional[str] = None
     status: WorkflowStatus = Field(default=WorkflowStatus.NEW)
     paused: Optional[WorkflowStatus] = None
     progress: float = Field(default=0.0)
-    etag: str = Field(default=None)
+    etag: str = Field(default=None, alias='_etag')
     ts_start: Optional[datetime] = None
     ts_expire: Optional[datetime] = None
     ts_finish: Optional[datetime] = None
+    params: dict = {}
+    memory: dict = {}
+    stepsm: dict = {} # steps memory
+    output: dict = {}
 
 
 class WorkflowActivity(WorkflowDataModel):
@@ -55,28 +60,20 @@ class WorkflowMessage(WorkflowDataModel):
     content: str
 
 
-class WorkflowMemory(WorkflowDataModel):
-    workflow_id: UUID_TYPE
-    params: Optional[dict] = None
-    memory: Optional[dict] = None
-    stepsm: Optional[dict] = None # steps memory
-    output: Optional[dict] = None 
-
-
 class WorkflowStep(WorkflowDataModel):
     id: UUID_TYPE = Field(default_factory=UUID_GENR, alias='_id')
+    title: str
+    desc: Optional[str] = None
     index: int = 0
+    message: Optional[str] = None
+    status: StepStatus = Field(default=StepStatus.ACTIVE)
     selector: UUID_TYPE
     workflow_id: UUID_TYPE
     step_key: str
     stage_key: str
-    desc: Optional[str] = None
     origin_step: Optional[UUID_TYPE] = None
-    step_name: str
     stm_state: str
-    message: Optional[str] = None
-    status: StepStatus = Field(default=StepStatus.ACTIVE)
-    label: Optional[str] = None
+    stm_label: Optional[str] = None
     ts_due: Optional[datetime] = None
     ts_start: Optional[datetime] = None
     ts_finish: Optional[datetime] = None

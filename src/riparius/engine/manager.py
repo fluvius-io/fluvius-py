@@ -32,7 +32,7 @@ class WorkflowManager(object):
 
     def process_event(self, event_name, event_data):
         for trigger in self.route_event(event_name, event_data):
-            wf = self.load_workflow(trigger.workflow_key, trigger.route_id)
+            wf = self.load_workflow(trigger.wfdef_key, trigger.resource_id)
             with wf.transaction():
                 if wf.status == WorkflowStatus.NEW:
                     wf.start()
@@ -43,19 +43,39 @@ class WorkflowManager(object):
     def route_event(self, event_name, event_data):
         return self.__router__.route_event(event_name, event_data)
     
-    def create_workflow(self, workflow_key, route_id, params, title=None, id=None):
-        wf_engine = self.__registry__[workflow_key]
-        wf = wf_engine.create_workflow(route_id, params, title=title, id=id)
-        self._running[workflow_key, route_id] = wf
+    def create_workflow(self, wfdef_key, resource_name, resource_id, params=None, title=None):
+        wf_engine = self.__registry__[wfdef_key]
+        params = params or {}
+
+        wf = wf_engine.create_workflow(resource_name, resource_id, params, title=title, id=id)
+        self._running[wfdef_key, resource_id] = wf
         return wf
 
-    def load_workflow(self, workflow_key, route_id):
-        if (workflow_key, route_id) not in self._running:
-            wf_engine = self.__registry__[workflow_key]
-            wf = wf_engine.create_workflow(route_id, {"started": timestamp()})
-            self._running[workflow_key, route_id] = wf
+    def load_workflow(self, wfdef_key, resource_name, resource_id):
+        if not resource_id:
+            raise ValueError('Invalid workflow resource: {resource}:{resource_id}')
+        if (wfdef_key, resource_name, resource_id) not in self._running:
+            wf_engine = self.__registry__[wfdef_key]
+            wf_data = self._datamgr.find_one('_workflow',
+                wfdef_key=wfdef_key,
+                resource_name=resource_name,
+                resource_id=resource_id
+            )
+            wf = wf_engine(wf_data)
+            self._running[wfdef_key, resource_name, resource_id] = wf
 
-        return self._running[workflow_key, route_id]
+        return self._running[wfdef_key, resource, resource_id]
+
+
+    def load_workflow_by_id(self, wfdef_key, workflow_id):
+        if (wfdef_key, resource_id) not in self._running:
+            wf_engine = self.__registry__[wfdef_key]
+            wf_data = self._datamgr.fetch('workflow', workflow_id)
+
+            wf = wf_engine(wf_data)
+            self._running[wfdef_key, resource_id] = wf
+
+        return self._running[wfdef_key, resource_id]
     
     async def _log_mutation(self, tx, wf_mut: MutationEnvelop):
         await tx.insert_many('workflow-mutation', wf_mut.model_dump())
@@ -133,7 +153,7 @@ class WorkflowManager(object):
     def _get_mutation_handlers(self):
         """Build dispatch table using mutation registry keys."""
         return {
-            'create-workflow': self._persist_create_workflow,
+            'initialize-workflow': self._persist_initialize_workflow,
             'update-workflow': self._persist_update_workflow,
             'add-step': self._persist_add_step,
             'update-step': self._persist_update_step,
@@ -159,8 +179,8 @@ class WorkflowManager(object):
         for source_field, target_field in field_map.items():
             if hasattr(obj, source_field):
                 value = getattr(obj, source_field)
-                # Convert UUID objects to strings for route_id
-                if source_field == 'route_id' and value is not None:
+                # Convert UUID objects to strings for resource_id
+                if source_field == 'resource_id' and value is not None:
                     value = str(value)
                 result[target_field] = value
         return result
@@ -175,7 +195,7 @@ class WorkflowManager(object):
                     updates[field] = value
         return updates
 
-    async def _persist_create_workflow(self, tx, wf_mut: MutationEnvelop):
+    async def _persist_initialize_workflow(self, tx, wf_mut: MutationEnvelop):
         """Create a new workflow record."""
         wf_data = wf_mut.mutation.workflow
         workflow_dict = wf_data.model_dump()
@@ -248,12 +268,12 @@ class WorkflowManager(object):
 
     @classmethod
     def register(cls, wf_cls):
-        workflow_key = wf_cls.Meta.key
-        if workflow_key in cls.__registry__:
-            raise ValueError(f'Worfklow already registered: {workflow_key}')
+        wfdef_key = wf_cls.Meta.key
+        if wfdef_key in cls.__registry__:
+            raise ValueError(f'Worfklow already registered: {wfdef_key}')
 
-        cls.__registry__[workflow_key] = type(f'WFE_{wf_cls.__name__}', (cls.__runner__, ), {}, wf_def=wf_cls)
-        logger.info('Registered workflow: %s', workflow_key)
+        cls.__registry__[wfdef_key] = type(f'WFE_{wf_cls.__name__}', (cls.__runner__, ), {}, wf_def=wf_cls)
+        logger.info('Registered workflow: %s', wfdef_key)
     
 
     async def commit_all_running(self):

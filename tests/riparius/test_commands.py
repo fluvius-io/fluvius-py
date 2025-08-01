@@ -60,7 +60,7 @@ def workflow_ids():
     return SimpleNamespace()
 
 @pytest.fixture(scope="module")
-def route_id():
+def resource_id():
     """Generate test route ID"""
     return UUID_GENF("test-route-001")
 
@@ -78,12 +78,12 @@ def step_id():
 
 
 @pytest.fixture(scope="module")
-async def workflow_created_id(async_client, route_id):
+async def workflow_created_id(async_client, resource_id):
     """Generate test workflow new ID"""
     payload = {
         "title": "Test Workflow",
-        "workflow_key": "sample-process",
-        "route_id": route_id,
+        "wfdef_key": "sample-process",
+        "resource_id": resource_id,
         "params": {"test_param": "test_value"}
     }
     
@@ -102,12 +102,12 @@ class TestWorkflowCommands:
     """Test workflow command endpoints"""
 
     @pytest.mark.asyncio(loop_scope="module")
-    async def test_create_workflow(self, async_client, route_id, workflow_ids):
+    async def test_create_workflow(self, async_client, resource_id, workflow_ids):
         """Test create workflow command"""
         payload = {
             "title": "Test Workflow",
-            "workflow_key": "sample-process",
-            "route_id": route_id,
+            "wfdef_key": "sample-process",
+            "resource_id": resource_id,
             "params": {"test_param": "test_value"}
         }
         
@@ -376,7 +376,7 @@ class TestCommandValidation:
         """Test create workflow with missing required fields"""
         payload = {
             "title": "Test Workflow"
-            # Missing workflow_key and route_id
+            # Missing wfdef_key and resource_id
         }
         
         response = await async_client.post(

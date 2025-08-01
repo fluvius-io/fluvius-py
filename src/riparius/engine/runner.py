@@ -135,12 +135,15 @@ class WorkflowRunner(object):
     __statemgr__    = None
 
     def __init__(self, wf_data):
+        if not isinstance(wf_data, WorkflowData):
+            raise RuntimeError(f'Invalid workflow state: {wf_data}')
+
         self._id = wf_data.id
         self._workflow = wf_data
-        self._memory = {}
-        self._params = {}
-        self._stepsm = {}
-        self._output = {}
+        self._memory = wf_data.memory or {}
+        self._params = wf_data.params or {}
+        self._stepsm = wf_data.stepsm or {}
+        self._output = wf_data.output or {}
         self._etag = None
         self._step_proxies = {}
         self._state_proxy = WorkflowStateProxy(self)
@@ -150,6 +153,7 @@ class WorkflowRunner(object):
         self._transaction_id = None
         self._action_context = collections.deque()
         self._counter = 0
+        self._load_steps(wf_data.steps)
     
     def __init_subclass__(cls, wf_def):
         if not issubclass(wf_def, Workflow):
@@ -332,7 +336,7 @@ class WorkflowRunner(object):
         if kwargs.get('stm_state') == FINISH_STATE:
             kwargs['status'] = StepStatus.COMPLETED
             kwargs['ts_finish'] = timestamp()
-            kwargs['label'] = FINISH_LABEL
+            kwargs['stm_label'] = FINISH_LABEL
         elif kwargs.get('stm_state') != BEGIN_STATE:
             kwargs['status'] = StepStatus.ACTIVE
 
@@ -412,14 +416,14 @@ class WorkflowRunner(object):
         step = stdef(
             _id=step_id,
             index=len(self.step_id_map) + 1,
+            title=title or stdef.__title__,
             selector=selector,
             step_key=step_key,
-            step_name=title or stdef.__step_name__,
             desc=stdef.__doc__,
             workflow_id=self._id,
             stm_state=BEGIN_STATE,
+            stm_label=BEGIN_LABEL,
             origin_step=origin_step,
-            label=BEGIN_LABEL,
             status=StepStatus.ACTIVE,
             ts_start=timestamp(),
             stage_key=stdef.__stage_key__,
@@ -430,8 +434,8 @@ class WorkflowRunner(object):
         self.mutate('add-step', step=step._data, step_id=step.id)
         return step
 
-    def _load_steps(self):
-        self._steps = {}
+    def _load_steps(self, steps: dict={}):
+        self._steps = steps
         self._stmap = {step.selector: step for step in self._steps.values()}
 
     def _set_memory(self, **kwargs):
@@ -481,8 +485,8 @@ class WorkflowRunner(object):
         return self.__wf_def__.Meta.key
 
     @property
-    def route_id(self):
-        return self._workflow.route_id
+    def resource_id(self):
+        return self._workflow.resource_id
 
     @property
     def statemgr(self):
@@ -636,9 +640,9 @@ class WorkflowRunner(object):
         memory = self._get_memory(step_id)
         return memory
     
-    @workflow_action('create', external=True)
-    def create(self, params):
-        self.mutate('create-workflow', workflow=self._workflow)
+    @workflow_action('initialize', external=True)
+    def initialize(self, params: dict):
+        self.mutate('initialize-workflow', workflow=self._workflow)
 
         if params:
             self._set_params(params)
@@ -647,20 +651,22 @@ class WorkflowRunner(object):
             self._add_stage(stage)
 
     @classmethod
-    def create_workflow(cls, route_id, params=None, title=None, id=None):
+    def create_workflow(cls, resource_name, resource_id, params=None, title=None, id=None):
         wf_def = cls.__wf_def__
 
         wf_state = WorkflowData(
             id=id or UUID_GENR(),
             title=title or wf_def.Meta.title,
-            revision=wf_def.Meta.revision,
-            workflow_key=wf_def.Meta.key,
+            wfdef_revision=wf_def.Meta.revision,
+            wfdef_key=wf_def.Meta.key,
             status=WorkflowStatus.NEW,
-            route_id=route_id)
+            resource_name=resource_name,
+            resource_id=resource_id,
+            params=params)
 
         wf = cls(wf_state)
         with wf.transaction(wf_state.id):
-            wf.create(params)
+            wf.initialize(params)
 
         return wf
 

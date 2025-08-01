@@ -9,8 +9,8 @@ from ..status import WorkflowStatus, StepStatus
 class CreateWorkflowData(DataModel):
     """Data for creating a new workflow"""
     title: str
-    workflow_key: str
-    route_id: UUID_TYPE
+    wfdef_key: str
+    resource_id: UUID_TYPE
     params: Optional[Dict[str, Any]] = None
 
 

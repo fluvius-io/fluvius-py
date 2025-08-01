@@ -17,7 +17,7 @@ class WorkflowAggregate(Aggregate):
     async def create_workflow(self, data):
         """Create a new workflow"""
         workflow = self.wfmgr.create_workflow(
-            data.workflow_key, data.route_id, data.params, title=data.title
+            data.wfdef_key, data.resource_id, data.params, title=data.title
         )
         await self.wfmgr.commit_workflow(workflow)
         return workflow._workflow.model_dump(exclude_none=True)

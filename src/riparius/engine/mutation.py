@@ -1,4 +1,4 @@
-from .datadef import WorkflowDataModel, WorkflowStep, WorkflowData, WorkflowParticipant, WorkflowStatus, StepStatus, WorkflowStage, WorkflowMemory
+from .datadef import WorkflowDataModel, WorkflowStep, WorkflowData, WorkflowParticipant, WorkflowStatus, StepStatus, WorkflowStage
 from datetime import datetime
 from typing import Optional
 from pydantic import Field, field_serializer
@@ -43,7 +43,7 @@ class AddStep(WorkflowMutation):
     step: WorkflowStep
 
 
-class CreateWorkflow(WorkflowMutation):
+class InitializeWorkflow(WorkflowMutation):
     workflow: WorkflowData
 
 

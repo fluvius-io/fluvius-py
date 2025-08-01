@@ -9,7 +9,7 @@ from fluvius.error import NotFoundError
 
 @dataclass
 class ActivityHandler(object):
-    workflow_key: str
+    wfdef_key: str
     step_key: str
     routing_func: Callable
     handler_func: Callable
@@ -20,9 +20,10 @@ class WorkflowTrigger(object):
     id: UUID_TYPE
     event_name: str
     event_data: SimpleNamespace
-    route_id: UUID_TYPE
+    resource_id: UUID_TYPE
+    resource_name: str
     selector: str
-    workflow_key: str
+    wfdef_key: str
     step_key: str
     handler_func: Callable
 
@@ -68,7 +69,7 @@ class ActivityRouter(object):
         cls.ROUTING_TABLE[act_name] += (act_handler, )
 
         if (_count := len(cls.ROUTING_TABLE[act_name])) > 1:
-            logger.warning('Event has multiple handlers [%d]: %s @ %s', _count, act_name, act_handler.workflow_key)
+            logger.warning('Event has multiple handlers [%d]: %s @ %s', _count, act_name, act_handler.wfdef_key)
 
     @classmethod
     def route_event(cls, evt_name, evt_data):
@@ -89,15 +90,15 @@ class ActivityRouter(object):
                 id=UUID_GENR(),
                 event_name=evt_name,
                 event_data=evt_data,
-                route_id=route,
+                resource_id=route,
                 selector=selector,
-                workflow_key=entry.workflow_key,
+                wfdef_key=entry.wfdef_key,
                 step_key=entry.step_key,
                 handler_func=entry.handler_func
             )
 
     @classmethod
-    def connect_events(cls, handler_cls, workflow_key, step_key):
+    def connect_events(cls, handler_cls, wfdef_key, step_key):
         for attr_name in dir(handler_cls):
             handler_func = getattr(handler_cls, attr_name)
             if not hasattr(handler_func, '__connect_act__'):
@@ -105,14 +106,14 @@ class ActivityRouter(object):
 
             act_name, act_router = handler_func.__connect_act__
             cls._connect(
-                act_name, ActivityHandler(workflow_key, step_key, act_router, handler_func)
+                act_name, ActivityHandler(wfdef_key, step_key, act_router, handler_func)
             )
 
     @classmethod
-    def connect_wf_events(cls, wf_cls, workflow_key):
-        return cls.connect_events(wf_cls, workflow_key, None)
+    def connect_wf_events(cls, wf_cls, wfdef_key):
+        return cls.connect_events(wf_cls, wfdef_key, None)
 
     @classmethod
-    def connect_st_events(cls, st_cls, workflow_key, step_key):
-        return cls.connect_events(st_cls, workflow_key, step_key)
+    def connect_st_events(cls, st_cls, wfdef_key, step_key):
+        return cls.connect_events(st_cls, wfdef_key, step_key)
 
