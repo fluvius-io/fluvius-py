@@ -24,6 +24,7 @@ class MediaInterface:
         self._manager = media_manager(app) if app is not None else NullMediaManager(app)
         self._filesystem_cache = filesystem_cache or {}
         self._default_fs_key = config.DEFAULT_FILESYSTEM
+        self._filesystem_root = config.FILESYSTEM_ROOT
 
     async def put(
         self, 
@@ -33,6 +34,7 @@ class MediaInterface:
         compress: Optional[FsSpecCompressionMethod] = None,
         resource: Optional[str] = None,
         resource_id: Optional[str] = None,
+        mime_type: Optional[str] = None,
         **metadata_kwargs
     ) -> MediaEntry:
         """
@@ -65,25 +67,25 @@ class MediaInterface:
             file_data = fileobj.read()
             if hasattr(fileobj, 'seek'):
                 fileobj.seek(0)  # Reset position
-                
+        
         if not filename and hasattr(fileobj, 'name'):
             filename = getattr(fileobj, 'name', 'unnamed_file')
-            
+        
         # Generate file hash and get length
         file_io = io.BytesIO(file_data)
         filehash, length = hash_n_length(file_io)
-        
+
         # Generate unique file path
         file_token = gen_token()
         file_ext = Path(filename).suffix if filename else ''
-        fspath = f"{file_token}{file_ext}"
-        
+        fspath = f"{self._filesystem_root}/{file_token}{file_ext}"
+
         # Detect MIME type
-        filemime = mimetypes.guess_type(filename)[0] if filename else 'application/octet-stream'
+        filemime = mime_type or mimetypes.guess_type(filename)[0] or 'application/octet-stream'
         
         # Get filesystem and store file
         fs = await self.get_filesystem(fs_key)
-        
+
         # Apply compression if specified
         file_to_store = file_data
         if compress:
@@ -97,6 +99,7 @@ class MediaInterface:
         
         # Create MediaEntry record using correct DataAccessManager pattern
         entry_data = {
+            '_id': uuid.uuid4(),
             'filename': filename or 'unnamed_file',
             'filehash': filehash,
             'filemime': filemime,
@@ -110,7 +113,7 @@ class MediaInterface:
         }
         
         # Create in-memory model then insert to database
-        entry = self._manager.create('MediaEntry', entry_data)
+        entry = self._manager.create('media-entry', entry_data)
         await self._manager.insert(entry)
         return entry
 
@@ -140,6 +143,20 @@ class MediaInterface:
             
         logger.info(f"Opened file {metadata.filename} from {metadata.fspath}")
         return file_handle
+
+    async def stream(self, file_id: str):
+        def _stream_file(fs, fspath):
+            with fs.open(fspath, "rb") as f:
+                while chunk := f.read(config.CHUNK_SIZE):
+                    yield chunk
+
+        """
+        Stream a file by its MediaEntry ID.
+        """
+        metadata = await self.get_metadata(file_id)
+        fs = await self.get_filesystem(metadata.fskey)
+
+        return _stream_file(fs, metadata.fspath)
 
     async def get(self, file_id: str) -> bytes:
         """
@@ -238,8 +255,25 @@ class MediaInterface:
             return self._filesystem_cache[fs_key]
 
         # Try to fetch filesystem configuration from manager. Let errors propagate.
-        fs_spec = await self._manager.fetch('MediaFilesystem', identifier=fs_key)
+        fs_spec = await self._manager.find_one('media-filesystem', where={'fskey': fs_key})
+        if not fs_spec:
+            raise ValueError(f"Filesystem {fs_key} not found")
+
+        # @TODO: Consider encrypting the filesystem params using cryptography.fernet
+        """
+            import json
+            from cryptography.fernet import Fernet
+            key = b'key' # Fernet.generate_key()
+            f = Fernet(key)
+            token = {"key": "value"}
+            token = json.dumps(token)
+            encrypted_token = f.encrypt(token.encode())
+            encrypted_token_db = encrypted_token.decode()  # save to db
+            decrypted_token = f.decrypt(encrypted_token_db.encode())
+            token = json.loads(decrypted_token.decode())
+        """
         fsys = fsspec.filesystem(fs_spec.protocol, **fs_spec.params)
+
         self._filesystem_cache[fs_key] = fsys
 
         return fsys
@@ -255,7 +289,7 @@ class MediaInterface:
             MediaEntry instance
         """
         # Always use manager (either real or null)
-        return await self._manager.fetch('MediaEntry', identifier=file_id)
+        return await self._manager.fetch('media-entry', file_id)
 
     async def list_files(
         self, 
@@ -283,7 +317,7 @@ class MediaInterface:
             query_params['resource__id'] = resource_id
             
         # Use the correct DataAccessManager method
-        return await self._manager.query('MediaEntry', **query_params)
+        return await self._manager.query('media-entry', **query_params)
 
     async def register_filesystem(
         self, 
@@ -312,7 +346,7 @@ class MediaInterface:
         }
         
         # Use correct DataAccessManager pattern
-        fs = self._manager.create('MediaFilesystem', fs_data)
+        fs = self._manager.create('media-filesystem', fs_data)
         await self._manager.insert(fs)
             
         # Clear cache to force reload
