@@ -15,7 +15,8 @@ from types import SimpleNamespace
 
 from fluvius.error import BadRequestError
 from fluvius.data import DataModel
-from fluvius.auth import AuthorizationContext
+from fluvius.auth import AuthorizationContext, event as auth_event
+from fluvius.helper import when
 
 from pydantic import AnyUrl, EmailStr
 from uuid import UUID
@@ -24,7 +25,7 @@ from typing import Literal, Optional
 from urllib.parse import urlparse
 
 from .setup import on_startup
-from .helper import uri
+from .helper import uri, generate_client_token, generate_session_id
 
 from . import config, logger
 
@@ -123,17 +124,21 @@ class FluviusAuthMiddleware(BaseHTTPMiddleware):
 
     async def get_auth_context(self, request):
         # You can optionally decode and validate the token here
-        if not (id_token := request.cookies.get("id_token")):
+        if not (id_token := request.cookies.get(config.SES_ID_TOKEN_FIELD)):
             return None
 
         try:
-            user_claims = request.session.get("user")
+            user_claims = request.session.get(config.SES_USER_FIELD)
             if not user_claims:
                 return None
         except (KeyError, ValueError):
             return None
 
-        return await self._auth_provider.get_auth_context(user_claims)
+        auth_context = await self._auth_provider.get_auth_context(user_claims)
+        auth_context.session_id = user_claims.get('session_id')
+        auth_context.client_token = user_claims.get('client_token')
+
+        return auth_context
 
 
     async def dispatch(self, request: Request, call_next):
@@ -304,8 +309,8 @@ def configure_authentication(app, config=config, base_path="/auth"):
     @api("callback")
     async def oauth_callback(request: Request):
         token = await oauth.keycloak.authorize_access_token(request)
-        id_token = token.get("id_token")
-        ac_token = token.get("access_token")
+        id_token = token.get(config.SES_ID_TOKEN_FIELD)
+        ac_token = token.get(config.SES_AC_TOKEN_FIELD)
 
         if not id_token:
             raise HTTPException(status_code=400, detail="Missing ID token")
@@ -313,12 +318,19 @@ def configure_authentication(app, config=config, base_path="/auth"):
         id_data = await decode_id_token(request.app.state.jwks_keyset, id_token)
         ac_data = await decode_ac_token(request.app.state.jwks_keyset, ac_token)
 
-        id_data.update(realm_access=ac_data.get("realm_access"), resource_access=ac_data.get("resource_access"))
+        id_data.update(
+            realm_access=ac_data.get("realm_access"),
+            resource_access=ac_data.get("resource_access"),
+            client_token=generate_client_token(request.session),
+            session_id=generate_session_id(request.session)
+        )
 
-        request.session["user"] = id_data
+        request.session[config.SES_USER_FIELD] = id_data
         next_url = validate_direct_url(request.session["next"], config.DEFAULT_SIGNIN_REDIRECT_URI)
         response = RedirectResponse(url=next_url)
-        response.set_cookie('id_token', id_token)
+        response.set_cookie(config.SES_ID_TOKEN_FIELD, id_token)
+        auth_event.authorization_success.send(request, user=id_data)
+
         return response
 
     @api("verify")
@@ -335,12 +347,15 @@ def configure_authentication(app, config=config, base_path="/auth"):
 
     @api("info")
     @auth_required()
-    async def verify_auth(request: Request):
+    async def info(request: Request):
         return request.state.auth_context
 
     @api("logout")
+    @auth_required()
     async def logout(request: Request):
         ''' Log out user locally (only for this API) '''
+        user = request.session.get(config.SES_USER_FIELD)
+        auth_event.user_logout.send(request, user=user)
         request.session.clear()
         redirect_uri = validate_direct_url(
             request.query_params.get('redirect'),
@@ -353,7 +368,7 @@ def configure_authentication(app, config=config, base_path="/auth"):
     async def sign_off(request: Request):
         ''' Log out user globally (including Keycloak) '''
         # 2. Logout from Keycloak using the logout endpoint
-        access_token = request.cookies.get("id_token")
+        access_token = request.cookies.get(config.SES_ID_TOKEN_FIELD)
         if not access_token:
             raise HTTPException(status_code=400, detail="No access token found")
 
@@ -372,7 +387,7 @@ def configure_authentication(app, config=config, base_path="/auth"):
 
         redirect_uri = validate_direct_url(request.query_params.get('redirect'), config.DEFAULT_LOGOUT_REDIRECT_URI)
         response = RedirectResponse(url=redirect_uri)  # Redirect after logout
-        response.delete_cookie("id_token")  # Clear the access_token cookie
+        response.delete_cookie(config.SES_ID_TOKEN_FIELD)  # Clear the access_token cookie
         request.session.clear()
 
         return response

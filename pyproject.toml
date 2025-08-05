@@ -20,6 +20,7 @@ requires-python = ">=3.12"
 license = "MIT"
 dependencies = [
     "aiohttp>=3.11.11",
+    "aioredis>=2.0.0",
     "arq>=0.26.3",
     "asyncpg>=0.30.0",
     "blinker>=1.9.0",
