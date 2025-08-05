@@ -34,11 +34,11 @@ class SampleProcess(Workflow):
         """ This is a sample step. 2-X """
         pass
 
-    class Step02(Step, name="step-02a", stage=Stage01):
+    class Step02(Step, name="step-02a", stage=Stage01, multiple=True):
         """ This is a sample step. 2-X """
         pass
 
-    class Step02b(Step, stage=Stage01):
+    class Step02b(Step, stage=Stage01, multiple=True):
         """ This is a sample step. 2-B """
         __title__ = "Step2B"
 

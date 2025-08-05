@@ -42,10 +42,12 @@ def validate_step_states(states):
 class Step(object):
     __states__ = tuple()
     __stage__ = None
+    __multi__ = False
 
-    def __init_subclass__(cls, name=None, stage=None, states=None):
+    def __init_subclass__(cls, name=None, stage=None, states=None, multiple=False):
         cls.__title__ = name or cls.__name__
         cls.__stage__ = stage or cls.__stage__
+        cls.__multi__ = multiple or cls.__multi__
 
         cls.__states__ =  (BEGIN_STATE, FINISH_STATE) + validate_step_states(
             states or cls.__states__
@@ -100,6 +102,10 @@ class Step(object):
     @property
     def data(self):
         return self._data
+
+    @property
+    def step_key(self):
+        return self._data.step_key
 
     @property
     def selector(self):

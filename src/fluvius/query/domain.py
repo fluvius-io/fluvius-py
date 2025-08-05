@@ -15,8 +15,6 @@ class DomainQueryResource(QueryResource):
     __abstract__ = True
 
     id: UUID_TYPE = f.PrimaryID()
-    realm: Optional[str] = f.QueryField("Realm", source="_realm", hidden=True)
-    deleted: Optional[datetime] = f.QueryField("Deleted", source="_deleted", hidden=True)
     etag: Optional[str] = f.QueryField("ETag", source="_etag", preset="none", hidden=True)
     created: datetime = f.DatetimeField("Created", source="_created", hidden=True)
     updated: Optional[datetime] = f.DatetimeField("Updated", source="_updated", hidden=True)
@@ -53,5 +51,6 @@ class DomainQueryManager(QueryManager):
     ):
         """ Execute the backend query with the state manager and return """
         resource = query_resource.backend_model()
-        data = await self.data_manager.query(resource, backend_query, return_meta=meta)
+        data = await self.data_manager.connector_query(resource, backend_query, return_meta=meta)
+        logger.warning(f'Data: {data}')
         return data, meta

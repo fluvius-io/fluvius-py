@@ -326,6 +326,11 @@ class DataAccessManager(DataAccessManagerBase):
         q = BackendQuery.create(q, **query)
         data = await self.connector.query(model_name, q, return_meta)
         return self._wrap_list(model_name, data)
+    
+    async def connector_query(self, model_name: str, q=None, return_meta=None, **query):
+        """ Query with offset and limits """
+        q = BackendQuery.create(q, **query)
+        return await self.connector.query(model_name, q, return_meta)
 
     async def invalidate(self, record: DataModel):
         model_name = self.lookup_record_model(record)

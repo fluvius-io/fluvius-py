@@ -197,6 +197,7 @@ class QueryManager(object):
             alias=query_resource._alias,
             text=fe_query.text,
         )
+
         return self.validate_backend_query(query_resource, backend_query)
 
     async def execute_query(

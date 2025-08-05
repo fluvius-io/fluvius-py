@@ -17,7 +17,8 @@ class WorkflowManager(object):
     __registry__ = {}
 
     def __init__(self, datamgr=None):
-        self._running = {}
+        self._wfbyres= {}
+        self._wfbyids = {}
         self._datamgr = datamgr or WorkflowDataManager(self)
 
         assert isinstance(self._datamgr, WorkflowDataManager), "Workflow manager requires WorkflowDataManager"
@@ -49,14 +50,15 @@ class WorkflowManager(object):
     def create_workflow(self, wfdef_key, resource_name, resource_id, params=None, title=None):
         wf_engine = self.__registry__[wfdef_key]
         wf = wf_engine.create_workflow(resource_name, resource_id, params or {}, title=title)
-        self._running[wfdef_key, resource_id] = wf
+        self._wfbyres[wfdef_key, resource_name, resource_id] = wf
+        self._wfbyids[wfdef_key, wf.id] = wf
         return wf
 
     async def load_workflow(self, wfdef_key, resource_name, resource_id):
         if not resource_id:
             raise ValueError('Invalid workflow resource: {resource}:{resource_id}')
 
-        if (wfdef_key, resource_name, resource_id) not in self._running:
+        if (wfdef_key, resource_name, resource_id) not in self._wfbyres:
             wf_engine = self.__registry__[wfdef_key]
             wf_data = await self._datamgr.find_one('_workflow', where=dict(
                 wfdef_key=wfdef_key,
@@ -64,20 +66,22 @@ class WorkflowManager(object):
                 resource_id=resource_id
             ))
             wf = wf_engine(wf_data)
-            self._running[wfdef_key, resource_name, resource_id] = wf
+            self._wfbyres[wfdef_key, resource_name, resource_id] = wf
+            self._wfbyids[wfdef_key, wf.id] = wf
 
-        return self._running[wfdef_key, resource_name, resource_id]
+        return self._wfbyres[wfdef_key, resource_name, resource_id]
 
 
-    def load_workflow_by_id(self, wfdef_key, workflow_id):
-        if (wfdef_key, resource_id) not in self._running:
+    async def load_workflow_by_id(self, wfdef_key, workflow_id):
+        if (wfdef_key, workflow_id) not in self._wfbyids:
             wf_engine = self.__registry__[wfdef_key]
-            wf_data = self._datamgr.fetch('workflow', workflow_id)
+            wf_data = await self._datamgr.fetch('_workflow', workflow_id, wfdef_key=wfdef_key)
 
             wf = wf_engine(wf_data)
-            self._running[wfdef_key, resource_id] = wf
+            self._wfbyids[wfdef_key, workflow_id] = wf
+            self._wfbyres[wfdef_key, wf.resource_name, wf.resource_id] = wf
 
-        return self._running[wfdef_key, resource_id]
+        return self._wfbyids[wfdef_key, workflow_id]
     
     async def _log_mutation(self, tx, wf_mut: MutationEnvelop):
         await tx.insert_many('workflow-mutation', wf_mut.model_dump())
@@ -280,7 +284,7 @@ class WorkflowManager(object):
 
     async def commit(self):
         async with self._datamgr.transaction(_writeable=True) as tx:
-            for wf in self._running.values():
+            for wf in self._wfbyres.values():
                 await self.persist(tx, wf)
     
 

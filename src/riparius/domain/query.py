@@ -1,6 +1,7 @@
-from fluvius.query import DomainQueryManager, QueryResource
+from fluvius.query import DomainQueryManager, DomainQueryResource
 from fluvius.query.field import StringField, UUIDField, DatetimeField, FloatField, EnumField, PrimaryID, IntegerField, ListField, DictField   
 from fluvius.data import UUID_TYPE, DataModel
+
 from .domain import WorkflowDomain
 from ..model import WorkflowDataManager
 from ..status import WorkflowStatus, StepStatus
@@ -22,34 +23,34 @@ class WorkflowQueryManager(DomainQueryManager):
 resource = WorkflowQueryManager.register_resource
 
 
+# @resource('workflow')
+# class WorkflowQuery(QueryResource):
+#     """Query workflows and their properties"""
+
+#     class Meta(QueryResource.Meta):
+#         description = "List and search workflow instances"
+
+#     id: UUID_TYPE = PrimaryID("Workflow ID")
+#     title: str = StringField("Workflow Title")
+#     wfdef_key: str = StringField("Workflow Key")
+#     wfdef_rev: int = IntegerField("Workflow Revision")
+#     resource_id: UUID_TYPE = UUIDField("Route ID")
+#     status: str = EnumField("Workflow Status")
+#     progress: float = FloatField("Completion Progress")
+#     resource_id: UUID_TYPE = UUIDField("Route ID")
+#     ts_start: str = DatetimeField("Start Time")
+#     ts_expire: str = DatetimeField("Expire Time")
+#     ts_finish: str = DatetimeField("Finish Time")
+
 @resource('workflow')
-class WorkflowQuery(QueryResource):
+class WorkflowQuery(DomainQueryResource):
     """Query workflows and their properties"""
 
-    class Meta(QueryResource.Meta):
-        description = "List and search workflow instances"
-
-    id: UUID_TYPE = PrimaryID("Workflow ID")
-    title: str = StringField("Workflow Title")
-    wfdef_key: str = StringField("Workflow Key")
-    wfdef_rev: int = IntegerField("Workflow Revision")
-    resource_id: UUID_TYPE = UUIDField("Route ID")
-    status: str = EnumField("Workflow Status")
-    progress: float = FloatField("Completion Progress")
-    resource_id: UUID_TYPE = UUIDField("Route ID")
-    ts_start: str = DatetimeField("Start Time")
-    ts_expire: str = DatetimeField("Expire Time")
-    ts_finish: str = DatetimeField("Finish Time")
-
-@resource('workflow-embed')
-class WorkflowFullQuery(QueryResource):
-    """Query workflows and their properties"""
-
-    class Meta(QueryResource.Meta):
+    class Meta(DomainQueryResource.Meta):
         description = "List and search workflow instances"
         backend_model = "_workflow"
 
-    id: UUID_TYPE = PrimaryID("Workflow ID")
+    # id: UUID_TYPE = PrimaryID("Workflow ID")
     title: str = StringField("Workflow Title")
     wfdef_key: str = StringField("Workflow Key")
     wfdef_rev: int = IntegerField("Workflow Revision")
@@ -65,10 +66,10 @@ class WorkflowFullQuery(QueryResource):
 
 
 @resource('workflow-step')
-class WorkflowStepQuery(QueryResource):
+class WorkflowStepQuery(DomainQueryResource):
     """Query workflow steps"""
 
-    class Meta(QueryResource.Meta):
+    class Meta(DomainQueryResource.Meta):
         description = "List and search workflow steps"
         scope_required = WorkflowScope
 
@@ -76,21 +77,21 @@ class WorkflowStepQuery(QueryResource):
     workflow_id: UUID_TYPE = UUIDField("Workflow ID")
     index: int = IntegerField("Step Index")
     stage_key: str = StringField("Stage Key")
-    step_name: str = StringField("Step Name")
+    title: str = StringField("Step Title")
     desc: str = StringField("Step Description")
     status: str = EnumField("Step Status")
     stm_state: str = StringField("State Machine State")
-    label: str = StringField("Step Label")
+    stm_label: str = StringField("Step Label")
     origin_step: UUID_TYPE = UUIDField("Origin Step ID")
     ts_start: str = DatetimeField("Start Time")
     ts_finish: str = DatetimeField("Finish Time")
 
 
 @resource('workflow-participant')
-class WorkflowParticipantQuery(QueryResource):
+class WorkflowParticipantQuery(DomainQueryResource):
     """Query workflow participants"""
 
-    class Meta(QueryResource.Meta):
+    class Meta(DomainQueryResource.Meta):
         description = "List workflow participants and their roles"
         scope_required = WorkflowScope
 
@@ -101,10 +102,10 @@ class WorkflowParticipantQuery(QueryResource):
 
 
 @resource('workflow-stage')
-class WorkflowStageQuery(QueryResource):
+class WorkflowStageQuery(DomainQueryResource):
     """Query workflow stages"""
 
-    class Meta(QueryResource.Meta):
+    class Meta(DomainQueryResource.Meta):
         description = "List workflow stages and their progress"
         scope_required = WorkflowScope
 

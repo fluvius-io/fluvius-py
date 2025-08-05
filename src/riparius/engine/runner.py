@@ -136,7 +136,7 @@ class WorkflowRunner(object):
 
     def __init__(self, wf_data):
         if not isinstance(wf_data, WorkflowData):
-            raise RuntimeError(f'Invalid workflow state: {wf_data}')
+            raise RuntimeError(f'Invalid workflow state: {wf_data.__class__}')
 
         self._id = wf_data.id
         self._workflow = wf_data
@@ -146,13 +146,13 @@ class WorkflowRunner(object):
         self._output = wf_data.output or {}
         self._etag = None
         self._step_proxies = {}
-        self._load_steps(wf_data.steps)
         self._mut_queue = queue.Queue()
         self._msg_queue = queue.Queue()
         self._act_queue = queue.Queue()
         self._transaction_id = None
         self._action_context = collections.deque()
         self._counter = 0
+        self._load_steps(wf_data.steps)
         self._state_proxy = WorkflowStateProxy(self)
     
     def __init_subclass__(cls, wf_def):
@@ -387,7 +387,8 @@ class WorkflowRunner(object):
             raise WorkflowExecutionError('P01004', f'Invalid step states: {to_state}. Allowed states: {step.__states__}')
 
         if to_state == from_state:
-            raise WorkflowExecutionError('P01120', f'Transition to the same state [{to_state}]. No action taken.')
+            logger.warning(f'Transition [{step.step_key}] to the same state [{to_state}]. No action taken.')
+            return
 
         transitions = step.__transitions__
 
@@ -408,10 +409,20 @@ class WorkflowRunner(object):
     
     def _add_step(self, origin_step, /, step_key, selector=None, title=None):
         stdef = self.__steps__[step_key]
-        step_id = UUID_GENF(step_key, self._id)
+        if not stdef.__multi__:
+            step_id = UUID_GENF(step_key, self._id)
+        else:
+            step_id = UUID_GENF(f"{step_key}-{len(self.step_id_map)}", self._id)
+    
+        if step_id in self.step_id_map:
+            raise WorkflowExecutionError('P01107', f'Step [{step_key}] already exists: {step_id}')
+
         selector = selector or step_id
         if selector in self.selector_map:
-            raise WorkflowExecutionError('P01107', f'Selector value already allocated to another step [{selector or step_key}]')
+            raise WorkflowExecutionError(
+                'P01107', 
+                f'Selector value already allocated to another step [{step_key}]: {selector}'
+            )
 
         step_data = WorkflowStep(
             _id=step_id,
@@ -580,7 +591,7 @@ class WorkflowRunner(object):
     @workflow_action('transit_step', allow_statuses=WorkflowStatus._ACTIVE)
     def workflow_transit_step(self, step_id, to_state):
         step = self.step_id_map[step_id]
-        updates = self._transit(step, to_state)
+        self._transit(step, to_state)
         return self
 
     @workflow_action('add_step', allow_statuses=WorkflowStatus._ACTIVE)
