@@ -100,7 +100,7 @@ class Aggregate(object):
 
     @asynccontextmanager
     async def command_aggregate(self, context, command_bundle, command_meta):
-        if hasattr(self, '_context'):
+        if getattr(self, '_context', None):
             raise RuntimeError('Overlapping context: %s' % str(context))
 
         self._evt_queue = queue.Queue()
@@ -118,7 +118,24 @@ class Aggregate(object):
             await self.fetch_command_rootobj(self._aggroot)
         )
 
+        self.before_command(context, command_bundle, command_meta)
         yield RestrictedAggregateProxy(self)
+        
+        if not self._evt_queue.empty():
+            raise RuntimeError('All events must be consumed by the command handler.')
+
+        self.after_command(context, command_bundle, command_meta)
+        self._command = None
+        self._cmdmeta = None
+        self._aggroot = None
+        self._rootobj = None
+        self._context = None
+    
+    def before_command(self, context, command_bundle, command_meta):
+        pass
+
+    def after_command(self, context, command_bundle, command_meta):
+        pass
 
     async def fetch_command_rootobj(self, aggroot):
         if self._cmdmeta.Meta.new_resource:

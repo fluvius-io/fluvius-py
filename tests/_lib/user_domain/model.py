@@ -4,7 +4,7 @@ from sqlalchemy.dialects import postgresql as pg
 from fluvius.data import UUID_GENR
 
 class UserConnector(SqlaDriver):
-    __db_dsn__ = "postgresql+asyncpg://postgres:postgres@localhost:5432/postgres"
+    __db_dsn__ = "postgresql+asyncpg://lexhung@localhost:5432/postgres"
 
 
 class User(UserConnector.__data_schema_base__):

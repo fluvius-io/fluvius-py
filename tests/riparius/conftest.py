@@ -53,7 +53,7 @@ class SampleProcess(Workflow):
             state.transit('TAKE')
             s1.transit(FINISH_STATE)
             s2.transit(FINISH_STATE)
-            assert state._id == s1._data.origin_step and s2._data.origin_step == state._id
+            assert state._id == s1._data.src_step and s2._data.src_step == state._id
             yield f"test_event_step ACTION! #2 {s1} & {s2} => {event}"
             yield f"MEMORY: {state.recall()}"
 

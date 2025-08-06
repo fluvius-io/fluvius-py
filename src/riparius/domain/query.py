@@ -23,25 +23,6 @@ class WorkflowQueryManager(DomainQueryManager):
 resource = WorkflowQueryManager.register_resource
 
 
-# @resource('workflow')
-# class WorkflowQuery(QueryResource):
-#     """Query workflows and their properties"""
-
-#     class Meta(QueryResource.Meta):
-#         description = "List and search workflow instances"
-
-#     id: UUID_TYPE = PrimaryID("Workflow ID")
-#     title: str = StringField("Workflow Title")
-#     wfdef_key: str = StringField("Workflow Key")
-#     wfdef_rev: int = IntegerField("Workflow Revision")
-#     resource_id: UUID_TYPE = UUIDField("Route ID")
-#     status: str = EnumField("Workflow Status")
-#     progress: float = FloatField("Completion Progress")
-#     resource_id: UUID_TYPE = UUIDField("Route ID")
-#     ts_start: str = DatetimeField("Start Time")
-#     ts_expire: str = DatetimeField("Expire Time")
-#     ts_finish: str = DatetimeField("Finish Time")
-
 @resource('workflow')
 class WorkflowQuery(DomainQueryResource):
     """Query workflows and their properties"""
@@ -50,14 +31,14 @@ class WorkflowQuery(DomainQueryResource):
         description = "List and search workflow instances"
         backend_model = "_workflow"
 
-    # id: UUID_TYPE = PrimaryID("Workflow ID")
+    id: UUID_TYPE = PrimaryID("Workflow ID")
     title: str = StringField("Workflow Title")
     wfdef_key: str = StringField("Workflow Key")
     wfdef_rev: int = IntegerField("Workflow Revision")
-    resource_id: UUID_TYPE = UUIDField("Route ID")
+    resource_id: UUID_TYPE = UUIDField("Resource ID")
+    resource_name: str = StringField("Resource Name")
     status: str = EnumField("Workflow Status")
     progress: float = FloatField("Completion Progress")
-    resource_id: UUID_TYPE = UUIDField("Route ID")
     ts_start: str = DatetimeField("Start Time")
     ts_expire: str = DatetimeField("Expire Time", hidden=True)
     ts_finish: str = DatetimeField("Finish Time", hidden=True)
@@ -82,7 +63,7 @@ class WorkflowStepQuery(DomainQueryResource):
     status: str = EnumField("Step Status")
     stm_state: str = StringField("State Machine State")
     stm_label: str = StringField("Step Label")
-    origin_step: UUID_TYPE = UUIDField("Origin Step ID")
+    src_step: UUID_TYPE = UUIDField("Origin Step ID")
     ts_start: str = DatetimeField("Start Time")
     ts_finish: str = DatetimeField("Finish Time")
 

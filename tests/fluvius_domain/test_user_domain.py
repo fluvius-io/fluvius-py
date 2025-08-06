@@ -49,7 +49,7 @@ def domain():
 
 @mark.asyncio
 async def test_create_user(domain):
-    db = domain.statemgr.connector._async_session._async_engine
+    db = domain.statemgr.connector.engine
     async with db.begin() as conn:
         await conn.run_sync(UserConnector.__data_schema_base__.metadata.drop_all)
         await conn.run_sync(UserConnector.__data_schema_base__.metadata.create_all)

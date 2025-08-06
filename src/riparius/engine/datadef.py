@@ -51,7 +51,7 @@ class WorkflowStep(WorkflowDataModel):
     workflow_id: UUID_TYPE
     step_key: str
     stage_key: str
-    origin_step: Optional[UUID_TYPE] = None
+    src_step: Optional[UUID_TYPE] = None
     stm_state: str
     stm_label: Optional[str] = None
     ts_due: Optional[datetime] = None

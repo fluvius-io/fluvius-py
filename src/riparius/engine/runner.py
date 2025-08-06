@@ -407,7 +407,7 @@ class WorkflowRunner(object):
 
         return self._update_step(step, stm_state=to_state, ts_transit=timestamp())
     
-    def _add_step(self, origin_step, /, step_key, selector=None, title=None):
+    def _add_step(self, src_step, /, step_key, selector=None, title=None):
         stdef = self.__steps__[step_key]
         if not stdef.__multi__:
             step_id = UUID_GENF(step_key, self._id)
@@ -434,7 +434,7 @@ class WorkflowRunner(object):
             workflow_id=self._id,
             stm_state=BEGIN_STATE,
             stm_label=BEGIN_LABEL,
-            origin_step=origin_step,
+            src_step=src_step,
             status=StepStatus.ACTIVE,
             ts_start=timestamp(),
             stage_key=stdef.__stage_key__,
@@ -510,6 +510,10 @@ class WorkflowRunner(object):
         return self._workflow.resource_id
 
     @property
+    def resource_name(self):
+        return self._workflow.resource_name
+
+    @property
     def statemgr(self):
         return self.__statemgr__
 
@@ -570,11 +574,11 @@ class WorkflowRunner(object):
         return self
 
     @workflow_action('add_task', allow_statuses=WorkflowStatus._ACTIVE, hook_name='task_added')
-    def add_task(self, /, origin_step, task_key, **kwargs):
+    def add_task(self, /, src_step, task_key, **kwargs):
         task_id = UUID_GENF(task_key, self._id)
         task = {
             'id': task_id,
-            'origin_step': origin_step,
+            'src_step': src_step,
             'title': kwargs.get('title', ''),
             'status': StepStatus.ACTIVE,
             'workflow_id': self._id,

@@ -135,17 +135,10 @@ class _AsyncSessionConfiguration(object):
         self._async_engine, self._async_sessionmaker = self.set_bind(bind_dsn=self._config, loop=None, echo=False, **kwargs)
 
     def make_session(self):
-        if not hasattr(self, "_async_engine"):
+        if not hasattr(self, "_async_sessionmaker"):
             raise ValueError('AsyncSession connection is not established.')
 
         return self._async_sessionmaker()
-
-    async def connection(self):
-        if hasattr(self, "_connection") and not self._connection.closed:
-            return self._connection
-
-        self._connection = await self._async_sessionmaker.connection()
-        return self._connection
 
     def _setup_sql_statement(self, dialect):
         sqla_dialect = importlib.import_module(f'sqlalchemy.dialects.{dialect}')
@@ -209,7 +202,6 @@ class SqlaDriver(DataDriver, QueryBuilder):
             raise ValueError(f'No database DSN provided to: {self.__class__}')
         self._session_configuration = _AsyncSessionConfiguration(dsn)
 
-
     def __init_subclass__(cls):
         cls.__data_schema_registry__ = {}
         cls.__data_schema_base__ = create_data_schema_base(cls)
@@ -217,6 +209,10 @@ class SqlaDriver(DataDriver, QueryBuilder):
     @property
     def dsn(self):
         return self.__db_dsn__
+
+    @property
+    def engine(self):
+        return self._session_configuration._async_engine
 
     @classmethod
     def validate_data_schema(cls, schema_model):
@@ -243,9 +239,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
     @asynccontextmanager
     async def transaction(self, *args, reuse_session=True):
         if self.active_session is not None:
-            logger.warning('Nested transaction detected: %s', self.active_session)
-            yield self.active_session
-            return
+            logger.warning(f'Nested/concurrent transaction detected: {self.active_session}')
 
         async with self._session_configuration.make_session() as async_session:
             self._active_session = async_session
@@ -351,10 +345,10 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
         data_schema = self.lookup_data_schema(resource)
         stmt = self.build_update(data_schema, query, updates)
-        sess = self.active_session
-        cursor = await sess.execute(stmt)
-        self._check_no_item_modified(cursor, 1, query)
-        return self._unwrap_result(cursor)
+        async with self.transaction() as sess:
+            cursor = await sess.execute(stmt)
+            self._check_no_item_modified(cursor, 1, query)
+            return self._unwrap_result(cursor)
 
     @sqla_error_handler('L1203')
     async def remove_one(self, resource, query: BackendQuery):
@@ -364,25 +358,25 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
         ''' @TODO: Add etag checking for batch items '''
         stmt = self.build_delete(data_schema, query)
-        sess = self.active_session
-        cursor = await sess.execute(stmt)
-        self._check_no_item_modified(cursor, 1, query)
-        return self._unwrap_result(cursor)
+        async with self.transaction() as sess:
+            cursor = await sess.execute(stmt)
+            self._check_no_item_modified(cursor, 1, query)
+            return self._unwrap_result(cursor)
 
     @sqla_error_handler('L1204')
     async def insert(self, resource, values: dict | list):
         data_schema = self.lookup_data_schema(resource)
         stmt = self.build_insert(data_schema, values)
-        sess = self.active_session
-        cursor = await sess.execute(stmt)
+        async with self.transaction() as sess:
+            cursor = await sess.execute(stmt)
 
-        expect = len(values) if isinstance(values, (list, tuple)) else 1
-        self._check_no_item_modified(cursor, expect)
+            expect = len(values) if isinstance(values, (list, tuple)) else 1
+            self._check_no_item_modified(cursor, expect)
 
-        if DEBUG_CONNECTOR:
-            logger.info("\n- DATA INSERTED: %s \n- RESULTS: %r", values, cursor)
+            if DEBUG_CONNECTOR:
+                logger.info("\n- DATA INSERTED: %s \n- RESULTS: %r", values, cursor)
 
-        return self._unwrap_result(cursor)
+            return self._unwrap_result(cursor)
 
     @sqla_error_handler('L1205')
     async def upsert(self, resource, data):
@@ -402,11 +396,11 @@ class SqlaDriver(DataDriver, QueryBuilder):
             set_=set_fields
         )
 
-        sess = self.active_session
-        cursor = await sess.execute(stmt)
-        DEBUG_CONNECTOR and logger.info("UPSERT %d items => %r", len(data), cursor.rowcount)
-        self._check_no_item_modified(cursor, 1)
-        return self._unwrap_result(cursor)
+        async with self.transaction() as sess:
+            cursor = await sess.execute(stmt)
+            DEBUG_CONNECTOR and logger.info("UPSERT %d items => %r", len(data), cursor.rowcount)
+            self._check_no_item_modified(cursor, 1)
+            return self._unwrap_result(cursor)
 
     @sqla_error_handler('L1206')
     async def native_query(self, nquery, *params, unwrapper):

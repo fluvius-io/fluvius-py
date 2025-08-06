@@ -53,7 +53,7 @@ class WorkflowSchema(WorkflowBaseSchema):
     usr_tag = sa.Column(pg.ARRAY(sa.String), nullable=True)
 
 
-class WorkflowFullSchema(WorkflowBaseSchema):
+class WorkflowViewSchema(WorkflowBaseSchema):
     __tablename__ = "_workflow"
     __external__ = True
     __table_args__ = WorkflowBaseSchema.__table_args__ | {'info': {'is_view': True}}
@@ -97,7 +97,7 @@ class WorkflowStep(WorkflowBaseSchema):
     selector = sa.Column(pg.UUID, nullable=True)
     stm_state = sa.Column(sa.String, nullable=False)
     stm_label = sa.Column(sa.String, nullable=True)
-    origin_step = sa.Column(pg.UUID, nullable=True)
+    src_step = sa.Column(pg.UUID, nullable=True)
     ts_due = sa.Column(sa.DateTime(timezone=True), nullable=True)
     ts_start = sa.Column(sa.DateTime(timezone=True), nullable=True)
     ts_finish = sa.Column(sa.DateTime(timezone=True), nullable=True)
@@ -189,7 +189,7 @@ SELECT
   wm.memory,
   wm.output,
   jsonb_agg(
-    jsonb_build_object(
+    DISTINCT jsonb_build_object(
       '_id', ws._id,
       'key', ws.key,
       'desc', ws.desc,
@@ -199,10 +199,10 @@ SELECT
       'order', ws.order,
       'status', ws.status
     )
-  ) AS stages,
+  ) FILTER (WHERE ws._id IS NOT NULL) AS stages,
   COALESCE(
       jsonb_agg(
-        jsonb_build_object(
+        DISTINCT jsonb_build_object(
           '_id', st._id,
           'desc', st.desc,
           'title', st.title,

@@ -163,6 +163,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             domain = self.__namespace__,
             revision = self.__revision__
         )
+        self._aggregate = self.__aggregate__(self)
 
         self.rsp_queue = queue.Queue()
         self.evt_queue = queue.Queue()
@@ -326,8 +327,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
     async def invoke_processors(self, ctx, statemgr, cmd_bundle, cmd_def):
         no_handler = True
-        aggregate = self.__aggregate__(self)
-        async with aggregate.command_aggregate(ctx, cmd_bundle, cmd_def) as agg_proxy:
+        async with self._aggregate.command_aggregate(ctx, cmd_bundle, cmd_def) as agg_proxy:
             for processor in self.cmd_processors(cmd_bundle):
                 async for particle in processor(agg_proxy, statemgr, cmd_bundle):
                     if particle is None:
@@ -337,7 +337,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
                 no_handler = False
 
-            for evt in aggregate.consume_events():
+            for evt in self._aggregate.consume_events():
                 yield evt
 
         if no_handler:

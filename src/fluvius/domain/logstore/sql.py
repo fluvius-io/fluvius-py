@@ -12,10 +12,11 @@ from fluvius.helper import camel_to_lower
 from .base import DomainLogStore
 
 LOG_STORE_SCHEMA = config.SQL_LOG_STORE_NAMESPACE
+LOG_STORE_DB_DSN = config.SQL_LOG_DB_DSN
 
 class DomainLogConnector(SqlaDriver):
-    __db_dsn__ = config.SQL_LOG_DB_DSN
-
+    __db_dsn__ = LOG_STORE_DB_DSN
+    __schema__ = LOG_STORE_SCHEMA
 
 class SQLDomainLogManager(DataFeedManager):
     __connector__ = DomainLogConnector
