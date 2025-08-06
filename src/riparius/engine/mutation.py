@@ -1,7 +1,7 @@
 from .datadef import WorkflowDataModel, WorkflowStep, WorkflowData, WorkflowParticipant, WorkflowStatus, StepStatus, WorkflowStage
 from datetime import datetime
 from typing import Optional
-from pydantic import Field, field_serializer
+from pydantic import Field, field_serializer, ConfigDict
 from uuid import UUID as UUID_TYPE
 from fluvius.helper import camel_to_lower
 from fluvius import logger
@@ -9,6 +9,8 @@ from fluvius import logger
 REGISTRY = {}
 
 class WorkflowMutation(WorkflowDataModel):
+    model_config = ConfigDict(extra="forbid")
+
     def __init_subclass__(cls):
         key = camel_to_lower(cls.__name__)
         if key in REGISTRY:
@@ -20,9 +22,9 @@ class WorkflowMutation(WorkflowDataModel):
 class UpdateStep(WorkflowMutation):
     title: Optional[str] = None
     stm_state: Optional[str] = None
+    stm_label: Optional[str] = None
     message: Optional[str] = None
     status: Optional[StepStatus] = None
-    label: Optional[str] = None
     ts_due: Optional[datetime] = None
     ts_start: Optional[datetime] = None
     ts_finish: Optional[datetime] = None

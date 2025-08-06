@@ -238,13 +238,13 @@ class WorkflowRunner(object):
         ActivityRouter.connect_wf_events(wf_def, wf_def.Meta.key)
 
     def gen_stages(self):
-        for key, stage in self.__stages__.items():
+        for idx, (key, stage) in enumerate(self.__stages__.items()):
             yield WorkflowStage(
                 workflow_id=self.id,
                 key=key,
                 stage_name=stage.name,
                 stage_type=stage.type,
-                order=stage.order,
+                order=stage.order or (100 + idx),
                 desc=stage.desc
             )
 
@@ -341,7 +341,7 @@ class WorkflowRunner(object):
             kwargs['status'] = StepStatus.ACTIVE
 
         step._data = step._data.set(**kwargs)
-        self.mutate('update-step', step_id=step.id, **kwargs)
+        self.mutate('update-step', **kwargs)
         return kwargs
 
     def _update_workflow(self, **kwargs):
@@ -440,7 +440,7 @@ class WorkflowRunner(object):
             stage_key=stdef.__stage_key__,
         )
         step = self._create_step(step_data)
-        self.mutate('add-step', step=step._data, step_id=step.id)
+        self.mutate('add-step', step=step._data)
         return step
 
     def _create_step(self, step_data):
@@ -464,7 +464,7 @@ class WorkflowRunner(object):
             return
         
         self._memory.update(kwargs)
-        self.mutate('set-memory', _id=self._id, memory=self._memory)
+        self.mutate('set-memory', memory=self._memory)
     
     def _set_step_memory(self, _step_id, **kwargs):
         if not kwargs:
@@ -473,14 +473,14 @@ class WorkflowRunner(object):
         sid = str(_step_id)
         self._stepsm.setdefault(sid, {})
         self._stepsm[sid].update(kwargs)
-        self.mutate('set-memory', _id=self._id, stepsm=self._stepsm)
+        self.mutate('set-memory', stepsm=self._stepsm)
     
     def _set_output(self, **kwargs):
         if not kwargs:
             return
 
         self._output.update(kwargs)
-        self.mutate('set-memory', _id=self._id, output=self._output)
+        self.mutate('set-memory', output=self._output)
     
     def _get_memory(self, _step_id=None):
         data = {} | self._memory
