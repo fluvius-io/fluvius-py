@@ -9,3 +9,5 @@ from .setup import create_app, on_startup, on_shutdown
 from .domain import configure_domain_manager
 from .query import configure_query_manager
 from .kcadmin import KCAdmin
+from .media import configure_media
+from .mqtt import configure_mqtt

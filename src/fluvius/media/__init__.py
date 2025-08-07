@@ -11,5 +11,5 @@ __all__ = [
     'MediaEntry', 
     'MediaManager',
     'MediaFilesystem',
-    'FsSpecCompressionMethod'
+    'FsSpecCompressionMethod',
 ]

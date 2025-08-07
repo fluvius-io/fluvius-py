@@ -36,6 +36,8 @@ class MediaSchema(MediaDataConnector.__data_schema_base__):
 
 
 class MediaEntry(MediaSchema):
+    __tablename__ = 'media-entry'
+
     _id = sa.Column(pg.UUID, primary_key=True, nullable=False, default=UUID_GENR, server_default=sa.text("uuid_generate_v4()"))
     _created = sa.Column(sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()"))
     _updated = sa.Column(sa.DateTime(timezone=True), nullable=True)
@@ -56,6 +58,8 @@ class MediaEntry(MediaSchema):
 
 
 class MediaFilesystem(MediaSchema):
+    __tablename__ = 'media-filesystem'
+
     _id = sa.Column(pg.UUID, primary_key=True, nullable=False, default=UUID_GENR, server_default=sa.text("uuid_generate_v4()"))
     _created = sa.Column(sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()"))
     _updated = sa.Column(sa.DateTime(timezone=True), nullable=True)
