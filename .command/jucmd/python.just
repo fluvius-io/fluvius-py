@@ -1,7 +1,7 @@
 export PYTHONPATH 	:= "./src:./tests/_lib:./cmd"
 export FLUVIUS_CONFIG_FILE := "config.ini"
 
-TEST_FILES 			:= "*"
+TEST_FILES 			:= env("TEST_FILES", "*")
 TEST_LOG_LEVEL  	:= "info"
 TEST_PARAMS			:= env("TEST_PARAMS", "")
 
