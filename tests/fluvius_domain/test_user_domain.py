@@ -54,20 +54,22 @@ async def test_create_user(domain):
         await conn.run_sync(UserConnector.__data_schema_base__.metadata.drop_all)
         await conn.run_sync(UserConnector.__data_schema_base__.metadata.create_all)
 
-
     user_id = UUID_GENR()
     payload = {
         "name": "John Doe"
     }
     result = await command_handler(domain, "create-user", payload, "user", user_id, context={"user_id": user_id})
-    user = await domain.statemgr.fetch('user',user_id)
-    assert user.name == "John Doe"
+    async with domain.statemgr.transaction():
+        user = await domain.statemgr.fetch('user',user_id)
+        assert user.name == "John Doe"
 
     update_payload = {"name": "Jane Doe Updated"}
     result = await command_handler(domain, "update-user", update_payload, "user", user_id, context={"user_id": user_id})
-    user = await domain.statemgr.fetch('user',user_id)
-    assert user.name == "Jane Doe Updated"
+    async with domain.statemgr.transaction():
+        user = await domain.statemgr.fetch('user',user_id)
+        assert user.name == "Jane Doe Updated"
 
     result = await command_handler(domain, "invalidate-user", None, "user", user_id, context={"user_id": user_id})
-    user = await domain.statemgr.find_one('user', identifier=user_id)
-    assert user is None
+    async with domain.statemgr.transaction():
+        user = await domain.statemgr.find_one('user', identifier=user_id)
+        assert user is None

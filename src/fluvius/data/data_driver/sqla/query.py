@@ -31,7 +31,7 @@ from fluvius.error import BadRequestError
 from fluvius.constant import QUERY_OPERATOR_SEP, OPERATOR_SEP_NEGATE, DEFAULT_DELETED_FIELD
 
 
-DEBUG_CONNECTOR = True or config.DEBUG
+DEBUG_CONNECTOR = config.DEBUG
 
 DEFAULT_TEXT_SEARCH_LANG = 'english'
 DEFAULT_TEXT_SEARCH_ENGINE = func.plainto_tsquery

@@ -50,7 +50,6 @@ class InitializeWorkflow(WorkflowMutation):
 
 
 class SetMemory(WorkflowMutation):
-    _id: UUID_TYPE
     params: Optional[dict] = None
     memory: Optional[dict] = None
     stepsm: Optional[dict] = None

@@ -1,4 +1,5 @@
 import asyncpg
+import asyncio
 import importlib
 from asyncio import current_task
 import sqlalchemy as sa
@@ -160,7 +161,7 @@ class _AsyncSessionConfiguration(object):
 
         engine = create_async_engine(
             bind_dsn,
-            isolation_level="AUTOCOMMIT",
+            isolation_level="SERIALIZABLE",
             pool_recycle=1800,
             json_serializer=serialize_json,
             **kwargs
@@ -238,17 +239,16 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
     @asynccontextmanager
     async def transaction(self, *args, reuse_session=True):
-        if self.active_session is not None:
+        if self._active_session is not None:
             logger.warning(f'Nested/concurrent transaction detected: {self.active_session}')
 
         async with self._session_configuration.make_session() as async_session:
             self._active_session = async_session
             try:
                 yield async_session
-            except ItemNotFoundError:
-                raise
+                await async_session.commit()
             except Exception:
-                # logger.exception('[E15201] Error during database transaction. Rolling back ...')
+                logger.error('[E15201] Error during database transaction. Rolling back ...')
                 await async_session.rollback()
                 raise
             finally:
@@ -256,6 +256,9 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
     @property
     def active_session(self):
+        if self._active_session is None:
+            raise RuntimeError('Operation must be run with in a tranasaction.')
+
         return self._active_session
 
     @sqla_error_handler('L1207')
@@ -300,12 +303,12 @@ class SqlaDriver(DataDriver, QueryBuilder):
         return_meta = isinstance(meta, dict)
 
         stmt = self.build_select(data_schema, query)
-        async with self.transaction() as sess:
-            if return_meta:
-                total_items = await self.query_count(sess, stmt)
+        sess = self.active_session
+        if return_meta:
+            total_items = await self.query_count(sess, stmt)
 
-            cursor = await sess.execute(stmt)
-            items = cursor.mappings().all()
+        cursor = await sess.execute(stmt)
+        items = cursor.mappings().all()
 
         DEBUG_CONNECTOR and logger.warning("\n[QUERY] %r\n=> [RESULT] %s items", str(stmt), items)
         if return_meta:
@@ -331,12 +334,12 @@ class SqlaDriver(DataDriver, QueryBuilder):
     @sqla_error_handler('L1201')
     async def find_one(self, resource, query: BackendQuery):
         data_schema = self.lookup_data_schema(resource)
-        async with self.transaction() as sess:
-            stmt = self.build_select(data_schema, query)
-            cursor = await sess.execute(stmt)
-            DEBUG_CONNECTOR and logger.info("\n[FIND_ONE] %r\n=> [RESOURCE] %s\n=> [QUERY] %s items", query, resource, cursor)
+        sess = self.active_session
+        stmt = self.build_select(data_schema, query)
+        cursor = await sess.execute(stmt)
+        DEBUG_CONNECTOR and logger.info("\n[FIND_ONE] %r\n=> [RESOURCE] %s\n=> [QUERY] %s items", query, resource, cursor)
 
-            return cursor.mappings().one()
+        return cursor.mappings().one()
 
     @sqla_error_handler('L1202')
     async def update_one(self, resource, query, **updates):
@@ -345,10 +348,10 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
         data_schema = self.lookup_data_schema(resource)
         stmt = self.build_update(data_schema, query, updates)
-        async with self.transaction() as sess:
-            cursor = await sess.execute(stmt)
-            self._check_no_item_modified(cursor, 1, query)
-            return self._unwrap_result(cursor)
+        sess = self.active_session
+        cursor = await sess.execute(stmt)
+        self._check_no_item_modified(cursor, 1, query)
+        return self._unwrap_result(cursor)
 
     @sqla_error_handler('L1203')
     async def remove_one(self, resource, query: BackendQuery):
@@ -358,25 +361,25 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
         ''' @TODO: Add etag checking for batch items '''
         stmt = self.build_delete(data_schema, query)
-        async with self.transaction() as sess:
-            cursor = await sess.execute(stmt)
-            self._check_no_item_modified(cursor, 1, query)
-            return self._unwrap_result(cursor)
+        sess = self.active_session
+        cursor = await sess.execute(stmt)
+        self._check_no_item_modified(cursor, 1, query)
+        return self._unwrap_result(cursor)
 
     @sqla_error_handler('L1204')
     async def insert(self, resource, values: dict | list):
         data_schema = self.lookup_data_schema(resource)
         stmt = self.build_insert(data_schema, values)
-        async with self.transaction() as sess:
-            cursor = await sess.execute(stmt)
+        sess = self.active_session
+        cursor = await sess.execute(stmt)
 
-            expect = len(values) if isinstance(values, (list, tuple)) else 1
-            self._check_no_item_modified(cursor, expect)
+        expect = len(values) if isinstance(values, (list, tuple)) else 1
+        self._check_no_item_modified(cursor, expect)
 
-            if DEBUG_CONNECTOR:
-                logger.info("\n- DATA INSERTED: %s \n- RESULTS: %r", values, cursor)
+        if DEBUG_CONNECTOR:
+            logger.info("\n- DATA INSERTED: %s \n- RESULTS: %r", values, cursor)
 
-            return self._unwrap_result(cursor)
+        return self._unwrap_result(cursor)
 
     @sqla_error_handler('L1205')
     async def upsert(self, resource, data):
@@ -396,11 +399,11 @@ class SqlaDriver(DataDriver, QueryBuilder):
             set_=set_fields
         )
 
-        async with self.transaction() as sess:
-            cursor = await sess.execute(stmt)
-            DEBUG_CONNECTOR and logger.info("UPSERT %d items => %r", len(data), cursor.rowcount)
-            self._check_no_item_modified(cursor, 1)
-            return self._unwrap_result(cursor)
+        sess = self.active_session
+        cursor = await sess.execute(stmt)
+        DEBUG_CONNECTOR and logger.info("UPSERT %d items => %r", len(data), cursor.rowcount)
+        self._check_no_item_modified(cursor, 1)
+        return self._unwrap_result(cursor)
 
     @sqla_error_handler('L1206')
     async def native_query(self, nquery, *params, unwrapper):

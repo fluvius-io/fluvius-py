@@ -51,6 +51,6 @@ class DomainQueryManager(QueryManager):
     ):
         """ Execute the backend query with the state manager and return """
         resource = query_resource.backend_model()
-        data = await self.data_manager.connector_query(resource, backend_query, return_meta=meta)
-        logger.warning(f'Data: {data}')
-        return data, meta
+        async with self.data_manager.transaction():
+            data = await self.data_manager.connector_query(resource, backend_query, return_meta=meta)
+            return data, meta
