@@ -100,9 +100,6 @@ class FluviusAuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         try:
             auth_context = await self.get_auth_context(request)
-            # # @TODO: Add these for MQTT auth
-            # auth_context.session_id = user_claims.get('session_id')
-            # auth_context.client_token = user_claims.get('client_token')
             request.state.auth_context = auth_context
         except Exception as e:
             logger.exception(e)
@@ -162,7 +159,11 @@ class FluviusAuthProfileProvider(object):
         except (KeyError, ValueError):
             raise UnauthorizedError("Q4031216", "Authorization Failed: Missing or invalid  claims token")
 
-        return await self.setup_context(auth_user)
+        auth_context = await self.setup_context(auth_user)
+        auth_context.session_id = auth_token.get('session_id')
+        auth_context.client_token = auth_token.get('client_token')
+        return auth_context
+
 
     async def setup_context(self, auth_user: KeycloakTokenPayload) -> AuthorizationContext:
         profile = SessionProfile(
