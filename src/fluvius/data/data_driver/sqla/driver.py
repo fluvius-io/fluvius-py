@@ -254,8 +254,12 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
     @asynccontextmanager
     async def transaction(self, *args, reuse_session=True):
-        if self._active_session.get() is not None:
-            logger.warning(f'Nested/concurrent transaction detected: {self._active_session.get()}')
+        active_session = self._active_session.get()
+
+        if active_session is not None:
+            logger.warning(f'Nested/concurrent transaction detected: {active_session}')
+            yield active_session
+            return
 
         async with self._session_configuration.make_session() as async_session:
             self._active_session.set(async_session)
@@ -265,8 +269,6 @@ class SqlaDriver(DataDriver, QueryBuilder):
             except Exception:
                 logger.error('[E15201] Error during database transaction. Rolling back ...')
                 await async_session.rollback()
-                await async_session.close()
-                self._active_session.set(None)
                 raise
             finally:
                 await async_session.close()
