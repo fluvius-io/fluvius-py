@@ -47,10 +47,18 @@ class SessionProfile(DataModel):
     org_id: Optional[UUID] = None
     usr_id: Optional[UUID] = None
 
+    @property
+    def _id(self):
+        return self.id
+
 
 class SessionOrganization(DataModel):
     id: UUID
     name: str
+
+    @property
+    def _id(self):
+        return self.id
 
 
 AuthorizationContext = SimpleNamespace

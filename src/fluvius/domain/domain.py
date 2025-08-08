@@ -443,8 +443,8 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         if authorization:
             audit = dict(
                 user_id=authorization.user._id,
-                profile_id=authorization.profile.id,
-                organization_id=authorization.organization.id,
+                profile_id=authorization.profile._id,
+                organization_id=authorization.organization._id,
                 iam_roles=authorization.iamroles,
                 realm=authorization.realm
             )
