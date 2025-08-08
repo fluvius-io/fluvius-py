@@ -32,7 +32,9 @@ class KeycloakTokenPayload(DataModel):
     def id(self):
         return self.sub
 
-
+    @property
+    def _id(self):
+        return self.sub
 
 class SessionProfile(DataModel):
     id: UUID
