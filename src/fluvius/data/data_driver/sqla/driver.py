@@ -4,6 +4,7 @@ import importlib
 from asyncio import current_task
 import sqlalchemy as sa
 from functools import wraps
+from contextvars import ContextVar
 
 from contextlib import asynccontextmanager
 from pypika.queries import QueryBuilder as PikaQueryBuilder
@@ -141,6 +142,13 @@ class _AsyncSessionConfiguration(object):
 
         return self._async_sessionmaker()
 
+    async def connection(self):
+        if hasattr(self, "_connection") and not self._connection.closed:
+            return self._connection
+
+        self._connection = await self._async_sessionmaker.connection()
+        return self._connection
+
     def _setup_sql_statement(self, dialect):
         sqla_dialect = importlib.import_module(f'sqlalchemy.dialects.{dialect}')
         self.insert = getattr(sqla_dialect, 'insert', sa.insert)
@@ -161,22 +169,23 @@ class _AsyncSessionConfiguration(object):
 
         engine = create_async_engine(
             bind_dsn,
-            isolation_level="SERIALIZABLE",
+            isolation_level="READ COMMITTED",
             pool_recycle=1800,
+            pool_size=pool_size,
             json_serializer=serialize_json,
             **kwargs
         )
 
         self._setup_sql_statement(engine.dialect.name)
-        sessionmaker = async_sessionmaker(
+        _sessionmaker = async_sessionmaker(
             bind=engine,
             expire_on_commit=False,
-            autoflush=True,
+            autoflush=False,
             autobegin=True
         )
 
         scoped_session = async_scoped_session(
-            session_factory=sessionmaker,
+            session_factory=_sessionmaker,
             scopefunc=current_task
         )
 
@@ -194,9 +203,11 @@ class _AsyncSessionConfiguration(object):
 class SqlaDriver(DataDriver, QueryBuilder):
     __db_dsn__ = None
     __data_schema_base__ = SqlaDataSchema
+    
+    # Task-local session tracking
+    _active_session = ContextVar('active_session', default=None)
 
     def __init__(self, **kwargs):
-        self._active_session = None
         DEBUG_CONNECTOR and logger.info(f'[{self.__class__.__name__}] setup with DSN: {self.dsn}')
         dsn = self.__db_dsn__
         if dsn is None:
@@ -214,6 +225,10 @@ class SqlaDriver(DataDriver, QueryBuilder):
     @property
     def engine(self):
         return self._session_configuration._async_engine
+
+    @property
+    def connection(self):
+        return self._session_configuration.connection()
 
     @classmethod
     def validate_data_schema(cls, schema_model):
@@ -239,27 +254,30 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
     @asynccontextmanager
     async def transaction(self, *args, reuse_session=True):
-        if self._active_session is not None:
-            logger.warning(f'Nested/concurrent transaction detected: {self.active_session}')
+        if self._active_session.get() is not None:
+            logger.warning(f'Nested/concurrent transaction detected: {self._active_session.get()}')
 
         async with self._session_configuration.make_session() as async_session:
-            self._active_session = async_session
+            self._active_session.set(async_session)
             try:
                 yield async_session
                 await async_session.commit()
             except Exception:
                 logger.error('[E15201] Error during database transaction. Rolling back ...')
                 await async_session.rollback()
+                await async_session.close()
+                self._active_session.set(None)
                 raise
             finally:
-                self._active_session = None
+                await async_session.close()
+                self._active_session.set(None)
 
     @property
     def active_session(self):
-        if self._active_session is None:
+        if self._active_session.get() is None:
             raise RuntimeError('Operation must be run with in a tranasaction.')
 
-        return self._active_session
+        return self._active_session.get()
 
     @sqla_error_handler('L1207')
     async def find_all(self, resource, query: BackendQuery):
