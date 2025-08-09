@@ -17,7 +17,8 @@ from .compressor import MediaCompressor
 
 class MediaInterface:
     """Interface for storing files with fsspec.filesystem and tracking metadata with MediaEntry objects"""
-    
+    _REGISTRY = {}
+
     def __init__(self, app=None, media_manager=MediaManager, filesystem_cache: Optional[Dict[str, fsspec.AbstractFileSystem]] = None):
         self._app = app
         
@@ -25,7 +26,6 @@ class MediaInterface:
         self._manager = media_manager(app) if app is not None else NullMediaManager(app)
         self._filesystem_cache = filesystem_cache or {}
         self._default_fs_key = config.DEFAULT_FILESYSTEM
-        self._REGISTRY = {}
         self.register_filesystem()
 
     async def put(
