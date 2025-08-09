@@ -12,6 +12,8 @@ DB_DSN = "sqlite+aiosqlite:////tmp/fluvius_pyiac.sqlite"
 DB_POOL_SIZE = 10
 DB_POOL_TIMEOUT = 10
 DB_MAX_OVERFLOW = 20
+DB_ISOLATION_LEVEL = 'READ COMMITTED'
+DB_POOL_RECYCLE = 1800
 
 SCHEMA_BASE = "fluvius--base"
 SQLALCHEMY_DIALECT = 'sqlite'  # sqlite | postgresql

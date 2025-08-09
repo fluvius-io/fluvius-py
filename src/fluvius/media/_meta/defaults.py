@@ -2,7 +2,7 @@ DEFAULT_FILESYSTEM = 'file'
 FILESYSTEM_PARAMS = {
     'user': 'admin'
 }
-FILESYSTEM_ROOT = 'root'
+FILESYSTEM_CONFIG_PATH = 'filesystem.yaml'
 
 # Database configuration
 MEDIA_DB_DSN = 'sqlite+aiosqlite:////tmp/fluvius_media.sqlite'

@@ -6,6 +6,7 @@ import fsspec
 from pathlib import Path
 from typing import Union, BinaryIO, Optional, Dict, Any
 from datetime import datetime, timezone
+from fluvius.helper import load_yaml
 
 from ._meta import config, logger
 from .model import MediaManager, MediaEntry, MediaFilesystem, FsSpecCompressionMethod
@@ -24,7 +25,8 @@ class MediaInterface:
         self._manager = media_manager(app) if app is not None else NullMediaManager(app)
         self._filesystem_cache = filesystem_cache or {}
         self._default_fs_key = config.DEFAULT_FILESYSTEM
-        self._filesystem_root = config.FILESYSTEM_ROOT
+        self._REGISTRY = {}
+        self.register_filesystem()
 
     async def put(
         self, 
@@ -53,6 +55,10 @@ class MediaInterface:
             MediaEntry: Created media entry with metadata
         """
         fs_key = fs_key or self._default_fs_key
+
+        # Get filesystem and store file
+        fs = await self.get_filesystem(fs_key)
+        fs_spec = self._REGISTRY[fs_key]
         
         # Prepare file data
         if isinstance(fileobj, (str, Path)):
@@ -78,13 +84,10 @@ class MediaInterface:
         # Generate unique file path
         file_token = gen_token()
         file_ext = Path(filename).suffix if filename else ''
-        fspath = f"{self._filesystem_root}/{file_token}{file_ext}"
+        fspath = f"{fs_spec.root_path}/{file_token}{file_ext}"
 
         # Detect MIME type
         filemime = mime_type or mimetypes.guess_type(filename)[0] or 'application/octet-stream'
-        
-        # Get filesystem and store file
-        fs = await self.get_filesystem(fs_key)
 
         # Apply compression if specified
         file_to_store = file_data
@@ -111,10 +114,10 @@ class MediaInterface:
             'resource__id': resource_id,
             **metadata_kwargs
         }
-        
-        # Create in-memory model then insert to database
-        entry = self._manager.create('media-entry', entry_data)
-        await self._manager.insert(entry)
+        async with self._manager.transaction():
+            # Create in-memory model then insert to database
+            entry = self._manager.create('media-entry', entry_data)
+            await self._manager.insert(entry)
         return entry
 
     async def open(self, file_id: str, mode: str = 'rb') -> BinaryIO:
@@ -255,23 +258,10 @@ class MediaInterface:
             return self._filesystem_cache[fs_key]
 
         # Try to fetch filesystem configuration from manager. Let errors propagate.
-        fs_spec = await self._manager.find_one('media-filesystem', where={'fskey': fs_key})
+        fs_spec = self._REGISTRY.get(fs_key)
         if not fs_spec:
             raise ValueError(f"Filesystem {fs_key} not found")
 
-        # @TODO: Consider encrypting the filesystem params using cryptography.fernet
-        """
-            import json
-            from cryptography.fernet import Fernet
-            key = b'key' # Fernet.generate_key()
-            f = Fernet(key)
-            token = {"key": "value"}
-            token = json.dumps(token)
-            encrypted_token = f.encrypt(token.encode())
-            encrypted_token_db = encrypted_token.decode()  # save to db
-            decrypted_token = f.decrypt(encrypted_token_db.encode())
-            token = json.loads(decrypted_token.decode())
-        """
         fsys = fsspec.filesystem(fs_spec.protocol, **fs_spec.params)
 
         self._filesystem_cache[fs_key] = fsys
@@ -289,7 +279,8 @@ class MediaInterface:
             MediaEntry instance
         """
         # Always use manager (either real or null)
-        return await self._manager.fetch('media-entry', file_id)
+        async with self._manager.transaction():
+            return await self._manager.fetch('media-entry', file_id)
 
     async def list_files(
         self, 
@@ -317,41 +308,18 @@ class MediaInterface:
             query_params['resource__id'] = resource_id
             
         # Use the correct DataAccessManager method
-        return await self._manager.query('media-entry', **query_params)
+        async with self._manager.transaction():
+            return await self._manager.query('media-entry', **query_params)
 
-    async def register_filesystem(
-        self, 
-        fs_key: str, 
-        protocol: str, 
-        name: str,
-        **params
-    ) -> MediaFilesystem:
-        """
-        Register a new filesystem configuration.
-        
-        Args:
-            fs_key: Unique filesystem identifier
-            protocol: fsspec protocol (e.g., 's3', 'file', 'gcs')
-            name: Human-readable name
-            **params: Filesystem-specific parameters
-            
-        Returns:
-            MediaFilesystem instance
-        """
-        fs_data = {
-            'fskey': fs_key,
-            'protocol': protocol,
-            'name': name,
-            'params': params
-        }
-        
-        # Use correct DataAccessManager pattern
-        fs = self._manager.create('media-filesystem', fs_data)
-        await self._manager.insert(fs)
-            
-        # Clear cache to force reload
-        if fs_key in self._filesystem_cache:
-            del self._filesystem_cache[fs_key]
-            
-        logger.info(f"Registered filesystem {fs_key} ({protocol}): {name}")
-        return fs
+    def register_filesystem(self):
+        """Load filesystem configurations from YAML file and register them"""
+        try:
+            fs_configs = load_yaml(config.FILESYSTEM_CONFIG_PATH)
+            logger.info(f"Loaded filesystem configs: {fs_configs}")
+            for fs_spec in fs_configs['filesystems']:
+                self._REGISTRY[fs_spec['fskey']] = MediaFilesystem(**fs_spec)
+                logger.info(f"Registered filesystem {fs_spec['fskey']}")
+                
+        except Exception as e:
+            logger.error(f"Failed to load filesystem configs: {e}")
+            raise

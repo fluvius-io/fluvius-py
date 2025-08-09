@@ -159,7 +159,7 @@ class _AsyncSessionConfiguration(object):
     def begin(self, *args, **kwargs):
         return self._async_engine.begin()
 
-    def set_bind(self, bind_dsn, loop=None, pool_size=10, **kwargs):
+    def set_bind(self, bind_dsn, loop=None, **kwargs):
         bind_dsn = build_dsn(bind_dsn)
         if not isinstance(bind_dsn, URL):
             raise ValueError('Invalid URI: {0}'.format(bind_dsn))
@@ -169,9 +169,9 @@ class _AsyncSessionConfiguration(object):
 
         engine = create_async_engine(
             bind_dsn,
-            isolation_level="READ COMMITTED",
-            pool_recycle=1800,
-            pool_size=pool_size,
+            isolation_level=config.DB_ISOLATION_LEVEL,
+            pool_recycle=config.DB_POOL_RECYCLE,
+            pool_size=config.DB_POOL_SIZE,
             json_serializer=serialize_json,
             **kwargs
         )

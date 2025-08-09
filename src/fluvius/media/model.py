@@ -1,6 +1,7 @@
 import enum
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pg
+from pydantic import BaseModel
 
 from fluvius.data import SqlaDriver, DataAccessManager, UUID_GENR
 from ._meta import config, logger
@@ -47,7 +48,7 @@ class MediaEntry(MediaSchema):
     fskey = sa.Column(sa.String(24))
     length = sa.Column(sa.BigInteger, nullable=False, default=0)
     fspath = sa.Column(sa.String(1024))
-    compress = sa.Column(sa.Enum(FsSpecCompressionMethod))
+    compress = sa.Column(sa.Enum(FsSpecCompressionMethod, schema=config.MEDIA_DB_SCHEMA))
     resource = sa.Column(sa.String(24))
     resource__id = sa.Column(pg.UUID)
     resource_sid = sa.Column(pg.UUID)
@@ -57,14 +58,21 @@ class MediaEntry(MediaSchema):
     cdn_url = sa.Column(sa.String(1024))
 
 
-class MediaFilesystem(MediaSchema):
-    __tablename__ = 'media-filesystem'
+# class MediaFilesystem(MediaSchema):
+#     __tablename__ = 'media-filesystem'
 
-    _id = sa.Column(pg.UUID, primary_key=True, nullable=False, default=UUID_GENR, server_default=sa.text("uuid_generate_v4()"))
-    _created = sa.Column(sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()"))
-    _updated = sa.Column(sa.DateTime(timezone=True), nullable=True)
-    fskey = sa.Column(sa.String(1024), nullable=False, unique=True)
-    fstype = sa.Column(sa.Enum(FsSpecFsType))
-    name = sa.Column(sa.String(1024), nullable=False)
-    protocol = sa.Column(sa.String(1024), nullable=False)
-    params = sa.Column(pg.JSON)
+#     _id = sa.Column(pg.UUID, primary_key=True, nullable=False, default=UUID_GENR, server_default=sa.text("uuid_generate_v4()"))
+#     _created = sa.Column(sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()"))
+#     _updated = sa.Column(sa.DateTime(timezone=True), nullable=True)
+#     fskey = sa.Column(sa.String(1024), nullable=False, unique=True)
+#     fstype = sa.Column(sa.Enum(FsSpecFsType))
+#     name = sa.Column(sa.String(1024), nullable=False)
+#     protocol = sa.Column(sa.String(1024), nullable=False)
+#     params = sa.Column(pg.JSON)
+
+
+class MediaFilesystem(BaseModel):
+    fskey: str
+    protocol: str
+    params: dict
+    root_path: str = 'root'

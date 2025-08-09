@@ -5,9 +5,6 @@ export FLUVIUS_CONFIG_FILE := "config.ini"
 help:
     just --list
 
-## Run sanic application
-run-sanic-app:
-    sanic sample_app.webserver:app --dev  -p 8000
+run APP:
+    uvicorn {{APP}}:app --host 0.0.0.0 --reload --reload-dir="../src" --reload-dir="./"
 
-run-fastapi:
-    cd fastapi_app && PYTHONPATH="../../lib:../../src:../" uvicorn main:app --host 0.0.0.0 --reload --reload-dir="../../src" --reload-dir="./"
