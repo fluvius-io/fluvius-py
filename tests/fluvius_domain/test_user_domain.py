@@ -26,20 +26,19 @@ async def command_handler(domain, cmd_key, payload, resource, identifier, scope=
     if context:
         _context.update(**context)
 
-    ctx = domain.setup_context(**_context)
-
-    command = domain.create_command(
-        cmd_key,
-        payload,
-        aggroot=(
-            resource,
-            identifier,
-            scope.get('domain_sid'),
-            scope.get('domain_iid'),
+    with domain.session(None, **_context):
+        command = domain.create_command(
+            cmd_key,
+            payload,
+            aggroot=(
+                resource,
+                identifier,
+                scope.get('domain_sid'),
+                scope.get('domain_iid'),
+            )
         )
-    )
 
-    return await domain.process_command(command, context=ctx)
+        return await domain.process_command(command)
 
 
 @pytest.fixture

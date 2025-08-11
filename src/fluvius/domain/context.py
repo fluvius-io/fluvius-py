@@ -47,14 +47,3 @@ class DomainContext(DomainEntityRecord):
     profile_id = field(type=nullable(UUID_TYPE), factory=identifier_factory, initial=None)
     user_id = field(type=nullable(UUID_TYPE), factory=identifier_factory, initial=None)
     realm = field(type=nullable(str), initial=None)
-
-    _service_proxy = field(type=DomainServiceProxy, initial=DomainServiceProxy(None))
-
-    @property
-    def app(self):
-        return self._service_proxy
-
-    def serialize(self):
-        data = super().serialize()
-        data.pop("_service_proxy", None)
-        return data

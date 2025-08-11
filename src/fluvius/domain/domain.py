@@ -1,5 +1,6 @@
 import os
 import queue
+import contextvars
 
 from contextlib import contextmanager
 from operator import itemgetter
@@ -23,7 +24,7 @@ from . import message as cm
 from . import response as cres
 
 from .aggregate import Aggregate, RestrictedAggregateProxy, AggregateRoot
-from .context import DomainContext
+from .context import DomainContext as DomainContextData
 from .decorators import DomainEntityRegistry
 from .exceptions import CommandProcessingError
 from .helper import consume_queue
@@ -92,19 +93,48 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
     __logstore__    = DomainLogStore
     __revision__    = 0       # API compatibility revision number
     __config__      = SimpleNamespace
-    __context__     = DomainContext
+    __context__     = DomainContextData
     __policymgr__   = None
 
     _cmd_processors = tuple()
     _msg_dispatchers = tuple()
     _entity_registry = dict()
-    _active_aggroot = None
-    _active_context = None
+    _active_context = contextvars.ContextVar('domain_context', default=None)
 
     _REGISTRY = {}
 
     class Meta:
         revision = 0
+
+    class Context(object):
+        _policymgr = None
+        _aggregate = None
+
+        def __init__(self, domain, authorization: Optional[AuthorizationContext]=None, **kwargs):
+            self._data = domain.setup_context(authorization, **kwargs)
+            self._aggregate = domain.__aggregate__(domain)
+
+            if domain.__policymgr__:
+                self._policymgr = domain.__policymgr__(domain)
+
+            self.rsp_queue = queue.Queue()
+            self.evt_queue = queue.Queue()
+            self.msg_queue = queue.Queue()
+            self.cmd_queue = queue.Queue()
+            self.act_queue = queue.Queue()
+
+        @property
+        def policymgr(self):
+            return self._policymgr
+
+        @property
+        def aggregate(self):
+            return self._aggregate
+
+        @property
+        def data(self):
+            return self._data
+
 
     def __init_subclass__(cls):
         if not hasattr(cls, '__namespace__'):
@@ -159,28 +189,24 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         self._config = self.validate_domain_config(config)
         self._logstore = self.__logstore__(app, **config)
         self._statemgr = self.__statemgr__(app, **config)
-        self._context = self.__context__(
-            domain = self.__namespace__,
-            revision = self.__revision__
-        )
-        self._aggregate = self.__aggregate__(self)
-
-        self.rsp_queue = queue.Queue()
-        self.evt_queue = queue.Queue()
-        self.msg_queue = queue.Queue()
-        self.cmd_queue = queue.Queue()
-        self.act_queue = queue.Queue()
-
         self.cmd_processors = _setup_command_processor_selector(self._cmd_processors)
         self.msg_dispatchers = _setup_message_dispatcher_selector(self._msg_dispatchers)
         self.register_signals()
-        self.setup_policymgr()
+        # self.setup_policymgr()
+        # self._aggregate = self.__aggregate__(self)
+
+        # self.rsp_queue = queue.Queue()
+        # self.evt_queue = queue.Queue()
+        # self.msg_queue = queue.Queue()
+        # self.cmd_queue = queue.Queue()
+        # self.act_queue = queue.Queue()
+
 
     def validate_domain_config(self, config):
         if not issubclass(self.__aggregate__, Aggregate):
             raise ValueError(f'Domain has invalid aggregate [{self.__aggregate__}]')
 
-        if not issubclass(self.__context__, DomainContext):
+        if not issubclass(self.__context__, DomainContextData):
             raise ValueError(f'Domain has invalid context [{self.__context__}]')
 
         if not issubclass(self.__statemgr__, StateManager):
@@ -192,6 +218,10 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         if not self.__namespace__:
             raise ValueError('Domain does not have a name [__namespace__]')
 
+        if self.__policymgr__ and not issubclass(self.__policymgr__, PolicyManager):
+                raise ValueError(f'Domain has invalid policy manager [{self.__policymgr__}]')
+
+
         return self.__config__(**config)
 
     def validate_application(self, app):
@@ -200,9 +230,6 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
     def setup_policymgr(self):
         if not self.__policymgr__:
             return
-
-        if not issubclass(self.__policymgr__, PolicyManager):
-            raise ValueError(f'Domain has invalid policy manager [{self.__policymgr__}]')
 
         self._policymgr = self.__policymgr__(self._statemgr)
 
@@ -248,32 +275,8 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             for dispatcher in self.msg_dispatchers(msg_record):
                 await dispatcher(msg_record)
 
-    @contextmanager
-    def aggroot(self, *args):
-        if self._active_aggroot is not None:
-            raise RuntimeError('Multiple aggroot is not allowed (#1).')
-
-        self._active_aggroot = AggregateRoot(*args)
-        yield self._active_aggroot
-        self._active_aggroot = None
-
-    def select_aggroot(self, aggroot):
-        if aggroot is None:
-            aggroot = self._active_aggroot
-        else:
-            if self._active_aggroot is not None:
-                raise RuntimeError('Multiple aggroot is not allowed (#2)')
-
-            if isinstance(aggroot, tuple):
-                return AggregateRoot(*aggroot)
-
-        if not isinstance(aggroot, AggregateRoot):
-            raise RuntimeError(f'Invalid aggroot: {aggroot}')
-
-        return aggroot
-
-    def create_command(self, cmd_key, cmd_data=None, aggroot=None):
-        aggroot = self.select_aggroot(aggroot)
+    def create_command(self, cmd_key, cmd_data, aggroot):
+        aggroot = AggregateRoot(*aggroot) if not isinstance(aggroot, AggregateRoot) else aggroot
         cmd_cls = self.lookup_command(cmd_key)
 
         if cmd_cls.Meta.resources and aggroot.resource not in cmd_cls.Meta.resources:
@@ -292,7 +295,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             domain_iid=aggroot.domain_iid,
         )
 
-    async def authorize_by_policy(self, context, command):
+    async def authorize_by_policy(self, ctx, command):
         '''
         Override this method to authorize the command
         and set the selector scope in order to fetch the aggroot
@@ -303,23 +306,23 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
         rsid = "" if cmdc.Meta.new_resource else command.identifier 
         reqs = PolicyRequest(
-            usr=context.user_id,
-            sub=context.profile_id,
-            org=context.organization_id,
+            usr=ctx.data.user_id,
+            sub=ctx.data.profile_id,
+            org=ctx.data.organization_id,
             dom=self.__namespace__,
             res=command.resource,
             rid=rsid,
             act=command.command
         )
 
-        resp = await self._policymgr.check_permission(reqs)
+        resp = await ctx.policymgr.check_permission(reqs)
         if not resp.allowed:
             raise ForbiddenError('D10012', f'Permission Failed: [{resp.narration}]')
 
         return command
 
     async def authorize_command(self,
-        context: DomainContext,
+        ctx: Context,
         authorization: Optional[AuthorizationContext],
         command: Type[cc.CommandBundle]
     ):
@@ -327,7 +330,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
     async def invoke_processors(self, ctx, statemgr, cmd_bundle, cmd_def):
         no_handler = True
-        async with self._aggregate.command_aggregate(ctx, cmd_bundle, cmd_def) as agg_proxy:
+        async with ctx.aggregate.command_aggregate(ctx, cmd_bundle, cmd_def) as agg_proxy:
             for processor in self.cmd_processors(cmd_bundle):
                 async for particle in processor(agg_proxy, statemgr, cmd_bundle):
                     if particle is None:
@@ -337,7 +340,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
                 no_handler = False
 
-            for evt in self._aggregate.consume_events():
+            for evt in ctx.aggregate.consume_events():
                 yield evt
 
         if no_handler:
@@ -362,10 +365,10 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
                 await self.publish(sig.EVENT_COMMITED, cmd, event=particle)
                 yield particle
             elif isinstance(particle, cm.MessageRecord):
-                self.msg_queue.put(particle)
+                ctx.msg_queue.put(particle)
                 await self.publish(sig.MESSAGE_RECEIVED, cmd, message=particle)
             elif isinstance(particle, cres.ResponseRecord):
-                self.rsp_queue.put(particle)
+                ctx.rsp_queue.put(particle)
                 await self.publish(sig.RESPONSE_RECEIVED, cmd, response=particle)
             elif isinstance(particle, act.ActivityLog):
                 await self.logstore.add_activity(particle)
@@ -374,63 +377,69 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
                     f"Invalid command_processor result: [{particle}]")
 
         await self.publish(sig.TRIGGER_REPLICATION, cmd, statemgr=self.statemgr)
-        self.cmd_queue.put(cmd)
+        ctx.cmd_queue.put(cmd)
 
         await self.publish(sig.COMMAND_COMPLETED, cmd)
 
     @contextmanager
-    def context(self, ctx):
-        assert self._active_context is not None, 'Context is already set for domain.'
+    def session(self, authorization: Optional[AuthorizationContext], **kwargs):
+        ctx = self._active_context.get()
+        assert ctx is None, f'Context is already set for domain: {ctx}.'
+        ctx = self.Context(self, authorization, **kwargs)
+        self._active_context.set(ctx)
+        yield self
+        self._active_context.set(None)
 
-        self._active_context = ctx
-        yield self._active_context
-        self._active_context = None
+    @property
+    def context(self):
+        ctx = self._active_context.get()
+        if ctx is None:
+            raise RuntimeError('Domain session is not started yet.')
 
-    def validate_context(self, ctx):
         return ctx
 
-    async def process_command(self, *commands, context: Optional[DomainContext]=None, authorization: Optional[AuthorizationContext]=None):
+    async def process_command(self, *commands):
         # Ensure saving of context before processing command
         if not commands:
             logger.warning('No commands provided to process.')
             return
 
-        ctx = context
+        ctx = self.context
+        agg = ctx.aggregate
         responses = {}
-        context = self.validate_context(select_value(ctx, self._active_context))
-        assert isinstance(ctx, self.__context__), f'Invalid domain context: {ctx}. Must be a subclass of {self.__context__}'
+        assert isinstance(ctx, self.Context), f'Invalid domain context: {ctx}. Must be a subclass of {self.Context}'
 
-        async with self.statemgr.transaction(context) as stm, \
-                   self.logstore.transaction(context) as log:
+        async with self.statemgr.transaction(ctx) as stm, \
+                   self.logstore.transaction(ctx) as log:
 
-            await self.logstore.add_context(context)
+            await self.logstore.add_context(ctx.data)
             ''' Run all command within a single transaction context,
                 expose a readonly state manager '''
 
             for cmd in commands:
                 preauth_cmd = cmd.set(
-                    context=context._id,
+                    context=ctx.data._id,
                     domain=self.__namespace__,
                     revision=self.__revision__
                 )
-                policy_cmd = await self.authorize_by_policy(context, preauth_cmd)
-                auth_cmd = await self.authorize_command(context, authorization, policy_cmd)
-                async for evt in self.process_command_internal(context, stm, auth_cmd):
+                policy_cmd = await self.authorize_by_policy(ctx, preauth_cmd)
+                auth_cmd = await self.authorize_command(ctx, authorization, policy_cmd)
+                async for evt in self.process_command_internal(ctx, stm, auth_cmd):
                     await self.logstore.add_event(evt)
             
             # Before exiting transaction manager context                    
-            await self.publish(sig.TRANSACTION_COMMITTING, self)
+            await self.trigger_reconciliation(self.cmd_queue, aggregate=agg)
+            await self.publish(sig.TRANSACTION_COMMITTING, self, aggregate=agg)
 
-            await self.publish(sig.TRANSACTION_COMMITTED, self)
-            await self.trigger_reconciliation(self.cmd_queue)
-            await self.dispatch_messages(self.msg_queue)
+        await self.publish(sig.TRANSACTION_COMMITTED, self)
+        await self.dispatch_messages(self.msg_queue)
 
-            for resp in consume_queue(self.rsp_queue):
-                if resp.response in responses:
-                    raise RuntimeError(f'Duplicated response: [{resp.response}].')
+        for resp in consume_queue(self.rsp_queue):
+            if resp.response in responses:
+                raise RuntimeError(f'Duplicated response: [{resp.response}].')
 
-                responses[resp.response] = resp.data
-            return responses
+            responses[resp.response] = resp.data
+        return responses
 
 
     async def trigger_reconciliation(self, cmd_queue):
@@ -439,16 +448,21 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             await self.publish(sig.TRIGGER_RECONCILIATION, cmd, statemgr=self.statemgr)
 
     def setup_context(self, authorization: Optional[AuthorizationContext]=None, **kwargs):
-        audit = {}
         if authorization:
-            audit = dict(
+            kwargs |= dict(
                 user_id=authorization.user._id,
                 profile_id=authorization.profile._id,
                 organization_id=authorization.organization._id,
                 iam_roles=authorization.iamroles,
                 realm=authorization.realm
             )
-        return self._context.set(_id=UUID_GENR(), **kwargs, **audit)
+
+        return self.__context__(
+            _id=UUID_GENR(),
+            domain=self.__namespace__,
+            revision=self.__revision__,
+            **kwargs
+        )
 
 
     def metadata(self, **kwargs):
