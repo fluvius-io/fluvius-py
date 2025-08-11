@@ -1,0 +1,10 @@
+export PYTHONPATH   := "../../lib:../../src:./"
+export FLUVIUS_CONFIG_FILE := "config.ini"
+
+
+help:
+    just --list
+
+dev:
+    uvicorn src:app --host 0.0.0.0 --reload --reload-dir="../../src" --reload-dir="./"
+

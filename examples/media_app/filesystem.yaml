@@ -1,0 +1,6 @@
+filesystems:
+  - fskey: 'file'
+    protocol: 'file'
+    name: 'Local Filesystem'
+    root_path: 'data'
+    params: {}
