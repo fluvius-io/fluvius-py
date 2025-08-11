@@ -106,7 +106,9 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
         scope: Optional[dict] = None
     ) -> Any:
         identifier = identifier or UUID_GENR()
-        context = domain.setup_context(
+        
+        domain_ins = domain(app)
+        context = domain_ins.setup_context(
             authorization=getattr(request.state, 'auth_context', None),
             headers=dict(request.headers),
             transport=DomainTransport.FASTAPI,
@@ -114,7 +116,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
             _service_proxy=DomainServiceProxy(app.state)
         )
 
-        command = domain.create_command(
+        command = domain_ins.create_command(
             cmd_key,
             payload,
             aggroot=(
@@ -125,7 +127,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
             )
         )
 
-        responses = await domain.process_command(command, context=context)
+        responses = await domain_ins.process_command(command, context=context)
         return {
             "data": responses,
             "status": "OK"
