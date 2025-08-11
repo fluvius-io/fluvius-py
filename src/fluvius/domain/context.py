@@ -11,24 +11,14 @@ from .record import DomainEntityRecord
 class DomainServiceProxy(object):
     ''' To filter the functionaly that will be exposed to CQRS handlers '''
 
-    def __init__(self, *args, **kwargs):
-        pass
+    def __init__(self, app):
+        self._app = app
 
-    @property
-    def mqtt_client(self):
-        return self._mqtt_client
-
-    @property
-    def arq_client(self):
-        return self._arq_client
-
-    @property
-    def lightq(self):
-        return self._lightq
-
-    @property
-    def brokerage_client(self):
-        return self._brokerage_client
+    def __getattr__(self, name):
+        try:
+            return getattr(self._app, name)
+        except KeyError:
+            raise AttributeError(f"{name} not found")
 
 
 class DomainTransport(enum.Enum):
@@ -57,3 +47,14 @@ class DomainContext(DomainEntityRecord):
     profile_id = field(type=nullable(UUID_TYPE), factory=identifier_factory, initial=None)
     user_id = field(type=nullable(UUID_TYPE), factory=identifier_factory, initial=None)
     realm = field(type=nullable(str), initial=None)
+
+    _service_proxy = field(type=DomainServiceProxy, initial=DomainServiceProxy(None))
+
+    @property
+    def app(self):
+        return self._service_proxy
+
+    def serialize(self):
+        data = super().serialize()
+        data.pop("_service_proxy", None)
+        return data

@@ -7,7 +7,7 @@ from fastapi import Request, Path, Body, Query
 from fluvius.data import UUID_TYPE, DataModel, UUID_GENR
 from fluvius.data.serializer import serialize_json
 from fluvius.domain import Domain
-from fluvius.domain.context import DomainContext, DomainTransport
+from fluvius.domain.context import DomainContext, DomainTransport, DomainServiceProxy
 from fluvius.domain.manager import DomainManager
 from fluvius.query import FrontendQuery, QueryResourceMeta
 from fluvius.query.helper import scope_decoder
@@ -110,7 +110,8 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
             authorization=getattr(request.state, 'auth_context', None),
             headers=dict(request.headers),
             transport=DomainTransport.FASTAPI,
-            source=request.client.host
+            source=request.client.host,
+            _service_proxy=DomainServiceProxy(app.state)
         )
 
         command = domain.create_command(
