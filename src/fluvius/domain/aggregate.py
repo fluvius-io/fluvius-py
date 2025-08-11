@@ -1,4 +1,5 @@
 import queue
+import contextvars
 
 from functools import wraps
 from contextlib import asynccontextmanager
@@ -61,8 +62,8 @@ def action(evt_key=None, resources=None):
 
         @wraps(func)
         async def wrapper(self, *args, **evt_args):
-            if resource_spec is not None and self._aggroot.resource not in resource_spec:
-                raise ForbiddenError("D100-001", f'Action is not allowed on resource: {self._aggroot.resource}')
+            if resource_spec is not None and self.aggroot.resource not in resource_spec:
+                raise ForbiddenError("D100-001", f'Action is not allowed on resource: {self.aggroot.resource}')
 
             evt_data = await func(self, *args, **evt_args)
 
@@ -79,6 +80,14 @@ def action(evt_key=None, resources=None):
 
 
 class Aggregate(object):
+    # Class-level context variables
+    _evt_queue = contextvars.ContextVar('evt_queue', default=queue.Queue())
+    _context = contextvars.ContextVar('context', default=None)
+    _command = contextvars.ContextVar('command', default=None)
+    _cmdmeta = contextvars.ContextVar('cmdmeta', default=None)
+    _aggroot = contextvars.ContextVar('aggroot', default=None)
+    _rootobj = contextvars.ContextVar('rootobj', default=None)
+
     def __init__(self, domain):
         ''' The aggregate should not be aware of command or domain, it should
             be treated as an "immutable" internal interface for the domain.
@@ -100,36 +109,30 @@ class Aggregate(object):
 
     @asynccontextmanager
     async def command_aggregate(self, context, command_bundle, command_meta):
-        if getattr(self, '_context', None):
-            raise RuntimeError('Overlapping context: %s' % str(context))
+        # Set the context variables for this command execution
+        self._evt_queue.set(queue.Queue())
+        self._context.set(context)
+        self._command.set(command_bundle)
+        self._cmdmeta.set(command_meta)
+        self._aggroot.set(AggregateRoot(
+            command_bundle.resource,
+            command_bundle.identifier,
+            command_bundle.domain_sid,
+            command_bundle.domain_iid,
+        ))
 
-        self._evt_queue = queue.Queue()
-        self._context = context
-        self._command = command_bundle
-        self._cmdmeta = command_meta
-        self._aggroot = AggregateRoot(
-            self._command.resource,
-            self._command.identifier,
-            self._command.domain_sid,
-            self._command.domain_iid,
-        )
-
-        self._rootobj = (
-            await self.fetch_command_rootobj(self._aggroot)
-        )
+        # Fetch the root object
+        rootobj = await self.fetch_command_rootobj(self._aggroot.get())
+        self._rootobj.set(rootobj)
 
         self.before_command(context, command_bundle, command_meta)
         yield RestrictedAggregateProxy(self)
         
-        if not self._evt_queue.empty():
+        # Check if all events were consumed
+        if not self._evt_queue.get().empty():
             raise RuntimeError('All events must be consumed by the command handler.')
 
         self.after_command(context, command_bundle, command_meta)
-        self._command = None
-        self._cmdmeta = None
-        self._aggroot = None
-        self._rootobj = None
-        self._context = None
     
     def before_command(self, context, command_bundle, command_meta):
         pass
@@ -138,21 +141,26 @@ class Aggregate(object):
         pass
 
     async def fetch_command_rootobj(self, aggroot):
-        if self._cmdmeta.Meta.new_resource:
+        # Get the command meta from context
+        cmdmeta = self._cmdmeta.get()
+        
+        if cmdmeta and cmdmeta.Meta.new_resource:
             return None
 
         def if_match():
-            if self.context.source or (not IF_MATCH_VERIFY):
+            context = self.context
+            if context and context.source or (not IF_MATCH_VERIFY):
                 return None
 
-            if_match_value = self.context.headers.get(IF_MATCH_HEADER, None)
-            if if_match_value is None:
-                raise BadRequestError(
-                    403648,
-                    f"[{IF_MATCH_HEADER}] header is required but not provided."
-                )
-
-            return if_match_value
+            if context:
+                if_match_value = context.headers.get(IF_MATCH_HEADER, None)
+                if if_match_value is None:
+                    raise BadRequestError(
+                        403648,
+                        f"[{IF_MATCH_HEADER}] header is required but not provided."
+                    )
+                return if_match_value
+            return None
 
         if_match_value = if_match()
         if aggroot.domain_sid is None:
@@ -182,7 +190,9 @@ class Aggregate(object):
             data=data
         )
 
-        self._evt_queue.put(evt)
+        # Get event queue from context
+        evt_queue = self._evt_queue.get()
+        evt_queue.put(evt)
         return evt
 
     def create_response(self, data, _type=None, **kwargs):
@@ -243,40 +253,60 @@ class Aggregate(object):
 
     @property
     def context(self):
-        if self._context is None:
+        context = self._context.get()
+        if context is None:
             raise RuntimeError('Aggregate context is not initialized.')
-
-        return self._context
+        return context
 
     @property
     def rootobj(self):
-        return self._rootobj
+        return self._rootobj.get()
 
     @property
     def aggroot(self):
-        if self._aggroot is None:
+        aggroot = self._aggroot.get()
+        if aggroot is None:
             raise RuntimeError('Aggregate context is not initialized.')
-
-        return self._aggroot
+        return aggroot
 
     @property
     def command(self):
-        if self._command is None:
+        command = self._command.get()
+        if command is None:
             raise RuntimeError('Aggregate context is not initialized.')
-
-        return self._command
+        return command
 
     def consume_events(self):
-        return consume_queue(self._evt_queue)
+        evt_queue = self._evt_queue.get()
+        return consume_queue(evt_queue)
 
     def get_context(self):
-        return self._context
+        return self._context.get()
 
     def get_rootobj(self):
         return self.rootobj
 
     def get_aggroot(self):
         return self.aggroot
+
+    def clear_context(self):
+        """Clear all context variables - useful for testing or cleanup"""
+        self._evt_queue.set(queue.Queue())
+        self._context.set(None)
+        self._command.set(None)
+        self._cmdmeta.set(None)
+        self._aggroot.set(None)
+        self._rootobj.set(None)
+
+    def get_context_state(self):
+        """Get current context state for debugging purposes"""
+        return {
+            'has_context': self._context.get() is not None,
+            'has_command': self._command.get() is not None,
+            'has_aggroot': self._aggroot.get() is not None,
+            'has_rootobj': self._rootobj.get() is not None,
+            'evt_queue_size': self._evt_queue.get().qsize() if self._evt_queue.get() else 0
+        }
 
 
 class RestrictedAggregateProxy(object):

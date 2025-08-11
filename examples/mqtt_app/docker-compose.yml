@@ -1,0 +1,30 @@
+version: '3'
+
+services:
+  mqtt:
+    image: fiisoft/mosquitto:latest
+    restart: always
+    ports:
+      - 1883:1883
+      - 9001:9001
+    environment:
+      ALLOW_ANONYMOUS: 'false'
+      SYSTEM_SECRET_KEY: change_me
+      NOTIFY_SECRET_KEY: change_me
+      REDIS_PASSWORD: change_me
+      REDIS_HOST: redis
+      MQTT_USER_PREFIX: mqtt
+      REDIS_DB: 1
+      LOG_TYPE: notice
+    depends_on:
+      - redis
+
+  redis:
+    image: "bitnami/redis:6.2.4"
+    restart: always
+    ports:
+      - 6379:6379
+    volumes:
+      - redis_local:/bitnami/redis/data
+    environment:
+      REDIS_PASSWORD: change_me
