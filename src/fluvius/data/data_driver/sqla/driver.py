@@ -135,6 +135,7 @@ class _AsyncSessionConfiguration(object):
     def __init__(self, config, **kwargs):
         self._config = config or kwargs
         self._async_engine, self._async_sessionmaker = self.set_bind(bind_dsn=self._config, loop=None, echo=False, **kwargs)
+        logger.warning('DB_DSN: %s' % str(config))
 
     def make_session(self):
         if not hasattr(self, "_async_sessionmaker"):

@@ -218,7 +218,7 @@ class Aggregate(object):
             logroot=logroot or self.aggroot,
             data=data,
             domain=self.domain_name,
-            context=self.context._id,
+            context=self.context.id,
             message=message,
             msgtype=msgtype,
             msglabel=msglabel,

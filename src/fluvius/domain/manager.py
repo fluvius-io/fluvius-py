@@ -27,8 +27,7 @@ class DomainManager(object):
 
         def _validate():
             for domain_cls in self.__domains__:
-                logger.info(f"Initializing domain: {domain_cls}")
-                yield domain_cls
+                yield domain_cls(app)
 
         self._domains = tuple(_validate())
         return self._domains

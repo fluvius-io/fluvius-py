@@ -110,18 +110,36 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         _policymgr = None
         _aggregate = None
 
-        def __init__(self, domain, authorization: Optional[AuthorizationContext]=None, **kwargs):
-            self._data = domain.setup_context(authorization, **kwargs)
-            self._aggregate = domain.__aggregate__(domain)
+        def __init__(self, domain, authorization: Optional[AuthorizationContext], service_proxy, **kwargs):
+            self._data = self.prepare_context_data(domain, authorization, **kwargs)
+            self._aggregate = domain.__aggregate__ and domain.__aggregate__(domain)
+            self._policymgr = domain.__policymgr__ and domain.__policymgr__(domain)
 
-            if domain.__policymgr__:
-                self._policymgr = domain.__policymgr__(domain)
-
+            self._authorization = authorization
+            self._service_proxy = service_proxy
             self.rsp_queue = queue.Queue()
             self.evt_queue = queue.Queue()
             self.msg_queue = queue.Queue()
             self.cmd_queue = queue.Queue()
             self.act_queue = queue.Queue()
+
+        def prepare_context_data(self, domain, authorization: Optional[AuthorizationContext]=None, **kwargs):
+            if authorization:
+                kwargs |= dict(
+                    user_id=authorization.user._id,
+                    profile_id=authorization.profile._id,
+                    organization_id=authorization.organization._id,
+                    iam_roles=authorization.iamroles,
+                    realm=authorization.realm
+                )
+
+            return domain.__context__(
+                _id=UUID_GENR(),
+                domain=domain.__namespace__,
+                revision=domain.__revision__,
+                **kwargs
+            )
+
 
         @property
         def policymgr(self):
@@ -135,6 +153,37 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         def data(self):
             return self._data
 
+        @property
+        def authorization(self):
+            return self._authorization
+
+        @property
+        def service_proxy(self):
+            return self._service_proxy
+
+        @property
+        def source(self):
+            return self._data.source
+
+        @property
+        def headers(self):
+            return self._data.headers
+
+        @property
+        def id(self):
+            return self._data._id
+
+        @property
+        def user_id(self):
+            return self._data.user_id
+
+        @property
+        def timestamp(self):
+            return self._data.timestamp
+
+        @property
+        def realm(self):
+            return self._data.realm
 
     def __init_subclass__(cls):
         if not hasattr(cls, '__namespace__'):
@@ -192,14 +241,6 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         self.cmd_processors = _setup_command_processor_selector(self._cmd_processors)
         self.msg_dispatchers = _setup_message_dispatcher_selector(self._msg_dispatchers)
         self.register_signals()
-        # self.setup_policymgr()
-        # self._aggregate = self.__aggregate__(self)
-
-        # self.rsp_queue = queue.Queue()
-        # self.evt_queue = queue.Queue()
-        # self.msg_queue = queue.Queue()
-        # self.cmd_queue = queue.Queue()
-        # self.act_queue = queue.Queue()
 
 
     def validate_domain_config(self, config):
@@ -219,19 +260,13 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             raise ValueError('Domain does not have a name [__namespace__]')
 
         if self.__policymgr__ and not issubclass(self.__policymgr__, PolicyManager):
-                raise ValueError(f'Domain has invalid policy manager [{self.__policymgr__}]')
+            raise ValueError(f'Domain has invalid policy manager [{self.__policymgr__}]')
 
 
         return self.__config__(**config)
 
     def validate_application(self, app):
         return app
-
-    def setup_policymgr(self):
-        if not self.__policymgr__:
-            return
-
-        self._policymgr = self.__policymgr__(self._statemgr)
 
     @property
     def app(self):
@@ -301,7 +336,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         and set the selector scope in order to fetch the aggroot
         '''
         cmdc = self.lookup_command(command.command)
-        if not self.__policymgr__ or not cmdc.Meta.policy_required:
+        if not ctx.policymgr or not cmdc.Meta.policy_required:
             return command
 
         rsid = "" if cmdc.Meta.new_resource else command.identifier 
@@ -323,7 +358,6 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
     async def authorize_command(self,
         ctx: Context,
-        authorization: Optional[AuthorizationContext],
         command: Type[cc.CommandBundle]
     ):
         return command
@@ -382,10 +416,11 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         await self.publish(sig.COMMAND_COMPLETED, cmd)
 
     @contextmanager
-    def session(self, authorization: Optional[AuthorizationContext], **kwargs):
+    def session(self, authorization: Optional[AuthorizationContext], service_proxy=None, **kwargs):
         ctx = self._active_context.get()
         assert ctx is None, f'Context is already set for domain: {ctx}.'
-        ctx = self.Context(self, authorization, **kwargs)
+
+        ctx = self.Context(self, authorization, service_proxy, **kwargs)
         self._active_context.set(ctx)
         yield self
         self._active_context.set(None)
@@ -423,18 +458,18 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
                     revision=self.__revision__
                 )
                 policy_cmd = await self.authorize_by_policy(ctx, preauth_cmd)
-                auth_cmd = await self.authorize_command(ctx, authorization, policy_cmd)
+                auth_cmd = await self.authorize_command(ctx, policy_cmd)
                 async for evt in self.process_command_internal(ctx, stm, auth_cmd):
                     await self.logstore.add_event(evt)
             
             # Before exiting transaction manager context                    
-            await self.trigger_reconciliation(self.cmd_queue, aggregate=agg)
+            await self.trigger_reconciliation(ctx.cmd_queue, aggregate=agg)
             await self.publish(sig.TRANSACTION_COMMITTING, self, aggregate=agg)
 
         await self.publish(sig.TRANSACTION_COMMITTED, self)
-        await self.dispatch_messages(self.msg_queue)
+        await self.dispatch_messages(ctx.msg_queue)
 
-        for resp in consume_queue(self.rsp_queue):
+        for resp in consume_queue(ctx.rsp_queue):
             if resp.response in responses:
                 raise RuntimeError(f'Duplicated response: [{resp.response}].')
 
@@ -442,27 +477,10 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         return responses
 
 
-    async def trigger_reconciliation(self, cmd_queue):
+    async def trigger_reconciliation(self, cmd_queue, aggregate):
         # This trigger run after statemgr committed.
         for cmd in consume_queue(cmd_queue):
-            await self.publish(sig.TRIGGER_RECONCILIATION, cmd, statemgr=self.statemgr)
-
-    def setup_context(self, authorization: Optional[AuthorizationContext]=None, **kwargs):
-        if authorization:
-            kwargs |= dict(
-                user_id=authorization.user._id,
-                profile_id=authorization.profile._id,
-                organization_id=authorization.organization._id,
-                iam_roles=authorization.iamroles,
-                realm=authorization.realm
-            )
-
-        return self.__context__(
-            _id=UUID_GENR(),
-            domain=self.__namespace__,
-            revision=self.__revision__,
-            **kwargs
-        )
+            await self.publish(sig.TRIGGER_RECONCILIATION, cmd, aggregate=aggregate)
 
 
     def metadata(self, **kwargs):
