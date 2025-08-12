@@ -444,8 +444,8 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         responses = {}
         assert isinstance(ctx, self.Context), f'Invalid domain context: {ctx}. Must be a subclass of {self.Context}'
 
-        async with self.statemgr.transaction(ctx, "statemgr") as stm, \
-                   self.logstore.transaction(ctx, "logstore") as log:
+        async with self.statemgr.transaction("statemgr") as stm, \
+                   self.logstore.transaction("logstore") as log:
 
             await self.logstore.add_context(ctx.data)
             ''' Run all command within a single transaction context,
