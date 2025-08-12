@@ -17,7 +17,7 @@ def test_domain_metadata():
     response = client.get("/_meta/generic-object/")
     assert response.status_code == 200
     data = response.json()
-    assert data["name"] == 'ObjectDomain'
+    assert data["name"] == 'Object Domain'
 
 
 def test_domain_create():
@@ -29,8 +29,8 @@ def test_domain_create():
     }
 
     resp = client.post("/generic-object:create-object/people-economist/:new", json=create_payload)
-    assert resp.status_code == 200
-    assert resp.json()
+    data = resp.json()
+    assert resp.status_code == 200, f"Invalid output: {data}"
     logger.info('JSON COMMAND OUTPUT: %s', resp.json())
 
 

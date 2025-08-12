@@ -135,7 +135,6 @@ class _AsyncSessionConfiguration(object):
     def __init__(self, config, **kwargs):
         self._config = config or kwargs
         self._async_engine, self._async_sessionmaker = self.set_bind(bind_dsn=self._config, loop=None, echo=False, **kwargs)
-        logger.warning('DB_DSN: %s' % str(config))
 
     def make_session(self):
         if not hasattr(self, "_async_sessionmaker"):
@@ -206,7 +205,6 @@ class SqlaDriver(DataDriver, QueryBuilder):
     __data_schema_base__ = SqlaDataSchema
     
     # Task-local session tracking
-    _active_session = ContextVar('active_session', default=None)
 
     def __init__(self, **kwargs):
         DEBUG_CONNECTOR and logger.info(f'[{self.__class__.__name__}] setup with DSN: {self.dsn}')
@@ -214,6 +212,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
         if dsn is None:
             raise ValueError(f'No database DSN provided to: {self.__class__}')
         self._session_configuration = _AsyncSessionConfiguration(dsn)
+        self._active_session = ContextVar('active_session', default=None)
 
     def __init_subclass__(cls):
         cls.__data_schema_registry__ = {}
@@ -254,15 +253,16 @@ class SqlaDriver(DataDriver, QueryBuilder):
         return cursor
 
     @asynccontextmanager
-    async def transaction(self, *args, reuse_session=True):
+    async def transaction(self, *args):
         active_session = self._active_session.get()
 
         if active_session is not None:
-            logger.warning(f'Nested/concurrent transaction detected: {active_session}')
+            logger.exception(f'Nested/concurrent transaction detected {args}: {active_session._args}')
             yield active_session
             return
 
         async with self._session_configuration.make_session() as async_session:
+            async_session._args = args
             self._active_session.set(async_session)
             try:
                 yield async_session

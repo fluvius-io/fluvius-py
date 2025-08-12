@@ -99,7 +99,6 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
     _cmd_processors = tuple()
     _msg_dispatchers = tuple()
     _entity_registry = dict()
-    _active_context = contextvars.ContextVar('domain_context', default=None)
 
     _REGISTRY = {}
 
@@ -238,6 +237,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         self._config = self.validate_domain_config(config)
         self._logstore = self.__logstore__(app, **config)
         self._statemgr = self.__statemgr__(app, **config)
+        self._active_context = contextvars.ContextVar('domain_context', default=None)
         self.cmd_processors = _setup_command_processor_selector(self._cmd_processors)
         self.msg_dispatchers = _setup_message_dispatcher_selector(self._msg_dispatchers)
         self.register_signals()
@@ -444,8 +444,8 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         responses = {}
         assert isinstance(ctx, self.Context), f'Invalid domain context: {ctx}. Must be a subclass of {self.Context}'
 
-        async with self.statemgr.transaction(ctx) as stm, \
-                   self.logstore.transaction(ctx) as log:
+        async with self.statemgr.transaction(ctx, "statemgr") as stm, \
+                   self.logstore.transaction(ctx, "logstore") as log:
 
             await self.logstore.add_context(ctx.data)
             ''' Run all command within a single transaction context,
