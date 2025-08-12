@@ -101,8 +101,7 @@ def tracker_params(**params):
     return _decorator
 
 
-
-class FluviusWorker(arq.Worker):
+class FluviusWorker(object):
     _functions = tuple()
     _cron_jobs = tuple()
     _startup_hooks = tuple()
@@ -149,16 +148,18 @@ class FluviusWorker(arq.Worker):
         self._last_heart_beat = time() - WORKER_HEART_BEAT_INTERVAL_SECONDS
         self._downstream_clients = dict(self._init_clients())
 
-        ctx = {"queue_name": self.__queue_name__, **self._downstream_clients, "worker_id": UUID_GENR()}
+        self.ctx = {"queue_name": self.__queue_name__, **self._downstream_clients, "worker_id": UUID_GENR()}
 
-        super().__init__(ctx=ctx, **self.build_settings(**kwargs))
+    def run(self, *args, **kwargs):
+        worker = arq.Worker(ctx=self.ctx, **self.build_settings(**kwargs))
+        return worker.run(*args, **kwargs)
 
     def _gather_exports(self):
         functions = []
         cron_jobs = []
 
         for func_name in dir(self):
-            if func_name in ('pool',):
+            if func_name in ('pool', 'state', 'run', 'ctx', 'build_settings'):
                 continue
 
             func = getattr(self, func_name)
@@ -328,7 +329,8 @@ class FluviusWorker(arq.Worker):
 
         return _decorator
 
-    async def shutdown(self, ctx):
+    @classmethod
+    def shutdown(cls, func_or_none):
         ''' Shutdown hook. '''
         def _decorator(func):
             cls._shutdown_hooks += (func,)
@@ -344,7 +346,10 @@ class FluviusWorker(arq.Worker):
             ctx["app"] = self
             results = []
             for hook in filter(None, hooks):
-                results.append(await hook(ctx))
+                if hasattr(hook, '__ext_hook__'):
+                    results.append(await hook(self))
+                else:
+                    results.append(await hook(ctx))
 
             for _, recv in event.on_startup.send(self, ctx=ctx):
                 await when(recv)
@@ -357,7 +362,10 @@ class FluviusWorker(arq.Worker):
         async def on_shutdown(ctx):
             results = []
             for hook in filter(None, hooks):
-                results.append(await hook(ctx))
+                if hasattr(hook, '__ext_hook__'):
+                    results.append(await hook(self))
+                else:
+                    results.append(await hook(ctx))
 
             for _, recv in event.on_shutdown.send(self, ctx=ctx):
                 await when(recv)
@@ -420,20 +428,40 @@ class FluviusWorker(arq.Worker):
 
             )
 
+class FastAPIFluviusWorker(FluviusWorker):
+    def _extend_hooks(self):
+        from fluvius.fastapi.setup import _on_startups, _on_shutdowns
+        for startup in _on_startups:
+            startup.__ext_hook__ = True
+            self.startup(startup)
 
-class SanicFluviusWorker(FluviusWorker):
-    def listener(self, hook):
-        evt_signal = event.SANIC_HOOK_EVENT_MAP[hook]
+        for shutdown in _on_shutdowns:
+            shutdown.__ext_hook__ = True
+            self.shutdown(shutdown)
 
-        def _decorator(func):
-            @functools.wraps(func)
-            def sanic_wrapper(sender, ctx):
-                '''make sure that the handler call the function
-                according to Sanic interface
-                '''
-                return func(sender, loop=get_event_loop())
+    def build_settings(self, *args, **kwargs):
+        self._extend_hooks()
+        return super().build_settings(*args, **kwargs)
 
-            evt_signal.connect(sanic_wrapper, sender=self, weak=False)
-            return func
+    @property
+    def state(self):
+        if not hasattr(self, '_state'):
+            self._state = SimpleNamespace(**self.ctx)
+        return self._state
+    
 
-        return _decorator
+    # def listener(self, hook):
+    #     evt_signal = event.SANIC_HOOK_EVENT_MAP[hook]
+
+    #     def _decorator(func):
+    #         @functools.wraps(func)
+    #         def sanic_wrapper(sender, ctx):
+    #             '''make sure that the handler call the function
+    #             according to Sanic interface
+    #             '''
+    #             return func(sender, loop=get_event_loop())
+
+    #         evt_signal.connect(sanic_wrapper, sender=self, weak=False)
+    #         return func
+
+    #     return _decorator

@@ -4,13 +4,13 @@ from fluvius.domain.context import DomainTransport
 from .datadef import DomainWorkerRequest, DomainWorkerCommand
 from .client import WorkerClient
 
-from . import FluviusWorker, logger, config, export_cron, export_task
+from . import FastAPIFluviusWorker, logger, config, export_cron, export_task
 
 
 DEBUG = config.DEBUG
 
 
-class DomainWorker(FluviusWorker, DomainManager):
+class DomainWorker(FastAPIFluviusWorker, DomainManager):
     def __init__(self, *args, **kwargs):
         self._register_domain_functions()
         super().__init__(*args, **kwargs)
@@ -25,15 +25,17 @@ class DomainWorker(FluviusWorker, DomainManager):
     def _generate_handler(self, domain, cmd_cls, cmd_key, fq_name):
         @export_task(name=fq_name)
         async def _handle_request(ctx, request: DomainWorkerRequest):
-            context = domain.setup_context(
+            domain_ins = domain(self)
+            context = domain_ins.setup_context(
                 headers=request.headers,
                 transport=DomainTransport.REDIS,
                 source=request.context.source,
+                _service_proxy=self.state,
                 **request.context.audit.serialize()
             )
 
             cmddata = request.command
-            command = domain.create_command(
+            command = domain_ins.create_command(
                 cmd_key,
                 cmddata.payload,
                 aggroot=(
@@ -44,7 +46,7 @@ class DomainWorker(FluviusWorker, DomainManager):
                 )
             )
 
-            return await domain.process_command(command, context=context)
+            return await domain_ins.process_command(command, context=context)
 
         return _handle_request
 
