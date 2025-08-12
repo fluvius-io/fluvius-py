@@ -4,13 +4,13 @@ from fluvius.domain.context import DomainTransport
 from .datadef import DomainWorkerRequest, DomainWorkerCommand
 from .client import WorkerClient
 
-from . import FluviusWorker, logger, config, export_cron, export_task
+from . import FastAPIFluviusWorker, logger, config, export_cron, export_task
 
 
 DEBUG = config.DEBUG
 
 
-class DomainWorker(FluviusWorker, DomainManager):
+class DomainWorker(FastAPIFluviusWorker, DomainManager):
     def __init__(self, *args, **kwargs):
         self._register_domain_functions()
         super().__init__(*args, **kwargs)
@@ -30,6 +30,7 @@ class DomainWorker(FluviusWorker, DomainManager):
                 headers=request.headers,
                 transport=DomainTransport.REDIS,
                 source=request.context.source,
+                _service_proxy=self.state,
                 **request.context.audit.serialize()
             )
 

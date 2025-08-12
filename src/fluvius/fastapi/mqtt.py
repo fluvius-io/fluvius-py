@@ -83,6 +83,10 @@ class FastapiMQTTClient(MQTTClient):
 
 
 def configure_mqtt_client(app, client_channel=None):
+    if hasattr(app.state, 'mqtt_client'):
+        logger.info("/MQTT/ MQTT client already configured")
+        return app
+
     global MQTT_CLIENT_CHANNEL
     if not config.MQTT_BROKER_HOST:
         logger.warn(
@@ -98,20 +102,22 @@ def configure_mqtt_client(app, client_channel=None):
 
     MQTT_CLIENT_CHANNEL = client_channel or config.MQTT_CLIENT_CHANNEL
 
+    client_id = f"fastapi-{os.getpid()}-{secrets.token_hex(12)}"
+    client = FastapiMQTTClient(client_id)
+    client.set_auth_credentials(MQTT_CLIENT_USER, MQTT_CLIENT_SECRET)
+
+    app.state.mqtt_client = client
+
     @on_startup
     async def connect_mqtt(app):
-        client_id = f"fastapi-{os.getpid()}-{secrets.token_hex(12)}"
-        client = FastapiMQTTClient(client_id)
-        client.set_auth_credentials(MQTT_CLIENT_USER, MQTT_CLIENT_SECRET)
-        await client.connect(MQTT_BROKER_HOST, MQTT_BROKER_PORT)
-
-        app.state.mqtt_client = client
+        await app.state.mqtt_client.connect(MQTT_BROKER_HOST, MQTT_BROKER_PORT)
+        logger.info(f"/MQTT/ Connected to MQTT broker: {MQTT_BROKER_HOST}:{MQTT_BROKER_PORT}")
 
     @on_shutdown
     async def disconnect_mqtt(app):
         await app.state.mqtt_client.disconnect()
+        logger.info("/MQTT/ Disconnected from MQTT broker")
 
-    app.state.mqtt_client = True
     return app
 
 
