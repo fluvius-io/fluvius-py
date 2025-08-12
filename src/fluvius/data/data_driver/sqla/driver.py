@@ -253,16 +253,16 @@ class SqlaDriver(DataDriver, QueryBuilder):
         return cursor
 
     @asynccontextmanager
-    async def transaction(self, *args):
+    async def transaction(self, trace_msg=None):
         active_session = self._active_session.get()
 
         if active_session is not None:
-            logger.exception(f'Nested/concurrent transaction detected {args}: {active_session._args}')
+            logger.exception(f'Nested/concurrent transaction detected [{trace_msg}]: {active_session._trace_msg}')
             yield active_session
             return
 
         async with self._session_configuration.make_session() as async_session:
-            async_session._args = args
+            async_session._trace_msg = trace_msg
             self._active_session.set(async_session)
             try:
                 yield async_session
