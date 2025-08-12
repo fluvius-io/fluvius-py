@@ -330,7 +330,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             domain_iid=aggroot.domain_iid,
         )
 
-    async def authorize_by_policy(self, ctx, command):
+    async def authorize_with_policymgr(self, ctx, command):
         '''
         Override this method to authorize the command
         and set the selector scope in order to fetch the aggroot
@@ -360,7 +360,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         ctx: Context,
         command: Type[cc.CommandBundle]
     ):
-        return command
+        return await self.authorize_with_policymgr(ctx, command)
 
     async def invoke_processors(self, ctx, statemgr, cmd_bundle, cmd_def):
         no_handler = True
@@ -457,8 +457,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
                     domain=self.__namespace__,
                     revision=self.__revision__
                 )
-                policy_cmd = await self.authorize_by_policy(ctx, preauth_cmd)
-                auth_cmd = await self.authorize_command(ctx, policy_cmd)
+                auth_cmd = await self.authorize_command(ctx, preauth_cmd)
                 async for evt in self.process_command_internal(ctx, stm, auth_cmd):
                     await self.logstore.add_event(evt)
             
