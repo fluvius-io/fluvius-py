@@ -25,7 +25,8 @@ class DomainWorker(FluviusWorker, DomainManager):
     def _generate_handler(self, domain, cmd_cls, cmd_key, fq_name):
         @export_task(name=fq_name)
         async def _handle_request(ctx, request: DomainWorkerRequest):
-            context = domain.setup_context(
+            domain_ins = domain(self)
+            context = domain_ins.setup_context(
                 headers=request.headers,
                 transport=DomainTransport.REDIS,
                 source=request.context.source,
@@ -33,7 +34,7 @@ class DomainWorker(FluviusWorker, DomainManager):
             )
 
             cmddata = request.command
-            command = domain.create_command(
+            command = domain_ins.create_command(
                 cmd_key,
                 cmddata.payload,
                 aggroot=(
@@ -44,7 +45,7 @@ class DomainWorker(FluviusWorker, DomainManager):
                 )
             )
 
-            return await domain.process_command(command, context=context)
+            return await domain_ins.process_command(command, context=context)
 
         return _handle_request
 
