@@ -107,31 +107,30 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
     ) -> Any:
         identifier = identifier or UUID_GENR()
         
-        domain_ins = domain(app)
-        context = domain_ins.setup_context(
+        with domain.session(
             authorization=getattr(request.state, 'auth_context', None),
             headers=dict(request.headers),
             transport=DomainTransport.FASTAPI,
             source=request.client.host,
-            _service_proxy=DomainServiceProxy(app.state)
-        )
+            service_proxy=DomainServiceProxy(app.state)
+        ):
 
-        command = domain_ins.create_command(
-            cmd_key,
-            payload,
-            aggroot=(
-                resource,
-                identifier,
-                scope.get('domain_sid'),
-                scope.get('domain_iid'),
+            command = domain.create_command(
+                cmd_key,
+                payload,
+                aggroot=(
+                    resource,
+                    identifier,
+                    scope.get('domain_sid'),
+                    scope.get('domain_iid'),
+                )
             )
-        )
 
-        responses = await domain_ins.process_command(command, context=context)
-        return {
-            "data": responses,
-            "status": "OK"
-        }
+            responses = await domain.process_command(command)
+            return {
+                "data": responses,
+                "status": "OK"
+            }
 
 
     cmd_endpoints = {'meta': f"/_meta/{fq_name}/"}
