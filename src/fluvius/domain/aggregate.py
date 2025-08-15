@@ -214,8 +214,12 @@ class Aggregate(object):
         code=0,
         **kwargs
     ):
-        return ActivityLog.create(
-            logroot=logroot or self.aggroot,
+        logroot = logroot or self.aggroot
+        return ActivityLog(
+            identifier=logroot.identifier,
+            resource=logroot.resource,
+            domain_sid=logroot.domain_sid,
+            domain_iid=logroot.domain_iid,
             data=data,
             domain=self.domain_name,
             context=self.context.id,
