@@ -177,6 +177,14 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             return self._data.user_id
 
         @property
+        def profile_id(self):
+            return self._data.profile_id
+
+        @property
+        def organization_id(self):
+            return self._data.organization_id
+
+        @property
         def timestamp(self):
             return self._data.timestamp
 
