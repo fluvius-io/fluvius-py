@@ -233,7 +233,7 @@ class Aggregate(object):
     def audit_updated(self):
         return dict(
             _updated=self.context.timestamp,
-            _updater=self.context.user_id,
+            _updater=self.context.profile_id,
             _etag=generate_etag(self.context)
         )
 
@@ -241,7 +241,7 @@ class Aggregate(object):
         return dict(
             _realm=self.context.realm,
             _created=self.context.timestamp,
-            _creator=self.context.user_id,
+            _creator=self.context.profile_id,
             _etag=generate_etag(self.context)
         )
 
