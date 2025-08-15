@@ -226,9 +226,8 @@ class SqlaDriver(DataDriver, QueryBuilder):
     def engine(self):
         return self._session_configuration._async_engine
 
-    @property
-    def connection(self):
-        return self._session_configuration.connection()
+    async def connection(self):
+        return await self._session_configuration.connection()
 
     @classmethod
     def validate_data_schema(cls, schema_model):
