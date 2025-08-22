@@ -12,6 +12,7 @@ from ._meta import config, logger
 from .setup import on_startup, on_shutdown
 from fluvius.auth import event as auth_event
 from fluvius.auth.hashes import make_hash
+from fluvius.data import serialize_json
 
 
 MQTT_DEBUG = config.MQTT_DEBUG
@@ -56,7 +57,7 @@ class FastapiMQTTClient(MQTTClient):
         MQTT_DEBUG and logger.info(f"/MQTT/ SUBSCRIBED [{self._client_id}] QOS: {qos}")
 
     def notify(self, user_id, kind: str, target: str, msg: dict, batch_id=None):
-        payl = json.dumps(dict(**msg, _kind=kind, _target=target))
+        payl = serialize_json(dict(**msg, _kind=kind, _target=target))
         chan = f"{user_id}/{MQTT_CLIENT_CHANNEL}"
 
         if batch_id is None:
