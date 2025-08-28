@@ -343,7 +343,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         and set the selector scope in order to fetch the aggroot
         '''
         cmdc = self.lookup_command(command.command)
-        if not ctx.policymgr or not cmdc.Meta.policy_required:
+        if not self.policymgr or not cmdc.Meta.policy_required:
             return command
 
         rsid = "" if cmdc.Meta.new_resource else command.identifier 
@@ -357,7 +357,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             act=command.command
         )
 
-        resp = await ctx.policymgr.check_permission(reqs)
+        resp = await self.policymgr.check_permission(reqs)
         if not resp.allowed:
             raise ForbiddenError('D10012', f'Permission Failed: [{resp.narration}]')
 
