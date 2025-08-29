@@ -131,8 +131,14 @@ class QueryManager(object):
             return base_scope
 
         try:
-            res = fe_query.scope["resource"]
-            rid = fe_query.scope["resource_id"]
+            if identifier and qmeta.policy_required == 'id':
+                rid = identifier
+            elif qmeta.policy_required in (fe_query.scope or {}):
+                rid = fe_query.scope[qmeta.policy_required]
+            else:
+                raise ValueError(f"scope_required must include the {qmeta.policy_required} field")
+
+            res = qmeta.resource
             actx = auth_ctx
             reqs = PolicyRequest(
                 usr=actx.user._id,
@@ -143,7 +149,9 @@ class QueryManager(object):
                 rid=rid,
                 act=query_resource._identifier
             )
-            resp = await self._policymgr.check_permission(reqs)
+
+            async with self.data_manager.transaction():
+                resp = await self._policymgr.check_permission(reqs)
 
             if not resp.allowed:
                 raise ForbiddenError('Q4031212', f'Permission Failed: [{resp.narration}]')

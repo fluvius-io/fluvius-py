@@ -61,6 +61,7 @@ class QueryResourceMeta(DataModel):  # We need DataModel.create method
     desc: Optional[str] = None
     tags: Optional[List] = None
 
+    resource: str = None
     backend_model: Optional[str] = None
 
     allow_item_view: bool = True
@@ -81,5 +82,4 @@ class QueryResourceMeta(DataModel):  # We need DataModel.create method
     include_all: bool = False
     excluded_fields: List = tuple()
 
-    policy_required: bool = False
-    
+    policy_required: str = None
