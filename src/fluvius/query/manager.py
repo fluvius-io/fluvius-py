@@ -131,8 +131,8 @@ class QueryManager(object):
             return base_scope
 
         try:
-            if identifier and qmeta.policy_required == 'id':
-                rid = identifier
+            if qmeta.policy_required == 'id':
+                rid = identifier or ""
             elif qmeta.policy_required in (fe_query.scope or {}):
                 rid = fe_query.scope[qmeta.policy_required]
             else:
