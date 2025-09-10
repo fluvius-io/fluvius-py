@@ -4,7 +4,7 @@ import click
 import sqlalchemy as sa
 import pandas as pd
 import os
-from ._common import load_connector_class, get_schema_name, convert_to_async_dsn, async_command, create_async_engine
+from ._common import load_connector_class, convert_to_async_dsn, async_command, create_async_engine
 
 
 @click.command()
@@ -23,7 +23,6 @@ async def export_data(connector_import: str, data_folder: str, force: bool, tabl
     try:
         # Load the connector class using shared function
         connector_class = load_connector_class(connector_import)
-        schema_name = get_schema_name(connector_class)
         
         # Convert to async DSN and create engine
         async_dsn = convert_to_async_dsn(connector_class.__db_dsn__)
@@ -45,41 +44,38 @@ async def export_data(connector_import: str, data_folder: str, force: bool, tabl
                 
                 exported_tables = []
                 
-                for table_name, table in tables_metadata.items():
+                for full_table_name, table in tables_metadata.items():
                     # Skip tables not in our schema
-                    if not table_name.startswith(f"{schema_name}."):
-                        continue
-                    
+                   
                     # Extract just the table name without schema
-                    short_table_name = table_name.split('.', 1)[1]
-                    
+
                     # Apply table filter if specified
-                    if table_filter and short_table_name not in table_filter:
+                    if table_filter and full_table_name not in table_filter:
                         continue
                     
-                    csv_file = os.path.join(data_folder, f"{short_table_name}.csv")
+                    csv_file = os.path.join(data_folder, f"{full_table_name}.csv")
                     
                     # Check if CSV file exists (if not forcing)
                     if not force and os.path.exists(csv_file):
                         click.echo(f"CSV file '{csv_file}' already exists. Use --force to overwrite.")
                         continue
                     
-                    click.echo(f"Exporting data from table '{table_name}' to '{csv_file}'")
+                    click.echo(f"Exporting data from table [{full_table_name}] to [{csv_file}] ...")
                     
                     try:
                         # Query all data from the table
                         # Split schema and table name for proper quoting
-                        schema_name, table_name_only = table_name.split('.', 1)
-                        result = await conn.execute(sa.text(f'SELECT * FROM "{schema_name}"."{table_name_only}"'))
+                        schema_name, table_name_only = full_table_name.split('.', 1)
+                        result = await conn.execute(sa.text(f'SELECT * FROM {full_table_name}'))
                         rows = result.fetchall()
                         
                         if not rows:
-                            click.echo(f"  Table '{table_name}' is empty")
+                            click.echo(f" =i= Table '{full_table_name}' is empty")
                             # Create empty CSV file with column headers
                             column_names = [col.name for col in table.columns]
                             empty_df = pd.DataFrame(columns=column_names)
                             empty_df.to_csv(csv_file, index=False)
-                            click.echo(f"  Created empty CSV file with headers '{csv_file}'")
+                            click.echo(f" =i= Created empty CSV file with headers '{csv_file}'")
                         else:
                             # Convert to DataFrame
                             df = pd.DataFrame(rows)
@@ -87,12 +83,12 @@ async def export_data(connector_import: str, data_folder: str, force: bool, tabl
                             
                             # Export to CSV
                             df.to_csv(csv_file, index=False)
-                            click.echo(f"  Exported {len(df)} rows to '{csv_file}'")
+                            click.echo(f" =i= Exported {len(df)} rows to '{csv_file}'")
                         
-                        exported_tables.append(short_table_name)
+                        exported_tables.append(full_table_name)
                         
                     except Exception as e:
-                        click.echo(f"  Error exporting table '{table_name}': {e}")
+                        click.echo(f" =E=  Error exporting table '{full_table_name}': {e}")
                         if not force:
                             raise
                 

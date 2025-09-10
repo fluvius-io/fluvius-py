@@ -2,8 +2,9 @@
 
 import click
 import sqlalchemy as sa
+import logging as logger
 from sqlalchemy.schema import DropSchema
-from ._common import load_connector_class, get_schema_name, convert_to_async_dsn, schema_exists, schema_has_tables, async_command, create_async_engine
+from ._common import load_connector_class, get_tables_schemas, convert_to_async_dsn, schema_exists, schema_has_tables, async_command, create_async_engine
 
 
 @click.command()
@@ -19,24 +20,14 @@ async def drop_schema(connector_import: str, force: bool):
     try:
         # Load the connector class using shared function
         connector_class = load_connector_class(connector_import)
-        schema_name = get_schema_name(connector_class)
+        tables_schemas = get_tables_schemas(connector_class)
         
         # Convert to async DSN and create engine
         async_dsn = convert_to_async_dsn(connector_class.__db_dsn__)
         engine = create_async_engine(async_dsn)
         
         async with engine.begin() as conn:
-            # Check if schema exists
-            if not force:
-                if not await schema_exists(conn, schema_name):
-                    click.echo(f"Schema '{schema_name}' does not exist.")
-                    return
-                
-                # Check if schema has tables (if not forcing)
-                if await schema_has_tables(conn, schema_name):
-                    click.echo(f"Schema '{schema_name}' contains tables. Use --force to drop anyway.")
-                    return
-            
+                # Check if schema exists
             # Drop all tables first using SQLAlchemy's metadata.drop_all
             if hasattr(connector_class, '__data_schema_base__'):
                 base_schema = connector_class.__data_schema_base__
@@ -48,11 +39,11 @@ async def drop_schema(connector_import: str, force: bool):
                 for table in tables:
                     try:
                         # Drop table with CASCADE to handle enum dependencies
-                        await conn.execute(sa.text(f'DROP TABLE IF EXISTS "{schema_name}"."{table.name}" CASCADE'))
-                        click.echo(f"Dropped table '{schema_name}.{table.name}'")
+                        await conn.execute(sa.text(f'DROP TABLE IF EXISTS "{table.schema}"."{table.name}" CASCADE'))
+                        click.echo(f"Dropped table '{table.schema}.{table.name}'")
                     except Exception as e:
                         if force:
-                            click.echo(f"Warning: Failed to drop table '{schema_name}.{table.name}': {e}")
+                            click.echo(f"Warning: Failed to drop table '{table.schema}.{table.name}': {e}")
                         else:
                             raise
                 
@@ -73,13 +64,22 @@ async def drop_schema(connector_import: str, force: bool):
                         if force:
                             click.echo(f"Warning: Failed to drop enum type '{enum_name}': {e}")
                 
-                click.echo(f"All tables and types for schema '{schema_name}' dropped successfully.")
+                click.echo(f"All tables and types for of connector '{connector_import}' dropped successfully.")
             
-            # Drop schema
-            await conn.execute(DropSchema(schema_name, cascade=force))
-            click.echo(f"Schema '{schema_name}' dropped successfully.")
+            for schema_name in tables_schemas:
+                if not await schema_exists(conn, schema_name):
+                    click.echo(f"Schema '{schema_name}' does not exist.")
+                    continue
+            
+                # Check if schema has tables (if not forcing)
+                if await schema_has_tables(conn, schema_name):
+                    await conn.execute(DropSchema(schema_name, cascade=force))
+                    click.echo(f"Schema '{schema_name}' dropped successfully.")
+                    continue
+        
         
         await engine.dispose()
             
     except Exception as e:
+        logger.exception(f"Failed to drop schema: {e}")
         raise click.ClickException(f"Failed to drop schema: {e}") 
