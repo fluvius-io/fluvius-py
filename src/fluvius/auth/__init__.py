@@ -15,7 +15,7 @@ class KeycloakTokenPayload(DataModel):
     typ: Literal["ID"]
     azp: str
     nonce: str
-    session_state: UUID
+    session_state: UUID = None
     at_hash: str
     acr: Optional[str] = None
     sid: UUID
