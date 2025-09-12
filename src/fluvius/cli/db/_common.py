@@ -3,7 +3,7 @@ import click
 import sqlalchemy as sa
 from sqlalchemy.schema import CreateSchema, DropSchema
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from fluvius.data import SqlaDriver
+from fluvius.data import SqlaDriver, logger
 from fluvius.helper import load_string
 from flvctl import async_command
 

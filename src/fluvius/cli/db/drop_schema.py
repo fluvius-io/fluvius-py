@@ -66,16 +66,14 @@ async def drop_schema(connector_import: str, force: bool):
                 
                 click.echo(f"All tables and types for of connector '{connector_import}' dropped successfully.")
             
+            click.echo(f"Tables schemas: {tables_schemas}")
             for schema_name in tables_schemas:
                 if not await schema_exists(conn, schema_name):
                     click.echo(f"Schema '{schema_name}' does not exist.")
                     continue
             
-                # Check if schema has tables (if not forcing)
-                if await schema_has_tables(conn, schema_name):
-                    await conn.execute(DropSchema(schema_name, cascade=force))
-                    click.echo(f"Schema '{schema_name}' dropped successfully.")
-                    continue
+                await conn.execute(DropSchema(schema_name, cascade=force))
+                click.echo(f"Schema '{schema_name}' dropped successfully.")
         
         
         await engine.dispose()
