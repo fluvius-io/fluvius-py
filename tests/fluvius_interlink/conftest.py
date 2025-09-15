@@ -3,14 +3,14 @@ import json
 
 from fluvius.data import UUID_GENF
 from fluvius.fastapi.auth import FluviusAuthProfileProvider
-from riparius import Workflow, Stage, Step, Role, st_connect, wf_connect, transition, FINISH_STATE
+from fluvius.interlink import Workflow, Stage, Step, Role, st_connect, wf_connect, transition, FINISH_STATE
 
 from typing import Optional
 from httpx import AsyncClient
 from fluvius.data.serializer.json_encoder import FluviusJSONEncoder
 from fastapi import Request
 
-# Test Data 
+# Test Data
 st01 = UUID_GENF('S101')
 wf01 = UUID_GENF('101')
 
@@ -121,13 +121,12 @@ class FluviusMockProfileProvider(FluviusAuthProfileProvider):
 # Custom AsyncClient with FluviusJSONEncoder
 class FluviusAsyncClient(AsyncClient):
     """AsyncClient that uses FluviusJSONEncoder for JSON serialization"""
-    
+
     async def request(self, method, url, **kwargs):
         # If json data is provided, serialize it with FluviusJSONEncoder
         if 'json' in kwargs:
             kwargs['content'] = json.dumps(kwargs.pop('json'), cls=FluviusJSONEncoder)
             kwargs['headers'] = kwargs.get('headers') or {}
             kwargs['headers'].setdefault('Content-Type', 'application/json')
-        
-        return await super().request(method, url, **kwargs)
 
+        return await super().request(method, url, **kwargs)

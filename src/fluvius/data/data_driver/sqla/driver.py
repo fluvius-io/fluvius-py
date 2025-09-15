@@ -257,6 +257,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
         active_session = self._active_session.get()
 
         if active_session is not None:
+            raise ValueError(f'Nested/concurrent transaction detected [{trace_msg}]: {active_session._trace_msg}')
             logger.exception(f'Nested/concurrent transaction detected [{trace_msg}]: {active_session._trace_msg}')
             yield active_session
             return

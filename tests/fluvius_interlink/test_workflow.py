@@ -1,12 +1,13 @@
 import pytest
 from pprint import pformat
 from types import SimpleNamespace
-from riparius import logger, config
-from riparius import Workflow, Stage, Step, Role, st_connect, wf_connect, transition, FINISH_STATE, ActivityRouter, WorkflowManager
+from fluvius.interlink import logger, config
+from fluvius.interlink import Workflow, Stage, Step, Role, st_connect, wf_connect, transition, FINISH_STATE, ActivityRouter, WorkflowManager
 from fluvius.data import UUID_GENF, UUID_GENR
 
 selector01 = UUID_GENF('S101')
 resource01 = UUID_GENR()
+
 
 @pytest.fixture(scope="session")
 async def workflows():

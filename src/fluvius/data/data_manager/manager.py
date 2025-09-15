@@ -100,6 +100,7 @@ class DataAccessManagerBase(object):
 
     def __init__(self, app, **config):
         self._app = app
+        self._transaction = None
         self._proxy = ReadonlyDataManagerProxy(self)
         self.setup_connector(config)
         self.setup_model()
@@ -167,13 +168,13 @@ class DataAccessManagerBase(object):
         return self
 
     @asynccontextmanager
-    async def transaction(self, *args, _writeable=False):
+    async def transaction(self, *args):
+        if self._transaction is not None:
+            raise RuntimeError(f'Nested transaction detected in {self.__class__.__name__}')
+
         async with self.connector.transaction(*args) as transaction:
             self._transaction = transaction
-            if _writeable:
-                yield self
-            else:
-                yield self._proxy
+            yield self._proxy
             self._transaction = None
 
     async def flush(self):
