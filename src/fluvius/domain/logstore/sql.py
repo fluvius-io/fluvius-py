@@ -65,6 +65,9 @@ class ActivityLog(DomainLogBaseModel):
     domain = sa.Column(sa.String)
     identifier = sa.Column(pg.UUID)
     resource = sa.Column(sa.String)
+    
+    domain_sid = sa.Column(pg.UUID)
+    domain_iid = sa.Column(pg.UUID)
 
     message = sa.Column(sa.String())
     msgtype = sa.Column(

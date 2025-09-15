@@ -3,7 +3,7 @@ import click
 import sqlalchemy as sa
 from sqlalchemy.schema import CreateSchema, DropSchema
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from fluvius.data import SqlaDriver
+from fluvius.data import SqlaDriver, logger
 from fluvius.helper import load_string
 from flvctl import async_command
 
@@ -33,23 +33,22 @@ def load_connector_class(connector_import: str) -> type:
         raise click.ClickException(f"Invalid connector class: {e}")
 
 
-def get_schema_name(connector_class: type) -> str:
-    """Get the schema name from a connector's base schema.
+def get_tables_schemas(connector_class: type) -> str:
+    """Get the schema names from a connector's base schema.
     
     Args:
         connector_class: The SqlaDriver connector class
         
     Returns:
-        The schema name (defaults to 'public' if not specified)
+        The schema names
     """
     if hasattr(connector_class, '__data_schema_base__'):
         base_schema = connector_class.__data_schema_base__
-        if hasattr(base_schema, '__table_args__'):
-            table_args = base_schema.__table_args__
-            if isinstance(table_args, dict) and 'schema' in table_args:
-                return table_args['schema']
+        schemas = {
+            t.schema for t in base_schema.metadata.tables.values() if t.schema is not None
+        }        
     
-    return 'public'
+    return schemas
 
 
 def convert_to_async_dsn(dsn: str) -> str:

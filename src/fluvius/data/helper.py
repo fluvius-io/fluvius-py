@@ -39,4 +39,37 @@ def serialize_mapping(data):
     raise ValueError('Unable to convert value to mapping: %s' % str(data.__class__))
 
 
+def parse_table_args(table_args):
+    args = []
+    opts = {}
 
+    if not table_args:
+        return args, opts
+
+    if isinstance(table_args, dict):
+        opts.update(table_args)
+    else:
+        for entry in table_args:
+            if isinstance(entry, dict):
+                opts.update(entry)
+            else:
+                args.append(entry)
+
+    return args, opts
+
+def merge_table_args(base_cls, child_cls):
+    base_args = getattr(base_cls, '__table_args__', None)
+    child_args = getattr(child_cls, '__table_args__', None)
+
+    if not child_args:
+        return base_args
+
+    if not base_args:
+        return child_args
+
+    args, opts = parse_table_args(base_args)
+    child_args, child_opts = parse_table_args(child_args)
+
+    args.extend(child_args)
+    opts.update(child_opts)
+    return tuple(args + [opts]) if opts else tuple(args)

@@ -126,7 +126,8 @@ def register_resource_endpoints(app, query_manager, query_resource):
         if scope_schema:
             @endpoint(SCOPE_SELECTOR, "{identifier}", **item_params)
             async def query_item_scoped(request: Request, identifier: Annotated[str, Path()], scope: Annotated[str, Path()]):
-                return query_resource(**(await item_query(request, identifier, scope=scope)).__dict__)
+                # return query_resource(**(await item_query(request, identifier, scope=scope)).__dict__)
+                return await item_query(request, identifier, scope=scope)
 
 
 def register_manager_endpoints(app, query_manager):

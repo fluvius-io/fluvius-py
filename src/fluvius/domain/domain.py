@@ -106,13 +106,11 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         revision = 0
 
     class Context(object):
-        _policymgr = None
         _aggregate = None
 
         def __init__(self, domain, authorization: Optional[AuthorizationContext], service_proxy, **kwargs):
             self._data = self.prepare_context_data(domain, authorization, **kwargs)
             self._aggregate = domain.__aggregate__ and domain.__aggregate__(domain)
-            self._policymgr = domain.__policymgr__ and domain.__policymgr__(domain)
 
             self._authorization = authorization
             self._service_proxy = service_proxy
@@ -177,6 +175,14 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             return self._data.user_id
 
         @property
+        def profile_id(self):
+            return self._data.profile_id
+
+        @property
+        def organization_id(self):
+            return self._data.organization_id
+
+        @property
         def timestamp(self):
             return self._data.timestamp
 
@@ -237,6 +243,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         self._config = self.validate_domain_config(config)
         self._logstore = self.__logstore__(app, **config)
         self._statemgr = self.__statemgr__(app, **config)
+        self._policymgr = self.__policymgr__ and self.__policymgr__(self._statemgr)
         self._active_context = contextvars.ContextVar('domain_context', default=None)
         self.cmd_processors = _setup_command_processor_selector(self._cmd_processors)
         self.msg_dispatchers = _setup_message_dispatcher_selector(self._msg_dispatchers)
@@ -336,7 +343,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         and set the selector scope in order to fetch the aggroot
         '''
         cmdc = self.lookup_command(command.command)
-        if not ctx.policymgr or not cmdc.Meta.policy_required:
+        if not self.policymgr or not cmdc.Meta.policy_required:
             return command
 
         rsid = "" if cmdc.Meta.new_resource else command.identifier 
@@ -350,7 +357,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             act=command.command
         )
 
-        resp = await ctx.policymgr.check_permission(reqs)
+        resp = await self.policymgr.check_permission(reqs)
         if not resp.allowed:
             raise ForbiddenError('D10012', f'Permission Failed: [{resp.narration}]')
 

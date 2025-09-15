@@ -6,7 +6,7 @@ import os
 import pandas as pd
 import sqlalchemy as sa
 
-from ._common import load_connector_class, get_schema_name, convert_to_async_dsn, async_command, create_async_engine
+from ._common import load_connector_class, convert_to_async_dsn, async_command, create_async_engine
 
 @click.command()
 @click.argument('connector_import', type=str)
@@ -24,7 +24,6 @@ async def import_data(connector_import: str, data_folder: str, force: bool, batc
     try:
         # Load the connector class using shared function
         connector_class = load_connector_class(connector_import)
-        schema_name = get_schema_name(connector_class)
         
         # Convert to async DSN and create engine
         async_dsn = convert_to_async_dsn(connector_class.__db_dsn__)
@@ -48,8 +47,7 @@ async def import_data(connector_import: str, data_folder: str, force: bool, batc
                 
                 for csv_file in csv_files:
                     # Get table name from CSV filename (without extension)
-                    table_name = os.path.splitext(os.path.basename(csv_file))[0]
-                    full_table_name = f"{schema_name}.{table_name}"
+                    full_table_name = os.path.splitext(os.path.basename(csv_file))[0]
                     
                     # Check if table exists
                     if full_table_name not in tables:

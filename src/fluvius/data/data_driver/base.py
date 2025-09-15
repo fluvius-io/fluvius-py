@@ -43,7 +43,7 @@ class DataDriver(object):
 
     @classmethod
     def register_schema(cls, data_schema=None, /, name=None):
-        def gen_schema_name(data_schema, custom_name):
+        def gen_table_name(data_schema, custom_name):
             if custom_name is not None:
                 return validate_lower_dash(custom_name)
 
@@ -53,7 +53,7 @@ class DataDriver(object):
             return data_schema.__tablename__
 
         def _decorator(schema_cls):
-            schema_name = gen_schema_name(data_schema, name)
+            schema_name = gen_table_name(data_schema, name)
             if schema_name in cls.__data_schema_registry__:
                 raise DataSchemaError(f'Schema model already registered: {schema_name}')
 

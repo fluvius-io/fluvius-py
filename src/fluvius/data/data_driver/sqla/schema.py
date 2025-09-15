@@ -3,9 +3,11 @@ import sqlalchemy as sa
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.dialects import postgresql as pg
 
+from fluvius.helper import camel_to_lower
+from fluvius.data import logger
 from fluvius.data.constant import ITEM_ID_FIELD
 from fluvius.data.identifier import UUID_GENR
-from fluvius.helper import camel_to_lower
+from fluvius.data.helper import merge_table_args
 
 
 def create_data_schema_base(driver_cls=None):
@@ -69,8 +71,11 @@ def create_data_schema_base(driver_cls=None):
         def __init_subclass__(cls):
             super().__init_subclass__()
 
+            parent = cls.__bases__[0]
+            cls.__table_args__ = merge_table_args(parent, cls)
             if cls.__dict__.get('__abstract__', False):
                 return
+
 
             if driver_cls is not None:
                 driver_cls.register_schema(cls)

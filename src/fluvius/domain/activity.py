@@ -14,7 +14,6 @@ class ActivityLog(DomainEntityRecord):
     domain      = field(type=str, mandatory=True)
     resource    = field(type=str, mandatory=True)
     identifier  = field(type=UUID_TYPE, mandatory=True, factory=identifier_factory)
-    etag        = field(type=bool, initial=False, mandatory=True)
 
     # Domain closure ID. The identifier to scope the item selection
     # in the case the identifier is duplicated (e.g. replication)

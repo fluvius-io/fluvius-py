@@ -279,18 +279,15 @@ class WorkflowManager(object):
             raise ValueError(f'Worfklow already registered: {wfdef_key}')
 
         cls.__registry__[wfdef_key] = type(f'WFE_{wf_cls.__name__}', (cls.__runner__, ), {}, wf_def=wf_cls)
-        logger.info('Registered workflow: %s', wfdef_key)
+        logger.warning('Registered workflow: %s', wfdef_key)
     
 
     async def commit(self):
-        async with self._datamgr.transaction(_writeable=True) as tx:
-            for wf in self._wfbyres.values():
-                await self.persist(tx, wf)
+        for wf in self._wfbyres.values():
+            await self.persist(self._datamgr, wf)
     
 
     async def commit_workflow(self, wf: WorkflowRunner):
-        async with self._datamgr.transaction(_writeable=True) as tx:
-            await self.persist(tx, wf)
-
+        await self.persist(self._datamgr, wf)
         return wf
 

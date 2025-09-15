@@ -214,8 +214,12 @@ class Aggregate(object):
         code=0,
         **kwargs
     ):
-        return ActivityLog.create(
-            logroot=logroot or self.aggroot,
+        logroot = logroot or self.aggroot
+        return ActivityLog(
+            identifier=logroot.identifier,
+            resource=logroot.resource,
+            domain_sid=logroot.domain_sid,
+            domain_iid=logroot.domain_iid,
             data=data,
             domain=self.domain_name,
             context=self.context.id,
@@ -229,7 +233,7 @@ class Aggregate(object):
     def audit_updated(self):
         return dict(
             _updated=self.context.timestamp,
-            _updater=self.context.user_id,
+            _updater=self.context.profile_id,
             _etag=generate_etag(self.context)
         )
 
@@ -237,7 +241,7 @@ class Aggregate(object):
         return dict(
             _realm=self.context.realm,
             _created=self.context.timestamp,
-            _creator=self.context.user_id,
+            _creator=self.context.profile_id,
             _etag=generate_etag(self.context)
         )
 
