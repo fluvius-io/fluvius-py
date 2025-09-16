@@ -7,15 +7,6 @@ from . import config
 DB_SCHEMA = config.CQRS_RESOURCE_SCHEMA
 DB_DSN = config.DB_DSN
 
-# --- Connector and Base Schema ---
-class WorkflowConnector(SqlaDriver):
-    __db_dsn__ = DB_DSN
-    __schema__ = DB_SCHEMA
-
-
-class WorkflowBaseSchema(WorkflowConnector.__data_schema_base__, DomainSchema):
-    __abstract__ = True
-
 # Function to create foreign key references to workflow table
 def workflow_fk(constraint_name, **kwargs):
     """Create a foreign key reference to the workflow table"""
@@ -26,12 +17,22 @@ def workflow_fk(constraint_name, **kwargs):
         name=f'fk_workflow_{constraint_name}'
     ), nullable=False, **kwargs)
 
+
+# --- Connector and Base Schema ---
+class WorkflowConnector(SqlaDriver):
+    __db_dsn__ = DB_DSN
+    __schema__ = DB_SCHEMA
+
+
+class WorkflowBaseSchema(WorkflowConnector.__data_schema_base__, DomainSchema):
+    __abstract__ = True
+
+
 # --- Models ---
 class WorkflowSchema(WorkflowBaseSchema):
     __tablename__ = "workflow"
     __table_args__ = (
-        sa.UniqueConstraint('resource_id', 'resource_name', 'wfdef_key', name='wf_resource_resource_id'),
-        WorkflowBaseSchema.__table_args__
+        sa.UniqueConstraint('resource_id', 'resource_name', 'wfdef_key', name='wf_resource_resource_id')
     )
 
     owner_id = sa.Column(pg.UUID, nullable=True)
@@ -56,7 +57,7 @@ class WorkflowSchema(WorkflowBaseSchema):
 class WorkflowViewSchema(WorkflowBaseSchema):
     __tablename__ = "_workflow"
     __external__ = True
-    __table_args__ = WorkflowBaseSchema.__table_args__ | {'info': {'is_view': True}}
+    __table_args__ = {'info': {'is_view': True}}
 
     owner_id = sa.Column(pg.UUID, nullable=True)
     company_id = sa.Column(sa.String, nullable=True)
