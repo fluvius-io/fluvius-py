@@ -194,9 +194,8 @@ class WorkflowRunner(object):
                 raise WorkflowConfigurationError('P01102', 'Stage [%s] is not defined for workflow [%s]' % (stage_key, cls.__key__))
 
             STEPS[step_key] = step_cls
-
-            # Register step's external events listeners
-            ActivityRouter.connect_st_events(step_cls, wf_def.Meta.key, step_key)
+            ActivityRouter.connect_events(step_cls, wf_def.Meta.key, step_key)
+            logger.warning('STEP_KEY: %s',step_key)
 
         def define_stage(key, stage):
             if hasattr(stage, '__key__'):
@@ -235,7 +234,7 @@ class WorkflowRunner(object):
         cls.__roles__ = ROLES
         cls.__stages__ = STAGES
 
-        ActivityRouter.connect_wf_events(wf_def, wf_def.Meta.key)
+        ActivityRouter.connect_events(wf_def, wf_def.Meta.key)
 
     def gen_stages(self):
         for idx, (key, stage) in enumerate(self.__stages__.items()):
@@ -539,7 +538,7 @@ class WorkflowRunner(object):
 
     @workflow_action('trigger', allow_statuses=WorkflowStatus._ACTIVE, external=True)
     def trigger(self, trigger):
-        wf_context = self.get_state_proxy(trigger.selector)
+        wf_context = self.get_state_proxy(trigger.step_key and trigger.selector)
         self.run_hook(trigger.handler_func, wf_context, trigger.event_data)
         return self
     

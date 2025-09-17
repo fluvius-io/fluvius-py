@@ -267,8 +267,8 @@ class SqlaDriver(DataDriver, QueryBuilder):
             try:
                 yield async_session
                 await async_session.commit()
-            except Exception:
-                logger.error('[E15201] Error during database transaction. Rolling back ...')
+            except Exception as e:
+                logger.error('[E15201] Error during database transaction (%s). Rolling back ...', e)
                 await async_session.rollback()
                 raise
             finally:

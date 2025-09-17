@@ -2,9 +2,9 @@ from dataclasses import dataclass
 from typing import Callable
 from types import SimpleNamespace
 from fluvius.data import UUID_TYPE, UUID_GENR
-from . import logger, config  # noqa
-
 from fluvius.error import NotFoundError
+
+from . import logger  # noqa
 
 
 @dataclass
@@ -13,6 +13,7 @@ class ActivityHandler(object):
     step_key: str
     routing_func: Callable
     handler_func: Callable
+    priority: int = 0
 
 
 @dataclass
@@ -27,30 +28,21 @@ class WorkflowTrigger(object):
     step_key: str
     handler_func: Callable
 
-def connect(act_name, router):
+def _default_route_func(evt):
+    return (evt.resource_id, evt.resource_name, evt.step_selector)
+
+# def _workflow_route_func(evt):
+#     return (evt.resource_id, evt.resource_name, None)
+
+def connect(act_name, step=None, router=_default_route_func, priority=0):
     def decorator(func):
-        if hasattr(func, '__connect_act__'):
+        if hasattr(func, '__wfevt_handler__'):
             raise ValueError(f'Activity already connected: {act_name}')
 
-        func.__connect_act__ = (act_name, router)
+        func.__wfevt_handler__ = (act_name, router, step, priority)
         return func
 
     return decorator
-
-def _step_route_func(evt):
-    return (evt.resource_id, evt.resource_name, evt.step_selector)
-
-def _workflow_route_func(evt):
-    return (evt.resource_id, evt.resource_name, None)
-
-
-def st_connect(act_name, route_func=None):
-    return connect(act_name, route_func or _step_route_func)
-
-
-def wf_connect(act_name, route_func=None):
-    return connect(act_name, route_func or _workflow_route_func)
-
 
 def validate_act_handler(act_handler):
     if not callable(act_handler.routing_func):
@@ -66,11 +58,12 @@ class ActivityRouter(object):
     def _connect(cls, act_name, act_handler):
         act_handler = validate_act_handler(act_handler)
 
-        cls.ROUTING_TABLE.setdefault(act_name, tuple())
-        cls.ROUTING_TABLE[act_name] += (act_handler, )
+        cls.ROUTING_TABLE.setdefault(act_name, [])
+        cls.ROUTING_TABLE[act_name] = sorted(cls.ROUTING_TABLE[act_name] + [act_handler,], key=lambda x: x.priority)
 
-        if (_count := len(cls.ROUTING_TABLE[act_name])) > 1:
-            logger.warning('Event has multiple handlers [%d]: %s @ %s', _count, act_name, act_handler.wfdef_key)
+        hdl_count = len(cls.ROUTING_TABLE[act_name])
+        if hdl_count > 1:
+            logger.warning('Event has multiple handlers [%d]: %s @ %s', hdl_count, act_name, act_handler.wfdef_key)
 
     @classmethod
     def route_event(cls, evt_name, evt_data):
@@ -84,8 +77,8 @@ class ActivityRouter(object):
 
             resource_id, resource_name, step_selector = act_route
 
-            if (entry.step_key is None) != (step_selector is None):
-                raise ValueError("Step event must be routed to a specific step, and vice versa.")
+            if (entry.step_key is not None) and (step_selector is None):
+                raise ValueError(f"Step event must be routed to a specific step [{entry.step_key}] <=> [{step_selector}].")
 
             yield WorkflowTrigger(
                 id=UUID_GENR(),
@@ -100,22 +93,20 @@ class ActivityRouter(object):
             )
 
     @classmethod
-    def connect_events(cls, handler_cls, wfdef_key, step_key):
+    def connect_events(cls, handler_cls, wfdef_key, step_key=None):
         for attr_name in dir(handler_cls):
             handler_func = getattr(handler_cls, attr_name)
-            if not hasattr(handler_func, '__connect_act__'):
+            if not hasattr(handler_func, '__wfevt_handler__'):
                 continue
 
-            act_name, act_router = handler_func.__connect_act__
+            evt_name, evt_router, evt_step_key, priority = handler_func.__wfevt_handler__
+            if step_key and evt_step_key:  # connector is defined within step class definition
+                raise ValueError(f'Event handler is connected with step [{step_key}] via step context.')
+
+            step_key = step_key or evt_step_key
+
             cls._connect(
-                act_name, ActivityHandler(wfdef_key, step_key, act_router, handler_func)
+                evt_name, ActivityHandler(wfdef_key, step_key, evt_router, handler_func, priority)
             )
 
-    @classmethod
-    def connect_wf_events(cls, wf_cls, wfdef_key):
-        return cls.connect_events(wf_cls, wfdef_key, None)
-
-    @classmethod
-    def connect_st_events(cls, st_cls, wfdef_key, step_key):
-        return cls.connect_events(st_cls, wfdef_key, step_key)
 

@@ -2,7 +2,7 @@ import pytest
 from pprint import pformat
 from types import SimpleNamespace
 from fluvius.interlink import logger, config
-from fluvius.interlink import Workflow, Stage, Step, Role, st_connect, wf_connect, transition, FINISH_STATE, ActivityRouter, WorkflowManager
+from fluvius.interlink import Workflow, Stage, Step, Role, connect, transition, FINISH_STATE, ActivityRouter, WorkflowManager
 from fluvius.data import UUID_GENF, UUID_GENR
 
 selector01 = UUID_GENF('S101')
@@ -34,9 +34,17 @@ async def test_workflow_01(workflows):
         )
 
         workflows.id01 = wf.id
+
+        index = 0
         async for wf in manager.process_event('test-event', evt_data):
-            assert len(wf.step_id_map) == 3  # 3 steps created
             await manager.commit_workflow(wf)
+            if index == 0:
+                assert len(wf.step_id_map) == 1  # 1 steps created
+
+            if index == 1:
+                assert len(wf.step_id_map) == 3  # 3 steps created
+
+            index += 1
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -51,8 +59,15 @@ async def test_workflow_02(workflows):
             step_selector=selector01
         )
 
+        index = 0
         async for wf in manager.process_event('test-event', evt_data):
-            assert len(wf.step_id_map) == 5  # 2 more steps created
             await manager.commit_workflow(wf)
 
+            if index == 0:
+                assert len(wf.step_id_map) == 3  # 3 steps from first tests
+
+            if index == 1:
+                assert len(wf.step_id_map) == 5  # 2 added by reprocessing event at step 2 steps created
+
+            index += 1
 

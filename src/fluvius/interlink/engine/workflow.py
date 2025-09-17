@@ -7,7 +7,7 @@ from fluvius.data import UUID_GENF, UUID_GENR,nullable, DataModel
 from fluvius.helper.registry import ClassRegistry
 from fluvius.helper import camel_to_lower
 
-from .router import st_connect, wf_connect, connect
+from .router import connect
 from .datadef import WorkflowStep, WorkflowData, RX_STATE
 from .exceptions import WorkflowExecutionError, WorkflowConfigurationError
 
@@ -45,8 +45,15 @@ class Step(object):
     __multi__ = False
 
     def __init_subclass__(cls, name=None, stage=None, states=None, multiple=False):
+        _stage = stage or cls.__stage__
+        # if isinstance(_stage, Stage):
+        #     _stage = _stage.__key__
+
+        # if not isinstance(_stage, str):
+        #     raise ValueError(f'Invalid step stage: {_stage}')
+
         cls.__title__ = name or cls.__name__
-        cls.__stage__ = stage or cls.__stage__
+        cls.__stage__ = _stage
         cls.__multi__ = multiple or cls.__multi__
 
         cls.__states__ =  (BEGIN_STATE, FINISH_STATE) + validate_step_states(
