@@ -171,7 +171,8 @@ class DataAccessManagerBase(object):
     @asynccontextmanager
     async def transaction(self, *args):
         if self._transaction is not None:
-            RAISE_NESTED_TRANSACTION_ERROR and raise RuntimeError(f'Nested transaction detected in {self.__class__.__name__}')
+            if RAISE_NESTED_TRANSACTION_ERROR:
+                raise RuntimeError(f'Nested transaction detected in {self.__class__.__name__}')
 
         async with self.connector.transaction(*args) as transaction:
             self._transaction = transaction
