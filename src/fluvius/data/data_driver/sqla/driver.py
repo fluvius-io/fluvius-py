@@ -35,6 +35,7 @@ from .query import QueryBuilder
 DEBUG_CONNECTOR = config.DEBUG
 RAISE_NO_ITEM_MODIFIED_ERROR = True
 BACKEND_QUERY_LIMIT = config.BACKEND_QUERY_INTERNAL_LIMIT
+RAISE_NESTED_TRANSACTION_ERROR = False
 
 
 def list_unwrapper(cursor):
@@ -256,7 +257,8 @@ class SqlaDriver(DataDriver, QueryBuilder):
         active_session = self._active_session.get()
 
         if active_session is not None:
-            raise ValueError(f'Nested/concurrent transaction detected [{trace_msg}]: {active_session._trace_msg}')
+            if RAISE_NESTED_TRANSACTION_ERROR:
+                raise ValueError(f'Nested/concurrent transaction detected [{trace_msg}]: {active_session._trace_msg}')
             logger.exception(f'Nested/concurrent transaction detected [{trace_msg}]: {active_session._trace_msg}')
             yield active_session
             return

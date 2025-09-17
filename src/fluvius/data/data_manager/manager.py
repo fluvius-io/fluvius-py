@@ -28,6 +28,7 @@ from fluvius.data.constant import (
 DEBUG = config.DEBUG
 ATTR_QUERY_MARKER = '__domain_query__'
 BACKEND_QUERY_LIMIT = config.BACKEND_QUERY_INTERNAL_LIMIT
+RAISE_NESTED_TRANSACTION_ERROR = False
 
 def list_unwrapper(cursor):
     return tuple(SimpleNamespace(**row._asdict()) for row in cursor.all())
@@ -170,7 +171,8 @@ class DataAccessManagerBase(object):
     @asynccontextmanager
     async def transaction(self, *args):
         if self._transaction is not None:
-            raise RuntimeError(f'Nested transaction detected in {self.__class__.__name__}')
+            if RAISE_NESTED_TRANSACTION_ERROR:
+                raise RuntimeError(f'Nested transaction detected in {self.__class__.__name__}')
 
         async with self.connector.transaction(*args) as transaction:
             self._transaction = transaction
