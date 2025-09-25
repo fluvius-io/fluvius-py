@@ -18,8 +18,7 @@ def env(name: str, defval: Any, redacted: bool = False, coercer: Callable[[Any],
     return coercer(value) if callable(coercer) else value
 
 
-FLUVIUS_DEFAULT_SECTION = env("FLUVIUS_DEFAULT_SECTION", "sysdefaults")
-FLUVIUS_CONFIG_MODULE = env("FLUVIUS_CONFIG_MODULE", "fluvius.config.sysdefaults")
+FLUVIUS_SYSTEM_DEFAULTS = env("FLUVIUS_SYSTEM_DEFAULTS", "sysdefaults")
 FLUVIUS_CONFIG_FILES = env("FLUVIUS_CONFIG_FILE", "base.ini|config.ini").split('|')
 DEBUG_ALL_CONFIG_VALUE = "#ALL"
 
@@ -158,9 +157,9 @@ def __module_config__():  # noqa: C901
         files in the list will be read
     '''
     __parser__.read(FLUVIUS_CONFIG_FILES)
-    default_config = get_config(FLUVIUS_DEFAULT_SECTION, sysdefaults)
+    default_config = get_config(FLUVIUS_SYSTEM_DEFAULTS, sysdefaults)
     # makes an instance of the Config helper class available to all the modules
-    return ModuleConfig, get_config, default_config
+    return ModuleConfig, get_config, default_config, __config__.items
 
 
-ModuleConfig, getConfig, default_config = __module_config__()
+ModuleConfig, getConfig, default_config, list_config = __module_config__()

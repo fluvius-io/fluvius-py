@@ -7,7 +7,7 @@ from typing import Any, Dict
 from .entrypoint import fluvius_manager
 from fluvius.helper import load_string
 
-@fluvius_manager.command(name="config")
+@fluvius_manager.command(name="show-config")
 @click.argument('module_path', type=str, default='fluvius')
 @click.option('--key', help='Specific config key to display (e.g., DB_DSN)')
 @click.option('--format', 'output_format', 
@@ -16,11 +16,13 @@ from fluvius.helper import load_string
               help='Output format for config values')
 @click.option('--filter', 'filter_pattern', 
               help='Filter config keys by pattern (case-insensitive)')
+@click.option('--show-sysdefaults', is_flag=True, 
+              help='Show system defaults')
 @click.option('--show-sensitive', is_flag=True, 
               help='Show sensitive values (passwords, tokens, etc.)')
 @click.option('--show-source', is_flag=True,
               help='Show configuration source information (requires fluvius debug info)')
-def show_config(module_path, key, output_format, filter_pattern, show_sensitive, show_source):
+def show_config(module_path, key, output_format, filter_pattern, show_sysdefaults, show_sensitive, show_source):
     """Display configuration values of an module"""
     config = load_string(f"{module_path}.config")
 
@@ -47,6 +49,8 @@ def show_config(module_path, key, output_format, filter_pattern, show_sensitive,
             # Get debug info for this key if available
             debug_info = vdebug.get(attr_name, (attr_value, type(attr_value), 'unknown'))
             source_info = debug_info[2] if len(debug_info) > 2 else 'unknown'
+            if not show_sysdefaults and source_info == 'fluvius.conf.sysdefaults':
+                continue
             
             # Extract namespace (module name) - get it from config object
             namespace = getattr(config, '__name__', 'fluvius')
@@ -116,13 +120,13 @@ def show_config(module_path, key, output_format, filter_pattern, show_sensitive,
                     json_output = {k: v['value'] for k, v in config_data.items()}
                 click.echo(json.dumps(json_output, indent=2, default=str))
         else:  # table format (default)
-            _print_config_table(config_data, show_sensitive, show_source)
+            _print_config_table(config_data, show_sensitive, show_source, show_sysdefaults)
             
     except Exception as e:
         click.echo(f"❌ Error retrieving configuration: {e}")
 
 
-def _print_config_table(config_data: Dict[str, Dict[str, Any]], show_sensitive: bool, show_source: bool = False):
+def _print_config_table(config_data: Dict[str, Dict[str, Any]], show_sensitive: bool, show_source: bool = False, show_sysdefaults: bool = False):
     """Print configuration in a formatted table."""
     
     if not config_data:
@@ -196,13 +200,17 @@ def _print_config_table(config_data: Dict[str, Dict[str, Any]], show_sensitive: 
     click.echo("=" * total_width)
     
     # Show legend
+    click.echo("\n💡 TIPS:")
     if not show_sensitive:
-        click.echo("\n💡 Tip: Use --show-sensitive to reveal masked values")
+        click.echo("   - Use --show-sensitive to reveal masked values")
     
     if not show_source:
-        click.echo("   Use --show-source to see configuration source details")
-    
-    click.echo("   Use --key <name> to show a specific configuration value")
-    click.echo("   Configuration follows fluvius hierarchy: INI files > module defaults > system defaults")
+        click.echo("   - Use --show-source to see configuration source details")
+
+    if not show_sysdefaults:
+        click.echo("   - Use --show-sysdefaults to show system defaults")
+
+    click.echo("   - Use --key <name> to show a specific configuration value")
+    click.echo("   - Configuration follows fluvius hierarchy: INI files > module defaults > system defaults")
 
 
