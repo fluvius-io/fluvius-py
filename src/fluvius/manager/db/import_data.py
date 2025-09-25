@@ -6,7 +6,7 @@ import os
 import pandas as pd
 import sqlalchemy as sa
 
-from ._common import load_connector_class, convert_to_async_dsn, async_command, create_async_engine
+from .base import load_connector_class, convert_to_async_dsn, async_command, create_async_engine
 
 @click.command()
 @click.argument('connector_import', type=str)

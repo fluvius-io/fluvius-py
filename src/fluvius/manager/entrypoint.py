@@ -2,16 +2,15 @@
 """Fluvius command line control tool."""
 
 import click
-from flvctl import db, run
-
+from . import db, run
 
 @click.group()
 @click.version_option(version="1.0.0")
-def cli():
+def fluvius_manager():
     """Fluvius command line control tool."""
     pass
 
 
 # Register command groups
-cli.add_command(db.commands, name="db")
-cli.add_command(run.commands, name="run")
+fluvius_manager.add_command(db.db_commands, name="db")
+fluvius_manager.add_command(run.run_commands, name="run")

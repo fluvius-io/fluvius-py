@@ -4,7 +4,7 @@ import click
 import sqlalchemy as sa
 import logging as logger
 from sqlalchemy.schema import DropSchema
-from ._common import load_connector_class, get_tables_schemas, convert_to_async_dsn, schema_exists, schema_has_tables, async_command, create_async_engine
+from .base import load_connector_class, get_tables_schemas, convert_to_async_dsn, schema_exists, schema_has_tables, async_command, create_async_engine
 
 
 @click.command()

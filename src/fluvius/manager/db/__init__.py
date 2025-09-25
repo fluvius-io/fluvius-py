@@ -10,11 +10,11 @@ from .export_data import export_data
 
 
 @click.group()
-def commands():
+def db_commands():
     """Database management commands."""
     pass
 
-commands.add_command(create_schema)
-commands.add_command(drop_schema)
-commands.add_command(import_data)
-commands.add_command(export_data)
+db_commands.add_command(create_schema)
+db_commands.add_command(drop_schema)
+db_commands.add_command(import_data)
+db_commands.add_command(export_data)

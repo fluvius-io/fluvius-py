@@ -4,7 +4,7 @@ import click
 import sqlalchemy as sa
 import pandas as pd
 import os
-from ._common import load_connector_class, convert_to_async_dsn, async_command, create_async_engine
+from .base import load_connector_class, convert_to_async_dsn, async_command, create_async_engine
 
 
 @click.command()

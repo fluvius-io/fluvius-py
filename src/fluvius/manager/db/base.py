@@ -5,7 +5,7 @@ from sqlalchemy.schema import CreateSchema, DropSchema
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from fluvius.data import SqlaDriver, logger
 from fluvius.helper import load_string
-from flvctl import async_command
+from .. import async_command
 
 
 def load_connector_class(connector_import: str) -> type:
