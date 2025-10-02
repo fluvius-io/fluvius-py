@@ -230,7 +230,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             'name': camel_to_title(cls.__name__),
             'prefix': cls.__namespace__,
             'desc': (cls.__doc__ or '').strip(),
-            'tags': [cls.__name__, ]
+            'tags': [cls.__namespace__, ]
         })
 
 

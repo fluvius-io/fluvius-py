@@ -102,7 +102,7 @@ def register_resource_endpoints(app, query_manager, query_resource):
                 return await resource_query(request, query_params, None, None)
 
     if meta.allow_meta_view:
-        @endpoint(base=f"/_meta{base_uri}", summary=f"Query Metadata [{meta.name}]", tags=["Metadata"])
+        @endpoint(base=f"/_meta{base_uri}", summary=meta.name, tags=["Metadata"])
         async def query_info(request: Request) -> dict:
             return query_resource.resource_meta()
 

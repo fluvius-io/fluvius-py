@@ -46,14 +46,13 @@ class FastAPIDomainManager(DomainManager):
 
             return {
                 "id": domain.__namespace__,
-                "name": domain.Meta.name,
+                "name": domain.__namespace__,
                 "description": domain.Meta.desc,
                 "externalDocs": {
                     "description": "Metadata",
                     "url": f"http://localhost:8000{metadata_uri}"
                 }
             }
-
 
         tags = [_setup_domain(domain) for domain in self._domains]
         self.app.openapi_tags = self.app.openapi_tags or []
