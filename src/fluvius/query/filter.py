@@ -189,6 +189,15 @@ class DatetimeFilterPreset(FilterPreset, name="datetime"):
     between = Filter("Between", dtype="timerange", input="timerange", validator=validate_datetime_range)
 
 
+class DateFilterPreset(FilterPreset, name="date"):
+    eq = Filter("Equals", dtype="date", input="date", default=True, validator=str_to_datetime)
+    gt = Filter("Greater than", dtype="date", input="date", validator=str_to_datetime)
+    lt = Filter("Less than", dtype="date", input="date", validator=str_to_datetime)
+    lte = Filter("Less or Equals", dtype="date", input="date", validator=str_to_datetime)
+    gte = Filter("Greater or Equals", dtype="date", input="date", validator=str_to_datetime)
+    between = Filter("Between", dtype="daterange", input="daterange", validator=validate_datetime_range)
+
+
 class EnumFilterPreset(FilterPreset, name="enum"):
     eq = Filter("Equals", dtype="string", input="string", default=True)
     in_ = Filter("In List", "string")

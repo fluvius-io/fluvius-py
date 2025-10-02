@@ -1,2 +1,4 @@
 from fluvius import setupModule
-config, logger = setupModule(__name__)
+from . import defaults
+
+config, logger = setupModule(__name__, defaults)

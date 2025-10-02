@@ -120,13 +120,13 @@ def show_config(module_path, key, output_format, filter_pattern, show_sysdefault
                     json_output = {k: v['value'] for k, v in config_data.items()}
                 click.echo(json.dumps(json_output, indent=2, default=str))
         else:  # table format (default)
-            _print_config_table(config_data, show_sensitive, show_source, show_sysdefaults)
+            _print_config_table(module_path, config_data, show_sensitive, show_source, show_sysdefaults)
             
     except Exception as e:
         click.echo(f"❌ Error retrieving configuration: {e}")
 
 
-def _print_config_table(config_data: Dict[str, Dict[str, Any]], show_sensitive: bool, show_source: bool = False, show_sysdefaults: bool = False):
+def _print_config_table(module_path, config_data: Dict[str, Dict[str, Any]], show_sensitive: bool, show_source: bool = False, show_sysdefaults: bool = False):
     """Print configuration in a formatted table."""
     
     if not config_data:
@@ -158,7 +158,7 @@ def _print_config_table(config_data: Dict[str, Dict[str, Any]], show_sensitive: 
         total_width += source_width + 3  # 3 for additional separator
     
     # Print header
-    click.echo("🔧 Fluvius Configuration (from fluvius config system)")
+    click.echo(f"🔧 Fluvius Configuration: {module_path}")
     click.echo("=" * total_width)
     
     if show_source:
