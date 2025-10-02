@@ -1,3 +1,4 @@
+import re
 import asyncpg
 import asyncio
 import importlib
@@ -227,6 +228,13 @@ class SqlaDriver(DataDriver, QueryBuilder):
     def engine(self):
         return self._session_configuration._async_engine
 
+    def format_sql_params(self, sql: str, params: list):
+        converted_sql = re.sub(r"\$(\d+)", lambda m: f":p{m.group(1)}", sql)
+        # Build params dict { "p1": val1, "p2": val2, ... }
+        param_dict = {f"p{i+1}": v for i, v in enumerate(params)}
+
+        return converted_sql, param_dict
+
     async def connection(self):
         return await self._session_configuration.connection()
 
@@ -437,8 +445,13 @@ class SqlaDriver(DataDriver, QueryBuilder):
         else:
             raise ValueError(f'[E92853] Invalid SQL query: {nquery}')
         
-        conn = await self.connection()
-        cursor = await conn.exec_driver_sql(stmt, params)
+        # conn = await self.connection()
+        # cursor = await conn.exec_driver_sql(stmt, params)
+
+        # Format SQL params to be used with SQLAlchemy text()
+        sess = self.active_session
+        stmt, params = self.format_sql_params(stmt, params)
+        cursor = await sess.execute(sa.text(stmt), params)
 
         DEBUG_CONNECTOR and logger.info("[SQL QUERY] %s\n   [QUERY PARAMS] %s", nquery, params)
         if unwrapper is None:
