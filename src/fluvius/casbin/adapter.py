@@ -6,7 +6,7 @@ from casbin.model import Model
 from casbin import persist
 
 from .datadef import PolicyRequest
-from ._meta import logger
+from . import logger
 
 
 MAX_POLICY_LINE = 10000
