@@ -11,6 +11,7 @@ fastapi-mcp>=0.3.3
 fsspec>=2025.3.2
 iso8601
 jsonurl-py>=0.4.0
+pandas
 pipe>=2.2
 pydantic[email]>=2.11.4
 pypika
