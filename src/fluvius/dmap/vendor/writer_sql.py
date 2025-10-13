@@ -102,7 +102,8 @@ class SQLWriter(Writer):
                 schema=schema_name,
                 index=False,
                 dtype=schematics,
-                if_exists=self.config.mode
+                if_exists=self.config.mode,
+                method="multi"
             )
 
         DEBUG_WRITER and logger.info('Data written to database @ [%s.%s]', schema_name, table_name)
