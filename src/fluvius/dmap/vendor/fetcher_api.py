@@ -168,7 +168,7 @@ class APIFetcher(DataFetcher):
                 status = RunStatus.SUCCESS
 
                 current_time = datetime.utcnow()
-                if current_time >= next_run:
+                if self.config.run_mode == RunMode.ONCE or current_time >= next_run:
                     next_run = cron_iter.get_next(datetime)
 
                     try:
