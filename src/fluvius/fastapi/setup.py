@@ -13,6 +13,29 @@ _on_startups = tuple()
 _on_shutdowns = tuple()
 
 
+def on_startup(*func):
+    global _on_startups
+    _on_startups += func
+    return func
+
+
+def on_shutdown(*func):
+    global _on_shutdowns
+    _on_shutdowns += func
+    return func
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    for func in _on_startups:
+        await func(app)
+
+    yield
+
+    for func in _on_shutdowns:
+        await func(app)
+
+
 def create_app(config=config, **kwargs) -> FastAPI:
     cfg = dict(
         title=config.APPLICATION_NAME,
@@ -129,23 +152,3 @@ def setup_kcadmin(app):
     )
 
     return app
-
-def on_startup(*func):
-    global _on_startups
-    _on_startups += func
-    return func
-
-def on_shutdown(*func):
-    global _on_shutdowns
-    _on_shutdowns += func
-    return func
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    for func in _on_startups:
-        await func(app)
-
-    yield
-
-    for func in _on_shutdowns:
-        await func(app)

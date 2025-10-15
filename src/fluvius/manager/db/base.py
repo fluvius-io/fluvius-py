@@ -42,11 +42,10 @@ def get_tables_schemas(connector_class: type) -> str:
     Returns:
         The schema names
     """
-    if hasattr(connector_class, '__data_schema_base__'):
-        base_schema = connector_class.__data_schema_base__
-        schemas = {
-            t.schema for t in base_schema.metadata.tables.values() if t.schema is not None
-        }        
+    base_schema = connector_class.__data_schema_base__
+    schemas = {
+        t.schema for t in base_schema.metadata.tables.values() if t.schema is not None
+    }        
     
     return schemas
 

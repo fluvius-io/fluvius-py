@@ -77,32 +77,33 @@ def register_resource_endpoints(app, query_manager, query_resource):
 
     if meta.allow_list_view:
         list_params = dict(
-            summary=meta.name,
             description=meta.desc,
             response_model=ListResultSchema
         )
         if scope_schema:
-            @endpoint(
-                SCOPE_SELECTOR, PATH_QUERY_SELECTOR, "", **list_params
-                )  # "" for trailing slash
-            async def query_resource_scoped(request: Request, path_query: Annotated[str, Path()], scope:  Annotated[str, Path()]):
-                return await resource_query(request, None, path_query, scope)
+            if meta.allow_path_query:
+                @endpoint(
+                    SCOPE_SELECTOR, PATH_QUERY_SELECTOR, "", summary=f"{meta.name}ScopedPath", **list_params
+                    )  # "" for trailing slash
+                async def query_resource_scoped(request: Request, path_query: Annotated[str, Path()], scope:  Annotated[str, Path()]):
+                    return await resource_query(request, None, path_query, scope)
 
-            @endpoint(SCOPE_SELECTOR, "", **list_params)  # "" for trailing slash
+            @endpoint(SCOPE_SELECTOR, "", summary=f"{meta.name}Scoped", **list_params)  # "" for trailing slash
             async def query_resource_scoped_json(request: Request, query_params: Annotated[QueryParams, Query()], scope: Annotated[str, Path()]):
                 return await resource_query(request, query_params, None, scope)
             
         if not meta.scope_required:
-            @endpoint(PATH_QUERY_SELECTOR, "", **list_params)
-            async def query_resource_json(request: Request, path_query: Annotated[str, Path()], query_params: Annotated[QueryParams, Query()]):
-                return await resource_query(request, query_params, path_query, None)
+            if meta.allow_path_query:
+                @endpoint(PATH_QUERY_SELECTOR, "", summary=f"{meta.name}Path", **list_params)
+                async def query_resource_json(request: Request, path_query: Annotated[str, Path()], query_params: Annotated[QueryParams, Query()]):
+                    return await resource_query(request, query_params, path_query, None)
 
-            @endpoint("", **list_params) # Trailing slash
+            @endpoint("", **list_params, summary=meta.name) # Trailing slash
             async def query_resource_default(request: Request, query_params: Annotated[QueryParams, Query()]):
                 return await resource_query(request, query_params, None, None)
 
     if meta.allow_meta_view:
-        @endpoint(base=f"/_meta{base_uri}", summary=meta.name, tags=["Metadata"])
+        @endpoint(base=f"/_meta{base_uri}", summary=f"{meta.name}Meta", tags=["Metadata"])
         async def query_info(request: Request) -> dict:
             return query_resource.resource_meta()
 
@@ -113,18 +114,17 @@ def register_resource_endpoints(app, query_manager, query_resource):
             ItemResultSchema = None
 
         item_params = dict(
-            summary=f"{meta.name} (Item)",
             description=meta.desc,
             response_model=ItemResultSchema)
         
         if not meta.scope_required:
-            @endpoint("{identifier}", **item_params)
+            @endpoint("{identifier}", summary=f"{meta.name}Item", **item_params)
             async def query_item_default(request: Request, identifier: Annotated[str, Path()]):
                 item = await item_query(request, identifier)
                 return item
 
         if scope_schema:
-            @endpoint(SCOPE_SELECTOR, "{identifier}", **item_params)
+            @endpoint(SCOPE_SELECTOR, "{identifier}", summary=f"{meta.name}ScopedItem", **item_params)
             async def query_item_scoped(request: Request, identifier: Annotated[str, Path()], scope: Annotated[str, Path()]):
                 # return query_resource(**(await item_query(request, identifier, scope=scope)).__dict__)
                 return await item_query(request, identifier, scope=scope)

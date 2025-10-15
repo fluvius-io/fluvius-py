@@ -68,6 +68,7 @@ class QueryResourceMeta(DataModel):  # We need DataModel.create method
     allow_list_view: bool = True
     allow_meta_view: bool = True
     allow_text_search: bool = False
+    allow_path_query: bool = False
 
     strict_response: bool = False
     auth_required: bool = True
