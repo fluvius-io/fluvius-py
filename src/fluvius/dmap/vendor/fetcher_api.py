@@ -95,7 +95,7 @@ class APIFetcher(DataFetcher):
         self.counter = 0
         self.stop_event = threading.Event()
         self.request_session = SafeSession()
-        signal.signal(signal.SIGINT, lambda s, f: self._signal_handler(s, f))
+        # signal.signal(signal.SIGINT, lambda s, f: self._signal_handler(s, f))
 
     def _stop_fetching(self):
         self.stop_event.set()
