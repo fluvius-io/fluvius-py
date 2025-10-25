@@ -58,7 +58,7 @@ class QueryManager(object):
         return cls.__resources__[identifier]
 
     @classmethod
-    def lookup_query_endpoint(self, identifier):
+    def lookup_query_endpoint(cls, identifier):
         return cls.__endpoints__[identifier]
 
     @classmethod
