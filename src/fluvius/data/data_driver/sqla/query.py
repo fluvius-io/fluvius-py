@@ -63,6 +63,7 @@ FIELD_OPERATOR = {
         "notin": lambda col, vals: col.notin_(vals),
         "ilike": ilike_op,
         "has": ilike_op,
+        "between": lambda col, vals: col.between(vals[0], vals[1]),
     },
     OPERATOR_SEP_NEGATE: {
         "gt": le,
@@ -77,6 +78,7 @@ FIELD_OPERATOR = {
         "ov": custom_op("&&"),
         "in": lambda col, vals: col.notin_(vals),
         "has": ilike_op,
+        "between": lambda col, vals: col.between(vals[0], vals[1]),
     }
 }
 
