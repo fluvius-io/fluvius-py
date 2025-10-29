@@ -361,8 +361,8 @@ class DataAccessManager(DataAccessManagerBase):
     async def upsert(self, model_name, record: DataModel):
         data = self._serialize(model_name, record)
         updt = timestamp()
-        data['_updated'] = updt
-        data['_etag'] = generate_etag(data)
+        # data['_updated'] = updt
+        # data['_etag'] = generate_etag(data)
         return await self.connector.upsert(model_name, data)
     
     async def insert_many(self, model_name: str, *records: list[dict]):

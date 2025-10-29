@@ -1,5 +1,9 @@
+from fluvius.data import config
+
 CHECK_WORKING_MEMORY_ATTRS = True
 DEBUG_RULE_ENGINE = True
 NARRATION_RULE_RETRACTED = 200
 NARRATION_RULE_FAIL_PRECOND = 100
-ORDINIS_RESOURCE_SCHEMA = "fluvius_ordinis"
+
+DB_DSN = config.DB_DSN
+DB_SCHEMA = "fluvius_ordinis"

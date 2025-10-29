@@ -287,18 +287,20 @@ class WorkflowAggregate(Aggregate):
     @action("event-injected", resources="workflow")
     async def inject_event(self, data):
         """Inject an event into the workflow"""
-        workflow = self.rootobj
-        
-        if workflow.status not in [WorkflowStatus.NEW, WorkflowStatus.ACTIVE]:
-            raise ValueError(f"Cannot inject event into workflow in status {workflow.status}")
+        wfentry = self.rootobj
+        if wfentry.status not in [WorkflowStatus.NEW, WorkflowStatus.ACTIVE]:
+            raise ValueError(f"Cannot inject event into workflow in status {wfentry.status}")
+
+        async for wf in manager.process_event(data.evt_name, data.evt_data):
+            if wf._id == wfentry._id:
+                await manager.commit_workflow(wf)
+
         
         # Implementation for injecting event
         event_result = {
-            "status": "event_injected",
-            "event_type": data.event_type,
-            "workflow_id": workflow._id,
-            "target_step_id": data.target_step_id,
-            "priority": data.priority,
+            "status": "ok",
+            "evt_name": data.evt_name,
+            "workflow_id": wfentry._id,
             "timestamp": timestamp()
         }
         

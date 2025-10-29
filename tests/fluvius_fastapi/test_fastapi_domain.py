@@ -45,7 +45,9 @@ def test_domain_query():
         size=1,
         page=2)
     resp = client.get("/sample-query-manager.company-query/", params=para)
-    logger.info('JSON QUERY OUTPUT: %s', resp.json())
     assert resp.status_code == 200
+
+    logger.info('JSON QUERY OUTPUT: %s', resp.json())
+    data = resp.json()
     assert len(data['data']) == 1
     assert len(data['meta']) > 0

@@ -76,19 +76,19 @@ def sqla_error_handler(code_prefix):
             except asyncpg.exceptions.UniqueViolationError as e:
                 raise UnprocessableError(
                     f"{code_prefix}.01",
-                    f"Duplicate entry detected. Record must be unique. [{e.orig.pgcode}]",
+                    f"Duplicate entry detected. Record must be unique. [{e.orig}]",
                     str(e.orig)
                 )
             except exc.IntegrityError as e:
                 raise UnprocessableError(
                     f"{code_prefix}.02",
-                    f"Integrity constraint violated. Please check your input. [{e.orig.pgcode}]",
+                    f"Integrity constraint violated. Please check your input. [{e.orig}]",
                     str(e.orig)
                 )
             except exc.OperationalError as e:
                 raise UnprocessableError(
                     f"{code_prefix}.03",
-                    f"The database is currently unreachable. Please try again later. [{e.orig.pgcode}]",
+                    f"The database is currently unreachable. Please try again later. [{e.orig}]",
                     str(e.orig)
                 )
             except exc.ProgrammingError as e:
@@ -101,7 +101,7 @@ def sqla_error_handler(code_prefix):
 
                 raise UnprocessableError(
                     f"{code_prefix}.04",
-                    f"There was a syntax or structure error in the database query. [{e.orig.pgcode}]",
+                    f"There was a syntax or structure error in the database query. [{e.orig}]",
                     str(e.orig)
                 )
             except exc.DBAPIError as e:
@@ -171,10 +171,8 @@ class _AsyncSessionConfiguration(object):
 
         engine = create_async_engine(
             bind_dsn,
-            isolation_level=config.DB_ISOLATION_LEVEL,
-            pool_recycle=config.DB_POOL_RECYCLE,
-            pool_size=config.DB_POOL_SIZE,
             json_serializer=serialize_json,
+            **(config.DB_CONFIG or {}),
             **kwargs
         )
 
@@ -235,8 +233,8 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
         return converted_sql, param_dict
 
-    async def connection(self):
-        return await self._session_configuration.connection()
+    def connect(self):
+        return self._session_configuration._async_engine.begin()
 
     @classmethod
     def validate_data_schema(cls, schema_model):

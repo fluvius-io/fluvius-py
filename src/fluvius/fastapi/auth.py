@@ -94,7 +94,14 @@ def validate_direct_url(url: str, default: str) -> str:
 class FluviusAuthMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, auth_profile_provider):
         super().__init__(app)
-        provider_cls = FluviusAuthProfileProvider.get(auth_profile_provider)
+
+        if isinstance(auth_profile_provider, str):
+            provider_cls = FluviusAuthProfileProvider.get(auth_profile_provider)
+        elif issubclass(auth_profile_provider, FluviusAuthProfileProvider):
+            provider_cls = auth_profile_provider
+        else:
+            raise ValueError(f'Invalid Auth Profile Provider: {auth_profile_provider}')
+
         self.get_auth_context = provider_cls(app).get_auth_context
 
     async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
@@ -195,9 +202,7 @@ class FluviusAuthProfileProvider(object):
 
 
 @Pipe
-def configure_authentication(app, config=config, base_path="/auth", auth_profile_provider=None):
-    auth_profile_provider = auth_profile_provider or config.AUTH_PROFILE_PROVIDER
-
+def configure_authentication(app, config=config, base_path="/auth", auth_profile_provider=config.AUTH_PROFILE_PROVIDER):
     def api(*paths, method=app.get, **kwargs):
         return method(uri(base_path, *paths), tags=["Authentication"], **kwargs)
 

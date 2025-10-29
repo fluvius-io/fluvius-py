@@ -9,7 +9,7 @@ from fluvius.helper import camel_to_lower
 from fluvius.data.data_driver import SqlaDriver
 from fluvius.data.data_manager import DataAccessManager
 from fluvius.data.data_schema import SqlaDataSchema
-from fluvius.data import logger
+from fluvius.data import logger, config
 from sqlalchemy.dialects.postgresql import UUID
 
 '''
@@ -19,7 +19,7 @@ GRANT ALL PRIVILEGES ON DATABASE fluvius_test TO  fluvius_test;
 '''
 
 class SQLiteConnector(SqlaDriver):
-    __db_dsn__ = "sqlite+aiosqlite:///:memory:"
+    __db_dsn__ = config.DB_DSN
 
 
 SampleSchemaModelBase = SQLiteConnector.__data_schema_base__

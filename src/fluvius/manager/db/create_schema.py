@@ -39,7 +39,7 @@ async def create_schema(connector_import: str, force: bool, tables_only: bool):
 
             
             # Create all tables defined in the connector
-            click.echo(f"Create tables for schema '{schema_name}'.")
+            click.echo(f"Create all tables for connector: '{connector_import}'.")
             if hasattr(connector_class, '__data_schema_base__'):
                 base_schema = connector_class.__data_schema_base__
 

@@ -16,6 +16,6 @@ queries = (
 )
 
 app = create_app() \
-    | configure_authentication() \
+    | configure_authentication(auth_profile_provider=FluviusMockProfileProvider) \
     | configure_domain_manager(*domains) \
-    | configure_query_manager(*queries) 
+    | configure_query_manager(*queries)
