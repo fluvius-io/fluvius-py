@@ -1,8 +1,10 @@
-""" Workflow engine designed for coordinating human activities """
+""" Navis - Fluvius Workflow Engine designed for coordinating human activities
+    navis => ship
+"""
 
 from ._meta import config, logger
 
-from .model import WorkflowDataManager, NavaWorkflowConnector
+from .model import WorkflowDataManager, WorkflowConnector
 from .engine.workflow import Workflow, Stage, Step, Role, connect, transition, FINISH_STATE, BEGIN_STATE
 from .engine.router import ActivityRouter
 from .engine.manager import WorkflowManager

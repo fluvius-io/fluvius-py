@@ -3,14 +3,15 @@ import pytest
 from enum import Enum
 import asyncpg
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql as pg
 
 from fluvius.error import UnprocessableError
 from fluvius.helper import camel_to_lower
 from fluvius.data.data_driver import SqlaDriver
 from fluvius.data.data_manager import DataAccessManager
 from fluvius.data.data_schema import SqlaDataSchema
-from fluvius.data import logger, config
-from sqlalchemy.dialects.postgresql import UUID
+
+from fluvius_test import logger, config
 
 '''
 CREATE USER fluvius_test WITH PASSWORD 'iyHu5WBQxiVXyLLJaYO0XJec';
@@ -19,7 +20,7 @@ GRANT ALL PRIVILEGES ON DATABASE fluvius_test TO  fluvius_test;
 '''
 
 class SQLiteConnector(SqlaDriver):
-    __db_dsn__ = config.DB_DSN
+    __db_dsn__ = config.SQLITE_DSN
 
 
 SampleSchemaModelBase = SQLiteConnector.__data_schema_base__
@@ -76,7 +77,7 @@ class CompanyMemberSchema(SampleSchemaModelBase):
     _id = sa.Column(sa.String, primary_key=True)
     member_id = sa.Column(sa.String)
     company_id = sa.Column(sa.String)
-    role_id = sa.Column(UUID)
+    role_id = sa.Column(pg.UUID)
     role_key = sa.Column(sa.String)
 
 class CompanySystemRoleSchema(SampleSchemaModelBase):

@@ -1,6 +1,6 @@
+from fluvius.data import UUID_GENF
 from fluvius.helper import timestamp
-from .. import logger, config
-from ..model import WorkflowDataManager
+
 
 from .datadef import WorkflowData, WorkflowStatus, WorkflowMessage, WorkflowActivity
 from .router import ActivityRouter
@@ -9,7 +9,10 @@ from .mutation import (
     MutationEnvelop,
     get_mutation
 )
-from fluvius.data import UUID_GENF
+
+from ..model import WorkflowDataManager
+from .. import logger, config
+
 
 class WorkflowManager(object):
     __router__ = ActivityRouter

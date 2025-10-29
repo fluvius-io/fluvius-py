@@ -19,6 +19,6 @@ def workflow_fk(constraint_name, **kwargs):
 
 
 # --- Connector and Base Schema ---
-class NavaWorkflowConnector(SqlaDriver):
+class WorkflowConnector(SqlaDriver):
     __db_dsn__ = DB_DSN
     __schema__ = DB_SCHEMA

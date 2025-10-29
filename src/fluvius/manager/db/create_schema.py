@@ -14,7 +14,7 @@ async def create_schema(connector_import: str, force: bool, tables_only: bool):
     """Create SQLAlchemy schema and tables for a SqlaDriver connector.
     
     CONNECTOR_IMPORT: Import string to the SqlaDriver connector class
-                      (e.g., 'fluvius.nava.NavaWorkflowConnector')
+                      (e.g., 'fluvius.navis.WorkflowConnector')
     """
     try:
         # Load the connector class using shared function

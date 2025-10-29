@@ -12,7 +12,7 @@ from fluvius.data.data_driver import SqlaDriver
 from fluvius.data.data_manager import DataAccessManager
 from fluvius.data.data_schema import SqlaDataSchema
 from fluvius.data.identifier import identifier_factory
-from sample_data_model import SampleDataAccessManager, SampleSchemaModelBase
+from fluvius_test.sample_data_model import SampleDataAccessManager, SampleSchemaModelBase
 
 sample_data_access_manager = SampleDataAccessManager(None)
 CompanyModel = sample_data_access_manager.lookup_model('company')

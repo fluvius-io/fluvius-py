@@ -1,6 +1,6 @@
 from pyrsistent import field
 from fluvius.domain.datadef import DomainResource, UUID_GENF
-from object_domain.storage import ObjectDAL
+from fluvius_test.object_domain.storage import ObjectDAL
 
 FIXTURE_ID = UUID_GENF("100")
 

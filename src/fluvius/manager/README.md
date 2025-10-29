@@ -22,23 +22,23 @@ flvctl
 
 ```bash
 # Create schema and all tables for a workflow connector
-flvctl db create-schema fluvius.cmd.flvctl.db.connectors.NavaWorkflowConnector
+flvctl db create-schema fluvius.cmd.flvctl.db.connectors.WorkflowConnector
 
 # Force recreate if schema/tables exist
-flvctl db create-schema fluvius.cmd.flvctl.db.connectors.NavaWorkflowConnector --force
+flvctl db create-schema fluvius.cmd.flvctl.db.connectors.WorkflowConnector --force
 
 # Create only tables (skip schema creation)
-flvctl db create-schema fluvius.cmd.flvctl.db.connectors.NavaWorkflowConnector --tables-only
+flvctl db create-schema fluvius.cmd.flvctl.db.connectors.WorkflowConnector --tables-only
 ```
 
 #### Drop Schema for a Connector
 
 ```bash
 # Drop schema for a workflow connector
-flvctl db drop-connector-schema fluvius.cmd.flvctl.db.connectors.NavaWorkflowConnector
+flvctl db drop-connector-schema fluvius.cmd.flvctl.db.connectors.WorkflowConnector
 
 # Force drop even if schema has tables
-flvctl db drop-connector-schema fluvius.cmd.flvctl.db.connectors.NavaWorkflowConnector --force
+flvctl db drop-connector-schema fluvius.cmd.flvctl.db.connectors.WorkflowConnector --force
 ```
 
 ### Runtime Management

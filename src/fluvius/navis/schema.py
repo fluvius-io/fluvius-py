@@ -22,12 +22,12 @@ def workflow_fk(constraint_name, **kwargs):
 
 
 # --- Connector and Base Schema ---
-class NavaWorkflowConnector(SqlaDriver):
+class WorkflowConnector(SqlaDriver):
     __db_dsn__ = DB_DSN
     __schema__ = DB_SCHEMA
 
 
-class WorkflowBaseSchema(NavaWorkflowConnector.__data_schema_base__, DomainSchema):
+class WorkflowBaseSchema(WorkflowConnector.__data_schema_base__, DomainSchema):
     __abstract__ = True
 
 

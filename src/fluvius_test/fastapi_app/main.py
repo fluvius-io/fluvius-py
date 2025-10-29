@@ -8,7 +8,7 @@ from fluvius.query import QueryResource, logger, config, QueryManager, FrontendQ
 from fluvius.query.field import StringField
 from fluvius.data.serializer import serialize_json
 
-from object_domain.query import ObjectDomainQueryManager
+from fluvius_test.object_domain.query import ObjectDomainQueryManager
 
 from sample_data_model import *
 

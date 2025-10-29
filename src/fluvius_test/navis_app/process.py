@@ -1,9 +1,8 @@
-
 import json
 
 from fluvius.data import UUID_GENF, logger
 from fluvius.fastapi.auth import FluviusAuthProfileProvider
-from fluvius.nava import Workflow, Stage, Step, Role, connect, transition, FINISH_STATE
+from fluvius.navis import Workflow, Stage, Step, Role, connect, transition, FINISH_STATE
 
 from typing import Optional
 from httpx import AsyncClient
@@ -72,17 +71,3 @@ class SampleProcess(Workflow):
         yield f"test_event ACTION! #1: {event}"
         yield f"MEMORY: {wf_state.recall()}"
 
-
-
-# Custom AsyncClient with FluviusJSONEncoder
-class FluviusAsyncClient(AsyncClient):
-    """AsyncClient that uses FluviusJSONEncoder for JSON serialization"""
-
-    async def request(self, method, url, **kwargs):
-        # If json data is provided, serialize it with FluviusJSONEncoder
-        if 'json' in kwargs:
-            kwargs['content'] = json.dumps(kwargs.pop('json'), cls=FluviusJSONEncoder)
-            kwargs['headers'] = kwargs.get('headers') or {}
-            kwargs['headers'].setdefault('Content-Type', 'application/json')
-
-        return await super().request(method, url, **kwargs)

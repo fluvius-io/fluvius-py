@@ -1,12 +1,12 @@
 import inspect
 import os
 
-from fluvius.data.data_driver import InMemoryDriver
+from fluvius.data.data_driver import SqlaDriver
 from fluvius.data import UUID_GENF, field, DataModel
 from fluvius.domain import logger, ImmutableDomainResource
 
 
-class ObjectExampleConnector(InMemoryDriver):
+class ObjectExampleConnector(SqlaDriver):
     pass
 
 

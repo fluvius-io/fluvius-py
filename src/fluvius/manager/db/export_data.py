@@ -17,7 +17,7 @@ async def export_data(connector_import: str, data_folder: str, force: bool, tabl
     """Export data from database tables to CSV files.
     
     CONNECTOR_IMPORT: Import string to the SqlaDriver connector class
-                      (e.g., 'fluvius.nava.NavaWorkflowConnector')
+                      (e.g., 'fluvius.navis.WorkflowConnector')
     DATA_FOLDER: Path to folder where CSV files will be saved
     """
     try:
