@@ -71,7 +71,7 @@ def register_resource_endpoints(app, query_manager, query_resource):
 
         auth_decorator = auth_required(**auth)
         def _api_def(func):
-            return auth_decorator(api_decorator(func))
+            return api_decorator(auth_decorator(func))
 
         return _api_def
 
@@ -143,7 +143,7 @@ def register_manager_endpoints(app, query_manager):
         auth_decorator = auth_required(**auth_params)
 
         def _decorator(func):
-            return auth_decorator(api_decorator(func))
+            return api_decorator(auth_decorator(func))
 
         return _decorator
 
