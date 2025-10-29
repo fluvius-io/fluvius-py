@@ -1,7 +1,7 @@
 
 from fluvius.data import DataAccessManager
-from .schema import WorkflowConnector
+from .schema import NavaWorkflowConnector
 
 class WorkflowDataManager(DataAccessManager):
-    __connector__ = WorkflowConnector
+    __connector__ = NavaWorkflowConnector
     __automodel__ = True

@@ -4,7 +4,7 @@ from fluvius.fastapi import (
     configure_domain_manager,
     configure_query_manager)
 
-from riparius.domain import WorkflowDomain, WorkflowQueryManager
+from fluvius.nava.domain import WorkflowDomain, WorkflowQueryManager
 
 domains = (
     WorkflowDomain,

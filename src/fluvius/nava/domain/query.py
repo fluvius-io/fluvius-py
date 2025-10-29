@@ -5,6 +5,7 @@ from fluvius.data import UUID_TYPE, DataModel
 from .domain import WorkflowDomain
 from ..model import WorkflowDataManager
 from ..status import WorkflowStatus, StepStatus
+from ..viewdef import WorkflowBaseSchema
 
 class WorkflowScope(DataModel):
     __default_key__ = 'workflow_id'
@@ -53,6 +54,7 @@ class WorkflowStepQuery(DomainQueryResource):
     class Meta(DomainQueryResource.Meta):
         description = "List and search workflow steps"
         scope_required = WorkflowScope
+        backend_model = "workflow_step"
 
     id: UUID_TYPE = PrimaryID("Step ID")
     workflow_id: UUID_TYPE = UUIDField("Workflow ID")
@@ -75,6 +77,7 @@ class WorkflowParticipantQuery(DomainQueryResource):
     class Meta(DomainQueryResource.Meta):
         description = "List workflow participants and their roles"
         scope_required = WorkflowScope
+        backend_model = "workflow_participant"
 
     id: UUID_TYPE = PrimaryID("Participant ID")
     workflow_id: UUID_TYPE = UUIDField("Workflow ID")
@@ -89,6 +92,7 @@ class WorkflowStageQuery(DomainQueryResource):
     class Meta(DomainQueryResource.Meta):
         description = "List workflow stages and their progress"
         scope_required = WorkflowScope
+        backend_model = "workflow_stage"
 
     id: UUID_TYPE = PrimaryID("Stage ID")
     workflow_id: UUID_TYPE = UUIDField("Workflow ID")

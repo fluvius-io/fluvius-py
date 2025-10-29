@@ -24,7 +24,7 @@ def test_riparius_domain_import():
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../../src'))
     
     try:
-        from riparius.domain import WorkflowDomain, WorkflowQueryManager
+        from fluvius.nava.domain import WorkflowDomain, WorkflowQueryManager
         assert WorkflowDomain is not None
         assert WorkflowQueryManager is not None
         print("✅ Riparius domain imported successfully!")

@@ -6,7 +6,7 @@ from .. import config
 
 class WorkflowDomain(Domain):
     """Riparius Workflow Management Domain"""
-    __namespace__ = config.CQRS_DOMAIN_NAMESPACE
+    __namespace__ = config.DOMAIN_NAMESPACE
     __aggregate__ = WorkflowAggregate
     __statemgr__ = WorkflowDataManager
 
@@ -14,7 +14,7 @@ class WorkflowDomain(Domain):
         name = "Workflow Management"
         description = "Domain for managing workflow processes, steps, and participants"
         tags = ["workflow"]
-        prefix = config.CQRS_DOMAIN_NAMESPACE
+        prefix = config.DOMAIN_NAMESPACE
 
     def __init__(self, app=None, **kwargs):
         super(WorkflowDomain, self).__init__(app, **kwargs) 

@@ -84,15 +84,15 @@ class WorkflowManager(object):
         return self._wfbyids[wfdef_key, workflow_id]
     
     async def _log_mutation(self, tx, wf_mut: MutationEnvelop):
-        await tx.insert_many('workflow-mutation', wf_mut.model_dump())
+        await tx.insert_many('workflow_mutation', wf_mut.model_dump())
 
     async def _log_activity(self, tx, wf_act: WorkflowActivity):
         """Add a workflow event record."""
-        await tx.insert_many('workflow-activity', wf_act.model_dump())
+        await tx.insert_many('workflow_activity', wf_act.model_dump())
     
     async def _log_message(self, tx, wf_msg: WorkflowMessage):
         """Add a workflow message record."""
-        await tx.insert_many('workflow-message', wf_msg.model_dump())
+        await tx.insert_many('workflow_message', wf_msg.model_dump())
     
     async def persist_activities(self, tx, activities: list[WorkflowActivity]):
         activities = tuple(activities)
@@ -217,20 +217,20 @@ class WorkflowManager(object):
     async def _persist_add_step(self, tx, wf_mut: MutationEnvelop):
         """Add a new step record."""
         step_data = wf_mut.mutation.step.model_dump()
-        await tx.insert_many('workflow-step', step_data)
+        await tx.insert_many('workflow_step', step_data)
 
     async def _persist_update_step(self, tx, wf_mut: MutationEnvelop):
         """Update an existing step record."""
         updates = wf_mut.mutation.model_dump(exclude_none=True)            
         if updates:
-            await tx.update_one('workflow-step', wf_mut.step_id, **updates)
+            await tx.update_one('workflow_step', wf_mut.step_id, **updates)
 
     async def _persist_set_memory(self, tx, wf_mut: MutationEnvelop):
         """Set workflow or step memory records."""
         values = wf_mut.mutation.model_dump(exclude_none=True)
         values['_id'] = wf_mut.workflow_id
         values['workflow_id'] = wf_mut.workflow_id
-        await tx.upsert_many('workflow-memory', values)
+        await tx.upsert_many('workflow_memory', values)
 
     async def _persist_add_participant(self, tx, wf_mut: MutationEnvelop):
         """Add a participant record."""
@@ -243,7 +243,7 @@ class WorkflowManager(object):
             'role': participant.role
         }
         
-        await tx.insert_many('workflow-participant', participant_fields)
+        await tx.insert_many('workflow_participant', participant_fields)
 
     async def _persist_del_participant(self, tx, wf_mut: MutationEnvelop):
         """Remove a participant record."""
@@ -261,7 +261,7 @@ class WorkflowManager(object):
         query = BackendQuery.create(**query_conditions)
 
         # Find the record first, then remove it
-        record = await tx.find_one('workflow-participant', **query_conditions)
+        record = await tx.find_one('workflow_participant', **query_conditions)
         if record:
             await tx.remove(record)
 
@@ -270,7 +270,7 @@ class WorkflowManager(object):
         stage_data = wf_mut.mutation.data.model_dump()
         stage_data['workflow_id'] = wf_mut.workflow_id
 
-        await tx.insert_many('workflow-stage', stage_data)
+        await tx.insert_many('workflow_stage', stage_data)
 
     @classmethod
     def register(cls, wf_cls):
