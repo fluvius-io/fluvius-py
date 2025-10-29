@@ -9,6 +9,7 @@ APPLICATION_ROOT = "/api"
 APPLICATION_SERIAL_NUMBER = 1001
 APPLICATION_VERSION = __version__
 AUTH_PROFILE_PROVIDER = None
+
 SES_CLIENT_TOKEN_FIELD = "client_token"
 SES_ID_TOKEN_FIELD = "id_token"
 SES_AC_TOKEN_FIELD = "access_token"
@@ -51,4 +52,6 @@ MQTT_PERMISSIONS = [
     ("base", 4),
     ("work", 4),
 ]
+
 MQTT_DEBUG = True
+ALLOW_LOGOUT_GET_METHOD = False

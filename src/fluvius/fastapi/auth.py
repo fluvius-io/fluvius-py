@@ -198,10 +198,10 @@ class FluviusAuthProfileProvider(object):
 def configure_authentication(app, config=config, base_path="/auth", auth_profile_provider=None):
     auth_profile_provider = auth_profile_provider or config.AUTH_PROFILE_PROVIDER
 
-    def api(*paths, method=app.get):
-        return method(uri(base_path, *paths), tags=["Authentication"])
+    def api(*paths, method=app.get, **kwargs):
+        return method(uri(base_path, *paths), tags=["Authentication"], **kwargs)
 
-    def _setup_oauth():
+    def setup_oauth():
         app.openapi_tags = app.openapi_tags or []
         app.openapi_tags.append({
             "name": "Authentication",
@@ -283,12 +283,6 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
     async def home():
         return {"message": "Go to /login to start OAuth2 login with Keycloak"}
 
-    @api("login")
-    async def login(request: Request):
-        request.session["next"] = request.query_params.get('next')
-        callback_uri = validate_direct_url(request.query_params.get('callback'), config.DEFAULT_CALLBACK_URI)
-        return await oauth.keycloak.authorize_redirect(request, callback_uri)
-
     @api("callback")
     async def oauth_callback(request: Request):
         token = await oauth.keycloak.authorize_access_token(request)
@@ -323,7 +317,8 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
             raise HTTPException(status_code=401, detail=f"Not logged in: {user}")
 
         return {
-            "message": f"OK",
+            "status": "OK",
+            "message": f"User logged in.",
             "context": request.state.auth_context,
             "headers": dict(request.headers) | {"cookie": "<redacted>"}
         }
@@ -333,22 +328,20 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
     async def info(request: Request):
         return request.state.auth_context
 
-    @api("logout")
+    @api("sign-in")
+    async def sign_in(request: Request):
+        request.session["next"] = request.query_params.get('next')
+        callback_uri = validate_direct_url(request.query_params.get('callback'), config.DEFAULT_CALLBACK_URI)
+        return await oauth.keycloak.authorize_redirect(request, callback_uri)
+
+    @api("sign-up")
+    async def sign_up(request: Request):
+        return RedirectResponse(url=KEYCLOAK_SIGNUP_URI)
+
+
+    @api("sign-out", method=app.post)
     @auth_required()
-    async def logout(request: Request):
-        ''' Log out user locally (only for this API) '''
-        user = request.session.get(config.SES_USER_FIELD)
-        auth_event.user_logout.send(request, user=user)
-        request.session.clear()
-        redirect_uri = validate_direct_url(
-            request.query_params.get('redirect'),
-            config.DEFAULT_LOGOUT_REDIRECT_URI
-        )
-        return RedirectResponse(url=redirect_uri)  # Redirect after logout
-
-
-    @api("signoff", method=app.post)
-    async def sign_off(request: Request):
+    async def sign_out(request: Request):
         ''' Log out user globally (including Keycloak) '''
         # 2. Logout from Keycloak using the logout endpoint
         access_token = request.cookies.get(config.SES_ID_TOKEN_FIELD)
@@ -380,7 +373,11 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
     KEYCLOAK_ISSUER = uri(config.KEYCLOAK_BASE_URL, "realms", config.KEYCLOAK_REALM)
     KEYCLOAK_JWKS_URI = uri(KEYCLOAK_ISSUER, "protocol/openid-connect/certs")
     KEYCLOAK_LOGOUT_URI = uri(KEYCLOAK_ISSUER, "protocol/openid-connect/logout")
+    KEYCLOAK_SIGNUP_URI = uri(KEYCLOAK_ISSUER, "protocol/openid-connect/registrations")
     KEYCLOAK_METADATA_URI = uri(KEYCLOAK_ISSUER, ".well-known/openid-configuration")
 
-    oauth = _setup_oauth()
+    oauth = setup_oauth()
+    if config.ALLOW_LOGOUT_GET_METHOD:
+        api("logout")(sign_out)
+
     return app
