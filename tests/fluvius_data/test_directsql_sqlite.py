@@ -26,7 +26,7 @@ async def fetch_id(dam, _id):
 
 @pytest.mark.asyncio
 async def test_sql_insert():
-    async with sample_data_access_manager.connector.connect() as conn:
+    async with sample_data_access_manager.connect() as conn:
         await conn.execute(text("ATTACH DATABASE 'temp/domain-audit.db' AS 'domain-audit'"))
         await conn.execute(text("ATTACH DATABASE 'temp/fluvius-tracker.db' AS 'fluvius-tracker'"))
         await conn.run_sync(SampleSchemaModelBase.metadata.drop_all)

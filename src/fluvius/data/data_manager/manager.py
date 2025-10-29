@@ -103,7 +103,7 @@ class DataAccessManagerBase(object):
         self._app = app
         self._transaction = None
         self._proxy = ReadonlyDataManagerProxy(self)
-        self.setup_connector(config)
+        self._connector = self.setup_connector(config)
         self.setup_model()
 
     def setup_model(self):
@@ -112,6 +112,7 @@ class DataAccessManagerBase(object):
 
         for model_name, data_schema in self.connector.__data_schema_registry__.items():
             model = self.generate_model(data_schema)
+
             try:
                 self.register_model(model_name)(model, is_generated=True)
             except ResourceAlreadyRegistered:
@@ -160,9 +161,12 @@ class DataAccessManagerBase(object):
 
         return self.__config__(**config)
 
+    @property
+    def connector(self):
+        return self._connector
+
     def connect(self, *args, **kwargs):
-        self.connector.connect(*args, **kwargs)
-        return self
+        return self.connector.connect(*args, **kwargs)
 
     async def disconnect(self):
         await self.connector.disconnect()
@@ -190,16 +194,12 @@ class DataAccessManagerBase(object):
 
         return self._context
 
-    @property
-    def connector(self):
-        return self._connector
-
     def setup_connector(self, config):
         con_cls = self.__connector__
         if not con_cls or not issubclass(con_cls, DataDriver):
             raise ValueError(f'Invalid data driver/connector: {con_cls}')
 
-        self._connector = con_cls(**config)
+        return con_cls(**config)
 
     @classmethod
     def create(cls, model_name: str, data: dict = None, / , **kwargs) -> DataModel:

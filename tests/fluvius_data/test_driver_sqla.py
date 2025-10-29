@@ -26,7 +26,7 @@ class FluviusAccessManager(DataAccessManager):
 async def test_manager():
     manager = FluviusAccessManager(None)
 
-    async with manager.connector.connect() as conn:
+    async with manager.connect() as conn:
         await conn.run_sync(FluviusConnector.__data_schema_base__.metadata.drop_all)
         await conn.run_sync(FluviusConnector.__data_schema_base__.metadata.create_all)
 
