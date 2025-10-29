@@ -1,6 +1,7 @@
 import base64
 import httpx
 import json
+from urllib.parse import urlencode
 
 from authlib.integrations.starlette_client import OAuth
 from authlib.jose import jwt, JsonWebKey
@@ -338,33 +339,24 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
     async def sign_up(request: Request):
         return RedirectResponse(url=KEYCLOAK_SIGNUP_URI)
 
-
-    @api("sign-out", method=app.post)
+    @api("sign-out")
     @auth_required()
     async def sign_out(request: Request):
         ''' Log out user globally (including Keycloak) '''
-        # 2. Logout from Keycloak using the logout endpoint
+
+        redirect_uri = validate_direct_url(
+            request.query_params.get('redirect_uri'),
+            config.DEFAULT_LOGOUT_REDIRECT_URI
+        )
+        
         access_token = request.cookies.get(config.SES_ID_TOKEN_FIELD)
         if not access_token:
             raise HTTPException(status_code=400, detail="No access token found")
 
-        async with httpx.AsyncClient() as client:
-            # Make the request to Keycloak's logout endpoint
-            logout_response = await client.get(
-                KEYCLOAK_LOGOUT_URI,
-                params={"id_token": access_token},
-            )
-
-            if logout_response.status_code != 200:
-                raise HTTPException(status_code=logout_response.status_code, detail=f"Keycloak logout failed {logout_response}: {access_token}")
-
-        # 1. Clear FastAPI session/cookie
-        # Assuming you're storing the JWT token in a secure cookie
-
-        redirect_uri = validate_direct_url(request.query_params.get('redirect'), config.DEFAULT_LOGOUT_REDIRECT_URI)
-        response = RedirectResponse(url=redirect_uri)  # Redirect after logout
-        response.delete_cookie(config.SES_ID_TOKEN_FIELD)  # Clear the access_token cookie
+        keycloak_logout_url = f"{KEYCLOAK_LOGOUT_URI}?{urlencode({'id_token_hint': access_token, 'post_logout_redirect_uri': redirect_uri})}"
         request.session.clear()
+        response = RedirectResponse(url=keycloak_logout_url)
+        response.delete_cookie(config.SES_ID_TOKEN_FIELD)
 
         return response
 
