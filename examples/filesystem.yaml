@@ -1,6 +1,0 @@
-filesystems:
-  - fskey: 'file'
-    protocol: 'file'
-    name: 'Local Filesystem'
-    root_path: 'media_app/data'
-    params: {}

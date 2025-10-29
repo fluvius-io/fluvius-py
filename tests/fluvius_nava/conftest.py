@@ -3,7 +3,7 @@ import json
 
 from fluvius.data import UUID_GENF, logger
 from fluvius.fastapi.auth import FluviusAuthProfileProvider
-from fluvius.interlink import Workflow, Stage, Step, Role, connect, transition, FINISH_STATE
+from fluvius.nava import Workflow, Stage, Step, Role, connect, transition, FINISH_STATE
 
 from typing import Optional
 from httpx import AsyncClient

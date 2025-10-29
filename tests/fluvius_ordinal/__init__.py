@@ -1,1 +1,0 @@
-# Tests for fluvius_ordinal package

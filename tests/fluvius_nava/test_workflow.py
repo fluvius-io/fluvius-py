@@ -1,8 +1,8 @@
 import pytest
 from pprint import pformat
 from types import SimpleNamespace
-from fluvius.interlink import logger, config
-from fluvius.interlink import Workflow, Stage, Step, Role, connect, transition, FINISH_STATE, ActivityRouter, WorkflowManager
+from fluvius.nava import logger, config
+from fluvius.nava import Workflow, Stage, Step, Role, connect, transition, FINISH_STATE, ActivityRouter, WorkflowManager
 from fluvius.data import UUID_GENF, UUID_GENR
 
 selector01 = UUID_GENF('S101')

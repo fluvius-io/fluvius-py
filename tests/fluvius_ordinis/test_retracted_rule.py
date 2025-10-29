@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from fluvius.ordinal import KnowledgeBase, rule, when, KnowledgeEngine, WorkingMemory, config, datadef
+from fluvius.ordinis import KnowledgeBase, rule, when, KnowledgeEngine, WorkingMemory, config, datadef
 from fluvius.data import DataModel
 
 import pytest

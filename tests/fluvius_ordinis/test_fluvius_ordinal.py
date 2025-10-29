@@ -1,4 +1,4 @@
-from fluvius.ordinal import KnowledgeBase, rule, when, KnowledgeEngine
+from fluvius.ordinis import KnowledgeBase, rule, when, KnowledgeEngine
 from pyrsistent import PRecord, field
 
 

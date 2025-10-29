@@ -7,7 +7,7 @@ from typing import Any, Dict
 from .entrypoint import fluvius_manager
 from fluvius.helper import load_string
 
-@fluvius_manager.command(name="show-config")
+@fluvius_manager.command(name="config")
 @click.argument('module_path', type=str, default='fluvius')
 @click.option('--key', help='Specific config key to display (e.g., DB_DSN)')
 @click.option('--format', 'output_format', 
@@ -113,7 +113,7 @@ def show_config(module_path, key, output_format, filter_pattern, show_sysdefault
                     yaml_output = {k: v['value'] for k, v in config_data.items()}
                 click.echo(yaml.dump(yaml_output, default_flow_style=False))
             except ImportError:
-                click.echo("❌ PyYAML not installed. Using JSON format instead.")
+                click.echo("[E] PyYAML not installed. Using JSON format instead.")
                 if show_source:
                     json_output = config_data
                 else:
@@ -123,14 +123,14 @@ def show_config(module_path, key, output_format, filter_pattern, show_sysdefault
             _print_config_table(module_path, config_data, show_sensitive, show_source, show_sysdefaults)
             
     except Exception as e:
-        click.echo(f"❌ Error retrieving configuration: {e}")
+        click.echo(f"[E] Error retrieving configuration: {e}")
 
 
 def _print_config_table(module_path, config_data: Dict[str, Dict[str, Any]], show_sensitive: bool, show_source: bool = False, show_sysdefaults: bool = False):
     """Print configuration in a formatted table."""
     
     if not config_data:
-        click.echo("No configuration values to display")
+        click.echo("[i] No configuration values to display.")
         return
     
     # Calculate column widths
@@ -158,7 +158,7 @@ def _print_config_table(module_path, config_data: Dict[str, Dict[str, Any]], sho
         total_width += source_width + 3  # 3 for additional separator
     
     # Print header
-    click.echo(f"🔧 Fluvius Configuration: {module_path}")
+    click.echo(f"[i] Fluvius Configuration: {module_path}")
     click.echo("=" * total_width)
     
     if show_source:
@@ -200,7 +200,7 @@ def _print_config_table(module_path, config_data: Dict[str, Dict[str, Any]], sho
     click.echo("=" * total_width)
     
     # Show legend
-    click.echo("\n💡 TIPS:")
+    click.echo("\n[i] TIPS:")
     if not show_sensitive:
         click.echo("   - Use --show-sensitive to reveal masked values")
     
