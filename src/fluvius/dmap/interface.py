@@ -2,6 +2,7 @@ import os
 from enum import Enum
 from pyrsistent import PClass, field
 from collections import namedtuple
+from fluvius.helper import file_checksum_sha256, file_mime
 
 
 # key: str, value: scalar, context: str, depth: int
@@ -65,6 +66,7 @@ class PipelineConfig(PClass):
 
 class DataProcessManagerConfig(PClass):
     process_name    = field(type=str)
+    process_tracker = field(type=dict)
     force_import    = field(type=bool, initial=lambda: False)
 
 
@@ -80,14 +82,28 @@ class DataProcessConfig(PClass):
 class InputFile(PClass):
     filename = field(type=str)
     filepath = field(type=str)
+    filesize = field()
+    filetype = field()
     source_id = field(type=(int, type(None)), initial=lambda: None)
     sha256sum = field(type=(str, type(None)), initial=lambda: None)
+    metadata = field()
 
     @classmethod
     def from_file(cls, filepath, **kwargs):
         name = os.path.basename(filepath)
         path = os.path.abspath(filepath)
-        return cls(filename=name, filepath=path, **kwargs)
+        size = os.path.getsize(filepath)
+        csum = file_checksum_sha256(filepath)
+        type = file_mime(filepath)
+
+        return cls(
+            filename=name,
+            filepath=path,
+            filesize=size,
+            filetype=type,
+            sha256sum=csum,
+            **kwargs
+        )
 
 
 ReaderFinished = type("ReaderFinished")()

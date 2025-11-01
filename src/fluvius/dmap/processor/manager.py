@@ -57,7 +57,7 @@ class DataProcessManager(object):
 
     def register_file(
         self,
-        file_resource: FileResource,
+        file_resource: InputFile,
         process_name,
         process_signature,
         **kwargs
@@ -110,18 +110,18 @@ class PostgresFileProcessManager(DataProcessManager):
 
     def register_file(
         self,
-        file_resource: FileResource,
+        file_resource: InputFile,
         process_name=None,
         status=None,
         forced=False,
         **kwargs
     ) -> DataProcessEntry:
         process_name = process_name or self.process_name
-        entry = self.fetch_entry(file_resource.checksum_sha256, process_name)
+        entry = self.fetch_entry(file_resource.sha256sum, process_name)
 
         if entry is not None:
             if entry.status == 'SUCCESS' and not forced:
-                raise FileAlreadyProcessed
+                raise InputAlreadyProcessedError
 
             self.update_entry(entry, status=status, status_message=None, **kwargs)
         else:
@@ -129,17 +129,17 @@ class PostgresFileProcessManager(DataProcessManager):
                 status = 'UNKNOWN'
 
             process_entry = self._construct_entry({
-                'checksum_sha256': file_resource.checksum_sha256,
+                'checksum_sha256': file_resource.sha256sum,
                 'process_name': self.process_name,
-                'file_name': file_resource.name,
-                'file_size': file_resource.length,
-                'mime_type': file_resource.content_type,
+                'file_name': file_resource.filename,
+                'file_size': file_resource.filesize,
+                'mime_type': file_resource.filetype,
                 'status': status,
                 **kwargs
             })
 
             self._submit_entry(process_entry)
-        return self.fetch_entry(file_resource.checksum_sha256)
+        return self.fetch_entry(file_resource.sha256sum)
 
     def _submit_entry(self, process_entry):
         data = process_entry.serialize()
