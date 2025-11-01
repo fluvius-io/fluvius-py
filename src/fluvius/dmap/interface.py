@@ -2,7 +2,7 @@ import os
 from enum import Enum
 from pyrsistent import PClass, field
 from collections import namedtuple
-from fluvius.helper import file_checksum_sha256, file_mime
+from fluvius.helper import osutil
 
 
 # key: str, value: scalar, context: str, depth: int
@@ -65,6 +65,7 @@ class PipelineConfig(PClass):
 
 
 class DataProcessManagerConfig(PClass):
+    name            = field(type=str)
     process_name    = field(type=str)
     process_tracker = field(type=dict)
     force_import    = field(type=bool, initial=lambda: False)
@@ -72,7 +73,7 @@ class DataProcessManagerConfig(PClass):
 
 class DataProcessConfig(PClass):
     inputs          = field(type=dict, initial=dict, factory=_validate_writer)
-    manager         = field(type=(DataProcessManagerConfig, type(None)))
+    manager         = field(type=(DataProcessManagerConfig, type(None)), factory=DataProcessManagerConfig.create)
     reader          = field(type=dict, initial=dict)
     writer          = field(type=dict, initial=dict, factory=_validate_writer)
     pipelines       = field(type=dict, initial=dict)
@@ -93,8 +94,8 @@ class InputFile(PClass):
         name = os.path.basename(filepath)
         path = os.path.abspath(filepath)
         size = os.path.getsize(filepath)
-        csum = file_checksum_sha256(filepath)
-        type = file_mime(filepath)
+        csum = osutil.file_checksum_sha256(filepath)
+        type = osutil.file_mime(filepath)
 
         return cls(
             filename=name,
