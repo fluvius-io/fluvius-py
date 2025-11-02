@@ -95,9 +95,9 @@ def process_input(process_config: DataProcessConfig, *args):
         )
 
     with ThreadPoolExecutor(max_workers=config.THREAD_POOL_SIZE) as executor:
+        workers = []
         for file_resource in data_fetcher.fetch():
-            workers = []
             process_pipelines(file_resource, process_config)
-            return [w.result() for w in workers]
+        return [w.result() for w in workers]
 
 
