@@ -196,8 +196,9 @@ class ProcessPipeline(object):
         yield BUILTIN_FIELD_INDEX, self.index, None
         yield BUILTIN_FIELD_COUNTER, self.counter, None
 
-        for buff in self.context_buffer.values():
-            yield from buff
+        if self.config.allow_ctx_buffer:
+            for buff in self.context_buffer.values():
+                yield from buff
 
         for buff in self.row_buffer:
             yield from buff

@@ -1,11 +1,14 @@
 from slugify import slugify
 from ruamel import yaml
 from fluvius.dmap import config
+from fluvius.dmap.interface import ResourceMeta, ReaderFinished, ReaderError
 
 quote = yaml.scalarstring.SingleQuotedScalarString
 
 MAPPING_FIXTURES = {
-    '_source_id': f"{config.BUILTIN_FIELD_PRID}|integer"
+    '_PRID': f"{config.BUILTIN_FIELD_PRID}|integer",
+    '_COUNTER': f"{config.BUILTIN_FIELD_COUNTER}|integer",
+    '_INDEX': f"{config.BUILTIN_FIELD_INDEX}|integer"
 }
 
 BUILTINS = {
@@ -22,13 +25,10 @@ def fname(ele_name):
 
 
 class DatamapProber(object):
-    def __init__(self, *readers):
-        self._readers = readers
+    def __init__(self, fetcher, reader):
+        self._fetcher = fetcher
+        self._reader = reader
         self._tables = {}
-
-    @property
-    def readers(self):
-        return self._readers
 
     @property
     def tables(self):
@@ -63,7 +63,7 @@ class DatamapProber(object):
             }
 
             if loop_id is not None:
-                spec['transaction_loop'] = loop_id
+                spec['transaction'] = loop_id
 
             yield table_meta['key'], spec
 
@@ -72,21 +72,30 @@ class DatamapProber(object):
             variant = 'STARTING'
             filepath = None
 
-            for r in self.readers:
-                if variant == 'STARTING':
-                    variant = r.variant
-                    filepath = r.filepath
-                elif r.variant != variant:
-                    raise ValueError(
-                        f'Readers have different variant [{variant}] != [{r.variant}] ({filepath}, {r.filepath})'
-                    )
+            r = self._reader
+            if variant == 'STARTING':
+                variant = r.variant
+                filepath = r.filepath
+            elif r.variant != variant:
+                raise ValueError(
+                    f'Readers have different variant [{variant}] != [{r.variant}] ({filepath}, {r.filepath})'
+                )
 
         def read():
-            check_variant()
-            for r in self.readers:
-                yield from r.read_data()
+            # check_variant()
+            for file_resource in self._fetcher.fetch():
+                yield from self._reader.read_file(file_resource)
 
         for data_loop in read():
+            if isinstance(data_loop, ReaderError):
+                raise ReaderError
+
+            if isinstance(data_loop, ResourceMeta):
+                continue
+
+            if data_loop == ReaderFinished:
+                continue
+
             if data_loop is None:
                 break
 
@@ -124,4 +133,5 @@ class DatamapProber(object):
             filepath = f'{filepath}.yml'
 
         with open(filepath, 'w', encoding="utf-8") as yaml_file:
-            yaml.dump(cfg, yaml_file, Dumper=yaml.RoundTripDumper)
+            yaml_in = yaml.YAML(typ='rt', pure=True)
+            yaml_in.dump(cfg, yaml_file)

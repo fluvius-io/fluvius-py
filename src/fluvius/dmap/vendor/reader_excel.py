@@ -1,17 +1,15 @@
 import re
 import openpyxl
-
-from pyrsistent import field
-from contextlib import contextmanager
-from fluvius.dmap.reader import register_reader
-from fluvius.dmap import logger, config
 from slugify import slugify
-from fluvius.datapack import DatapackAPI
+from pyrsistent import field
 
-from .tabular import TabularReader, TabularReaderOptions
+from fluvius.dmap.reader import register_reader
+from fluvius.dmap.reader.tabular import TabularReader, TabularReaderConfig, EMPTY_VALUES, RowValidationError
+from fluvius.dmap.interface import DataElement, DataLoop
+from fluvius.dmap import logger
 
 
-class XLSXReaderOptions(TabularReaderOptions):
+class XLSXReaderOptions(TabularReaderConfig):
     worksheet = field(type=(str, type(None)), initial=lambda: None)
     try_sheets = field(type=(list, str), initial=list)
     header_row = field(type=int, initial=lambda: 1)
@@ -45,44 +43,34 @@ def sheet_matcher(try_sheets):
 
 @register_reader('xlsx')
 class XLSXReader(TabularReader):
-    def validate_options(self, options):
-        return XLSXReaderOptions(**options)
+    CONFIG_TEMPLATE = XLSXReaderOptions
 
-    @contextmanager
-    def read_file(self, file_resource):
+    def read_tabular(self, file_resource):
         path_or_file = file_resource.filepath
-        if config.DATAPACK_RESOURCE:
-            datapack = DatapackAPI.load(file_resource.namespace)
-            path_or_file = datapack.file_system.open(path_or_file, 'rb')
-
         wbobj = openpyxl.load_workbook(path_or_file, read_only=True)
         shobj = None
 
-        # @TODO: Consolidate these two options into one. \
-        # The worksheet option can be try_sheets with a single value
-        # Also the option name need to be updated to reflect the changes
-        if self.options.worksheet:
-            shobj = wbobj[self.options.worksheet]
+        if self.config.worksheet:
+            shobj = wbobj[self.config.worksheet]
 
         if shobj is None:
-            matcher = sheet_matcher(self.options.try_sheets)
+            matcher = sheet_matcher(self.config.try_sheets)
 
             for shname in wbobj.sheetnames:
                 if matcher(shname):
                     shobj = wbobj[shname]
-                    break
+                    shobj.reset_dimensions()
+                    logger.info('Read XLSX: %s // Worksheet: %r', path_or_file, shobj.title)
+                    rowiter = shobj.iter_rows()
+                    for rowidx in range(self.config.header_row):
+                        headers = next(rowiter)
+
+                    yield shname, headers, rowiter
 
         if shobj is None:
             raise ValueError(
                 f'No worksheets matches sheet selector: '
-                f'\n - worksheet: {self.options.worksheet}\n - try_sheets: {self.options.try_sheets}')
-
-        logger.info('Read XLSX: %s // Worksheet: %r', path_or_file, shobj.title)
-        rowiter = shobj.iter_rows()
-        for rowidx in range(self.options.header_row):
-            headers = next(rowiter)
-
-        yield headers, rowiter
+                f'\n - worksheet: {self.config.worksheet}\n - try_sheets: {self.config.try_sheets}')
         wbobj.close()
 
     def process_headers(self, headers):
@@ -91,3 +79,40 @@ class XLSXReader(TabularReader):
     def process_row(self, idx, row):
         for hdr, cell in row:
             yield hdr, cell.value
+
+    def iter_data_loop(self, file_resource):
+        required_fields = self.config.required_fields
+        ignore_invalid_rows = self.config.ignore_invalid_rows
+        trim_spaces = self.config.trim_spaces
+        if trim_spaces:
+            gen_val = (lambda val: val.strip() if isinstance(val, str) else val)
+        else:
+            gen_val = (lambda val: val)
+
+        def gen_row(idx, row):
+            for hdr, val in self.process_row(idx, zip(headers, row)):
+                if not hdr:
+                    continue
+                if required_fields and hdr in required_fields and val in EMPTY_VALUES:
+                    if self.config.error_log:
+                        self.error_log(headers, row, f"{idx},{str(hdr)},Required fields [{hdr}] is empty.")
+                    raise RowValidationError('Error processing row [%d]. Required fields [%s] is empty.' % (idx, hdr))
+
+                yield DataElement(hdr, gen_val(val), None)
+
+        for (transaction_loop, headers, stream) in self.read_tabular(file_resource):
+            headers = self.process_headers(headers)
+            self.check_required_headers(headers)
+
+            for idx, row in enumerate(stream, start=1):
+                try:
+                    if not row:
+                        continue
+                    data = tuple(gen_row(idx, row))
+                    yield DataLoop(transaction_loop, data, 1, None)
+                    yield DataLoop(transaction_loop, None, 1, None)
+                except RowValidationError as e:
+                    if ignore_invalid_rows:
+                        logger.warning('Skipped row [%d]: %s', idx, str(e))
+                    else:
+                        raise

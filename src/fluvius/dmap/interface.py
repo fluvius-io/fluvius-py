@@ -62,6 +62,7 @@ class PipelineConfig(PClass):
     transforms       = field(type=list, initial=list, factory=_validate_list)
     writer           = field(type=dict, initial=dict, factory=_validate_writer)
     coercer_profile  = field(type=str, initial=lambda: 'generic')
+    allow_ctx_buffer = field(type=bool, initial=True)
 
 
 class DataProcessManagerConfig(PClass):
