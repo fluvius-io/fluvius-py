@@ -9,7 +9,7 @@ from fluvius.helper import camel_to_lower
 
 from .router import connect
 from .datadef import WorkflowStep, WorkflowData, RX_STATE
-from .exceptions import WorkflowExecutionError, WorkflowConfigurationError
+from fluvius.navis.error import WorkflowConfigurationError
 
 BEGIN_STATE  = "_CREATED"
 FINISH_STATE = "_FINISHED"
@@ -17,9 +17,9 @@ BEGIN_LABEL = "NEW"
 FINISH_LABEL = "DONE"
 
 
-def transition(to_state, allowed_origins=tuple(), unallowed_origins=tuple()):
+def transition(to_state, allowed_origins=None, unallowed_origins=None):
     def _decorator(func):
-        func.__transition__ = (to_state, allowed_origins, unallowed_origins)
+        setattr(func, '__transition__', (to_state, allowed_origins, unallowed_origins))
         return func
     return _decorator
 
@@ -46,11 +46,6 @@ class Step(object):
 
     def __init_subclass__(cls, name=None, stage=None, states=None, multiple=False):
         _stage = stage or cls.__stage__
-        # if isinstance(_stage, Stage):
-        #     _stage = _stage.__key__
-
-        # if not isinstance(_stage, str):
-        #     raise ValueError(f'Invalid step stage: {_stage}')
 
         cls.__title__ = name or cls.__name__
         cls.__stage__ = _stage

@@ -1,4 +1,6 @@
-from fluvius_test.navis_app
+from fluvius_test import navis_app
+from httpx import AsyncClient
+
 
 # Custom AsyncClient with FluviusJSONEncoder
 class FluviusAsyncClient(AsyncClient):

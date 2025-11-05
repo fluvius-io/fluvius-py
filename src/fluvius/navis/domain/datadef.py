@@ -82,7 +82,7 @@ class AbortWorkflowData(DataModel):
 
 class InjectEventData(DataModel):
     """Data for injecting an event into the workflow"""
-    event_type: str
+    event_name: str
     event_data: Optional[Dict[str, Any]] = None
     target_step_id: Optional[UUID_TYPE] = None
     priority: Optional[int] = None

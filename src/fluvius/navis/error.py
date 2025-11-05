@@ -11,3 +11,7 @@ class WorkflowConfigurationError(UnprocessableError):
 
 class WorkflowExecutionError(UnprocessableError):
     pass
+
+
+class WorkflowCommandError(UnprocessableError):
+    pass

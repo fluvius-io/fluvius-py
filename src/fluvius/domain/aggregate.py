@@ -118,23 +118,23 @@ class Aggregate(object):
             await self.fetch_command_rootobj(self._aggroot)
         )
 
-        self.before_command(context, command_bundle, command_meta)
+        await self.before_command(context, command_bundle, command_meta)
         yield RestrictedAggregateProxy(self)
         
         if not self._evt_queue.empty():
             raise RuntimeError('All events must be consumed by the command handler.')
 
-        self.after_command(context, command_bundle, command_meta)
+        await self.after_command(context, command_bundle, command_meta)
         self._command = None
         self._cmdmeta = None
         self._aggroot = None
         self._rootobj = None
         self._context = None
     
-    def before_command(self, context, command_bundle, command_meta):
+    async def before_command(self, context, command_bundle, command_meta):
         pass
 
-    def after_command(self, context, command_bundle, command_meta):
+    async def after_command(self, context, command_bundle, command_meta):
         pass
 
     async def fetch_command_rootobj(self, aggroot):

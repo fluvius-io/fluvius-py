@@ -1,4 +1,6 @@
 from fluvius.data import serialize_mapping, DataModel
+from ..error import WorkflowCommandError
+
 from .domain import WorkflowDomain
 from .datadef import (
     CreateWorkflowData, UpdateWorkflowData, AddParticipantData, RemoveParticipantData,
@@ -25,9 +27,6 @@ class CreateWorkflow(Command):
     Data = CreateWorkflowData
 
     async def _process(self, agg, stm, payload):
-        # Load resource item first if needed
-        await agg.load_resource_item()
-        
         workflow = await agg.create_workflow(payload)
         yield agg.create_response(serialize_mapping(workflow), _type="workflow-response")
 
@@ -46,9 +45,6 @@ class UpdateWorkflow(Command):
     Data = UpdateWorkflowData
 
     async def _process(self, agg, stm, payload):
-        # Ensure we have the resource item loaded
-        await agg.load_resource_item()
-        
         workflow = await agg.update_workflow(payload)
         yield agg.create_response(serialize_mapping(workflow), _type="workflow-response")
 
@@ -67,9 +63,6 @@ class AddParticipant(Command):
     Data = AddParticipantData
 
     async def _process(self, agg, stm, payload):
-        # Ensure we have the resource item loaded
-        await agg.load_resource_item()
-        
         participant = await agg.add_participant(payload)
         yield agg.create_response(serialize_mapping(participant), _type="workflow-response")
 
@@ -88,9 +81,6 @@ class RemoveParticipant(Command):
     Data = RemoveParticipantData
 
     async def _process(self, agg, stm, payload):
-        # Ensure we have the resource item loaded
-        await agg.load_resource_item()
-        
         result = await agg.remove_participant(payload)
         yield agg.create_response(serialize_mapping(result), _type="workflow-response")
 
@@ -163,9 +153,6 @@ class StartWorkflow(Command):
     Data = StartWorkflowData
 
     async def _process(self, agg, stm, payload):
-        # Ensure we have the resource item loaded
-        await agg.load_resource_item()
-        
         result = await agg.start_workflow(payload)
         yield agg.create_response(serialize_mapping(result), _type="workflow-response")
 
@@ -202,9 +189,6 @@ class IgnoreStep(Command):
     Data = IgnoreStepData
 
     async def _process(self, agg, stm, payload):
-        # Ensure we have the resource item loaded
-        await agg.load_resource_item()
-        
         result = await agg.ignore_step(payload)
         yield agg.create_response(serialize_mapping(result), _type="step-response")
 
@@ -223,9 +207,6 @@ class CancelStep(Command):
     Data = CancelStepData
 
     async def _process(self, agg, stm, payload):
-        # Ensure we have the resource item loaded
-        await agg.load_resource_item()
-        
         result = await agg.cancel_step(payload)
         yield agg.create_response(serialize_mapping(result), _type="step-response")
 

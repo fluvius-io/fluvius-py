@@ -3,14 +3,15 @@ import collections
 
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Callable, Literal, Optional
+from typing import Callable, Literal, Optional, Any
 from types import SimpleNamespace
 from functools import partial, wraps
 from fluvius.data import UUID_GENF, UUID_GENR, UUID_TYPE
 from fluvius.helper import timestamp, consume_queue
 
-from .exceptions import WorkflowExecutionError, WorkflowConfigurationError, StepTransitionError
-from .datadef import WorkflowStep, WorkflowStatus, StepStatus, WorkflowData, WorkflowMessage, WorkflowStage, WorkflowActivity
+from ..error import WorkflowExecutionError, WorkflowConfigurationError, StepTransitionError
+from .datadef import WorkflowStep, WorkflowStatus, StepStatus, WorkflowData, WorkflowMessage, WorkflowStage, WorkflowActivity, WorkflowStep
+from .mutation import MutationEnvelop
 from .workflow import Workflow, Stage, Step, Role, BEGIN_STATE, FINISH_STATE, BEGIN_LABEL, FINISH_LABEL
 from .router import ActivityRouter
 
@@ -19,12 +20,14 @@ from . import logger, mutation as m
 STEP_ACTION = Literal['step']
 WORKFLOW_ACTION = Literal['workflow']
 
+
 @dataclass
 class ActionContext(object):
     action_name: str
     action_args: tuple
     action_kwargs: dict
     step_id: Optional[UUID_TYPE] = None
+
 
 class WorkflowStateProxy(object):
     def __init__(self, wf_engine):
@@ -39,23 +42,26 @@ class WorkflowStateProxy(object):
             if action_type == WORKFLOW_ACTION and not external:
                 setattr(self, action_name, wf_func)
 
+
 def action_response(*mutations, response=None):
     return SimpleNamespace(resp=response, mutations=mutations)
+
 
 class StepStateProxy(object):
     def __init__(self, wf_engine, selector):
         step = wf_engine.selector_map[selector]
-        step_id = step.id
-        self._id = step_id
-        self._data = step.data
-        for attr in dir(wf_engine):
-            wf_func = getattr(wf_engine, attr)
+        step_id: UUID_TYPE = step.id
+        self._id: UUID_TYPE = step_id
+        self._data: WorkflowStep = step.data
+        for wf_func_name in dir(wf_engine):
+            wf_func = getattr(wf_engine, wf_func_name)
             if not hasattr(wf_func, '__action__'):
                 continue
 
             action_type, action_name, _ = wf_func.__action__
             if action_type == STEP_ACTION:
                 setattr(self, action_name, partial(wf_func, step_id))
+
 
 def validate_statuses(statuses):
     if statuses is None:
@@ -72,13 +78,13 @@ def validate_statuses(statuses):
 
 def validate_transaction(wf, action_name, allowed, unallowed):
     if wf._transaction_id is None:
-        raise WorkflowExecutionError('P01002', f'Unable to perform action [{action_name}] outside of a transaction')
+        raise WorkflowExecutionError('P010.01', f'Unable to perform action [{action_name}] outside of a transaction')
 
     if allowed and wf.status not in allowed:
-        raise WorkflowExecutionError('P01003', f'Unable to perform action [{action_name}] at workflow status [{wf.status}]')
+        raise WorkflowExecutionError('P010.02', f'Unable to perform action [{action_name}] at workflow status [{wf.status}]')
 
     if unallowed and wf.status in unallowed:
-        raise WorkflowExecutionError('P01004', f'Unable to perform action [{action_name}] at workflow status [{wf.status}]')
+        raise WorkflowExecutionError('P010.03', f'Unable to perform action [{action_name}] at workflow status [{wf.status}]')
 
 
 def workflow_action(activity_name, allow_statuses = None, unallow_statuses = None, hook_name = None, external=False):
@@ -97,7 +103,7 @@ def workflow_action(activity_name, allow_statuses = None, unallow_statuses = Non
             self.run_hook(hook_name, self._state_proxy)
 
             if activity_name == 'start' and len(self.step_id_map) == 0:
-                raise WorkflowConfigurationError('P01005', f'Workflow {self.key} has no steps after started.')
+                raise WorkflowConfigurationError('P011.05', f'Workflow {self.key} has no steps after started.')
             
             self.log_activity(activity_name, *args, **kwargs)
             self._action_context.pop()
@@ -138,32 +144,32 @@ class WorkflowRunner(object):
         if not isinstance(wf_data, WorkflowData):
             raise RuntimeError(f'Invalid workflow state: {wf_data.__class__}')
 
-        self._id = wf_data.id
-        self._workflow = wf_data
-        self._memory = wf_data.memory or {}
-        self._params = wf_data.params or {}
-        self._stepsm = wf_data.stepsm or {}
-        self._output = wf_data.output or {}
-        self._etag = None
-        self._step_proxies = {}
-        self._mut_queue = queue.Queue()
-        self._msg_queue = queue.Queue()
-        self._act_queue = queue.Queue()
-        self._transaction_id = None
-        self._action_context = collections.deque()
-        self._counter = 0
+        self._id: UUID_TYPE = wf_data.id
+        self._workflow: WorkflowData = wf_data
+        self._memory: dict[str, Any] = wf_data.memory or {}
+        self._params: dict[str, Any] = wf_data.params or {}
+        self._stepsm: dict[UUID_TYPE, StepStateProxy] = wf_data.stepsm or {}
+        self._output: dict[str, Any] = wf_data.output or {}
+        self._etag: Optional[str] = None
+        self._step_proxies: dict[UUID_TYPE, StepStateProxy] = {}
+        self._mut_queue: queue.Queue[MutationEnvelop] = queue.Queue()
+        self._msg_queue: queue.Queue[WorkflowMessage] = queue.Queue()
+        self._act_queue: queue.Queue[WorkflowActivity] = queue.Queue()
+        self._transaction_id: Optional[UUID_TYPE] = None
+        self._action_context: collections.deque[ActionContext] = collections.deque()
+        self._counter: int = 0
         self._load_steps(wf_data.steps)
-        self._state_proxy = WorkflowStateProxy(self)
+        self._state_proxy: WorkflowStateProxy = WorkflowStateProxy(self)
     
     def __init_subclass__(cls, wf_def):
         if not issubclass(wf_def, Workflow):
-            raise WorkflowConfigurationError('P01201', f'Invalid workflow definition: {wf_def}')
+            raise WorkflowConfigurationError('P012.01', f'Invalid workflow definition: {wf_def}')
 
         cls.__wf_def__ = wf_def
 
-        STEPS = cls.__steps__.copy()
-        ROLES = cls.__roles__.copy()
-        STAGES = cls.__stages__.copy()
+        STEPS: dict[str, WorkflowStep] = cls.__steps__.copy()
+        ROLES: dict[str, Role] = cls.__roles__.copy()
+        STAGES: dict[str, Stage] = cls.__stages__.copy()
 
         def is_stage(ele):
             try:
@@ -188,10 +194,10 @@ class WorkflowRunner(object):
             stage_key = step_cls.__stage_key__ = stage.__key__
 
             if step_key in STEPS:
-                raise WorkflowConfigurationError('P01101', 'Step already registered [%s]' % step_cls)
+                raise WorkflowConfigurationError('P011.01', 'Step already registered [%s]' % step_cls)
 
             if stage_key not in STAGES:
-                raise WorkflowConfigurationError('P01102', 'Stage [%s] is not defined for workflow [%s]' % (stage_key, cls.__key__))
+                raise WorkflowConfigurationError('P011.02', 'Stage [%s] is not defined for workflow [%s]' % (stage_key, cls.__key__))
 
             STEPS[step_key] = step_cls
             ActivityRouter.connect_events(step_cls, wf_def.Meta.key, step_key)
@@ -199,10 +205,10 @@ class WorkflowRunner(object):
 
         def define_stage(key, stage):
             if hasattr(stage, '__key__'):
-                raise WorkflowConfigurationError('P01103', f'Stage is already defined with key: {stage.__key__}')
+                raise WorkflowConfigurationError('P011.03', f'Stage is already defined with key: {stage.__key__}')
 
             if key in STAGES:
-                raise WorkflowConfigurationError('P01104', 'Stage already registered [%s]' % stage)
+                raise WorkflowConfigurationError('P011.04', 'Stage already registered [%s]' % stage)
 
             stage.__key__ = key
             STAGES[key] = stage
@@ -210,7 +216,7 @@ class WorkflowRunner(object):
         def define_role(key, role):
             role.__key__ = key
             if key in ROLES:
-                raise WorkflowConfigurationError('P01105', 'Role already registered [%s]' % role)
+                raise WorkflowConfigurationError('P011.05', 'Role already registered [%s]' % role)
 
             ROLES[key] = role
 
@@ -262,8 +268,11 @@ class WorkflowRunner(object):
     def mutate(self, mut_name, _step_id=None, **kwargs):
         if self._transaction_id is None:
             raise WorkflowExecutionError('P01010', f'Mutation [{mut_name}] generated outside of a transaction.')
+
+        if len(self._action_context) == 0:
+            raise WorkflowExecutionError('P01016', f'Mutation is only allowed to be triggered by workflow actions')
         
-        act_ctx = self._action_context[-1]        
+        act_ctx = self._action_context[-1]
         mut_cls = m.get_mutation(mut_name)
         self._counter += 1
 
@@ -281,7 +290,7 @@ class WorkflowRunner(object):
     @contextmanager
     def transaction(self, transaction_id=None):
         if self._transaction_id is not None:
-            raise WorkflowExecutionError('P01009', f'Transaction already started.')
+            raise WorkflowExecutionError('P010.09', f'Transaction already started.')
 
         self._transaction_id = transaction_id or UUID_GENR()
         yield self._state_proxy
@@ -308,13 +317,14 @@ class WorkflowRunner(object):
         if not steps:
             return None
 
-        status = self.compute_status(steps) 
+        new_status = self.compute_status(steps)
         progress = self.compute_progress(steps)
 
-        if status is not None and status != self._workflow.status:
-            if status == WorkflowStatus.NEW:
-                raise WorkflowExecutionError('P01005', f'Workflow {self.id} is in new status. Cannot reconcile.')
-            updates['status'] = status
+        if new_status is not None and new_status != self._workflow.status:
+            if new_status == WorkflowStatus.NEW:
+                raise WorkflowExecutionError('P010.05', f'Workflow {self.id} is in new status. Cannot reconcile.')
+
+            updates['status'] = new_status
 
         if progress != self._workflow.progress:
             updates['progress'] = progress
@@ -344,15 +354,18 @@ class WorkflowRunner(object):
         return kwargs
 
     def _update_workflow(self, **kwargs):
-        status = kwargs.get('status')
-        if status and status != WorkflowStatus.ACTIVE:
-            raise WorkflowExecutionError('P01005', f'Workflow {status} is not allowed to be updated.')
+        new_status = kwargs.get('status')
+        # note: new status and existing status
+        if new_status and self.status not in (WorkflowStatus.ACTIVE, WorkflowStatus.NEW):
+            raise WorkflowExecutionError('P01005', f'Workflow at [{self.status}] is not allowed to be updated.')
 
         self._workflow = self._workflow.set(**kwargs)
         self.mutate('update-workflow', **kwargs)
         return kwargs
 
     def run_hook(self, handler_func, wf_context, *args, **kwargs):
+        """" Run workflow action hook """
+
         func = handler_func if callable(handler_func) else \
                 getattr(self.__wf_def__, f'on_{handler_func}', None)
         
@@ -374,7 +387,7 @@ class WorkflowRunner(object):
 
         if selector not in self._step_proxies:
             if selector not in self.selector_map:
-                raise WorkflowExecutionError('P0100X', f'No step available for selector value: {selector}')
+                raise WorkflowExecutionError('P102.01', f'No step available for selector value: {selector}')
 
             self._step_proxies[selector] = StepStateProxy(self, selector)
 
@@ -383,7 +396,7 @@ class WorkflowRunner(object):
     def _transit(self, step, to_state):
         from_state = step.stm_state
         if to_state not in step.__states__:
-            raise WorkflowExecutionError('P01004', f'Invalid step states: {to_state}. Allowed states: {step.__states__}')
+            raise WorkflowExecutionError('P102.02', f'Invalid step states: {to_state}. Allowed states: {step.__states__}')
 
         if to_state == from_state:
             logger.warning(f'Transition [{step.step_key}] to the same state [{to_state}]. No action taken.')
@@ -396,10 +409,10 @@ class WorkflowRunner(object):
             allowed_states, unallowed_states, transition_hook = transitions[to_state]
 
             if allowed_states and step.stm_state not in allowed_states:
-                raise WorkflowExecutionError('P01003', f'Transition to state [{to_state}] is limited to: {allowed_states}. Current state: {step.stm_state}')
+                raise WorkflowExecutionError('P010.07', f'Transition to state [{to_state}] is limited to: {allowed_states}. Current state: {step.stm_state}')
 
             if unallowed_states and step.stm_state in unallowed_states:
-                raise WorkflowExecutionError('P01003', f'Transition to state [{to_state}] is not allowed. Current state: {step.stm_state}')
+                raise WorkflowExecutionError('P010.08', f'Transition to state [{to_state}] is not allowed. Current state: {step.stm_state}')
 
             step_proxy = self.get_state_proxy(step.selector)
             self.run_hook(transition_hook, step_proxy, from_state)
@@ -419,7 +432,7 @@ class WorkflowRunner(object):
         selector = selector or step_id
         if selector in self.selector_map:
             raise WorkflowExecutionError(
-                'P01107', 
+                'P011.07', 
                 f'Selector value already allocated to another step [{step_key}]: {selector}'
             )
 

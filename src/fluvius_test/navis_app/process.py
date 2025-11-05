@@ -23,7 +23,7 @@ class SampleProcess(Workflow):
 
     Stage01 = Stage('Stage 01', desc="Iam great")
     Stage02 = Stage('Stage 02', desc="Iam bigger")
-    Role01 = Role(title="Role 01")
+    Role01  = Role(title="Role 01")
 
     class Step01(Step, name='Step 03', stage=Stage01):
         """ This is a sample step. 2-X """
