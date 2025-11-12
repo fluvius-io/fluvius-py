@@ -190,7 +190,7 @@ class QueryManager(object):
         query   = query_resource.process_query(fe_query.user_query, fe_query.path_query)
         limit   = fe_query.limit
         offset  = (fe_query.page - 1) * fe_query.limit
-        sort    = query_resource.process_sort(*fe_query.sort) if fe_query.sort else tuple()
+        sort    = query_resource.process_sort(*fe_query.sort if fe_query.sort else tuple())
         include, exclude = query_resource.process_select(fe_query.include, fe_query.exclude)
 
         backend_query = BackendQuery.create(
