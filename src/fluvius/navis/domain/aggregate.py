@@ -19,80 +19,38 @@ class WorkflowAggregate(Aggregate):
         # to avoid async loop conflicts with domain state manager
         self.wf_manager = WorkflowManager(self.statemgr)
 
-        self.wf_resource = None  # Will be set to the resource object referenced by resource_name/resource_id
-        self.wf_instance = None
+    async def load_wf_instance(self):
+        if not hasattr(self, '_wf_resource'):
+            """Get or load the workflow runner instance"""
 
-    async def before_command(self, context, command_bundle, command_meta):
-        """Hook called before command execution - load resource item here"""
-        await super().before_command(context, command_bundle, command_meta)
+            if self.aggroot.resource != 'workflow':
+                raise ValueError('Workflow instance only available on workflow aggroot.')
 
-        # Load the resource item if we have a workflow with resource references
-        self.wf_record = self.rootobj
-        # The resource that attached to the workflow
-        self.wf_resource = await self._load_wf_resource()
+            wf_data = self.rootobj
 
-        # The workflow runner instance that manage the actual workflow
-        self.wf_instance = await self._load_wf_instance()
-
-    async def _load_wf_resource(self):
-        """Load the resource item referenced by the workflow's resource_name and resource_id"""
-        if not (self.rootobj and self.rootobj.resource_name and self.rootobj.resource_id):
-            return None
-
-        try:
-            # Use the state manager to fetch the resource
-            return await self.statemgr.fetch(
-                self.rootobj.resource_name,
-                self.rootobj.resource_id
-            )
-        except Exception as e:
-            # Log warning but don't fail - some workflows might not have accessible resources
-            logger.warning(f"Could not load resource item {self.rootobj.resource_name}:{self.rootobj.resource_id}: {e}")
-            return None
-
-    async def _load_wf_instance(self):
-        """Get or load the workflow runner instance"""
-
-        workflow_data = self.rootobj
-
-        # For create commands, rootobj is None - return None as there's no instance to load yet
-        if workflow_data is None:
-            return None
-            
-        # Load the workflow using the WorkflowManager
-        if hasattr(workflow_data, 'id'):
-            return self.wf_manager.load_workflow_by_id(
-                workflow_data.wfdef_key, 
-                workflow_data.id
+            self._wf_instance = await self.wf_manager.load_workflow_by_id(
+                wf_data.wfdef_key,
+                wf_data._id
             )
 
-        return await self.wf_manager.load_workflow(
-            workflow_data.wfdef_key,
-            workflow_data.resource_name,
-            workflow_data.resource_id
-        )
+        return self._wf_instance
 
-    @action("workflow-created", resources="workflow")
+    @action("workflow-created")
     async def create_workflow(self, data):
         """Create a new workflow"""
         # Create workflow using WorkflowManager
+
         wf_instance = self.wf_manager.create_workflow(
-            data.wfdef_key, 
-            data.resource_name if hasattr(data, 'resource_name') else "default",
-            data.resource_id, 
+            data.wfdef_key,
+            self.aggroot.resource,
+            self.aggroot.identifier,
             data.params, 
             title=data.title
         )
         
         # Commit the workflow
         await self.wf_manager.commit_workflow(wf_instance)
-        
-        # Set as rootobj for subsequent operations
-        self._rootobj = wf_instance._workflow
-        
-        # Load the resource item
-        self.wf_resource = await self._load_wf_resource()
-        
+
         return wf_instance._workflow.model_dump(exclude_none=True)
 
     @action("workflow-updated", resources="workflow")
@@ -103,25 +61,28 @@ class WorkflowAggregate(Aggregate):
         if not changes:
             raise ValueError("No changes provided for workflow update")
 
+        wf_instance = await self.load_wf_instance()
+
         # Use workflow runner's method
-        with self.wf_instance.transaction():
-            self.wf_instance.update_workflow(**changes)
-        await self.wf_manager.commit_workflow(self.wf_instance)
-        return self.wf_instance._workflow.model_dump(exclude_none=True)
+        with wf_instance.transaction():
+            wf_instance.update_workflow(**changes)
+        await self.wf_manager.commit_workflow(wf_instance)
+        return wf_instance._workflow.model_dump(exclude_none=True)
 
     @action("participant-added", resources="workflow")
     async def add_participant(self, data):
         """Add a participant to the workflow"""
         # Get the workflow runner and use its participant management
-        with self.wf_instance.transaction():
-            self.wf_instance.add_participant(data.role, data.user_id)
-        await self.wf_manager.commit_workflow(self.wf_instance)
+        wf_instance = await self.load_wf_instance()
+        with wf_instance.transaction():
+            wf_instance.add_participant(data.role, data.user_id)
+        await self.wf_manager.commit_workflow(wf_instance)
         
         return {
             "status": "participant_added", 
             "user_id": str(data.user_id),
             "role": data.role,
-            "workflow_id": str(self.wf_instance._id)
+            "workflow_id": str(wf_instance._id)
         }
 
     @action("participant-removed", resources="workflow")
@@ -129,46 +90,51 @@ class WorkflowAggregate(Aggregate):
         """Remove a participant from the workflow"""
 
         # Get the workflow runner and use its participant management
-        with self.wf_instance.transaction():
-            self.wf_instance.del_participant(data.role, data.user_id)
-        await self.wf_manager.commit_workflow(self.wf_instance)
+        wf_instance = await self.load_wf_instance()
+        with wf_instance.transaction():
+            wf_instance.del_participant(data.role, data.user_id)
+        await self.wf_manager.commit_workflow(wf_instance)
         
         return {"status": "participant_removed", "user_id": str(data.user_id)}
 
     @action("role-added", resources="workflow")
     async def add_role(self, data):
         """Add a role to workflow"""
-        with self.wf_instance.transaction():
-            self.wf_instance.add_role(data.role_name)
-        await self.wf_manager.commit_workflow(self.wf_instance)
+        wf_instance = await self.load_wf_instance()
+        with wf_instance.transaction():
+            wf_instance.add_role(data.role_name)
+        await self.wf_manager.commit_workflow(wf_instance)
         return {"status": "role_added", "role_name": data.role_name}
 
     @action("role-removed", resources="workflow")
     async def remove_role(self, data):
         """Remove a role from workflow"""
-        with self.wf_instance.transaction():
-            self.wf_instance.remove_role(data.role_name)
-        await self.wf_manager.commit_workflow(self.wf_instance)
+        wf_instance = await self.load_wf_instance()
+        with wf_instance.transaction():
+            wf_instance.remove_role(data.role_name)
+        await self.wf_manager.commit_workflow(wf_instance)
         return {"status": "role_removed", "role_name": data.role_name}
 
     @action("workflow-started", resources="workflow")
     async def start_workflow(self, data):
         """Start a workflow"""
         # Get the workflow runner and start it
-        with self.wf_instance.transaction():
-            self.wf_instance.start()
-        await self.wf_manager.commit_workflow(self.wf_instance)
+        wf_instance = await self.load_wf_instance()
+        with wf_instance.transaction():
+            wf_instance.start()
+        await self.wf_manager.commit_workflow(wf_instance)
         
-        return {"status": "started", "workflow_id": self.wf_instance._id}
+        return {"status": "started", "workflow_id": wf_instance._id}
 
     @action("workflow-cancelled", resources="workflow")
     async def cancel_workflow(self, data):
         """Cancel a workflow"""
 
         # Get the workflow runner and start it
-        with self.wf_instance.transaction():
-            self.wf_instance.cancel_workflow()
-        await self.wf_manager.commit_workflow(self.wf_instance)
+        wf_instance = await self.load_wf_instance()
+        with wf_instance.transaction():
+            wf_instance.cancel_workflow()
+        await self.wf_manager.commit_workflow(wf_instance)
 
         # Implementation for canceling workflow
         return {"status": "cancelled", "reason": data.reason}
@@ -176,9 +142,10 @@ class WorkflowAggregate(Aggregate):
     @action("step-ignored", resources="workflow")
     async def ignore_step(self, data):
         # Get the workflow runner and ignore the step
-        with self.wf_instance.transaction():
-            self.wf_instance.ignore_step(data.step_id, data.reason if hasattr(data, 'reason') else None)
-        await self.wf_manager.commit_workflow(self.wf_instance)
+        wf_instance = await self.load_wf_instance()
+        with wf_instance.transaction():
+            wf_instance.ignore_step(data.step_id, data.reason if hasattr(data, 'reason') else None)
+        await self.wf_manager.commit_workflow(wf_instance)
         
         return {"status": "step_ignored", "step_id": data.step_id}
 
@@ -186,19 +153,21 @@ class WorkflowAggregate(Aggregate):
     async def cancel_step(self, data):
         """Cancel a workflow step"""
 
-        with self.wf_instance.transaction():
+        wf_instance = await self.load_wf_instance()
+        with wf_instance.transaction():
             # Use workflow runner's cancel step method
-            self.wf_instance.cancel_step(data.step_id, data.reason if hasattr(data, 'reason') else None)
-        await self.wf_manager.commit_workflow(self.wf_instance)
+            wf_instance.cancel_step(data.step_id, data.reason if hasattr(data, 'reason') else None)
+        await self.wf_manager.commit_workflow(wf_instance)
         
         return {"status": "step_cancelled", "step_id": data.step_id}
 
     @action("workflow-aborted", resources="workflow")
     async def abort_workflow(self, data):
         # Get the workflow runner and ignore the step
-        with self.wf_instance.transaction():
-            self.wf_instance.abort_workflow()
-        await self.wf_manager.commit_workflow(self.wf_instance)
+        wf_instance = await self.load_wf_instance()
+        with wf_instance.transaction():
+            wf_instance.abort_workflow()
+        await self.wf_manager.commit_workflow(wf_instance)
 
         return {"status": "workflow_aborted", "reason": data.reason}
 
@@ -209,8 +178,10 @@ class WorkflowAggregate(Aggregate):
         event_dict = data.event_data or {}
         evt_data = SimpleNamespace(**event_dict)
 
-        with self.wf_instance.transaction():
-            for trigger in self.wf_manager.route_event(data.event_name, evt_data, self.wf_instance.wf_selector):
-                self.wf_instance.trigger(trigger)
-        await self.wf_manager.commit_workflow(self.wf_instance)
-        return {"status": "ok", "event_name": data.event_name, "workflow_id": self.wf_instance._id, "timestamp": timestamp()}
+        wf_instance = await self.load_wf_instance()
+        with wf_instance.transaction():
+            for trigger in self.wf_manager.route_event(data.event_name, evt_data, wf_instance.wf_selector):
+                wf_instance.trigger(trigger)
+
+        await self.wf_manager.commit_workflow(wf_instance)
+        return {"status": "ok", "event_name": data.event_name, "workflow_id": wf_instance._id, "timestamp": timestamp()}

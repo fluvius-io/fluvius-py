@@ -1,6 +1,6 @@
 from fluvius.data import serialize_mapping, DataModel
 from ..error import WorkflowCommandError
-
+from .. import config
 from .domain import WorkflowDomain
 from .datadef import (
     CreateWorkflowData, UpdateWorkflowData, AddParticipantData, RemoveParticipantData,
@@ -18,11 +18,10 @@ class CreateWorkflow(Command):
     class Meta:
         key = 'create-workflow'
         name = 'Create Workflow'
-        resources = ("workflow",)
+        resources = None
         tags = ["workflow", "create"]
         auth_required = True
-        new_resource = True
-        description = "Create a new workflow instance"
+        description = "Create a new workflow instance from a workflow definition"
 
     Data = CreateWorkflowData
 

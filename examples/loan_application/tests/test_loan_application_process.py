@@ -9,6 +9,8 @@ from fluvius.navis import WorkflowManager
 from types import SimpleNamespace
 from loan_application.process import LoanApplicationProcess
 
+WORKFLOW_AGGROOT = 'workflow_definition/f7156bed-ee14-4077-8958-79682afa43e3'
+CREATE_WF_URL = f"/process:create-workflow/{WORKFLOW_AGGROOT}"
 
 class TestLoanApplicationProcessStructure:
     """Test the structure and configuration of the Loan Application Process"""
@@ -117,11 +119,9 @@ class TestLoanApplicationWorkflow:
         resource_id = UUID_GENR()
         
         response = await client.post(
-            "/process:create-workflow/workflow/:new",
+            f"/process:create-workflow/{WORKFLOW_AGGROOT}",
             json={
                 "wfdef_key": "loan-application-process",
-                "resource_name": "loan-application",
-                "resource_id": str(resource_id),
                 "title": "Test Loan Application",
                 "params": {
                     "borrower_name": "John Doe",
@@ -131,8 +131,8 @@ class TestLoanApplicationWorkflow:
             }
         )
         
-        assert response.status_code in [200, 201]
         data = response.json()
+        assert response.status_code in [200, 201], str(data)
         assert data["status"] == "OK"
         assert "data" in data
         assert "workflow-response" in data["data"]
@@ -144,11 +144,10 @@ class TestLoanApplicationWorkflow:
         # First create a workflow
         resource_id = UUID_GENR()
         create_response = await client.post(
-            "/process:create-workflow/workflow/:new",
+            CREATE_WF_URL,
             json={
                 "wfdef_key": "loan-application-process",
-                "resource_name": "loan-application",
-                "resource_id": str(resource_id),
+
                 "title": "Test Loan for Starting",
                 "params": {
                     "borrower_name": "Jane Smith",
@@ -179,11 +178,9 @@ class TestLoanApplicationWorkflow:
         
         # Create workflow
         create_response = await client.post(
-            "/process:create-workflow/workflow/:new",
+            CREATE_WF_URL,
             json={
                 "wfdef_key": "loan-application-process",
-                "resource_name": "loan-application",
-                "resource_id": str(resource_id),
                 "title": "Test Loan with Loan Officer",
                 "params": {}
             }
@@ -212,11 +209,10 @@ class TestLoanApplicationWorkflow:
         
         # Create workflow
         create_response = await client.post(
-            "/process:create-workflow/workflow/:new",
+            CREATE_WF_URL,
             json={
                 "wfdef_key": "loan-application-process",
-                "resource_name": "loan-application",
-                "resource_id": str(resource_id),
+
                 "title": "Test Loan with Borrower",
                 "params": {}
             }
@@ -247,11 +243,10 @@ class TestLoanApplicationEvents:
         
         # Create and start workflow
         create_response = await client.post(
-            "/process:create-workflow/workflow/:new",
+            CREATE_WF_URL,
             json={
                 "wfdef_key": "loan-application-process",
-                "resource_name": "loan-application",
-                "resource_id": str(resource_id),
+
                 "title": "Test Borrower Info Event",
                 "params": {}
             }
@@ -292,11 +287,10 @@ class TestLoanApplicationEvents:
         
         # Create workflow
         create_response = await client.post(
-            "/process:create-workflow/workflow/:new",
+            CREATE_WF_URL,
             json={
                 "wfdef_key": "loan-application-process",
-                "resource_name": "loan-application",
-                "resource_id": str(resource_id),
+
                 "title": "Test Soft Pull Event",
                 "params": {}
             }
@@ -336,11 +330,10 @@ class TestLoanApplicationEvents:
         
         # Create workflow
         create_response = await client.post(
-            "/process:create-workflow/workflow/:new",
+            CREATE_WF_URL,
             json={
                 "wfdef_key": "loan-application-process",
-                "resource_name": "loan-application",
-                "resource_id": str(resource_id),
+
                 "title": "Test Pre-Approval Event",
                 "params": {}
             }
@@ -380,11 +373,10 @@ class TestLoanApplicationEvents:
         
         # Create workflow
         create_response = await client.post(
-            "/process:create-workflow/workflow/:new",
+            CREATE_WF_URL,
             json={
                 "wfdef_key": "loan-application-process",
-                "resource_name": "loan-application",
-                "resource_id": str(resource_id),
+
                 "title": "Test Purchase Agreement Event",
                 "params": {}
             }
@@ -424,11 +416,10 @@ class TestLoanApplicationEvents:
         
         # Create workflow
         create_response = await client.post(
-            "/process:create-workflow/workflow/:new",
+            CREATE_WF_URL,
             json={
                 "wfdef_key": "loan-application-process",
-                "resource_name": "loan-application",
-                "resource_id": str(resource_id),
+
                 "title": "Test CTC Event",
                 "params": {}
             }
@@ -466,11 +457,10 @@ class TestLoanApplicationEvents:
         
         # Create workflow
         create_response = await client.post(
-            "/process:create-workflow/workflow/:new",
+            CREATE_WF_URL,
             json={
                 "wfdef_key": "loan-application-process",
-                "resource_name": "loan-application",
-                "resource_id": str(resource_id),
+
                 "title": "Test Loan Funded Event",
                 "params": {}
             }
@@ -603,11 +593,10 @@ class TestLoanApplicationWorkflowLifecycle:
         
         # Create workflow
         create_response = await client.post(
-            "/process:create-workflow/workflow/:new",
+            CREATE_WF_URL,
             json={
                 "wfdef_key": "loan-application-process",
-                "resource_name": "loan-application",
-                "resource_id": str(resource_id),
+
                 "title": "Test Cancellation",
                 "params": {}
             }
@@ -633,11 +622,10 @@ class TestLoanApplicationWorkflowLifecycle:
         
         # Create workflow
         create_response = await client.post(
-            "/process:create-workflow/workflow/:new",
+            CREATE_WF_URL,
             json={
                 "wfdef_key": "loan-application-process",
-                "resource_name": "loan-application",
-                "resource_id": str(resource_id),
+
                 "title": "Multi-Participant Test",
                 "params": {}
             }

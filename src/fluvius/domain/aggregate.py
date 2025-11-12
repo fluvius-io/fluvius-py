@@ -4,7 +4,7 @@ from functools import wraps
 from contextlib import asynccontextmanager
 from fluvius.error import BadRequestError, PreconditionFailedError, ForbiddenError
 from fluvius.data import UUID_TYPE, generate_etag, field, timestamp
-from typing import NamedTuple
+from typing import NamedTuple, Optional
 
 from . import config, logger
 
@@ -19,7 +19,6 @@ from . import mutation
 IF_MATCH_HEADER = config.IF_MATCH_HEADER
 IF_MATCH_VERIFY = config.IF_MATCH_VERIFY
 DEFAULT_RESPONSE_TYPE = config.DEFAULT_RESPONSE_TYPE
-ALL_RESOURCES = '_ALL'
 
 NoneType = type(None)
 
@@ -30,20 +29,20 @@ class AggregateRoot(NamedTuple):
     domain_iid: UUID_TYPE = None
 
 
-def validate_resource_spec(resources):
-    if not resources:
+def validate_resource_spec(resource_spec: Optional[str | list[str] | tuple[str, ...]]) -> tuple[str, ...]:
+    if not resource_spec:
         return None
 
-    if isinstance(resources, list):
-        return tuple(resources)
+    if isinstance(resource_spec, str):
+        return (resource_spec,)
 
-    if isinstance(resources, str):
-        return (resources,)
+    if isinstance(resource_spec, list):
+        return tuple(resource_spec)
 
-    if isinstance(resources, tuple):
-        return resources
+    if isinstance(resource_spec, tuple):
+        return resource_spec
 
-    raise ValueError(f"Invalid resource specification: {resources}")
+    raise ValueError(f"Invalid resource specification: {resource_spec}")
 
 
 def action(evt_key=None, resources=None):
@@ -142,7 +141,7 @@ class Aggregate(object):
             return None
 
         def if_match():
-            if self.context.source or (not IF_MATCH_VERIFY):
+            if self.context.source:
                 return None
 
             if_match_value = self.context.headers.get(IF_MATCH_HEADER, None)
@@ -154,18 +153,15 @@ class Aggregate(object):
 
             return if_match_value
 
-        if_match_value = if_match()
         if aggroot.domain_sid is None:
             item = await self.statemgr.fetch(aggroot.resource, aggroot.identifier)
         else:
             item = await self.statemgr.fetch_with_domain_sid(aggroot.resource, aggroot.identifier, aggroot.domain_sid)
 
-        if if_match_value and item._etag != if_match_value:
-            raise PreconditionFailedError(
-                412649,
-                "Un-matched document signatures. "
-                "The document might be modified since it was loaded. [%s]" % if_match_value
-            )
+        if IF_MATCH_VERIFY:
+            if_match_etag = if_match()
+            if if_match_etag and item._etag != if_match_etag:
+                raise PreconditionFailedError("E412.49", f"Un-matched document signatures. The document is modified after it was loaded. [{if_match_etag}]")
 
         return item
 

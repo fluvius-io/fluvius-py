@@ -10,8 +10,6 @@ class CreateWorkflowData(DataModel):
     """Data for creating a new workflow"""
     title: str
     wfdef_key: str
-    resource_name: str
-    resource_id: UUID_TYPE
     params: Optional[Dict[str, Any]] = None
 
 

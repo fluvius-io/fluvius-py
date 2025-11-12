@@ -37,11 +37,17 @@ class WorkflowSelector(object):
     resource_name: str
 
 
-
 def _default_route_func(event_data):
-    step_selector =  UUID_TYPE(event_data.step_selector) if getattr(event_data, 'step_selector', None) else None
-    resource_id = UUID_TYPE(event_data.resource_id)  # Fails if there is no resource_id
+    step_selector = event_data.step_selector if getattr(event_data, 'step_selector', None) else None
+    if step_selector is not None and not isinstance(step_selector, UUID_TYPE):
+        step_selector = UUID_TYPE(step_selector)
+
+    resource_id = event_data.resource_id  # Fails if there is no resource_id
+    if resource_id is not None and not isinstance(resource_id, UUID_TYPE):
+        resource_id = UUID_TYPE(resource_id)
+
     resource_name = event_data.resource_name  # Fails if there is no resource_name
+    assert resource_name, f"Invalid resource name: {resource_name}"
 
     return (resource_name, resource_id, step_selector)
 
