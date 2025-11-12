@@ -621,6 +621,10 @@ class WorkflowRunner(object):
         self._transit(step, to_state)
         return self
 
+    def update_workflow(self, **kwargs):
+        self._update_workflow(**kwargs)
+        return self
+
     @workflow_action('add_step', allow_statuses=WorkflowStatus._ACTIVE)
     def workflow_add_step(self, step_key, /, selector=None, title=None, **kwargs):
         step = self._add_step(None, step_key, selector, title)
@@ -668,7 +672,6 @@ class WorkflowRunner(object):
         self._params = params
         self.mutate('set-memory', params=params)
     
-
     def _add_stage(self, stage):
         self.mutate('add-stage', data=stage)
 

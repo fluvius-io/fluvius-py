@@ -245,21 +245,3 @@ class InjectEvent(Command):
     async def _process(self, agg, stm, payload):
         result = await agg.inject_event(payload)
         yield agg.create_response(serialize_mapping(result), _type="workflow-response")
-
-
-class SendTrigger(Command):
-    """Send a trigger to the workflow"""
-
-    class Meta:
-        key = 'send-trigger'
-        name = 'Send Trigger'
-        resources = ("workflow",)
-        tags = ["workflow", "trigger", "send"]
-        auth_required = True
-        description = "Send a trigger to the workflow for external events"
-
-    Data = SendTriggerData
-
-    async def _process(self, agg, stm, payload):
-        result = await agg.send_trigger(payload)
-        yield agg.create_response(serialize_mapping(result), _type="workflow-response")

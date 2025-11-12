@@ -4,7 +4,7 @@ import click
 
 from fluvius import logger, config
 
-from . import db, run
+from . import db, run, wf
 from .. import __version__
 
 
@@ -20,6 +20,7 @@ def fluvius_manager(ctx):
 # Register command groups
 fluvius_manager.add_command(db.db_commands, name="db")
 fluvius_manager.add_command(run.run_commands, name="run")
+fluvius_manager.add_command(wf.wf_commands, name="wf")
 
 
 try:

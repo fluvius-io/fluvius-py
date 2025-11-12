@@ -155,6 +155,25 @@ class WorkflowTask(WorkflowBaseSchema):
     desc = sa.Column(sa.String, nullable=True)
 
 
+class WorkflowDefinition(WorkflowBaseSchema):
+    """Store workflow definition metadata extracted from Workflow classes"""
+    __tablename__ = "workflow_definition"
+    __table_args__ = (
+        sa.UniqueConstraint('wfdef_key', 'wfdef_rev', name='uq_wfdef_key_rev'),
+    )
+
+    wfdef_key = sa.Column(sa.String, nullable=False)
+    wfdef_rev = sa.Column(sa.Integer, nullable=False)
+    title = sa.Column(sa.String, nullable=False)
+    namespace = sa.Column(sa.String, nullable=False)
+    desc = sa.Column(sa.String, nullable=True)
+    stages = sa.Column(FluviusJSONField, nullable=True)
+    steps = sa.Column(FluviusJSONField, nullable=True)
+    roles = sa.Column(FluviusJSONField, nullable=True)
+    params_schema = sa.Column(FluviusJSONField, nullable=True)
+    memory_schema = sa.Column(FluviusJSONField, nullable=True)
+
+
 create_view_workflow = sa.DDL(f'''
 CREATE OR REPLACE VIEW "{DB_SCHEMA}"."_workflow" AS
 SELECT

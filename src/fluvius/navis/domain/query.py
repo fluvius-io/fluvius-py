@@ -100,3 +100,24 @@ class WorkflowStageQuery(DomainQueryResource):
     stage_type: str = StringField("Stage Type")
     order: int = IntegerField("Stage Order")
     desc: str = StringField("Stage Description")
+
+
+@resource('workflow-definition')
+class WorkflowDefinitionQuery(DomainQueryResource):
+    """Query workflow definitions"""
+
+    class Meta(DomainQueryResource.Meta):
+        description = "List and search workflow definitions and their metadata"
+        backend_model = "workflow_definition"
+
+    id: UUID_TYPE = PrimaryID("Definition ID")
+    wfdef_key: str = StringField("Workflow Key")
+    wfdef_rev: int = IntegerField("Workflow Revision")
+    title: str = StringField("Workflow Title")
+    namespace: str = StringField("Namespace")
+    desc: str = StringField("Description")
+    stages: list = ListField("Stages Metadata", hidden=True)
+    steps: list = ListField("Steps Metadata", hidden=True)
+    roles: list = ListField("Roles Metadata", hidden=True)
+    params_schema: dict = DictField("Params Schema", hidden=True)
+    memory_schema: dict = DictField("Memory Schema", hidden=True)

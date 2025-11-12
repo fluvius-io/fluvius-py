@@ -7,10 +7,7 @@ from fluvius.error import NotFoundError
 from .datadef import WorkflowData, WorkflowStatus, WorkflowMessage, WorkflowActivity
 from .router import ActivityRouter, WorkflowSelector
 from .runner import WorkflowRunner
-from .mutation import (
-    MutationEnvelop,
-    get_mutation
-)
+from .mutation import MutationEnvelop
 
 from ..model import WorkflowDataManager
 from .. import logger, config
@@ -90,15 +87,15 @@ class WorkflowManager(object):
         return self._wfbyids[wfdef_key, workflow_id]
     
     async def _log_mutation(self, tx, wf_mut: MutationEnvelop):
-        await tx.insert_many('workflow_mutation', wf_mut.model_dump())
+        await tx.insert_data('workflow_mutation', wf_mut.model_dump())
 
     async def _log_activity(self, tx, wf_act: WorkflowActivity):
         """Add a workflow event record."""
-        await tx.insert_many('workflow_activity', wf_act.model_dump())
+        await tx.insert_data('workflow_activity', wf_act.model_dump())
     
     async def _log_message(self, tx, wf_msg: WorkflowMessage):
         """Add a workflow message record."""
-        await tx.insert_many('workflow_message', wf_msg.model_dump())
+        await tx.insert_data('workflow_message', wf_msg.model_dump())
     
     async def persist_activities(self, tx, activities: list[WorkflowActivity]):
         activities = tuple(activities)
@@ -204,25 +201,25 @@ class WorkflowManager(object):
         """Create a new workflow record."""
         wf_data = wf_mut.mutation.workflow
         workflow_dict = wf_data.model_dump()
-        await tx.insert_many('workflow', workflow_dict)
+        await tx.insert_data('workflow', workflow_dict)
 
     async def _persist_update_workflow(self, tx, wf_mut: MutationEnvelop):
         """Update an existing workflow record."""
         updates = wf_mut.mutation.model_dump(exclude_none=True)
             
         if updates:
-            await tx.update_one('workflow', wf_mut.workflow_id, **updates)
+            await tx.update_data('workflow', wf_mut.workflow_id, **updates)
 
     async def _persist_add_step(self, tx, wf_mut: MutationEnvelop):
         """Add a new step record."""
         step_data = wf_mut.mutation.step.model_dump()
-        await tx.insert_many('workflow_step', step_data)
+        await tx.insert_data('workflow_step', step_data)
 
     async def _persist_update_step(self, tx, wf_mut: MutationEnvelop):
         """Update an existing step record."""
         updates = wf_mut.mutation.model_dump(exclude_none=True)            
         if updates:
-            await tx.update_one('workflow_step', wf_mut.step_id, **updates)
+            await tx.update_data('workflow_step', wf_mut.step_id, **updates)
 
     async def _persist_set_memory(self, tx, wf_mut: MutationEnvelop):
         """Set workflow or step memory records."""
@@ -242,7 +239,7 @@ class WorkflowManager(object):
             'role': participant.role
         }
         
-        await tx.insert_many('workflow_participant', participant_fields)
+        await tx.insert_data('workflow_participant', participant_fields)
 
     async def _persist_del_participant(self, tx, wf_mut: MutationEnvelop):
         """Remove a participant record."""
@@ -269,7 +266,7 @@ class WorkflowManager(object):
         stage_data = wf_mut.mutation.data.model_dump()
         stage_data['workflow_id'] = wf_mut.workflow_id
 
-        await tx.insert_many('workflow_stage', stage_data)
+        await tx.insert_data('workflow_stage', stage_data)
 
     @classmethod
     def register(cls, wf_cls):
@@ -290,3 +287,92 @@ class WorkflowManager(object):
         await self.persist(self._datamgr, wf)
         return wf
 
+    @classmethod
+    def gen_wfdefs(cls, *repositories):
+        """
+        Generate workflow definitions from all registered workflows.
+        
+        Args:
+            workflow_manager_class: The WorkflowManager class with __registry__
+            
+        Returns:
+            list: List of workflow metadata dicts compatible with WorkflowDefinition schema
+        """
+        import importlib
+        repos = repositories or config.WORKFLOW_REPOSITORIES
+        for wf_repo in repos:
+            importlib.import_module(wf_repo)
+        
+        wfdefs = []
+        for wfdef_key, wf_engine_cls in cls.__registry__.items():
+            # Extract the original workflow definition class
+            wf_def = getattr(wf_engine_cls, '__wf_def__', None)
+            if not wf_def:
+                logger.warning(f"Could not extract workflow definition for {wfdef_key}")
+                continue
+            
+            # Extract stages metadata
+            stages = []
+            for stage_key, stage_obj in getattr(wf_engine_cls, '__stages__', {}).items():
+                stages.append({
+                    'key': stage_key,
+                    'name': stage_obj.name,
+                    'type': stage_obj.type,
+                    'order': stage_obj.order,
+                    'desc': stage_obj.desc
+                })
+            
+            # Extract steps metadata
+            steps = []
+            for step_key, step_cls in getattr(wf_engine_cls, '__steps__', {}).items():
+                stage_obj = getattr(step_cls, '__stage__', None)
+                stage_name = stage_obj.key if stage_obj and hasattr(stage_obj, 'key') else None
+                steps.append({
+                    'key': step_key,
+                    'title': getattr(step_cls, '__title__', step_key),
+                    'stage': stage_name,
+                    'multiple': getattr(step_cls, '__multi__', False),
+                    'states': list(getattr(step_cls, '__states__', []))
+                })
+            
+            # Extract roles metadata
+            roles = []
+            for role_key, role_obj in getattr(wf_engine_cls, '__roles__', {}).items():
+                roles.append({
+                    'key': role_key,
+                    'title': getattr(role_obj, '__title__', role_key)
+                })
+            
+            # Extract params and memory schemas if available
+            params_schema = None
+            memory_schema = None
+            if hasattr(wf_def.Meta, 'params_schema') and wf_def.Meta.params_schema:
+                try:
+                    params_schema = wf_def.Meta.params_schema.model_json_schema()
+                except:
+                    params_schema = None
+            
+            if hasattr(wf_def.Meta, 'memory_schema') and wf_def.Meta.memory_schema:
+                try:
+                    memory_schema = wf_def.Meta.memory_schema.model_json_schema()
+                except:
+                    memory_schema = None
+            
+            # Get description from docstring
+            desc = wf_def.__doc__.strip() if wf_def.__doc__ else None
+            
+            wfdef = {
+                'wfdef_key': wf_def.Meta.key,
+                'wfdef_rev': wf_def.Meta.revision,
+                'title': wf_def.Meta.title,
+                'namespace': wf_def.Meta.namespace,
+                'desc': desc,
+                'stages': stages if stages else None,
+                'steps': steps if steps else None,
+                'roles': roles if roles else None,
+                'params_schema': params_schema,
+                'memory_schema': memory_schema
+            }
+            wfdefs.append(wfdef)
+        
+        return wfdefs    

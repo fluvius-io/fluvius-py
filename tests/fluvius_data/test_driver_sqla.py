@@ -44,11 +44,11 @@ async def test_manager():
             dict(_id="3", name="user3"),
             dict(_id="4", name="user4"),
         ]
-        await manager.insert_many('user', *user_record)
+        await manager.insert_data('user', *user_record)
 
     # ============== Test Update One ===============
     async with manager.transaction():
-        await manager.update_one('user', user_id1, name="user-updated")
+        await manager.update_data('user', user_id1, name="user-updated")
         item = await manager.fetch('user', user_id1)
     assert item.name == "user-updated"
 
@@ -78,6 +78,6 @@ async def test_manager():
 
     # ============== Test Invalidate ===============
     async with manager.transaction():
-        await manager.invalidate_one('user', "1")
+        await manager.invalidate_data('user', "1")
         item = await manager.find_one('user', identifier='1', incl_deleted=True)
     assert item._deleted is not None

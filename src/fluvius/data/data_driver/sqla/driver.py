@@ -286,7 +286,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
     @property
     def active_session(self):
         if self._active_session.get() is None:
-            raise RuntimeError('Operation must be run with in a tranasaction.')
+            raise RuntimeError('Database operation must be run with in a transaction.')
 
         return self._active_session.get()
 
@@ -371,7 +371,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
         return cursor.mappings().one()
 
     @sqla_error_handler('L1202')
-    async def update_one(self, resource, query, **updates):
+    async def update_data(self, resource, query, **updates):
         if not query.identifier:
             raise ValueError(f'Invalid update query: {query}')
 

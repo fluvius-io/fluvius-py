@@ -188,7 +188,6 @@ class Workflow(object):
         from .manager import WorkflowManager
         WorkflowManager.register(cls)
 
-
     def __init__(self, **data):
         self._data = WorkflowData(**data)
 

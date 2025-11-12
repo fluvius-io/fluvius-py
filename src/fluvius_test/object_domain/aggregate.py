@@ -6,7 +6,7 @@ class ObjectAggregate(Aggregate):
     @action('object-updated', resources='people-economist')
     async def update(self, stm, /, content):
         obj = self.get_rootobj()
-        await stm.update_one('people-economist', obj._id, etag=obj._etag, **content)
+        await stm.update_data('people-economist', obj._id, etag=obj._etag, **content)
         return {'_id': obj._id}
 
     @action('object-replaced', resources='people-economist')
@@ -15,7 +15,7 @@ class ObjectAggregate(Aggregate):
         if "_id" in content and content["_id"] != obj._id:
             raise ValueError("Object replacement must not change existing _id")
 
-        await stm.update_one('people-economist', person._id, etag=person._etag, **content)
+        await stm.update_data('people-economist', person._id, etag=person._etag, **content)
         return {'_id': person._id}
 
     @action('object-created')
@@ -27,7 +27,7 @@ class ObjectAggregate(Aggregate):
     @action('object-removed')
     async def remove(self, stm, /):
         obj = self.get_rootobj()
-        await stm.invalidate_one('people-economist', obj._id)
+        await stm.invalidate_data('people-economist', obj._id)
         return {'_id': obj._id}
 
     @action('action-logged')

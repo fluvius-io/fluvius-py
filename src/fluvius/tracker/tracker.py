@@ -50,7 +50,7 @@ class SQLTrackerManager(DataAccessManagerBase):
     async def update_entry(self, record, **updates):
         model_name = self.lookup_record_model(record)
         q = BackendQuery.create(identifier=record._id)
-        await self.connector.update_one(model_name, q, **updates)
+        await self.connector.update_data(model_name, q, **updates)
         return await self.fetch_entry(model_name, record._id)
 
     async def fetch_entry(self, model_name, handle_id):

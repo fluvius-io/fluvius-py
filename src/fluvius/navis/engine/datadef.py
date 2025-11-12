@@ -15,8 +15,9 @@ class WorkflowDataModel(DataModel):
     """Base class for all workflow data models."""
     pass
 
+
 class WorkflowActivity(WorkflowDataModel):
-    ''' Workflow Activity is internal event that generate mutations and mutates the workflow state. '''
+    """ Workflow Activity is internal event that generate mutations and mutates the workflow state. """
     workflow_id: UUID_TYPE
     transaction_id: UUID_TYPE
     activity_name: str
@@ -24,6 +25,7 @@ class WorkflowActivity(WorkflowDataModel):
     activity_data: Optional[dict] = None
     step_id: Optional[UUID_TYPE] = None
     order: int
+
 
 class WorkflowTask(WorkflowDataModel):
     workflow_id: UUID_TYPE
