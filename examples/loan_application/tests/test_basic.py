@@ -10,15 +10,15 @@ import sys
 def test_project_structure():
     """Test that the project has the expected structure"""
     # Check main files exist in new structure
-    assert os.path.exists("src/workflow_manager/__init__.py")
-    assert os.path.exists("src/workflow_manager/main.py")
-    assert os.path.exists("src/workflow_manager/config.py")
+    assert os.path.exists("src/loan_application/__init__.py")
+    assert os.path.exists("src/loan_application/main.py")
+    assert os.path.exists("src/loan_application/config.py")
     assert os.path.exists("docs/README.md")
     assert os.path.exists("requirements.txt")
     
     # Check directory structure
     assert os.path.exists("src/")
-    assert os.path.exists("src/workflow_manager/")
+    assert os.path.exists("src/loan_application/")
     assert os.path.exists("tests/")
     assert os.path.exists("docs/")
     assert os.path.exists("img/")

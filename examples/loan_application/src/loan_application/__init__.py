@@ -6,7 +6,9 @@ from fluvius.fastapi import (
 
 from fluvius.navis.domain import WorkflowDomain, WorkflowQueryManager
 from fluvius.fastapi.auth_mock import FluviusMockProfileProvider
-from fluvius_test.navis_app import process
+
+# Import the loan application process workflow
+from . import process
 
 domains = (
     WorkflowDomain,

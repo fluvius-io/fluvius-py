@@ -54,6 +54,10 @@ class WorkflowAggregate(Aggregate):
         """Get or load the workflow runner instance"""
 
         workflow_data = self.rootobj
+
+        # For create commands, rootobj is None - return None as there's no instance to load yet
+        if workflow_data is None:
+            return None
             
         # Load the workflow using the WorkflowManager
         if hasattr(workflow_data, 'id'):
@@ -84,10 +88,10 @@ class WorkflowAggregate(Aggregate):
         await self.wf_manager.commit_workflow(wf_instance)
         
         # Set as rootobj for subsequent operations
-        self.rootobj = wf_instance._workflow
+        self._rootobj = wf_instance._workflow
         
         # Load the resource item
-        await self.load_wf_resource()
+        self.wf_resource = await self._load_wf_resource()
         
         return wf_instance._workflow.model_dump(exclude_none=True)
 
@@ -110,14 +114,14 @@ class WorkflowAggregate(Aggregate):
         """Add a participant to the workflow"""
         # Get the workflow runner and use its participant management
         with self.wf_instance.transaction():
-            self.wf_instance.add_participant(data.user_id, data.role)
+            self.wf_instance.add_participant(data.role, data.user_id)
         await self.wf_manager.commit_workflow(self.wf_instance)
         
         return {
             "status": "participant_added", 
-            "user_id": data.user_id, 
+            "user_id": str(data.user_id),
             "role": data.role,
-            "workflow_id": self.wf_instance._id
+            "workflow_id": str(self.wf_instance._id)
         }
 
     @action("participant-removed", resources="workflow")
@@ -126,10 +130,10 @@ class WorkflowAggregate(Aggregate):
 
         # Get the workflow runner and use its participant management
         with self.wf_instance.transaction():
-            self.wf_instance.remove_participant(data.user_id, data.role)
+            self.wf_instance.del_participant(data.role, data.user_id)
         await self.wf_manager.commit_workflow(self.wf_instance)
         
-        return {"status": "participant_removed", "user_id": data.user_id}
+        return {"status": "participant_removed", "user_id": str(data.user_id)}
 
     @action("role-added", resources="workflow")
     async def add_role(self, data):
@@ -152,7 +156,7 @@ class WorkflowAggregate(Aggregate):
         """Start a workflow"""
         # Get the workflow runner and start it
         with self.wf_instance.transaction():
-            self.wf_instance.start(data.start_params if hasattr(data, 'start_params') else {})
+            self.wf_instance.start()
         await self.wf_manager.commit_workflow(self.wf_instance)
         
         return {"status": "started", "workflow_id": self.wf_instance._id}
@@ -201,43 +205,12 @@ class WorkflowAggregate(Aggregate):
     @action("event-injected", resources="workflow")
     async def inject_event(self, data):
         """Inject an event into the workflow"""
-        evt_data = SimpleNamespace(**data.event_data)
-        has_wf = False
-        wfs = []
-        async for wf in self.wf_manager.process_event(data.event_name, evt_data):
-            wfs.append(wf._id)
-            if wf._id == self.wf_instance._id:
-                has_wf = True
-                await self.wf_manager.commit_workflow(wf)
+        # Prepare event data with step_selector if target_step_id is provided
+        event_dict = data.event_data or {}
+        evt_data = SimpleNamespace(**event_dict)
 
-        if not has_wf:
-            raise WorkflowCommandError('P019.81', f'Event [{data.event_name}] not found in workflow [{self.wf_instance._id}] => {wfs}.')
-    
-        # Implementation for injecting event
-        event_result = {
-            "status": "ok",
-            "event_name": data.event_name,
-            "workflow_id": self.wf_instance._id,
-            "timestamp": timestamp()
-        }
-        
-        return event_result
-
-    @action("trigger-sent", resources="workflow")
-    async def send_trigger(self, data):
-        """Send a trigger to the workflow"""
-        workflow = self.rootobj
-        
-        if workflow.status not in [WorkflowStatus.NEW, WorkflowStatus.ACTIVE]:
-            raise ValueError(f"Cannot send trigger to workflow in status {workflow.status}")
-        
-        # Implementation for sending trigger
-        return {
-            "status": "trigger_sent",
-            "trigger_type": data.trigger_type,
-            "workflow_id": workflow._id,
-            "target_id": data.target_id,
-            "delay_seconds": data.delay_seconds,
-            "timestamp": timestamp()
-        }
-        
+        with self.wf_instance.transaction():
+            for trigger in self.wf_manager.route_event(data.event_name, evt_data, self.wf_instance.wf_selector):
+                self.wf_instance.trigger(trigger)
+        await self.wf_manager.commit_workflow(self.wf_instance)
+        return {"status": "ok", "event_name": data.event_name, "workflow_id": self.wf_instance._id, "timestamp": timestamp()}

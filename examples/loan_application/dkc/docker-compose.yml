@@ -13,7 +13,7 @@ services:
       - db
     volumes:
       - .:/app
-    command: uvicorn workflow_manager.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn loan_application.main:app --host 0.0.0.0 --port 8000 --reload
 
   db:
     image: postgres:15

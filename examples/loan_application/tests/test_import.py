@@ -12,7 +12,7 @@ def test_import_application():
     
     # Import the application
     try:
-        from workflow_manager import app
+        from loan_application import app
         assert app is not None
         print("✅ Workflow Manager application imported successfully!")
     except ImportError as e:

@@ -37,10 +37,10 @@ just run
 just dev
 
 # Or using uv directly
-uv run python -m workflow_manager.main
+uv run python -m loan_application.main
 
 # Or using uvicorn with uv
-uv run uvicorn workflow_manager.main:app --reload --host 0.0.0.0 --port 8000
+uv run uvicorn loan_application.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### Running Tests

@@ -13,7 +13,7 @@ __all__ = ["app"]
 
 if __name__ == "__main__":
     uvicorn.run(
-        "workflow_manager.main:app",
+        "loan_application.main:app",
         host="0.0.0.0",
         port=8000,
         reload=True,

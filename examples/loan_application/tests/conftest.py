@@ -1,10 +1,13 @@
 """
-Pytest configuration and fixtures for workflow_manager tests
+Pytest configuration and fixtures for loan_application tests
 """
 
 import pytest
 import asyncio
 from typing import AsyncGenerator
+from httpx import AsyncClient, ASGITransport
+from loan_application import app
+
 
 @pytest.fixture(scope="session")
 def event_loop():
@@ -12,6 +15,14 @@ def event_loop():
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
+
+
+@pytest.fixture(scope="function")
+async def client():
+    """Create an async HTTP client for testing the API"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
 
 
 @pytest.fixture

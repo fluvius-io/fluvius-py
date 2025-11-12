@@ -15,9 +15,9 @@ def check_file_structure():
     print("📁 Checking file structure...")
     
     required_files = [
-        "src/workflow_manager/__init__.py",
-        "src/workflow_manager/main.py", 
-        "src/workflow_manager/config.py",
+        "src/loan_application/__init__.py",
+        "src/loan_application/main.py", 
+        "src/loan_application/config.py",
         "docs/README.md",
         "requirements.txt",
         "pyproject.toml",
@@ -29,7 +29,7 @@ def check_file_structure():
     
     required_dirs = [
         "src/",
-        "src/workflow_manager/",
+        "src/loan_application/",
         "tests/",
         "docs/",
         "img/",

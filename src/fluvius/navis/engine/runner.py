@@ -1,3 +1,5 @@
+from fluvius.navis.engine.datadef import WorkflowActivity, WorkflowMessage
+from fluvius.navis.engine.mutation import MutationEnvelop
 import queue
 import collections
 
@@ -13,7 +15,7 @@ from ..error import WorkflowExecutionError, WorkflowConfigurationError, StepTran
 from .datadef import WorkflowStep, WorkflowStatus, StepStatus, WorkflowData, WorkflowMessage, WorkflowStage, WorkflowActivity, WorkflowStep
 from .mutation import MutationEnvelop
 from .workflow import Workflow, Stage, Step, Role, BEGIN_STATE, FINISH_STATE, BEGIN_LABEL, FINISH_LABEL
-from .router import ActivityRouter
+from .router import ActivityRouter, WorkflowSelector
 
 from . import logger, mutation as m
 
@@ -146,6 +148,11 @@ class WorkflowRunner(object):
 
         self._id: UUID_TYPE = wf_data.id
         self._workflow: WorkflowData = wf_data
+        self._wf_selector: WorkflowSelector = WorkflowSelector(
+            wfdef_key=wf_data.wfdef_key,
+            resource_id=wf_data.resource_id,
+            resource_name=wf_data.resource_name
+        )
         self._memory: dict[str, Any] = wf_data.memory or {}
         self._params: dict[str, Any] = wf_data.params or {}
         self._stepsm: dict[UUID_TYPE, StepStateProxy] = wf_data.stepsm or {}
@@ -336,9 +343,9 @@ class WorkflowRunner(object):
 
     def commit(self):
         return (
-            tuple(consume_queue(self._mut_queue)), 
-            tuple(consume_queue(self._msg_queue)), 
-            tuple(consume_queue(self._act_queue))
+            tuple[MutationEnvelop, ...](consume_queue(self._mut_queue)), 
+            tuple[WorkflowMessage, ...](consume_queue(self._msg_queue)), 
+            tuple[WorkflowActivity, ...](consume_queue(self._act_queue))
         )
 
     def _update_step(self, step, **kwargs):
@@ -381,17 +388,17 @@ class WorkflowRunner(object):
             )
             self._msg_queue.put(wfmsg)
 
-    def get_state_proxy(self, selector):
-        if selector is None:
+    def get_state_proxy(self, step_selector):
+        if step_selector is None:
             return self._state_proxy
 
-        if selector not in self._step_proxies:
-            if selector not in self.selector_map:
-                raise WorkflowExecutionError('P102.01', f'No step available for selector value: {selector}')
+        if step_selector not in self._step_proxies:
+            if step_selector not in self.selector_map:
+                raise WorkflowExecutionError('P102.01', f'No step available for selector value: {step_selector}')
 
-            self._step_proxies[selector] = StepStateProxy(self, selector)
+            self._step_proxies[step_selector] = StepStateProxy(self, step_selector)
 
-        return self._step_proxies[selector]
+        return self._step_proxies[step_selector]
 
     def _transit(self, step, to_state):
         from_state = step.stm_state
@@ -540,6 +547,10 @@ class WorkflowRunner(object):
     @property
     def selector_map(self):
         return self._stmap
+    
+    @property
+    def wf_selector(self):
+        return self._wf_selector
 
     def get_task(self, task_id):
         return None
@@ -557,12 +568,12 @@ class WorkflowRunner(object):
     
     @workflow_action('add_participant', allow_statuses=WorkflowStatus._EDITABLE, external=True)
     def add_participant(self, /, role, member_id, **kwargs):
-        self.mutate('add-participant', role=role, member_id=member_id, **kwargs)
+        self.mutate('add-participant', role=role, user_id=member_id, **kwargs)
         return self
 
     @workflow_action('del_participant', allow_statuses=WorkflowStatus._EDITABLE, external=True)
     def del_participant(self, /, role, member_id):
-        self.mutate('del-participant', role=role, member_id=member_id)
+        self.mutate('del-participant', role=role, user_id=member_id)
         return self
 
     @workflow_action('cancel', allow_statuses=WorkflowStatus._EDITABLE, hook_name='cancelled')

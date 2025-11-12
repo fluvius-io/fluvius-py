@@ -1,9 +1,11 @@
+from fluvius.navis.engine.mutation import MutationEnvelop
 from fluvius.data import UUID_GENF
 from fluvius.helper import timestamp
+from fluvius.error import NotFoundError
 
 
 from .datadef import WorkflowData, WorkflowStatus, WorkflowMessage, WorkflowActivity
-from .router import ActivityRouter
+from .router import ActivityRouter, WorkflowSelector
 from .runner import WorkflowRunner
 from .mutation import (
     MutationEnvelop,
@@ -47,8 +49,8 @@ class WorkflowManager(object):
 
             yield wf
 
-    def route_event(self, event_name, event_data):
-        return self.__router__.route_event(event_name, event_data)
+    def route_event(self, event_name, event_data, wf_selector: WorkflowSelector = None):
+        return self.__router__.route_event(event_name, event_data, wf_selector)
     
     def create_workflow(self, wfdef_key, resource_name, resource_id, params=None, title=None):
         wf_engine = self.__registry__[wfdef_key]
@@ -58,21 +60,22 @@ class WorkflowManager(object):
         return wf
 
     async def load_workflow(self, wfdef_key, resource_name, resource_id):
-        if not resource_id:
-            raise ValueError('Invalid workflow resource: {resource}:{resource_id}')
+        if (wfdef_key, resource_name, resource_id) in self._wfbyres:
+            return self._wfbyres[wfdef_key, resource_name, resource_id]
 
-        if (wfdef_key, resource_name, resource_id) not in self._wfbyres:
-            wf_engine = self.__registry__[wfdef_key]
-            wf_data = await self._datamgr.find_one('_workflow', where=dict(
-                wfdef_key=wfdef_key,
-                resource_name=resource_name,
-                resource_id=resource_id
-            ))
-            wf = wf_engine(wf_data)
-            self._wfbyres[wfdef_key, resource_name, resource_id] = wf
-            self._wfbyids[wfdef_key, wf.id] = wf
+        wf_engine = self.__registry__[wfdef_key]
+        wf_data = await self._datamgr.find_one('_workflow', where=dict(
+            wfdef_key=wfdef_key,
+            resource_name=resource_name,
+            resource_id=resource_id
+        ))
+        if not wf_data:
+            raise NotFoundError(f'Workflow not found: {wfdef_key}:{resource_name}:{resource_id}')
 
-        return self._wfbyres[wfdef_key, resource_name, resource_id]
+        wf = wf_engine(wf_data)
+        self._wfbyres[wfdef_key, resource_name, resource_id] = wf
+        self._wfbyids[wfdef_key, wf.id] = wf
+        return wf
 
 
     async def load_workflow_by_id(self, wfdef_key, workflow_id):
@@ -117,7 +120,6 @@ class WorkflowManager(object):
         Args:
             messages: List of WorkflowMessage objects to persist
         """
-        messages = tuple(messages)
         for msg in messages:
             await self._log_message(tx, msg)
         
@@ -130,14 +132,9 @@ class WorkflowManager(object):
         Args:
             mutations: List of MutationEnvelop objects to persist
         """
-        mutations = tuple(mutations)
         for wf_mut in mutations:
-            try:
-                await self._persist_single_mutation(tx, wf_mut)                    
-                await self._log_mutation(tx, wf_mut)
-            except Exception as e:
-                logger.error(f"Failed to persist mutation {wf_mut.action}: {e}")
-                raise        
+            await self._persist_single_mutation(tx, wf_mut)                    
+            await self._log_mutation(tx, wf_mut)
         return mutations
     
     async def persist(self, tx, wf: WorkflowRunner):
@@ -156,7 +153,6 @@ class WorkflowManager(object):
         messages = await self.persist_messages(tx, messages)
         activities = await self.persist_activities(tx, activities)
 
-        logger.info(f"Persisted {len(mutations)} mutations, {len(messages)} messages, {len(activities)} events")
         return mutations, messages, activities
 
     def _get_mutation_handlers(self):

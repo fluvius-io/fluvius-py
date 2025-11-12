@@ -9,7 +9,7 @@ from . import logger  # noqa
 
 
 @dataclass
-class ActivityHandler(object):
+class WorkflowEventHandler(object):
     wfdef_key: str
     step_key: str
     routing_func: Callable
@@ -30,8 +30,20 @@ class WorkflowTrigger(object):
     handler_func: Callable
 
 
+@dataclass
+class WorkflowSelector(object):
+    wfdef_key: str
+    resource_id: UUID_TYPE
+    resource_name: str
+
+
+
 def _default_route_func(event_data):
-    return (event_data.resource_name, UUID_TYPE(event_data.resource_id), UUID_TYPE(event_data.step_selector))
+    step_selector =  UUID_TYPE(event_data.step_selector) if getattr(event_data, 'step_selector', None) else None
+    resource_id = UUID_TYPE(event_data.resource_id)  # Fails if there is no resource_id
+    resource_name = event_data.resource_name  # Fails if there is no resource_name
+
+    return (resource_name, resource_id, step_selector)
 
 
 def connect(act_name, step=None, router=_default_route_func, priority=0):
@@ -44,11 +56,11 @@ def connect(act_name, step=None, router=_default_route_func, priority=0):
 
     return decorator
 
-def validate_act_handler(act_handler):
-    if not callable(act_handler.routing_func):
-        raise ValueError("Invalid Workflow Event Router [%s] does not exists." % act_handler.routing_func)
+def validate_wfevt_handler(wfevt_handler):
+    if not callable(wfevt_handler.routing_func):
+        raise ValueError("Invalid Workflow Event Router [%s] does not exists." % wfevt_handler.routing_func)
     
-    return act_handler
+    return wfevt_handler
 
 
 class ActivityRouter(object):
@@ -56,7 +68,7 @@ class ActivityRouter(object):
 
     @classmethod
     def _connect(cls, act_name, act_handler):
-        act_handler = validate_act_handler(act_handler)
+        act_handler = validate_wfevt_handler(act_handler)
 
         cls.ROUTING_TABLE.setdefault(act_name, [])
         cls.ROUTING_TABLE[act_name] = sorted(cls.ROUTING_TABLE[act_name] + [act_handler,], key=lambda x: x.priority)
@@ -65,7 +77,7 @@ class ActivityRouter(object):
             logger.warning('Event has multiple handlers [%d]: %s @ %s', hdl_count, act_name, act_handler.wfdef_key)
 
     @classmethod
-    def route_event(cls, evt_name, evt_data):
+    def route_event(cls, evt_name, evt_data, wf_selector: WorkflowSelector = None):
         """ This method routes the event to the appropriate handler.
         
         Args:
@@ -88,13 +100,24 @@ class ActivityRouter(object):
             raise NotFoundError('P018.81', f'Event [{evt_name}] does not have any handlers.')
 
         for route_entry in cls.ROUTING_TABLE[evt_name]:
-            route_data = route_entry.routing_func(evt_data)
-            if route_data is None:
+            # Route is targeting a specific workflow step
+            step_route_entry = route_entry.step_key is not None
+
+            # Route is targeting a specific workflow
+            if wf_selector and wf_selector.wfdef_key != route_entry.wfdef_key:
+                continue
+
+            if (route_data := route_entry.routing_func(evt_data)) is None:
                 continue
 
             resource_name, resource_id, step_selector = route_data
 
-            if (route_entry.step_key is not None) and (step_selector is None):
+            if wf_selector and (
+                wf_selector.resource_id != resource_id or 
+                wf_selector.resource_name != resource_name):
+                continue
+
+            if step_route_entry and (step_selector is None):
                 raise NotFoundError('P018.82', f'Step event must be routed to a specific step [{route_entry.step_key}/{step_selector}].')
 
             yield WorkflowTrigger(
@@ -123,7 +146,7 @@ class ActivityRouter(object):
             step_key = step_key or evt_step_key
 
             cls._connect(
-                evt_name, ActivityHandler(wfdef_key, step_key, evt_router, handler_func, priority)
+                evt_name, WorkflowEventHandler(wfdef_key, step_key, evt_router, handler_func, priority)
             )
 
 
