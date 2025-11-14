@@ -2,7 +2,7 @@ from fluvius.query import DomainQueryManager, DomainQueryResource
 from fluvius.query.field import StringField, UUIDField, DatetimeField, IntegerField, BooleanField, ListField, DictField, PrimaryID
 from fluvius.data import UUID_TYPE, DataModel
 
-from .domain import FormDomain
+from .domain.domain import FormDomain
 from .model import FormDataManager
 
 

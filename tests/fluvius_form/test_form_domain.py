@@ -1,7 +1,7 @@
 import pytest
 from pytest import mark
 from sqlalchemy import text
-from fluvius.form.domain import FormDomain
+from fluvius.form import FormDomain
 from fluvius.form.model import FormConnector
 from fluvius.data import UUID_GENR
 from fluvius.domain.context import DomainTransport
@@ -13,7 +13,9 @@ FIXTURE_ORGANIZATION_ID = "05e8bb7e-43e6-4766-98d9-8f8c779dbe45"
 FIXTURE_PROFILE_ID = UUID_GENR()
 
 
-async def command_handler(domain, cmd_key, payload, resource, identifier, scope={}, context={}):
+async def command_handler(domain, cmd_key, payload, resource, identifier, scope=None, context=None):
+    scope = scope or {}
+    context = context or {}
     _context = dict(
         headers=dict(),
         transport=DomainTransport.FASTAPI,
@@ -46,21 +48,19 @@ def domain():
     return FormDomain(None)
 
 
-@pytest.fixture(autouse=True)
-async def setup_database(domain):
-    """Setup and teardown database for each test"""
+async def setup_db(domain):
+    """Helper to setup database schema"""
     db = domain.statemgr.connector.engine
     async with db.begin() as conn:
         await conn.run_sync(FormConnector.__data_schema_base__.metadata.drop_all)
         await conn.run_sync(FormConnector.__data_schema_base__.metadata.create_all)
-    yield
-    async with db.begin() as conn:
-        await conn.run_sync(FormConnector.__data_schema_base__.metadata.drop_all)
 
 
 @mark.asyncio
 async def test_create_collection(domain):
     """Test creating a collection"""
+    await setup_db(domain)
+
     collection_id = UUID_GENR()
     payload = {
         "collection_key": "test-collection-01",
@@ -83,6 +83,8 @@ async def test_create_collection(domain):
 @mark.asyncio
 async def test_update_collection(domain):
     """Test updating a collection"""
+    await setup_db(domain)
+
     collection_id = UUID_GENR()
     create_payload = {
         "collection_key": "test-collection-02",
@@ -110,6 +112,8 @@ async def test_update_collection(domain):
 @mark.asyncio
 async def test_remove_collection(domain):
     """Test removing a collection"""
+    await setup_db(domain)
+
     collection_id = UUID_GENR()
     create_payload = {
         "collection_key": "test-collection-03",
@@ -133,6 +137,8 @@ async def test_remove_collection(domain):
 @mark.asyncio
 async def test_create_document(domain):
     """Test creating a document"""
+    await setup_db(domain)
+
     document_id = UUID_GENR()
     payload = {
         "document_key": "test-document-01",
@@ -161,6 +167,8 @@ async def test_create_document(domain):
 @mark.asyncio
 async def test_update_document(domain):
     """Test updating a document"""
+    await setup_db(domain)
+
     document_id = UUID_GENR()
     create_payload = {
         "document_key": "test-document-02",
@@ -190,6 +198,8 @@ async def test_update_document(domain):
 @mark.asyncio
 async def test_remove_document(domain):
     """Test removing a document"""
+    await setup_db(domain)
+
     document_id = UUID_GENR()
     create_payload = {
         "document_key": "test-document-03",
@@ -213,6 +223,8 @@ async def test_remove_document(domain):
 @mark.asyncio
 async def test_copy_document(domain):
     """Test copying a document"""
+    await setup_db(domain)
+
     # First create a source document
     source_document_id = UUID_GENR()
     create_payload = {
@@ -227,15 +239,15 @@ async def test_copy_document(domain):
     # Create a section for the source document
     section_id = UUID_GENR()
     async with domain.statemgr.transaction():
-        section = domain.statemgr.init_resource(
+        section = domain.statemgr.create(
             "section",
+            _id=section_id,
             document_id=source_document_id,
             section_key="section-01",
             section_name="Section 01",
             order=0,
         )
-        await domain.statemgr.save(section)
-        section_id = section._id
+        await domain.statemgr.insert(section)
     
     # Copy the document
     copy_payload = {
@@ -251,30 +263,32 @@ async def test_copy_document(domain):
     # Verify the copied document exists
     async with domain.statemgr.transaction():
         # Find the copied document by document_key
-        documents = await domain.statemgr.query('document', document_key='copied-document')
-        assert len(documents) > 0
-        copied_doc = documents[0]
-        assert copied_doc.document_key == "copied-document"
-        assert copied_doc.document_name == "Copied Document"
+        documents = await domain.statemgr.query('document', where={'document_key': 'copied-document'})
+    assert len(documents) > 0
+    copied_doc = documents[0]
+    assert copied_doc.document_key == "copied-document"
+    assert copied_doc.document_name == "Copied Document"
 
 
 @mark.asyncio
 async def test_form_commands(domain):
     """Test form-related commands (populate, save, submit)"""
+    await setup_db(domain)
+
     # Note: These commands require form_instance tables which may need to be added
     # For now, we'll test that the commands can be invoked without errors
     form_id = UUID_GENR()
     
     # Create a form first
     async with domain.statemgr.transaction():
-        form = domain.statemgr.init_resource(
+        form = domain.statemgr.create(
             "data_form",
+            _id=form_id,
             form_key="test-form-01",
             form_name="Test Form",
             version=1,
         )
-        await domain.statemgr.save(form)
-        form_id = form._id
+        await domain.statemgr.insert(form)
     
     # Test populate form command
     populate_payload = {

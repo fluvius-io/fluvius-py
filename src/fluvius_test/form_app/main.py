@@ -4,7 +4,7 @@ from fluvius.fastapi import (
     configure_domain_manager,
     configure_query_manager)
 
-from fluvius.form.domain import FormDomain
+from fluvius.form import FormDomain
 from fluvius.form.query import FormQueryManager
 from fluvius.fastapi.auth_mock import FluviusMockProfileProvider
 

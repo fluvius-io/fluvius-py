@@ -2,7 +2,7 @@ from fluvius.domain.aggregate import Aggregate, action
 from fluvius.data import UUID_GENR, timestamp
 from fluvius.error import NotFoundError, BadRequestError
 
-from . import logger
+from .. import logger
 
 
 class FormAggregate(Aggregate):
@@ -13,6 +13,7 @@ class FormAggregate(Aggregate):
         """Create a new collection"""
         collection = self.init_resource(
             "collection",
+            _id=self.aggroot.identifier,
             collection_key=data.collection_key,
             collection_name=data.collection_name,
             desc=data.desc,
@@ -20,9 +21,9 @@ class FormAggregate(Aggregate):
             owner_id=data.owner_id,
             organization_id=data.organization_id,
         )
-        await self.statemgr.save(collection)
+        await self.statemgr.insert(collection)
         return {
-            "collection_id": str(collection._id),
+            "collection_id": str(self.aggroot.identifier),
             "collection_key": collection.collection_key,
             "collection_name": collection.collection_name,
         }
@@ -35,24 +36,23 @@ class FormAggregate(Aggregate):
         if not changes:
             raise BadRequestError("D100-001", "No changes provided for collection update")
 
-        for key, value in changes.items():
-            setattr(collection, key, value)
+        await self.statemgr.update(collection, **changes)
 
-        collection._updated = self.context.timestamp
-        collection._updater = self.context.profile_id
-        await self.statemgr.save(collection)
+        # Refresh the object to get updated values
+        async with self.statemgr.transaction():
+            updated_collection = await self.statemgr.fetch('collection', collection._id)
 
         return {
-            "collection_id": str(collection._id),
-            "collection_key": collection.collection_key,
-            "collection_name": collection.collection_name,
+            "collection_id": str(updated_collection._id),
+            "collection_key": updated_collection.collection_key,
+            "collection_name": updated_collection.collection_name,
         }
 
     @action("collection-removed", resources="collection")
     async def remove_collection(self, data):
         """Remove a collection"""
         collection = self.rootobj
-        await self.statemgr.delete(collection)
+        await self.statemgr.remove(collection)
         return {
             "collection_id": str(collection._id),
             "status": "removed",
@@ -63,6 +63,7 @@ class FormAggregate(Aggregate):
         """Create a new document"""
         document = self.init_resource(
             "document",
+            _id=self.aggroot.identifier,
             document_key=data.document_key,
             document_name=data.document_name,
             desc=data.desc,
@@ -73,9 +74,9 @@ class FormAggregate(Aggregate):
             resource_id=data.resource_id,
             resource_name=data.resource_name,
         )
-        await self.statemgr.save(document)
+        await self.statemgr.insert(document)
         return {
-            "document_id": str(document._id),
+            "document_id": str(self.aggroot.identifier),
             "document_key": document.document_key,
             "document_name": document.document_name,
         }
@@ -88,24 +89,23 @@ class FormAggregate(Aggregate):
         if not changes:
             raise BadRequestError("D100-002", "No changes provided for document update")
 
-        for key, value in changes.items():
-            setattr(document, key, value)
+        await self.statemgr.update(document, **changes)
 
-        document._updated = self.context.timestamp
-        document._updater = self.context.profile_id
-        await self.statemgr.save(document)
+        # Refresh the object to get updated values
+        async with self.statemgr.transaction():
+            updated_document = await self.statemgr.fetch('document', document._id)
 
         return {
-            "document_id": str(document._id),
-            "document_key": document.document_key,
-            "document_name": document.document_name,
+            "document_id": str(updated_document._id),
+            "document_key": updated_document.document_key,
+            "document_name": updated_document.document_name,
         }
 
     @action("document-removed", resources="document")
     async def remove_document(self, data):
         """Remove a document"""
         document = self.rootobj
-        await self.statemgr.delete(document)
+        await self.statemgr.remove(document)
         return {
             "document_id": str(document._id),
             "status": "removed",
@@ -116,9 +116,11 @@ class FormAggregate(Aggregate):
         """Copy a document"""
         source_document = self.rootobj
 
-        # Create new document
+        # Create new document - use a new UUID for the copied document
+        new_document_id = UUID_GENR()
         new_document = self.init_resource(
             "document",
+            _id=new_document_id,
             document_key=data.new_document_key,
             document_name=data.new_document_name or source_document.document_name,
             desc=source_document.desc,
@@ -127,52 +129,55 @@ class FormAggregate(Aggregate):
             owner_id=source_document.owner_id,
             organization_id=source_document.organization_id,
         )
-        await self.statemgr.save(new_document)
+        await self.statemgr.insert(new_document)
 
         # Copy sections if requested
         if data.copy_sections:
             sections = await self.statemgr.query(
                 "section",
-                document_id=source_document._id,
-                order_by="order"
+                where={"document_id": source_document._id},
+                sort=(("order", "asc"),)
             )
             section_map = {}
             for section in sections:
+                new_section_id = UUID_GENR()
                 new_section = self.init_resource(
                     "section",
-                    document_id=new_document._id,
+                    _id=new_section_id,
+                    document_id=new_document_id,
                     section_key=section.section_key,
                     section_name=section.section_name,
                     desc=section.desc,
                     order=section.order,
                     attrs=section.attrs,
                 )
-                await self.statemgr.save(new_section)
-                section_map[section._id] = new_section._id
+                await self.statemgr.insert(new_section)
+                section_map[section._id] = new_section_id
 
             # Copy document-form relationships if requested
             if data.copy_forms:
                 doc_forms = await self.statemgr.query(
                     "document_form",
-                    document_id=source_document._id,
-                    order_by="order"
+                    where={"document_id": source_document._id},
+                    sort=(("order", "asc"),)
                 )
                 for doc_form in doc_forms:
                     new_section_id = section_map.get(doc_form.section_id)
                     if new_section_id:
                         new_doc_form = self.init_resource(
                             "document_form",
-                            document_id=new_document._id,
+                            _id=UUID_GENR(),
+                            document_id=new_document_id,
                             section_id=new_section_id,
                             form_id=doc_form.form_id,
                             order=doc_form.order,
                             attrs=doc_form.attrs,
                         )
-                        await self.statemgr.save(new_doc_form)
+                        await self.statemgr.insert(new_doc_form)
 
         return {
             "source_document_id": str(source_document._id),
-            "new_document_id": str(new_document._id),
+            "new_document_id": str(new_document_id),
             "document_key": new_document.document_key,
             "status": "copied",
         }

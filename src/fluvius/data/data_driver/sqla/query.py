@@ -200,7 +200,7 @@ class QueryBuilder(object):
 
     def build_delete(self, data_schema, query: BackendQuery):
         sql = delete(data_schema)
-        sql = self._build_where(sql, query)
+        sql = self._build_where(data_schema, sql, query)
 
         return sql
 

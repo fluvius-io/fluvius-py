@@ -1,5 +1,6 @@
 from fluvius.data import serialize_mapping
 from .domain import FormDomain
+from . import datadef
 from .datadef import (
     CreateCollectionData, UpdateCollectionData, RemoveCollectionData,
     CreateDocumentData, UpdateDocumentData, RemoveDocumentData, CopyDocumentData,

@@ -350,7 +350,7 @@ class DataAccessManager(DataAccessManagerBase):
     async def remove(self, record: DataModel):
         model_name = self.lookup_record_model(record)
         query = BackendQuery.create(identifier=record._id, etag=record._etag)
-        return await self.connector.remove_record(model_name, query)
+        return await self.connector.remove_one(model_name, query)
 
     async def insert(self, record: DataModel):
         model_name = self.lookup_record_model(record)

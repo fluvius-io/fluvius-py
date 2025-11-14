@@ -1,7 +1,7 @@
 from fluvius.domain.domain import Domain
 from .aggregate import FormAggregate
-from .model import FormDataManager
-from . import config
+from ..model import FormDataManager
+from .. import config
 
 
 class FormDomain(Domain):
