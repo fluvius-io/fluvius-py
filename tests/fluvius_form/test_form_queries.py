@@ -19,9 +19,13 @@ def domain():
 
 async def setup_db(domain):
     """Helper to setup database schema"""
+    from fluvius.form.schema import FormConnector
+
     db = domain.statemgr.connector.engine
     async with db.begin() as conn:
+        # Drop form schema second
         await conn.run_sync(FormConnector.__data_schema_base__.metadata.drop_all)
+        # Create form schema first
         await conn.run_sync(FormConnector.__data_schema_base__.metadata.create_all)
 
 

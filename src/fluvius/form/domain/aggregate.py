@@ -268,6 +268,8 @@ class FormAggregate(Aggregate):
                     organization_id=organization_id,
                 )
                 await element_data_mgr.insert(form_instance)
+                # Refresh to get _etag from database
+                form_instance = await element_data_mgr.fetch('form_instance', data.form_instance_id)
             else:
                 form_instance = form_instances[0]
 
@@ -343,6 +345,8 @@ class FormAggregate(Aggregate):
                     organization_id=organization_id,
                 )
                 await element_data_mgr.insert(form_instance)
+                # Refresh to get _etag from database
+                form_instance = await element_data_mgr.fetch('form_instance', data.form_instance_id)
             else:
                 form_instance = form_instances[0]
 
@@ -447,6 +451,8 @@ class FormAggregate(Aggregate):
                     organization_id=organization_id,
                 )
                 await element_data_mgr.insert(form_instance)
+                # Refresh to get _etag from database
+                form_instance = await element_data_mgr.fetch('form_instance', data.form_instance_id)
             else:
                 form_instance = form_instances[0]
 
@@ -510,8 +516,7 @@ class FormAggregate(Aggregate):
             # Lock form instance
             await element_data_mgr.update(
                 form_instance,
-                locked=True,
-                **self.audit_updated()
+                locked=True
             )
         
         return {
