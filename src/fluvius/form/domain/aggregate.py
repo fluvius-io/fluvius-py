@@ -1,6 +1,8 @@
 from fluvius.domain.aggregate import Aggregate, action
 from fluvius.data import UUID_GENR, timestamp
 from fluvius.error import NotFoundError, BadRequestError
+from fluvius.form.element import get_element_type, ElementDataManager
+from fluvius.data import UUID_GENR
 
 from .. import logger
 
@@ -217,35 +219,194 @@ class FormAggregate(Aggregate):
 
     @action("element-saved", resources="data_element")
     async def save_element(self, data):
-        """Save element data"""
+        """Save element data with validation"""
+        from fluvius.data import UUID_GENR
+
         element = self.rootobj
 
-        # Note: This assumes form_instance and element_data tables exist
-        # In a real implementation, you would:
-        # 1. Get or create form_instance
-        # 2. Save element_data linked to form_instance and element
+        # Get element type from database
+        element_type_record = await self.statemgr.fetch('element_type', element.element_type_id)
+
+        # Get element type class for validation
+        try:
+            element_type_cls = get_element_type(element_type_record.type_key)
+        except RuntimeError:
+            # Element type not registered, skip validation
+            element_type_cls = None
+
+        # Validate data using element type class
+        validated_data = data.data
+        if element_type_cls:
+            validated_data = element_type_cls.validate_data(data.data)
+
+        # Get element data manager (reuse connector config)
+        element_data_mgr = ElementDataManager()
+
+        # Use transaction context for element data operations
+        async with element_data_mgr.transaction():
+            # Check if form instance exists, create if it doesn't
+            form_instances = await element_data_mgr.query(
+                "form_instance",
+                where={"_id": data.form_instance_id},
+                limit=1
+            )
+
+            if not form_instances:
+                # Create form instance if it doesn't exist
+                organization_id = None
+                if hasattr(self, 'context') and self.context.organization_id:
+                    organization_id = str(self.context.organization_id)
+                form_instance = element_data_mgr.create(
+                    "form_instance",
+                    _id=data.form_instance_id,
+                    form_id=element.form_id,
+                    instance_key=f"instance-{str(data.form_instance_id)[:8]}",
+                    instance_name=None,
+                    locked=False,
+                    attrs=data.attrs,
+                    owner_id=self.context.profile_id if hasattr(self, 'context') else None,
+                    organization_id=organization_id,
+                )
+                await element_data_mgr.insert(form_instance)
+            else:
+                form_instance = form_instances[0]
+
+            # Check if element data already exists
+            existing_data = await element_data_mgr.query(
+                "element_data",
+                where={
+                    "form_instance_id": data.form_instance_id,
+                    "element_id": element._id
+                },
+                limit=1
+            )
+
+            if existing_data:
+                # Update existing element data
+                element_data = existing_data[0]
+                await element_data_mgr.update(
+                    element_data,
+                    data=validated_data,
+                    attrs=data.attrs,
+                    **self.audit_updated()
+                )
+            else:
+                # Create new element data
+                element_data = element_data_mgr.create(
+                    "element_data",
+                    _id=UUID_GENR(),
+                    form_instance_id=data.form_instance_id,
+                    element_id=element._id,
+                    data=validated_data,
+                    attrs=data.attrs,
+                )
+                await element_data_mgr.insert(element_data)
         
         return {
             "element_id": str(element._id),
             "form_instance_id": str(data.form_instance_id),
+            "element_data_id": str(element_data._id),
             "status": "saved",
             "message": "Element data saved",
         }
 
     @action("form-saved", resources="data_form")
     async def save_form(self, data):
-        """Save form data (multiple elements) but still allow further editing"""
         form = self.rootobj
 
-        # Note: This assumes form_instance and element_data tables exist
-        # In a real implementation, you would:
-        # 1. Get or create form_instance
-        # 2. Save all element_data entries linked to form_instance
+        # Get element data manager
+        element_data_mgr = ElementDataManager()
+
+        # Use transaction context for element data operations
+        async with element_data_mgr.transaction():
+            # Check if form instance exists, create if it doesn't
+            form_instances = await element_data_mgr.query(
+                "form_instance",
+                where={"_id": data.form_instance_id},
+                limit=1
+            )
+
+            if not form_instances:
+                # Create form instance if it doesn't exist
+                organization_id = None
+                if hasattr(self, 'context') and self.context.organization_id:
+                    organization_id = str(self.context.organization_id)
+                form_instance = element_data_mgr.create(
+                    "form_instance",
+                    _id=data.form_instance_id,
+                    form_id=form._id,
+                    instance_key=f"instance-{str(data.form_instance_id)[:8]}",
+                    instance_name=None,
+                    locked=False,
+                    attrs=data.attrs,
+                    owner_id=self.context.profile_id if hasattr(self, 'context') else None,
+                    organization_id=organization_id,
+                )
+                await element_data_mgr.insert(form_instance)
+            else:
+                form_instance = form_instances[0]
+
+            # Save each element data
+            saved_count = 0
+            for element_data in data.elements:
+                element_id = element_data.get("element_id")
+                element_data_dict = element_data.get("data", {})
+                element_attrs = element_data.get("attrs")
+
+                if not element_id:
+                    continue
+
+                # Get element from database
+                element = await self.statemgr.fetch('data_element', element_id)
+
+                # Get element type for validation
+                element_type_record = await self.statemgr.fetch('element_type', element.element_type_id)
+
+                # Validate data
+                validated_data = element_data_dict
+                try:
+                    element_type_cls = get_element_type(element_type_record.type_key)
+                    validated_data = element_type_cls.validate_data(element_data_dict)
+                except RuntimeError:
+                    # Element type not registered, skip validation
+                    pass
+
+                # Check if element data already exists
+                existing_data = await element_data_mgr.query(
+                    "element_data",
+                    where={
+                        "form_instance_id": data.form_instance_id,
+                        "element_id": element_id
+                    },
+                    limit=1
+                )
+
+                if existing_data:
+                    # Update existing
+                    await element_data_mgr.update(
+                        existing_data[0],
+                        data=validated_data,
+                        attrs=element_attrs,
+                        **self.audit_updated()
+                    )
+                else:
+                    # Create new
+                    new_element_data = element_data_mgr.create(
+                        "element_data",
+                        _id=UUID_GENR(),
+                        form_instance_id=data.form_instance_id,
+                        element_id=element_id,
+                        data=validated_data,
+                        attrs=element_attrs,
+                    )
+                    await element_data_mgr.insert(new_element_data)
+
+                saved_count += 1
         
         return {
             "form_id": str(form._id),
             "form_instance_id": str(data.form_instance_id),
-            "elements_saved": len(data.elements),
+            "elements_saved": saved_count,
             "status": "saved",
             "message": "Form data saved (editable)",
         }
@@ -253,18 +414,110 @@ class FormAggregate(Aggregate):
     @action("form-submitted", resources="data_form")
     async def submit_form(self, data):
         """Submit form (saves element data and locks from further editing)"""
+        from fluvius.data import UUID_GENR
+
         form = self.rootobj
 
-        # Note: This assumes form_instance and element_data tables exist
-        # In a real implementation, you would:
-        # 1. Get or create form_instance
-        # 2. Save all element_data entries
-        # 3. Set form_instance.locked = True or similar flag
+        # Get element data manager
+        element_data_mgr = ElementDataManager()
+
+        # Use transaction context for element data operations
+        async with element_data_mgr.transaction():
+            # Check if form instance exists, create if it doesn't
+            form_instances = await element_data_mgr.query(
+                "form_instance",
+                where={"_id": data.form_instance_id},
+                limit=1
+            )
+
+            if not form_instances:
+                # Create form instance if it doesn't exist
+                organization_id = None
+                if hasattr(self, 'context') and self.context.organization_id:
+                    organization_id = str(self.context.organization_id)
+                form_instance = element_data_mgr.create(
+                    "form_instance",
+                    _id=data.form_instance_id,
+                    form_id=form._id,
+                    instance_key=f"instance-{str(data.form_instance_id)[:8]}",
+                    instance_name=None,
+                    locked=False,
+                    attrs=data.attrs,
+                    owner_id=self.context.profile_id if hasattr(self, 'context') else None,
+                    organization_id=organization_id,
+                )
+                await element_data_mgr.insert(form_instance)
+            else:
+                form_instance = form_instances[0]
+
+            # Save each element data
+            saved_count = 0
+            for element_data in data.elements:
+                element_id = element_data.get("element_id")
+                element_data_dict = element_data.get("data", {})
+                element_attrs = element_data.get("attrs")
+
+                if not element_id:
+                    continue
+
+                # Get element from database
+                element = await self.statemgr.fetch('data_element', element_id)
+
+                # Get element type for validation
+                element_type_record = await self.statemgr.fetch('element_type', element.element_type_id)
+
+                # Validate data
+                validated_data = element_data_dict
+                try:
+                    element_type_cls = get_element_type(element_type_record.type_key)
+                    validated_data = element_type_cls.validate_data(element_data_dict)
+                except RuntimeError:
+                    # Element type not registered, skip validation
+                    pass
+
+                # Check if element data already exists
+                existing_data = await element_data_mgr.query(
+                    "element_data",
+                    where={
+                        "form_instance_id": data.form_instance_id,
+                        "element_id": element_id
+                    },
+                    limit=1
+                )
+
+                if existing_data:
+                    # Update existing
+                    await element_data_mgr.update(
+                        existing_data[0],
+                        data=validated_data,
+                        attrs=element_attrs,
+                        **self.audit_updated()
+                    )
+                else:
+                    # Create new
+                    new_element_data = element_data_mgr.create(
+                        "element_data",
+                        _id=UUID_GENR(),
+                        form_instance_id=data.form_instance_id,
+                        element_id=element_id,
+                        data=validated_data,
+                        attrs=element_attrs,
+                    )
+                    await element_data_mgr.insert(new_element_data)
+
+                saved_count += 1
+
+            # Lock form instance
+            await element_data_mgr.update(
+                form_instance,
+                locked=True,
+                **self.audit_updated()
+            )
         
         return {
             "form_id": str(form._id),
             "form_instance_id": str(data.form_instance_id),
-            "elements_saved": len(data.elements),
+            "elements_saved": saved_count,
             "status": "submitted",
             "locked": True,
             "message": "Form submitted and locked from further editing",

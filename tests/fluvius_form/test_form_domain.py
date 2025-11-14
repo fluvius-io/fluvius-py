@@ -289,6 +289,31 @@ async def test_form_commands(domain):
             version=1,
         )
         await domain.statemgr.insert(form)
+        
+        # Create an element type
+        element_type_id = UUID_GENR()
+        element_type = domain.statemgr.create(
+            "element_type",
+            _id=element_type_id,
+            type_key="test-element-type",
+            type_name="Test Element Type",
+            desc="A test element type",
+        )
+        await domain.statemgr.insert(element_type)
+        
+        # Create an element
+        element_id = UUID_GENR()
+        element = domain.statemgr.create(
+            "data_element",
+            _id=element_id,
+            form_id=form_id,
+            element_type_id=element_type_id,
+            element_key="test-element",
+            element_label="Test Element",
+            order=0,
+            required=False,
+        )
+        await domain.statemgr.insert(element)
     
     # Test populate form command
     populate_payload = {
@@ -305,7 +330,7 @@ async def test_form_commands(domain):
         "form_id": form_id,
         "form_instance_id": UUID_GENR(),
         "elements": [
-            {"element_id": UUID_GENR(), "data": {"value": "test"}}
+            {"element_id": element_id, "data": {"value": "test"}}
         ],
     }
     result = await command_handler(
@@ -318,7 +343,7 @@ async def test_form_commands(domain):
         "form_id": form_id,
         "form_instance_id": UUID_GENR(),
         "elements": [
-            {"element_id": UUID_GENR(), "data": {"value": "test"}}
+            {"element_id": element_id, "data": {"value": "test"}}
         ],
     }
     result = await command_handler(
