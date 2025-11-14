@@ -2,11 +2,11 @@ import glob
 import os
 
 from functools import wraps
-# from fluvius.datapack import FileResource
 # from fluvius.datapack.dataprocess import FileAlreadyProcessed, PostgresFileProcessManager
 
 from fluvius.dmap import logger, processor
-from fluvius.dmap.interface import DataProcessConfig
+from fluvius.dmap.interface import InputFile, InputAlreadyProcessedError
+from fluvius.dmap.processor import PostgresFileProcessManager
 
 FILE_PARSER_REGISTRY = dict()
 
@@ -29,17 +29,16 @@ def data_process_manager_wrapper(func):
         process_manager
     ):
         def register_process_manager(file_path):
-            from_func = getattr(FileResource, file_resource_func)
-            file_resource = from_func(file_path, filesystem, datapack_identifier)
+            file_resource = InputFile.from_file(file_path)
             if not process_manager:
                 return no_op, file_resource
 
             file_processor_handler = process_manager.register_file(
                 file_resource,
-                data_provider=process_config.reader_config.reader,
-                data_variant=process_config.reader_config.variant,
+                data_provider=process_config.reader.reader,
+                data_variant=process_config.reader.variant,
                 status="RUNNING",
-                forced=process_config.force_import,
+                forced=process_config.manager.force_import,
                 _transaction_date=os.getenv("TRANSACTION_DATE")
             )
 
@@ -49,7 +48,7 @@ def data_process_manager_wrapper(func):
 
         try:
             set_status, file_resource = register_process_manager(file_path)
-        except FileAlreadyProcessed:
+        except InputAlreadyProcessedError:
             logger.warning('File already processed successfully [%s]', file_path)
             return (file_path, 'SKIPPED', None)
 
@@ -71,10 +70,11 @@ def process_inputs(
         process_manager=PostgresFileProcessManager
 ):
     file_parser = data_process_manager_wrapper(processor.file_parser)
+    cfg_manager = cfg.manager
     pm = process_manager(
-        **cfg.process_tracker, 
-        process_name=cfg.process_name
-    ) if cfg.process_tracker else None
+        **cfg_manager.process_tracker, 
+        process_name=cfg_manager.process_name
+    ) if cfg_manager.process_tracker else None
 
     def sequential_runner():
         for fp in inputs:

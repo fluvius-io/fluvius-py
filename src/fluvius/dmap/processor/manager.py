@@ -1,10 +1,10 @@
 from pyrsistent import PClass, field
 from fluvius.dmap.interface import InputAlreadyProcessedError, InputFile
-from fluvius.dmap import logger
+from fluvius.dmap import logger, config
 
-from sqlalchemy import text, pgsql_execute
+from sqlalchemy import text, create_engine
 
-DEBUG = False
+DEBUG = config.DEBUG_MANAGER
 
 
 class DataProcessEntry(PClass):
@@ -52,12 +52,28 @@ class DataProcessManager(object):
         - Other ETL tasks, etc.
     '''
 
-    def __init__(self):
-        pass
+    __abstract__ = True
+    __registry__ = {}
+
+    def __init_subclass__(cls, **kwargs):
+        if cls.__dict__.get('__abstract__'):
+            return
+
+        if cls.name in cls.__registry__:
+            raise ValueError(f"DataProcessManager [{cls.name}] is already registered!")
+
+        cls.__registry__[cls.name] = cls
+
+    @classmethod
+    def init_manager(cls, name, **kwargs):
+        if name not in cls.__registry__:
+            raise ValueError(f"DataProcessManager [{name}] is not registered!")
+
+        return cls.__registry__[name](**kwargs)
 
     def register_file(
         self,
-        file_resource: FileResource,
+        file_resource: InputFile,
         process_name,
         process_signature,
         **kwargs
@@ -74,14 +90,25 @@ class DataProcessManager(object):
 
 
 class PostgresFileProcessManager(DataProcessManager):
-    def __init__(self, uri, table, schema, process_name):
+    name = 'postgres'
+
+    def __init__(self, config):
+        pt = config.process_tracker
+        table = pt['table']
+        schema = pt['schema']
+
+        self.process_name = config.process_name
         self.table_addr = f'"{schema}"."{table}"' if schema else f'"{table}"'
-        self.uri = uri
-        self.process_name = process_name
+        self.uri = pt['uri']
+        self.engine = create_engine(self.uri)
 
     def run_query(self, query_stmt, **kwargs):
         DEBUG and logger.info("\n\tSQL : %s\n\tDATA: %s", query_stmt, str(kwargs))
-        return pgsql_execute(self.uri, query_stmt, **kwargs)
+        with self.engine.connect() as conn:
+            result = conn.execute(query_stmt, kwargs)
+            conn.commit()
+
+        return result
 
     def fetch_entry(self, checksum_sha256, process_name=None):
         process_name = process_name or self.process_name
@@ -91,16 +118,17 @@ class PostgresFileProcessManager(DataProcessManager):
             '"process_name" = :process_name'
         )
 
-        row = self.run_query(
-            sql_query,
-            checksum_sha256=checksum_sha256,
-            process_name=self.process_name
-        ).fetchone()
-
-        if row is not None:
+        try:
+            row = self.run_query(
+                sql_query,
+                checksum_sha256=checksum_sha256,
+                process_name=self.process_name
+            ).mappings().one()
+        
             return self._construct_entry(row)
-
-        return None
+        except Exception as e:
+            logger.info(f"Not Found Entry: {str(e)}")
+            return None
 
     def _construct_entry(self, data):
         return DataProcessEntry.create({
@@ -110,18 +138,18 @@ class PostgresFileProcessManager(DataProcessManager):
 
     def register_file(
         self,
-        file_resource: FileResource,
+        file_resource: InputFile,
         process_name=None,
         status=None,
         forced=False,
         **kwargs
     ) -> DataProcessEntry:
         process_name = process_name or self.process_name
-        entry = self.fetch_entry(file_resource.checksum_sha256, process_name)
+        entry = self.fetch_entry(file_resource.sha256sum, process_name)
 
         if entry is not None:
             if entry.status == 'SUCCESS' and not forced:
-                raise FileAlreadyProcessed
+                raise InputAlreadyProcessedError
 
             self.update_entry(entry, status=status, status_message=None, **kwargs)
         else:
@@ -129,17 +157,17 @@ class PostgresFileProcessManager(DataProcessManager):
                 status = 'UNKNOWN'
 
             process_entry = self._construct_entry({
-                'checksum_sha256': file_resource.checksum_sha256,
+                'checksum_sha256': file_resource.sha256sum,
                 'process_name': self.process_name,
-                'file_name': file_resource.name,
-                'file_size': file_resource.length,
-                'mime_type': file_resource.content_type,
+                'file_name': file_resource.filename,
+                'file_size': file_resource.filesize,
+                'mime_type': file_resource.filetype,
                 'status': status,
                 **kwargs
             })
 
             self._submit_entry(process_entry)
-        return self.fetch_entry(file_resource.checksum_sha256)
+        return self.fetch_entry(file_resource.sha256sum)
 
     def _submit_entry(self, process_entry):
         data = process_entry.serialize()

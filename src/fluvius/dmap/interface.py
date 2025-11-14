@@ -2,6 +2,7 @@ import os
 from enum import Enum
 from pyrsistent import PClass, field
 from collections import namedtuple
+from fluvius.helper import osutil
 
 
 # key: str, value: scalar, context: str, depth: int
@@ -61,16 +62,19 @@ class PipelineConfig(PClass):
     transforms       = field(type=list, initial=list, factory=_validate_list)
     writer           = field(type=dict, initial=dict, factory=_validate_writer)
     coercer_profile  = field(type=str, initial=lambda: 'generic')
+    allow_ctx_buffer = field(type=bool, initial=True)
 
 
 class DataProcessManagerConfig(PClass):
+    name            = field(type=str)
     process_name    = field(type=str)
+    process_tracker = field(type=dict)
     force_import    = field(type=bool, initial=lambda: False)
 
 
 class DataProcessConfig(PClass):
     inputs          = field(type=dict, initial=dict, factory=_validate_writer)
-    manager         = field(type=(DataProcessManagerConfig, type(None)))
+    manager         = field(type=(DataProcessManagerConfig, type(None)), factory=DataProcessManagerConfig.create)
     reader          = field(type=dict, initial=dict)
     writer          = field(type=dict, initial=dict, factory=_validate_writer)
     pipelines       = field(type=dict, initial=dict)
@@ -80,14 +84,28 @@ class DataProcessConfig(PClass):
 class InputFile(PClass):
     filename = field(type=str)
     filepath = field(type=str)
+    filesize = field()
+    filetype = field()
     source_id = field(type=(int, type(None)), initial=lambda: None)
     sha256sum = field(type=(str, type(None)), initial=lambda: None)
+    metadata = field()
 
     @classmethod
     def from_file(cls, filepath, **kwargs):
         name = os.path.basename(filepath)
         path = os.path.abspath(filepath)
-        return cls(filename=name, filepath=path, **kwargs)
+        size = os.path.getsize(filepath)
+        csum = osutil.file_checksum_sha256(filepath)
+        type = osutil.file_mime(filepath)
+
+        return cls(
+            filename=name,
+            filepath=path,
+            filesize=size,
+            filetype=type,
+            sha256sum=csum,
+            **kwargs
+        )
 
 
 ReaderFinished = type("ReaderFinished")()

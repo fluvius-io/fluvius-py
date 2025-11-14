@@ -23,6 +23,12 @@ run MODULE:
 run-updatedb:
 	python tests/fluvius_worker/update_db.py
 
+run-fetcher:
+	python -m fluvius.dmap.cli.fetcher --config tests/_conf/mock_data_with_manager.yml
+
+run-prober:
+	python -m fluvius.dmap.cli.prober --config tests/_conf/mock_data_with_manager.yml --output tests/_conf/mock_data_prober.yml
+
 doc:
 	docpress serve
 

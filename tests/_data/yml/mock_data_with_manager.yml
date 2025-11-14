@@ -1,0 +1,37 @@
+inputs:
+  name: file
+  recursive: false
+  paths: 'tests/_data/mock_data*.csv'
+reader:
+  name: csv
+pipelines:
+  mock_data.output_test_01:
+    mapping:
+      COUNTER: '_COUNTER'
+      INDEX: '_INDEX'
+      PRID: '_PRID'
+      ID: 'id'
+      First Name: 'first_name'
+      Last Name: 'last_name'
+      IP Address: 'ip_address'
+      Gender: 'gender'
+  mock_data.output_test_02:
+    mapping:
+      COUNTER: '_COUNTER'
+      INDEX: '_INDEX'
+      PRID: '_PRID'
+      ID: 'id'
+      First Name: 'last_name'
+      Last Name: 'first_name'
+      IP Address: 'ip_address'
+      Gender: 'gender'
+writer:
+  name: sql
+  uri: 'postgresql://postgres:postgres@localhost:5432/fluvius_data'
+manager:
+  name: 'postgres'
+  process_name: 'mock_data_process'
+  process_tracker:
+    uri: 'postgresql://postgres:postgres@localhost:5432/fluvius_data'
+    table: 'app__data_process'
+    schema: 'data_master'
