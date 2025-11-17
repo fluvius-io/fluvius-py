@@ -3,12 +3,14 @@ import pytest
 import sqlalchemy as sa
 from fluvius.data import SqlaDriver, DataAccessManager
 from fluvius.casbin import PolicySchema, PolicyManager, PolicyRequest, logger
+from fluvius_test import config
+from fluvius_test.helper import _conf, _csv
 
 RX_COMMA = re.compile(r"\s*[,;\s]\s*")
 
 
 class PolicyConnector(SqlaDriver):
-    __db_dsn__ = "postgresql+asyncpg://postgres:postgres@localhost:5432/postgres"
+    __db_dsn__ = config.POSTGRES_DSN
 
 
 class PolicyData(PolicyConnector.__data_schema_base__, PolicySchema):
@@ -24,11 +26,11 @@ class PolicyAccessManager(DataAccessManager):
 
 class TestPolicyManager(PolicyManager):
     __table__ = "casbin_rule"
-    __model__ = "tests/_conf/model_2.conf"
+    __model__ = _conf("model_2")
 
 
-async def copy_table_from_csv(engine, schema, table, source=None, columns=None, **options):
-    _source = source if source else f"tests/_data/{table}.csv"
+async def copy_table_from_csv(manager, schema, table, source=None, columns=None, **options):
+    _source = source if source else _csv(table)
     opts = dict(
         schema_name=schema,
         source=_source,
@@ -39,8 +41,7 @@ async def copy_table_from_csv(engine, schema, table, source=None, columns=None, 
     )
 
     opts.update(options)
-    db = engine.connector._async_session._async_engine
-    async with db.begin() as conn:
+    async with manager.connect() as conn:
         raw_asyncpg_conn = (await conn.get_raw_connection()).driver_connection
         await raw_asyncpg_conn.copy_to_table(table, **opts)
 
@@ -49,17 +50,16 @@ async def copy_table_from_csv(engine, schema, table, source=None, columns=None, 
 async def test_sql_adapter():
     dam = PolicyAccessManager(None)
 
-    db = dam.connector._async_session._async_engine
-    async with db.begin() as conn:
+    async with dam.connect() as conn:
         await conn.run_sync(PolicyConnector.__data_schema_base__.metadata.drop_all)
         await conn.run_sync(PolicyConnector.__data_schema_base__.metadata.create_all)
 
     await copy_table_from_csv(
-        engine=dam,
+        manager=dam,
         schema="public",
         table="casbin_rule",
         columns="ptype,v0,v1,v2,v3,v4,v5,e1,e2,_id,_deleted",
-        source="tests/_data/policy_2.csv"
+        source=_csv("policy_2")
     )
 
     plm = TestPolicyManager(dam)

@@ -132,7 +132,7 @@ class QueryBuilder(object):
     def _sort_clauses(self, data_schema, sort_query):
         for field_name, sort_type in sort_query:
             db_field = self._field(data_schema, field_name)
-            yield getattr(db_field, sort_type)().nulls_last()
+            yield getattr(db_field, sort_type)()
 
 
     def _build_limit(self, data_schema, stmt, q: BackendQuery):
@@ -196,9 +196,11 @@ class QueryBuilder(object):
         if isinstance(values, (list, tuple)):
             return sql.values(values)
 
+        raise ValueError(f'Unsupported values: {values}')
+
     def build_delete(self, data_schema, query: BackendQuery):
         sql = delete(data_schema)
-        sql = self._build_where(sql, query)
+        sql = self._build_where(data_schema, sql, query)
 
         return sql
 

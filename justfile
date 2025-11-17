@@ -43,12 +43,12 @@ dev:
 	done
 
 recreate-schema MODULE:
-	./flvctl db drop-schema --force "{{MODULE}}"
-	./flvctl db create-schema "{{MODULE}}"
+	./manager db drop-schema --force "{{MODULE}}"
+	./manager db create-schema "{{MODULE}}"
 
 create-schema MODULE:
-	./flvctl db create-schema "{{MODULE}}"
+	./manager db create-schema "{{MODULE}}"
 
 drop-schema MODULE:
-	./flvctl db drop-schema "{{MODULE}}"
+	./manager db drop-schema "{{MODULE}}"
 	
