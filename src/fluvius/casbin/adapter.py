@@ -54,7 +54,8 @@ class PolicySchema:
                         "ptype": "p",
                         "dom": request.dom,
                         "res": request.res,
-                        "act": request.act
+                        "act": request.act,
+                        "cqrs": request.cqrs
                     }]
                 },
                 {

@@ -147,7 +147,8 @@ class QueryManager(object):
                 dom=self.Meta.prefix,
                 res=res,
                 rid=rid,
-                act=query_resource._identifier
+                act=query_resource._identifier,
+                cqrs='QUERY'
             )
 
             async with self.data_manager.transaction():

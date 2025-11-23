@@ -354,7 +354,8 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             dom=self.__namespace__,
             res=command.resource,
             rid=rsid,
-            act=command.command
+            act=command.command,
+            cqrs='COMMAND'
         )
 
         resp = await self.policymgr.check_permission(reqs)

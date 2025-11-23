@@ -73,6 +73,8 @@ class PolicyManager:
                 request.res,
                 request.rid,
                 request.act,
+                request.cqrs,
+                request.level.value,
             )
             return PolicyResponse(
                 allowed=allowed,
