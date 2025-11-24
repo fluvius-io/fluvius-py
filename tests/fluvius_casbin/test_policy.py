@@ -1,7 +1,7 @@
 import re
 import pytest
 from fluvius.data import SqlaDriver, DataAccessManager
-from fluvius.casbin import PolicySchema, PolicyManager, PolicyRequest, logger
+from fluvius.casbin import PolicySchema, PolicyManager, PolicyRequest, PolicyScope, logger
 from fluvius.error import ForbiddenError
 
 RX_COMMA = re.compile(r"\s*[,;\s]\s*")
@@ -57,392 +57,84 @@ async def test_project_admin_create_without_resource_id():
         source="tests/_data/policy_test.csv"
     )
     policy_manager = TestPolicyManager(dam)
-    """Project admin can create projects without resource_id."""
-    request = PolicyRequest(
-        usr="user-123",
-        sub="profile-123",
-        org="org-1",
-        dom="domain-1",
-        res="project",
-        rid="",
-        act="create",
-        cqrs="COMMAND"
-    )
-    async with policy_manager._dam.transaction():
-        response = await policy_manager.check_permission(request)
-        assert response.allowed is True, "Project admin should be able to create projects"
+    """
+        user-1:
+            - pro-1:
+                - org-1: admin
+            - pro-2:
+                - org-1: member
+                    - proj-1: project-admin
+            - pro-3:
+                - org-1: member
+                    - proj-1: project-member
+        user-2:
+            - pro-4:
+                - org-2: admin
+                    - proj-2: project-admin
+        user-3:
+            - pro-5:
+                - org-system: sysadmin
+    """
+    test_cases = [
+        ("user-1", "pro-1", "org-1", "fluvius-project", "project", "", "create", "COMMAND", PolicyScope.ORG, True, "Allow admin to create project in org-1"),
+        ("user-1", "pro-1", "org-1", "fluvius-project", "project", "", "view", "QUERY", PolicyScope.ORG, True, "Allow admin to view projects in org-1"),
+        ("user-1", "pro-1", "org-1", "fluvius-project", "project", "proj-1", "update", "COMMAND", PolicyScope.ORG, True, "Allow admin to update project-1 in org-1"),
+        ("user-1", "pro-1", "org-1", "fluvius-project", "project", "proj-2", "view", "QUERY", PolicyScope.ORG, True, "Allow admin to view project-2 in org-1"),
+        ("user-1", "pro-2", "org-1", "fluvius-project", "project", "proj-1", "update", "COMMAND", PolicyScope.ORG, True, "Allow project-admin to update project-1 in org-1"),
+        ("user-1", "pro-2", "org-1", "fluvius-project", "project", "proj-1", "view", "QUERY", PolicyScope.ORG, True, "Allow project-admin to view project-1 in org-1 (same organization)"),
+        ("user-1", "pro-3", "org-1", "fluvius-project", "project", "proj-1", "view", "QUERY", PolicyScope.ORG, True, "Allow project-member to view project-1 in org-1 (same organization)"),
+        ("user-1", "pro-1", "org-1", "fluvius-user", "user", "user-1", "update", "COMMAND", PolicyScope.USER, True, "Allow user-admin to update user-1 in org-1"),
 
-    """Project admin can update resources granted via g2."""
-    request = PolicyRequest(
-        usr="user-123",
-        sub="profile-123",
-        org="org-1",
-        dom="domain-1",
-        res="project",
-        rid="proj-1",
-        act="update",
-        cqrs="COMMAND"
-    )
-    async with policy_manager._dam.transaction():
-        response = await policy_manager.check_permission(request)
-        assert response.allowed is True, "Project admin should be able to update granted projects"
+        # Deny test cases
+        ("user-1", "pro-2", "org-1", "fluvius-project", "project", "", "create", "COMMAND", PolicyScope.ORG, False, "Deny member to create project in org-1"),
+        ("user-1", "pro-1", "org-2", "fluvius-project", "project", "", "create", "COMMAND", PolicyScope.ORG, False, "Deny admin to create project in org-2 (wrong organization)"),
+        ("user-1", "pro-1", "org-2", "fluvius-project", "project", "", "view", "QUERY", PolicyScope.ORG, False, "Deny admin to view projects in org-2 (wrong organization)"),
+        ("user-1", "pro-1", "org-1", "fluvius-project", "project", "proj-4", "update", "COMMAND", PolicyScope.ORG, False, "Deny admin to update project-4 in org-2 (wrong project)"),
+        ("user-1", "pro-1", "org-1", "fluvius-project", "project", "proj-4", "view", "QUERY", PolicyScope.ORG, False, "Deny admin to view project-4 in org-1 (wrong project)"),
+        ("user-1", "pro-3", "org-1", "fluvius-project", "project", "proj-1", "update", "COMMAND", PolicyScope.ORG, False, "Deny project-member to update project-1 in org-1"),
+        ("user-1", "pro-1", "org-1", "fluvius-user", "user", "user-2", "update", "COMMAND", PolicyScope.USER, False, "Deny user-admin to update user-2 in org-1 (wrong user)"),
+        ("user-1", "pro-1", "org-1", "fluvius-user", "user", "user-2", "view", "QUERY", PolicyScope.USER, False, "Deny user-admin to view user-2 in org-1 (wrong user)"),
 
-    """Project admin can view resources granted via g2."""
-    request = PolicyRequest(
-        usr="user-123",
-        sub="profile-123",
-        org="org-1",
-        dom="domain-1",
-        res="project",
-        rid="proj-2",
-        act="view",
-        cqrs="QUERY"
-    )
-    async with policy_manager._dam.transaction():
-        response = await policy_manager.check_permission(request)
-        assert response.allowed is True, "Project admin should be able to view granted projects"
+        # System Admin
+        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "", "create", "COMMAND", PolicyScope.ORG, True, "System Admin Check"),
+        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "", "create", "COMMAND", PolicyScope.ORG, True, "System Admin Check"),
+        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "", "view", "QUERY", PolicyScope.ORG, True, "System Admin Check"),
+        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-4", "update", "COMMAND", PolicyScope.ORG, True, "System Admin Check"),
+        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-4", "view", "QUERY", PolicyScope.ORG, True, "System Admin Check"),
+        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-1", "update", "COMMAND", PolicyScope.ORG, True, "System Admin Check"),
+        ("user-3", "pro-5", "org-system", "fluvius-user", "user", "user-2", "update", "COMMAND", PolicyScope.USER, True, "System Admin Check"),
+        ("user-3", "pro-5", "org-system", "fluvius-user", "user", "user-2", "view", "QUERY", PolicyScope.USER, True, "System Admin Check"),
+        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "", "create", "COMMAND", PolicyScope.ORG, True, "System Admin Check"),
+        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "", "view", "QUERY", PolicyScope.ORG, True, "System Admin Check"),
+        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-1", "update", "COMMAND", PolicyScope.ORG, True, "System Admin Check"),
+        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-2", "view", "QUERY", PolicyScope.ORG, True, "System Admin Check"),
+        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-1", "update", "COMMAND", PolicyScope.ORG, True, "System Admin Check"),
+        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-1", "view", "QUERY", PolicyScope.ORG, True, "System Admin Check"),
+        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-1", "view", "QUERY", PolicyScope.ORG, True, "System Admin Check"),
+        ("user-3", "pro-5", "org-system", "fluvius-user", "user", "user-1", "update", "COMMAND", PolicyScope.USER, True, "System Admin Check"),
 
-    """Project admin can delete resources granted via g2."""
-    request = PolicyRequest(
-        usr="user-123",
-        sub="profile-123",
-        org="org-1",
-        dom="domain-1",
-        res="project",
-        rid="proj-1",
-        act="delete",
-        cqrs="COMMAND"
-    )
-    async with policy_manager._dam.transaction():
-        response = await policy_manager.check_permission(request)
-        assert response.allowed is True, "Project admin should be able to delete granted projects"
+    ]
 
-    """Project admin cannot access resources not granted via g2."""
-    request = PolicyRequest(
-        usr="user-123",
-        sub="profile-123",
-        org="org-1",
-        dom="domain-1",
-        res="project",
-        rid="proj-X",
-        act="update",
-        cqrs="COMMAND"
-    )
-    async with policy_manager._dam.transaction():
-        response = await policy_manager.check_permission(request)
-        assert response.allowed is False, "Project admin should not be able to access resources not granted via g2"
-
-    """Project admin cannot access resources in wrong organization."""
-    request = PolicyRequest(
-        usr="user-123",
-        sub="profile-123",
-        org="org-2",
-        dom="domain-1",
-        res="project",
-        rid="",
-        act="create",
-        cqrs="COMMAND"
-    )
-    async with policy_manager._dam.transaction():
-        response = await policy_manager.check_permission(request)
-        assert response.allowed is False, "Project admin should not be able to access resources in wrong organization"
-
-    """Project admin cannot access resources in wrong domain."""
-    request = PolicyRequest(
-        usr="user-123",
-        sub="profile-123",
-        org="org-1",
-        dom="domain-2",
-        res="project",
-        rid="proj-1",
-        act="update",
-        cqrs="COMMAND"
-    )
-    async with policy_manager._dam.transaction():
-        response = await policy_manager.check_permission(request)
-        assert response.allowed is False, "Project admin should not be able to access resources in wrong domain"
-
-    """Team lead can view resources granted via g2."""
-    request = PolicyRequest(
-        usr="user-456",
-        sub="profile-456",
-        org="org-1",
-        dom="domain-1",
-        res="project",
-        rid="proj-2",
-        act="view",
-        cqrs="QUERY"
-    )
-    async with policy_manager._dam.transaction():
-        response = await policy_manager.check_permission(request)
-        assert response.allowed is True, "Team lead should be able to view granted projects"
-
-    """Team lead can update resources granted via g2."""
-    request = PolicyRequest(
-        usr="user-456",
-        sub="profile-456",
-        org="org-1",
-        dom="domain-1",
-        res="project",
-        rid="proj-2",
-        act="update",
-        cqrs="COMMAND"
-    )
-    async with policy_manager._dam.transaction():
-        response = await policy_manager.check_permission(request)
-        assert response.allowed is True, "Team lead should be able to update granted projects"
-
-    """Team lead cannot access resources not granted via g2."""
-    request = PolicyRequest(
-        usr="user-456",
-        sub="profile-456",
-        org="org-1",
-        dom="domain-1",
-        res="project",
-        rid="proj-4",
-        act="update",
-        cqrs="COMMAND"
-    )
-    async with policy_manager._dam.transaction():
-        response = await policy_manager.check_permission(request)
-        assert response.allowed is False, "Team lead should not be able to access resources not granted via g2"
-
-    """Team lead cannot create projects."""
-    request = PolicyRequest(
-        usr="user-456",
-        sub="profile-456",
-        org="org-1",
-        dom="domain-1",
-        res="project",
-        rid="",
-        act="create",
-        cqrs="COMMAND"
-    )
-    async with policy_manager._dam.transaction():
-        response = await policy_manager.check_permission(request)
-        assert response.allowed is False, "Team lead should not be able to create projects"
-
-    """Team lead cannot delete projects."""
-    request = PolicyRequest(
-        usr="user-456",
-        sub="profile-456",
-        org="org-1",
-        dom="domain-1",
-        res="project",
-        rid="proj-2",
-        act="delete",
-        cqrs="COMMAND"
-    )
-    async with policy_manager._dam.transaction():
-        response = await policy_manager.check_permission(request)
-        assert response.allowed is False, "Team lead should not be able to delete projects"
-
-    """Team member can view resources granted via g2."""
-    request = PolicyRequest(
-        usr="user-789",
-        sub="profile-789",
-        org="org-1",
-        dom="domain-1",
-        res="project",
-        rid="proj-3",
-        act="view",
-        cqrs="QUERY"
-    )
-    async with policy_manager._dam.transaction():
-        response = await policy_manager.check_permission(request)
-        assert response.allowed is True, "Team member should be able to view granted projects"
-
-    """Team member cannot update projects."""
-    request = PolicyRequest(
-        usr="user-789",
-        sub="profile-789",
-        org="org-1",
-        dom="domain-1",
-        res="project",
-        rid="proj-3",
-        act="update",
-        cqrs="COMMAND"
-    )
-    async with policy_manager._dam.transaction():
-        response = await policy_manager.check_permission(request)
-        assert response.allowed is False, "Team member should not be able to update projects"
-
-    """Team member cannot create projects."""
-    request = PolicyRequest(
-        usr="user-789",
-        sub="profile-789",
-        org="org-1",
-        dom="domain-1",
-        res="project",
-        rid="",
-        act="create",
-        cqrs="COMMAND"
-    )
-    async with policy_manager._dam.transaction():
-        response = await policy_manager.check_permission(request)
-        assert response.allowed is False, "Team member should not be able to create projects"
-
-    """System admin can bypass all checks via g3."""
-    request = PolicyRequest(
-        usr="user-999",
-        sub="profile-999",
-        org="org-1",
-        dom="domain-1",
-        res="project",
-        rid="proj-1",
-        act="view",
-        cqrs="QUERY"
-    )
-    async with policy_manager._dam.transaction():
-        response = await policy_manager.check_permission(request)
-        assert response.allowed is True, "System admin should bypass all checks"
-
-    """System admin can create any resource."""
-    request = PolicyRequest(
-        usr="user-999",
-        sub="profile-999",
-        org="org-1",
-        dom="domain-1",
-        res="project",
-        rid="",
-        act="create",
-        cqrs="COMMAND"
-    )
-    async with policy_manager._dam.transaction():
-        response = await policy_manager.check_permission(request)
-        assert response.allowed is True, "System admin should be able to create any resource"
-
-    """System admin can update any resource."""
-    request = PolicyRequest(
-        usr="user-999",
-        sub="profile-999",
-        org="org-1",
-        dom="domain-1",
-        res="project",
-        rid="proj-1",
-        act="update",
-        cqrs="COMMAND"
-    )
-    async with policy_manager._dam.transaction():
-        response = await policy_manager.check_permission(request)
-        assert response.allowed is True, "System admin should be able to update any resource"
-
-    """System admin can delete any resource."""
-    request = PolicyRequest(
-        usr="user-999",
-        sub="profile-999",
-        org="org-1",
-        dom="domain-1",
-        res="project",
-        rid="proj-1",
-        act="delete",
-        cqrs="COMMAND"
-    )
-    async with policy_manager._dam.transaction():
-        response = await policy_manager.check_permission(request)
-        assert response.allowed is True, "System admin should be able to delete any resource"
-
-    """User cannot access other users' g4 resources."""
-    request = PolicyRequest(
-        usr="user-123",
-        sub="profile-123",
-        org="org-1",
-        dom="domain-1",
-        res="project",
-        rid="proj-6",
-        act="view",
-        cqrs="QUERY"
-    )
-    async with policy_manager._dam.transaction():
-        response = await policy_manager.check_permission(request)
-        assert response.allowed is False, "User should not access other users' g4 resources"
-
-    """Unknown profile should be denied."""
-    request = PolicyRequest(
-        usr="user-unknown",
-        sub="profile-unknown",
-        org="org-1",
-        dom="domain-1",
-        res="project",
-        rid="proj-1",
-        act="view",
-        cqrs="QUERY"
-    )
-    async with policy_manager._dam.transaction():
-        response = await policy_manager.check_permission(request)
-        assert response.allowed is False, "Unknown profile should be denied"
-
-    """Unknown action should be denied."""
-    request = PolicyRequest(
-        usr="user-123",
-        sub="profile-123",
-        org="org-1",
-        dom="domain-1",
-        res="project",
-        rid="proj-1",
-        act="unknown-action",
-        cqrs="COMMAND"
-    )
-    async with policy_manager._dam.transaction():
-        response = await policy_manager.check_permission(request)
-        assert response.allowed is False, "Unknown action should be denied"
-
-    """Wrong resource type should be denied."""
-    request = PolicyRequest(
-        usr="user-123",
-        sub="profile-123",
-        org="org-1",
-        dom="domain-1",
-        res="document",
-        rid="proj-1",
-        act="view",
-        cqrs="QUERY"
-    )
-    async with policy_manager._dam.transaction():
-        response = await policy_manager.check_permission(request)
-        assert response.allowed is False, "Wrong resource type should be denied"
-
-    """Empty resource_id should be allowed for create action."""
-    request = PolicyRequest(
-        usr="user-123",
-        sub="profile-123",
-        org="org-1",
-        dom="domain-1",
-        res="project",
-        rid="",
-        act="create",
-        cqrs="COMMAND"
-    )
-    async with policy_manager._dam.transaction():
-        response = await policy_manager.check_permission(request)
-        assert response.allowed is True, "Empty resource_id should be allowed for create"
-
-    """Profile in org-1 cannot access org-2 resources."""
-    request = PolicyRequest(
-        usr="user-123",
-        sub="profile-123",
-        org="org-1",
-        dom="domain-1",
-        res="project",
-        rid="proj-4",
-        act="view",
-        cqrs="QUERY"
-    )
-    async with policy_manager._dam.transaction():
-        response = await policy_manager.check_permission(request)
-        assert response.allowed is False, "Profile in org-1 cannot access org-2 resources"
-
-    """Profile in org-2 can access org-2 resources."""
-    request = PolicyRequest(
-        usr="user-111",
-        sub="profile-111",
-        org="org-2",
-        dom="domain-1",
-        res="project",
-        rid="proj-4",
-        act="view",
-        cqrs="QUERY"
-    )
-    async with policy_manager._dam.transaction():
-        response = await policy_manager.check_permission(request)
-        assert response.allowed is True, "Profile in org-2 can access org-2 resources"
+    for test_case in test_cases:
+        usr, sub, org, dom, res, rid, act, cqrs, scope, allowed, message = test_case
+        request = PolicyRequest(
+            usr=usr,
+            sub=sub,
+            org=org,
+            dom=dom,
+            res=res,
+            rid=rid,
+            act=act,
+            cqrs=cqrs,
+            scope=scope
+        )
+        async with policy_manager._dam.transaction():
+            response = await policy_manager.check_permission(request)
+            logger.info(response)
+            logger.info("Test case: %s", message)
+            logger.info(
+                "Test case: usr=%s, sub=%s, org=%s, dom=%s, res=%s, rid=%s, act=%s, cqrs=%s, scope=%s | expected=%s | actual=%s",
+                request.usr, request.sub, request.org, request.dom, request.res, request.rid, request.act, request.cqrs, request.scope, allowed, response.allowed
+            )
+            logger.info("--------------------------------")
+            assert response.allowed is allowed, message

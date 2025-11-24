@@ -41,6 +41,8 @@ class PolicySchema:
                 return [ptype, p.sub, p.role]
             case "g4":
                 return [ptype, p.sub, p.res, p.rid]
+            case "g5":
+                return [ptype, p.sub, p.role, p.rid]
             case _:
                 raise ValueError(f"Unsupported policy type: {ptype}")
 
@@ -92,6 +94,13 @@ class PolicySchema:
                         "ptype": "g4",
                         "sub": request.usr,
                         "res": request.res,
+                        "rid": request.rid,
+                    }]
+                },
+                {
+                    ".and": [{
+                        "ptype": "g5",
+                        "sub": request.sub,
                         "rid": request.rid,
                     }]
                 },

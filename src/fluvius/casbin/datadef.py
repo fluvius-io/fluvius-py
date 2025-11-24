@@ -1,7 +1,7 @@
 from pyrsistent import PClass, field, pvector_field
 from enum import Enum
 
-class PolicyLevel(Enum):
+class PolicyScope(Enum):
     ORG = "ORG"
     USER = "USER"
 
@@ -15,7 +15,7 @@ class PolicyRequest(PClass):
     rid = field(type=str, factory=str)
     act = field(type=str, factory=str)
     cqrs = field(type=str, factory=str, initial="COMMAND")
-    level = field(type=PolicyLevel, factory=lambda x: PolicyLevel(x), initial=PolicyLevel.ORG)
+    scope = field(type=PolicyScope, factory=lambda x: PolicyScope(x), initial=PolicyScope.ORG)
 
 
 class PolicyData(PClass):
