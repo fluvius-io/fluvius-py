@@ -2,6 +2,7 @@ from pyrsistent import PClass, field, pvector_field
 from enum import Enum
 
 class PolicyScope(Enum):
+    SYS = "SYS"
     ORG = "ORG"
     USER = "USER"
 

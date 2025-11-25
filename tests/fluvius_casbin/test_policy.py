@@ -73,7 +73,13 @@ async def test_project_admin_create_without_resource_id():
                     - proj-2: project-admin
         user-3:
             - pro-5:
-                - org-system: sysadmin
+                - org-system: sys_admin
+        user-4:
+            - pro-6
+                - org-system: sys_readonly
+        user-5:
+            - pro-7
+                - org-system: sys_audit
     """
     test_cases = [
         ("user-1", "pro-1", "org-1", "fluvius-project", "project", "", "create", "COMMAND", PolicyScope.ORG, True, "Allow admin to create project in org-1"),
@@ -96,23 +102,44 @@ async def test_project_admin_create_without_resource_id():
         ("user-1", "pro-1", "org-1", "fluvius-user", "user", "user-2", "view", "QUERY", PolicyScope.USER, False, "Deny user-admin to view user-2 in org-1 (wrong user)"),
 
         # System Admin
-        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "", "create", "COMMAND", PolicyScope.ORG, True, "System Admin Check"),
-        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "", "create", "COMMAND", PolicyScope.ORG, True, "System Admin Check"),
-        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "", "view", "QUERY", PolicyScope.ORG, True, "System Admin Check"),
-        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-4", "update", "COMMAND", PolicyScope.ORG, True, "System Admin Check"),
-        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-4", "view", "QUERY", PolicyScope.ORG, True, "System Admin Check"),
-        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-1", "update", "COMMAND", PolicyScope.ORG, True, "System Admin Check"),
-        ("user-3", "pro-5", "org-system", "fluvius-user", "user", "user-2", "update", "COMMAND", PolicyScope.USER, True, "System Admin Check"),
-        ("user-3", "pro-5", "org-system", "fluvius-user", "user", "user-2", "view", "QUERY", PolicyScope.USER, True, "System Admin Check"),
-        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "", "create", "COMMAND", PolicyScope.ORG, True, "System Admin Check"),
-        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "", "view", "QUERY", PolicyScope.ORG, True, "System Admin Check"),
-        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-1", "update", "COMMAND", PolicyScope.ORG, True, "System Admin Check"),
-        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-2", "view", "QUERY", PolicyScope.ORG, True, "System Admin Check"),
-        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-1", "update", "COMMAND", PolicyScope.ORG, True, "System Admin Check"),
-        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-1", "view", "QUERY", PolicyScope.ORG, True, "System Admin Check"),
-        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-1", "view", "QUERY", PolicyScope.ORG, True, "System Admin Check"),
-        ("user-3", "pro-5", "org-system", "fluvius-user", "user", "user-1", "update", "COMMAND", PolicyScope.USER, True, "System Admin Check"),
+        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "", "create", "COMMAND", PolicyScope.SYS, True, "System Admin Check Create Project"),
+        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "", "create", "COMMAND", PolicyScope.SYS, True, "System Admin Check View Project"),
+        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "", "view", "QUERY", PolicyScope.SYS, True, "System Admin Check Update Project"),
+        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-4", "update", "COMMAND", PolicyScope.SYS, True, "System Admin Check Update Project"),
+        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-4", "view", "QUERY", PolicyScope.SYS, True, "System Admin Check View Project"),
+        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-1", "update", "COMMAND", PolicyScope.SYS, True, "System Admin Check Update Project"),
+        ("user-3", "pro-5", "org-system", "fluvius-user", "user", "user-2", "update", "COMMAND", PolicyScope.SYS, True, "System Admin Check Update User"),
+        ("user-3", "pro-5", "org-system", "fluvius-user", "user", "user-2", "view", "QUERY", PolicyScope.SYS, True, "System Admin Check View User"),
+        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "", "create", "COMMAND", PolicyScope.SYS, True, "System Admin Check Create Project"),
+        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "", "view", "QUERY", PolicyScope.SYS, True, "System Admin Check View Project"),
+        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-1", "update", "COMMAND", PolicyScope.SYS, True, "System Admin Check Update Project"),
+        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-2", "view", "QUERY", PolicyScope.SYS, True, "System Admin Check View Project"),
+        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-1", "update", "COMMAND", PolicyScope.SYS, True, "System Admin Check Update Project"),
+        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-1", "view", "QUERY", PolicyScope.SYS, True, "System Admin Check View Project"),
+        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-1", "view", "QUERY", PolicyScope.SYS, True, "System Admin Check View Project"),
+        ("user-3", "pro-5", "org-system", "fluvius-user", "user", "user-1", "update", "COMMAND", PolicyScope.SYS, True, "System Admin Check Update User"),
 
+        # System Read Only
+        ("user-4", "pro-6", "org-system", "fluvius-project", "project", "", "create", "COMMAND", PolicyScope.SYS, False, "System Read Only Check Create Project"),
+        ("user-4", "pro-6", "org-system", "fluvius-project", "project", "", "view", "QUERY", PolicyScope.SYS, True, "System Read Only Check View Project"),
+        ("user-4", "pro-6", "org-system", "fluvius-project", "project", "proj-4", "update", "COMMAND", PolicyScope.SYS, False, "System Read Only Check Update Project"),
+        ("user-4", "pro-6", "org-system", "fluvius-project", "project", "proj-4", "view", "QUERY", PolicyScope.SYS, True, "System Read Only Check View Project"),
+        ("user-4", "pro-6", "org-system", "fluvius-project", "project", "proj-1", "update", "COMMAND", PolicyScope.SYS, False, "System Read Only Check Update Project"),
+        ("user-4", "pro-6", "org-system", "fluvius-user", "user", "user-2", "update", "COMMAND", PolicyScope.SYS, False, "System Read Only Check Update User"),
+        ("user-4", "pro-6", "org-system", "fluvius-user", "user", "user-2", "view", "QUERY", PolicyScope.SYS, True, "System Read Only Check View User"),
+        ("user-4", "pro-6", "org-system", "fluvius-project", "project", "", "create", "COMMAND", PolicyScope.SYS, False, "System Read Only Check Create Project"),
+        ("user-4", "pro-6", "org-system", "fluvius-project", "project", "", "view", "QUERY", PolicyScope.SYS, True, "System Read Only Check View Project"),
+        ("user-4", "pro-6", "org-system", "fluvius-project", "project", "proj-1", "update", "COMMAND", PolicyScope.SYS, False, "System Read Only Check Update Project"),
+        ("user-4", "pro-6", "org-system", "fluvius-project", "project", "proj-2", "view", "QUERY", PolicyScope.SYS, True, "System Read Only Check View Project"),
+        ("user-4", "pro-6", "org-system", "fluvius-project", "project", "proj-1", "update", "COMMAND", PolicyScope.SYS, False, "System Read Only Check Update Project"),
+        ("user-4", "pro-6", "org-system", "fluvius-project", "project", "proj-1", "view", "QUERY", PolicyScope.SYS, True, "System Read Only Check View Project"),
+        ("user-4", "pro-6", "org-system", "fluvius-project", "project", "proj-1", "view", "QUERY", PolicyScope.SYS, True, "System Read Only Check View Project"),
+        ("user-4", "pro-6", "org-system", "fluvius-user", "user", "user-1", "update", "COMMAND", PolicyScope.SYS, False, "System Read Only Check Update User"),
+
+        # System Audit (Only View Logs)
+        ("user-5", "pro-7", "org-system", "fluvius-project", "project", "", "create", "COMMAND", PolicyScope.SYS, False, "System Audit Check Create Project"),
+        ("user-5", "pro-7", "org-system", "fluvius-project", "project", "", "view", "QUERY", PolicyScope.SYS, False, "System Audit Check View Project"),
+        ("user-5", "pro-7", "org-system", "fluvius-log", "log", "", "view", "QUERY", PolicyScope.SYS, True, "System Audit Check View Logs"),
     ]
 
     for test_case in test_cases:

@@ -54,18 +54,10 @@ class PolicySchema:
                 {
                     ".and": [{
                         "ptype": "p",
-                        "dom": request.dom,
-                        "res": request.res,
-                        "act": request.act,
-                        "cqrs": request.cqrs
-                    }]
-                },
-                {
-                    ".and": [{
-                        "ptype": "p",
-                        "dom": "*",
-                        "res": "*",
-                        "act": "*"
+                        # "dom": request.dom,
+                        # "res": request.res,
+                        # "act": request.act,
+                        # "cqrs": request.cqrs
                     }]
                 },
                 {
