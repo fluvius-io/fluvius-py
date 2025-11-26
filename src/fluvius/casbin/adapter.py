@@ -52,13 +52,33 @@ class PolicySchema:
         return {
             ".or": [
                 {
-                    ".and": [{
-                        "ptype": "p",
-                        # "dom": request.dom,
-                        # "res": request.res,
-                        # "act": request.act,
-                        # "cqrs": request.cqrs
-                    }]
+                    ".and": [
+                        {"ptype": "p"},
+                        {
+                            ".or": [
+                                {"dom": request.dom},
+                                {"dom": "*"}
+                            ]
+                        },
+                        {
+                            ".or": [
+                                {"res": request.res},
+                                {"res": "*"}
+                            ]
+                        },
+                        {
+                            ".or": [
+                                {"act": request.act},
+                                {"act": "*"}
+                            ]
+                        },
+                        {
+                            ".or": [
+                                {"cqrs": request.cqrs},
+                                {"cqrs": "*"}
+                            ]
+                        }
+                    ]
                 },
                 {
                     ".and": [{
