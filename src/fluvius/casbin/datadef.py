@@ -31,6 +31,7 @@ class PolicyData(PClass):
 class PolicyNarration(PClass):
     message  = field(type=str, factory=str)
     policies = pvector_field(PolicyData, initial=[])
+    trace    = pvector_field(dict, initial=[])
 
 
 class PolicyResponse(PClass):

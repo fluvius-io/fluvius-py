@@ -65,7 +65,7 @@ class PolicyManager:
             await self._enforcer.load_filtered_policy(fitler)
             logger.info(f"Time taken to load filtered policy: {time() - start}")
             start = time()
-            allowed, narration = self._enforcer.enforce_ex(
+            allowed, narration, trace = self._enforcer.enforce_ex(
                 request.usr,
                 request.sub,
                 request.org,
@@ -78,12 +78,12 @@ class PolicyManager:
             )
             return PolicyResponse(
                 allowed=allowed,
-                narration=self._generate_narration(request, allowed, narration)
+                narration=self._generate_narration(request, allowed, narration, trace)
             )
         except Exception as e:
             raise RuntimeError(f"Permission check failed: {str(e)}")
 
-    def _generate_narration(self, request: PolicyRequest, allowed: bool, narration: list) -> str:
+    def _generate_narration(self, request: PolicyRequest, allowed: bool, narration: list, trace: list) -> str:
         """Generate a human readable explanation of the policy decision."""
         message = f"Request: {request}"
 
@@ -102,4 +102,4 @@ class PolicyManager:
                 )
                 policies.append(prule)
 
-        return PolicyNarration(message=message, policies=policies)
+        return PolicyNarration(message=message, policies=policies, trace=trace)

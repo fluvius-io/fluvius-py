@@ -157,7 +157,8 @@ async def test_project_admin_create_without_resource_id():
         )
         async with policy_manager._dam.transaction():
             response = await policy_manager.check_permission(request)
-            logger.info(response)
+            for trace in response.narration.trace:
+                logger.info(trace["detail"])
             logger.info("Test case: %s", message)
             logger.info(
                 "Test case: usr=%s, sub=%s, org=%s, dom=%s, res=%s, rid=%s, act=%s, cqrs=%s, scope=%s | expected=%s | actual=%s",

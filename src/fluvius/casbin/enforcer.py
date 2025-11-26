@@ -3,6 +3,9 @@ from casbin.util import generate_g_function, util, generate_conditional_g_functi
 from casbin.core_enforcer import EnforceContext
 from casbin import AsyncEnforcer
 
+from fluvius.casbin import logger
+from fluvius.casbin.helper import enable_simpleeval_trace, extract_trace_log
+
 
 class FluviusEnforcer(AsyncEnforcer):
     def enforce_ex(self, *rvals):
@@ -17,7 +20,7 @@ class FluviusEnforcer(AsyncEnforcer):
             mtype = "m"
 
             if not self.enabled:
-                return [True, []]
+                return [True, [], []]
 
             functions = self.fm.get_functions()
 
@@ -62,6 +65,7 @@ class FluviusEnforcer(AsyncEnforcer):
 
             explain_index = -1
             explain_plist = []
+            explain_trace = []
             if not 0 == policy_len:
                 for i, pvals in enumerate(self.model["p"][ptype].policy):
                     if len(p_tokens) != len(pvals):
@@ -76,7 +80,11 @@ class FluviusEnforcer(AsyncEnforcer):
                         exp_with_rule = util.replace_eval(exp_string, rules)
                         expression = self._get_expression(exp_with_rule, functions)
 
+                    enable_simpleeval_trace(expression)
                     result = expression.eval(parameters)
+
+                    trace_log = expression._trace_log
+                    explain_trace.append({"index": i, "result": result, "policy": self.model["p"][ptype].policy[i], "parameters": parameters, "detail": extract_trace_log(trace_log)})
 
                     if isinstance(result, bool):
                         if not result:
@@ -150,5 +158,4 @@ class FluviusEnforcer(AsyncEnforcer):
             for index in explain_plist:
                 if index != -1 and index < policy_len:
                     explain_rule.append(self.model["p"][ptype].policy[index])
-
-            return result, explain_rule
+            return result, explain_rule, explain_trace
