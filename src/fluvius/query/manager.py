@@ -159,9 +159,6 @@ class QueryManager(object):
 
             auth_scope = []
             for policy in resp.narration.policies:
-                if policy.role == 'sys-admin':
-                    return base_scope
-
                 if policy.meta:
                     if not isinstance(policy.meta, str):
                         raise ForbiddenError('Q4031213', f'{policy.meta} must be str with jsonurl format.')
