@@ -16,7 +16,8 @@ class PolicySchema:
     _id = sa.Column(UUID, primary_key=True, nullable=False)
     ptype = sa.Column(sa.String(255))
     role = sa.Column(sa.String(255))
-    sub = sa.Column(sa.String(255))
+    usr = sa.Column(sa.String(255))
+    pro = sa.Column(sa.String(255))
     org = sa.Column(sa.String(255))
     dom = sa.Column(sa.String(255))
     res = sa.Column(sa.String(255))
@@ -34,15 +35,17 @@ class PolicySchema:
             case "p":
                 return [ptype, p.role, p.dom, p.res, p.act, p.cqrs, p.meta]
             case "g":
-                return [ptype, p.sub, p.role, p.org]
+                return [ptype, p.usr, p.pro]
             case "g2":
-                return [ptype, p.org, p.res, p.rid]
+                return [ptype, p.pro, p.role, p.org]
             case "g3":
-                return [ptype, p.sub, p.role]
+                return [ptype, p.org, p.res, p.rid]
             case "g4":
-                return [ptype, p.sub, p.res, p.rid]
+                return [ptype, p.pro, p.role, p.rid]
             case "g5":
-                return [ptype, p.sub, p.role, p.rid]
+                return [ptype, p.usr, p.role]
+            case "g6":
+                return [ptype, p.usr, p.res, p.rid]
             case _:
                 raise ValueError(f"Unsupported policy type: {ptype}")
 
@@ -83,37 +86,42 @@ class PolicySchema:
                 {
                     ".and": [{
                         "ptype": "g",
-                        "sub": request.sub,
-                        "org": request.org,
+                        "usr": request.usr,
+                        "pro": request.pro,
                     }]
                 },
                 {
                     ".and": [{
                         "ptype": "g2",
+                        "pro": request.pro,
                         "org": request.org,
-                        "res": request.res,
-                        "rid": request.rid,
                     }]
                 },
                 {
                     ".and": [{
                         "ptype": "g3",
-                        "sub": request.usr,
+                        "org": request.org,
+                        "res": request.res,
                     }]
                 },
                 {
                     ".and": [{
                         "ptype": "g4",
-                        "sub": request.usr,
-                        "res": request.res,
+                        "pro": request.pro,
                         "rid": request.rid,
                     }]
                 },
                 {
                     ".and": [{
                         "ptype": "g5",
-                        "sub": request.sub,
-                        "rid": request.rid,
+                        "usr": request.usr,
+                    }]
+                },
+                {
+                    ".and": [{
+                        "ptype": "g6",
+                        "usr": request.usr,
+                        "res": request.res,
                     }]
                 },
             ]

@@ -1,8 +1,7 @@
 import re
 import pytest
 from fluvius.data import SqlaDriver, DataAccessManager
-from fluvius.casbin import PolicySchema, PolicyManager, PolicyRequest, PolicyScope, logger
-from fluvius.error import ForbiddenError
+from fluvius.casbin import PolicySchema, PolicyManager, PolicyRequest, logger
 
 RX_COMMA = re.compile(r"\s*[,;\s]\s*")
 
@@ -53,7 +52,7 @@ async def test_project_admin_create_without_resource_id():
         engine=dam,
         schema="public",
         table="casbin_rule",
-        columns="ptype,role,sub,org,dom,res,rid,act,cqrs,meta,_id,_deleted",
+        columns="ptype,role,usr,pro,org,dom,res,rid,act,cqrs,meta,_id,_deleted",
         source="tests/_data/policy_test.csv"
     )
     policy_manager = TestPolicyManager(dam)
@@ -82,78 +81,37 @@ async def test_project_admin_create_without_resource_id():
                 - org-system: sys_audit
     """
     test_cases = [
-        ("user-1", "pro-1", "org-1", "fluvius-project", "project", "", "create", "COMMAND", PolicyScope.ORG, True, "Allow admin to create project in org-1"),
-        ("user-1", "pro-1", "org-1", "fluvius-project", "project", "", "view", "QUERY", PolicyScope.ORG, True, "Allow admin to view projects in org-1"),
-        ("user-1", "pro-1", "org-1", "fluvius-project", "project", "proj-1", "update", "COMMAND", PolicyScope.ORG, True, "Allow admin to update project-1 in org-1"),
-        ("user-1", "pro-1", "org-1", "fluvius-project", "project", "proj-2", "view", "QUERY", PolicyScope.ORG, True, "Allow admin to view project-2 in org-1"),
-        ("user-1", "pro-2", "org-1", "fluvius-project", "project", "proj-1", "update", "COMMAND", PolicyScope.ORG, True, "Allow project-admin to update project-1 in org-1"),
-        ("user-1", "pro-2", "org-1", "fluvius-project", "project", "proj-1", "view", "QUERY", PolicyScope.ORG, True, "Allow project-admin to view project-1 in org-1 (same organization)"),
-        ("user-1", "pro-3", "org-1", "fluvius-project", "project", "proj-1", "view", "QUERY", PolicyScope.ORG, True, "Allow project-member to view project-1 in org-1 (same organization)"),
-        ("user-1", "pro-1", "org-1", "fluvius-user", "user", "user-1", "update", "COMMAND", PolicyScope.USER, True, "Allow user-admin to update user-1 in org-1"),
+        ("user-1", "pro-1", "org-1", "fluvius-project", "project", "", "create", "COMMAND", True, "Allow admin to create project in org-1"),
+        ("user-1", "pro-1", "org-1", "fluvius-project", "project", "", "view", "QUERY", True, "Allow admin to view projects in org-1"),
+        ("user-1", "pro-1", "org-1", "fluvius-project", "project", "proj-1", "update", "COMMAND", True, "Allow admin to update project-1 in org-1"),
+        ("user-1", "pro-1", "org-1", "fluvius-project", "project", "proj-2", "view", "QUERY", True, "Allow admin to view project-2 in org-1"),
+        ("user-1", "pro-2", "org-1", "fluvius-project", "project", "proj-1", "update", "COMMAND", True, "Allow project-admin to update project-1 in org-1"),
+        ("user-1", "pro-2", "org-1", "fluvius-project", "project", "proj-1", "view", "QUERY", True, "Allow project-admin to view project-1 in org-1 (same organization)"),
+        ("user-1", "pro-3", "org-1", "fluvius-project", "project", "proj-1", "view", "QUERY", True, "Allow project-member to view project-1 in org-1 (same organization)"),
+        ("user-1", "pro-1", "org-1", "fluvius-user", "user", "user-1", "update", "COMMAND", True, "Allow user-admin to update user-1 in org-1"),
 
         # Deny test cases
-        ("user-1", "pro-2", "org-1", "fluvius-project", "project", "", "create", "COMMAND", PolicyScope.ORG, False, "Deny member to create project in org-1"),
-        ("user-1", "pro-1", "org-2", "fluvius-project", "project", "", "create", "COMMAND", PolicyScope.ORG, False, "Deny admin to create project in org-2 (wrong organization)"),
-        ("user-1", "pro-1", "org-2", "fluvius-project", "project", "", "view", "QUERY", PolicyScope.ORG, False, "Deny admin to view projects in org-2 (wrong organization)"),
-        ("user-1", "pro-1", "org-1", "fluvius-project", "project", "proj-4", "update", "COMMAND", PolicyScope.ORG, False, "Deny admin to update project-4 in org-2 (wrong project)"),
-        ("user-1", "pro-1", "org-1", "fluvius-project", "project", "proj-4", "view", "QUERY", PolicyScope.ORG, False, "Deny admin to view project-4 in org-1 (wrong project)"),
-        ("user-1", "pro-3", "org-1", "fluvius-project", "project", "proj-1", "update", "COMMAND", PolicyScope.ORG, False, "Deny project-member to update project-1 in org-1"),
-        ("user-1", "pro-1", "org-1", "fluvius-user", "user", "user-2", "update", "COMMAND", PolicyScope.USER, False, "Deny user-admin to update user-2 in org-1 (wrong user)"),
-        ("user-1", "pro-1", "org-1", "fluvius-user", "user", "user-2", "view", "QUERY", PolicyScope.USER, False, "Deny user-admin to view user-2 in org-1 (wrong user)"),
-
-        # System Admin
-        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "", "create", "COMMAND", PolicyScope.SYS, True, "System Admin Check Create Project"),
-        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "", "create", "COMMAND", PolicyScope.SYS, True, "System Admin Check View Project"),
-        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "", "view", "QUERY", PolicyScope.SYS, True, "System Admin Check Update Project"),
-        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-4", "update", "COMMAND", PolicyScope.SYS, True, "System Admin Check Update Project"),
-        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-4", "view", "QUERY", PolicyScope.SYS, True, "System Admin Check View Project"),
-        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-1", "update", "COMMAND", PolicyScope.SYS, True, "System Admin Check Update Project"),
-        ("user-3", "pro-5", "org-system", "fluvius-user", "user", "user-2", "update", "COMMAND", PolicyScope.SYS, True, "System Admin Check Update User"),
-        ("user-3", "pro-5", "org-system", "fluvius-user", "user", "user-2", "view", "QUERY", PolicyScope.SYS, True, "System Admin Check View User"),
-        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "", "create", "COMMAND", PolicyScope.SYS, True, "System Admin Check Create Project"),
-        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "", "view", "QUERY", PolicyScope.SYS, True, "System Admin Check View Project"),
-        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-1", "update", "COMMAND", PolicyScope.SYS, True, "System Admin Check Update Project"),
-        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-2", "view", "QUERY", PolicyScope.SYS, True, "System Admin Check View Project"),
-        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-1", "update", "COMMAND", PolicyScope.SYS, True, "System Admin Check Update Project"),
-        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-1", "view", "QUERY", PolicyScope.SYS, True, "System Admin Check View Project"),
-        ("user-3", "pro-5", "org-system", "fluvius-project", "project", "proj-1", "view", "QUERY", PolicyScope.SYS, True, "System Admin Check View Project"),
-        ("user-3", "pro-5", "org-system", "fluvius-user", "user", "user-1", "update", "COMMAND", PolicyScope.SYS, True, "System Admin Check Update User"),
-
-        # System Read Only
-        ("user-4", "pro-6", "org-system", "fluvius-project", "project", "", "create", "COMMAND", PolicyScope.SYS, False, "System Read Only Check Create Project"),
-        ("user-4", "pro-6", "org-system", "fluvius-project", "project", "", "view", "QUERY", PolicyScope.SYS, True, "System Read Only Check View Project"),
-        ("user-4", "pro-6", "org-system", "fluvius-project", "project", "proj-4", "update", "COMMAND", PolicyScope.SYS, False, "System Read Only Check Update Project"),
-        ("user-4", "pro-6", "org-system", "fluvius-project", "project", "proj-4", "view", "QUERY", PolicyScope.SYS, True, "System Read Only Check View Project"),
-        ("user-4", "pro-6", "org-system", "fluvius-project", "project", "proj-1", "update", "COMMAND", PolicyScope.SYS, False, "System Read Only Check Update Project"),
-        ("user-4", "pro-6", "org-system", "fluvius-user", "user", "user-2", "update", "COMMAND", PolicyScope.SYS, False, "System Read Only Check Update User"),
-        ("user-4", "pro-6", "org-system", "fluvius-user", "user", "user-2", "view", "QUERY", PolicyScope.SYS, True, "System Read Only Check View User"),
-        ("user-4", "pro-6", "org-system", "fluvius-project", "project", "", "create", "COMMAND", PolicyScope.SYS, False, "System Read Only Check Create Project"),
-        ("user-4", "pro-6", "org-system", "fluvius-project", "project", "", "view", "QUERY", PolicyScope.SYS, True, "System Read Only Check View Project"),
-        ("user-4", "pro-6", "org-system", "fluvius-project", "project", "proj-1", "update", "COMMAND", PolicyScope.SYS, False, "System Read Only Check Update Project"),
-        ("user-4", "pro-6", "org-system", "fluvius-project", "project", "proj-2", "view", "QUERY", PolicyScope.SYS, True, "System Read Only Check View Project"),
-        ("user-4", "pro-6", "org-system", "fluvius-project", "project", "proj-1", "update", "COMMAND", PolicyScope.SYS, False, "System Read Only Check Update Project"),
-        ("user-4", "pro-6", "org-system", "fluvius-project", "project", "proj-1", "view", "QUERY", PolicyScope.SYS, True, "System Read Only Check View Project"),
-        ("user-4", "pro-6", "org-system", "fluvius-project", "project", "proj-1", "view", "QUERY", PolicyScope.SYS, True, "System Read Only Check View Project"),
-        ("user-4", "pro-6", "org-system", "fluvius-user", "user", "user-1", "update", "COMMAND", PolicyScope.SYS, False, "System Read Only Check Update User"),
-
-        # System Audit (Only View Logs)
-        ("user-5", "pro-7", "org-system", "fluvius-project", "project", "", "create", "COMMAND", PolicyScope.SYS, False, "System Audit Check Create Project"),
-        ("user-5", "pro-7", "org-system", "fluvius-project", "project", "", "view", "QUERY", PolicyScope.SYS, False, "System Audit Check View Project"),
-        ("user-5", "pro-7", "org-system", "fluvius-log", "log", "", "view", "QUERY", PolicyScope.SYS, True, "System Audit Check View Logs"),
+        ("user-1", "pro-2", "org-1", "fluvius-project", "project", "", "create", "COMMAND", False, "Deny member to create project in org-1"),
+        ("user-1", "pro-1", "org-2", "fluvius-project", "project", "", "create", "COMMAND", False, "Deny admin to create project in org-2 (wrong organization)"),
+        ("user-1", "pro-1", "org-2", "fluvius-project", "project", "", "view", "QUERY", False, "Deny admin to view projects in org-2 (wrong organization)"),
+        ("user-1", "pro-1", "org-1", "fluvius-project", "project", "proj-4", "update", "COMMAND", False, "Deny admin to update project-4 in org-2 (wrong project)"),
+        ("user-1", "pro-1", "org-1", "fluvius-project", "project", "proj-4", "view", "QUERY", False, "Deny admin to view project-4 in org-1 (wrong project)"),
+        ("user-1", "pro-3", "org-1", "fluvius-project", "project", "proj-1", "update", "COMMAND", False, "Deny project-member to update project-1 in org-1"),
+        ("user-1", "pro-1", "org-1", "fluvius-user", "user", "user-2", "update", "COMMAND", False, "Deny user-admin to update user-2 in org-1 (wrong user)"),
+        ("user-1", "pro-1", "org-1", "fluvius-user", "user", "user-2", "view", "QUERY", False, "Deny user-admin to view user-2 in org-1 (wrong user)"),
     ]
 
     for test_case in test_cases:
-        usr, sub, org, dom, res, rid, act, cqrs, scope, allowed, message = test_case
+        usr, sub, org, dom, res, rid, act, cqrs, allowed, message = test_case
         request = PolicyRequest(
             usr=usr,
-            sub=sub,
+            pro=sub,
             org=org,
             dom=dom,
             res=res,
             rid=rid,
             act=act,
             cqrs=cqrs,
-            scope=scope
         )
         async with policy_manager._dam.transaction():
             response = await policy_manager.check_permission(request)
@@ -161,8 +119,8 @@ async def test_project_admin_create_without_resource_id():
                 logger.info(trace["detail"])
             logger.info("Test case: %s", message)
             logger.info(
-                "Test case: usr=%s, sub=%s, org=%s, dom=%s, res=%s, rid=%s, act=%s, cqrs=%s, scope=%s | expected=%s | actual=%s",
-                request.usr, request.sub, request.org, request.dom, request.res, request.rid, request.act, request.cqrs, request.scope, allowed, response.allowed
+                "Test case: usr=%s, pro=%s, org=%s, dom=%s, res=%s, rid=%s, act=%s, cqrs=%s, | expected=%s | actual=%s",
+                request.usr, request.pro, request.org, request.dom, request.res, request.rid, request.act, request.cqrs, allowed, response.allowed
             )
             logger.info("--------------------------------")
             assert response.allowed is allowed, message

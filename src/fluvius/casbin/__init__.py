@@ -3,7 +3,6 @@
 from ._meta import config, logger
 from .manager import PolicyManager, PolicyRequest, PolicyResponse
 from .adapter import PolicySchema
-from .datadef import PolicyScope
 
 __all__ = [
     'config',
@@ -12,6 +11,5 @@ __all__ = [
     'PolicyRequest',
     'PolicyResponse',
     'PolicySchema',
-    'PolicyScope'
 ]
 

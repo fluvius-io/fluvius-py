@@ -1,22 +1,15 @@
 from pyrsistent import PClass, field, pvector_field
 from enum import Enum
 
-class PolicyScope(Enum):
-    SYS = "SYS"
-    ORG = "ORG"
-    USER = "USER"
-
-
 class PolicyRequest(PClass):
     usr = field(type=str, factory=str)
-    sub = field(type=str, factory=str)
+    pro = field(type=str, factory=str)
     org = field(type=str, factory=str)
     dom = field(type=str, factory=str)
     res = field(type=str, factory=str)
     rid = field(type=str, factory=str)
     act = field(type=str, factory=str)
     cqrs = field(type=str, factory=str, initial="COMMAND")
-    scope = field(type=PolicyScope, factory=lambda x: PolicyScope(x), initial=PolicyScope.ORG)
 
 
 class PolicyData(PClass):

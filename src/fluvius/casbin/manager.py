@@ -67,14 +67,13 @@ class PolicyManager:
             start = time()
             allowed, narration, trace = self._enforcer.enforce_ex(
                 request.usr,
-                request.sub,
+                request.pro,
                 request.org,
                 request.dom,
                 request.res,
                 request.rid,
                 request.act,
                 request.cqrs,
-                request.scope.value,
             )
             return PolicyResponse(
                 allowed=allowed,

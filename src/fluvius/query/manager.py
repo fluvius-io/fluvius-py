@@ -125,10 +125,11 @@ class QueryManager(object):
 
     async def authorize_by_policy(self, auth_ctx: Optional[AuthorizationContext], query_resource, fe_query, identifier=None):
         qmeta = query_resource.Meta
-        base_scope = query_resource.base_query(auth_ctx, fe_query.scope)
+        if not config.QUERY_PERMISSION:
+            return None
 
         if not self.__policymgr__ or not qmeta.policy_required or not auth_ctx:
-            return base_scope
+            return None
 
         try:
             if qmeta.policy_required == 'id':
@@ -142,7 +143,7 @@ class QueryManager(object):
             actx = auth_ctx
             reqs = PolicyRequest(
                 usr=actx.user._id,
-                sub=actx.profile._id,
+                pro=actx.profile._id,
                 org=actx.organization._id,
                 dom=self.Meta.prefix,
                 res=res,
@@ -167,7 +168,7 @@ class QueryManager(object):
                     scope_meta = jsonurl_py.loads(format_meta)
                     auth_scope.append(scope_meta)
 
-            scope = [_scope for _scope in [auth_scope, base_scope] if _scope]
+            scope = [_scope for _scope in auth_scope if _scope]
 
             if not scope:
                 return None
@@ -184,11 +185,12 @@ class QueryManager(object):
         policy_scope=None
     ):
         """ Convert from the frontend query to the backend query """
-        scope   = (fe_query.scope or {}) | (policy_scope or {})
-        query   = query_resource.process_query(fe_query.user_query, fe_query.path_query)
-        limit   = fe_query.limit
-        offset  = (fe_query.page - 1) * fe_query.limit
-        sort    = query_resource.process_sort(*fe_query.sort if fe_query.sort else tuple())
+        base_scope = query_resource.base_query(auth_ctx, fe_query.scope)
+        query      = query_resource.process_query(fe_query.user_query, fe_query.path_query, base_scope)
+        scope      = (fe_query.scope or {}) | (policy_scope or {})
+        limit      = fe_query.limit
+        offset     = (fe_query.page - 1) * fe_query.limit
+        sort       = query_resource.process_sort(*fe_query.sort if fe_query.sort else tuple())
         include, exclude = query_resource.process_select(fe_query.include, fe_query.exclude)
 
         backend_query = BackendQuery.create(

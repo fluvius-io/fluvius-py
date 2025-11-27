@@ -342,6 +342,9 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         Override this method to authorize the command
         and set the selector scope in order to fetch the aggroot
         '''
+        if not config.COMMAND_PERMISSION:
+            return command
+
         cmdc = self.lookup_command(command.command)
         if not self.policymgr or not cmdc.Meta.policy_required:
             return command
@@ -349,7 +352,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         rsid = "" if cmdc.Meta.new_resource else command.identifier 
         reqs = PolicyRequest(
             usr=ctx.data.user_id,
-            sub=ctx.data.profile_id,
+            pro=ctx.data.profile_id,
             org=ctx.data.organization_id,
             dom=self.__namespace__,
             res=command.resource,
