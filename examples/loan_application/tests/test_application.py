@@ -41,20 +41,20 @@ class TestApplication:
 
     async def test_api_prefix_endpoints(self, client: AsyncClient):
         """Test that API endpoints are available under the correct prefix"""
-        # Test that workflow endpoints exist under /api/v1/workflow
-        response = await client.get("/api/v1/workflow/workflow")
+        # Test that workflow endpoints exist under /process
+        response = await client.get("/process/workflow")
         # Should be accessible
         assert response.status_code in [200, 401, 403]
 
     async def test_cors_headers(self, client: AsyncClient):
         """Test CORS headers if configured"""
-        response = await client.options("/api/v1/workflow/workflow")
+        response = await client.options("/process/workflow")
         # Should handle OPTIONS request
         assert response.status_code in [200, 204, 405]
 
     async def test_content_type_json(self, client: AsyncClient):
         """Test that endpoints return JSON content type"""
-        response = await client.get("/api/v1/workflow/workflow")
+        response = await client.get("/process/workflow")
         if response.status_code == 200:
             assert "application/json" in response.headers.get("content-type", "")
 
@@ -65,6 +65,6 @@ class TestApplication:
 
     async def test_method_not_allowed(self, client: AsyncClient):
         """Test method not allowed responses"""
-        response = await client.delete("/api/v1/workflow/workflow")
+        response = await client.delete("/process/workflow")
         # Should return 405 if DELETE is not allowed
         assert response.status_code in [405, 404, 401] 

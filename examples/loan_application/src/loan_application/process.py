@@ -654,6 +654,8 @@ class LoanApplicationProcess(Workflow):
         # Start with the first step in Stage 01
         step1 = wf_state.add_step('CollectBasicInformation')
         step1.transit('PENDING')
+        step2 = wf_state.add_step('TransferToLOS')
+        step2.transit('PENDING')
         
         yield f"Loan Application Process started - initial step created"
 

@@ -18,7 +18,7 @@ sys.path.insert(0, 'src')
 
 from fluvius.navis.engine.manager import WorkflowManager
 from fluvius.navis.model import WorkflowDataManager
-from fluvius.manager.workflow.import_definitions import gen_wfdefs
+from fluvius.manager.wf.import_definitions import gen_wfdefs
 
 # Import your workflows to register them
 from loan_application import process

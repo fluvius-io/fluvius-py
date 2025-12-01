@@ -9,8 +9,9 @@ from fluvius.navis import WorkflowManager
 from types import SimpleNamespace
 from loan_application.process import LoanApplicationProcess
 
-WORKFLOW_AGGROOT = 'workflow_definition/f7156bed-ee14-4077-8958-79682afa43e3'
+WORKFLOW_AGGROOT = 'workflow_definition/a40c60f9-11c2-4735-9bf9-d7b0c8a3ee17'
 CREATE_WF_URL = f"/process:create-workflow/{WORKFLOW_AGGROOT}"
+
 
 class TestLoanApplicationProcessStructure:
     """Test the structure and configuration of the Loan Application Process"""

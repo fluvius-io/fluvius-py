@@ -42,13 +42,19 @@ dev:
 	  while read -t 1 -r; do :; done  # drain remaining events
 	done
 
+
 recreate-schema MODULE:
 	./manager db drop-schema --force "{{MODULE}}"
 	./manager db create-schema "{{MODULE}}"
 
+
 create-schema MODULE:
 	./manager db create-schema "{{MODULE}}"
+
 
 drop-schema MODULE:
 	./manager db drop-schema "{{MODULE}}"
 	
+
+import-wfdefs PROCESS_REPSITORY:
+	./manager wf import-definitions --repository {{PROCESS_REPSITORY}}

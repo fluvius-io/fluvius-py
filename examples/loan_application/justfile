@@ -42,7 +42,7 @@ dev:
 # Run tests
 test:
     @echo "🧪 Running tests..."
-    uv run pytest tests/
+    pytest tests/
 
 # Run tests with coverage
 test-cov:
