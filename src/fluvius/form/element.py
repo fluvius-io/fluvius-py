@@ -7,6 +7,9 @@ optionally has a Meta object containing the element type key, title, desc,
 data schema (optional), etc.
 
 Usage:
+    class TextInputData(DataModel):
+        value: str
+    
     class TextInputElementData(ElementData):
         __tablename__ = "text_input_element_data"
         
@@ -14,19 +17,14 @@ Usage:
             type_key = "text-input"
             type_name = "Text Input"
             desc = "A text input element"
-            schema_def = {
-                "type": "object",
-                "properties": {
-                    "value": {"type": "string"}
-                }
-            }
+            element_schema = TextInputData  # DataModel class for validation
         
         # Add custom columns as needed
         custom_field = sa.Column(sa.String, nullable=True)
 """
 from fluvius.data import DataModel
 from fluvius.helper.registry import ClassRegistry
-from typing import Optional, Dict, Any, ClassVar
+from typing import Optional, Dict, Any, ClassVar, Type
 from pydantic import Field
 from fluvius.data import DataAccessManager
 
@@ -63,13 +61,13 @@ class BaseElementType(DataModel):
     - type_key: Unique identifier for the element type
     - type_name: Human-readable name
     - desc: Description (optional)
-    - schema_def: JSON schema for validation (optional)
+    - element_schema: DataModel class for validation (optional)
     - attrs: Additional configuration (optional)
     """
     type_key: ClassVar[str]
     type_name: ClassVar[str]
     desc: ClassVar[Optional[str]] = None
-    schema_def: ClassVar[Optional[Dict[str, Any]]] = None
+    element_schema: ClassVar[Optional[Type[DataModel]]] = None  # DataModel class for validation
     attrs: ClassVar[Optional[Dict[str, Any]]] = None
 
     @classmethod
@@ -86,14 +84,13 @@ class BaseElementType(DataModel):
         Raises:
             BadRequestError: If data doesn't match the schema
         """
-        if cls.schema_def:
-            # Use JSON schema validation if schema_def is provided
+        if cls.element_schema:
+            # Use DataModel validation if element_schema is provided
             try:
-                from jsonschema import validate, ValidationError
-                validate(instance=data, schema=cls.schema_def)
-            except ImportError:
-                # jsonschema not available, skip validation
-                pass
+                # Instantiate the DataModel class with the data to validate
+                validated_instance = cls.element_schema(**data)
+                # Convert back to dict for return
+                data = validated_instance.model_dump()
             except Exception as e:
                 raise BadRequestError(
                     "F00.101",
@@ -123,13 +120,13 @@ class BaseElementType(DataModel):
         Convert this element type to a dictionary suitable for ElementType table.
         
         Returns:
-            Dictionary with keys: type_key, type_name, desc, schema_def, attrs
+            Dictionary with keys: type_key, type_name, desc, element_schema, attrs
         """
         return {
             "type_key": cls.type_key,
             "type_name": cls.type_name,
             "desc": cls.desc,
-            "schema_def": cls.schema_def,
+            "element_schema": cls.element_schema.__name__ if cls.element_schema else None,  # Store class name
             "attrs": cls.attrs,
         }
 
@@ -249,13 +246,13 @@ class ElementDataMeta(DataModel):
     - type_key: Unique identifier for the element type (required)
     - type_name: Human-readable name (required)
     - desc: Description (optional)
-    - schema_def: JSON schema for validation (optional)
+    - element_schema: DataModel class for validation (optional)
     - attrs: Additional configuration (optional)
     """
     type_key: str
     type_name: str
     desc: Optional[str] = None
-    schema_def: Optional[Dict[str, Any]] = None
+    element_schema: Optional[Type[DataModel]] = None  # DataModel class for validation
     attrs: Optional[Dict[str, Any]] = None
     
     def to_dict(self) -> Dict[str, Any]:
@@ -264,7 +261,7 @@ class ElementDataMeta(DataModel):
             "type_key": self.type_key,
             "type_name": self.type_name,
             "desc": self.desc,
-            "schema_def": self.schema_def,
+            "element_schema": self.element_schema.__name__ if self.element_schema else None,  # Store class name
             "attrs": self.attrs,
         }
 
@@ -278,6 +275,9 @@ class ElementData(ElementBaseSchema):
     element type metadata.
     
     Example:
+        class TextInputData(DataModel):
+            value: str
+        
         class TextInputElementData(ElementData):
             __tablename__ = "text_input_element_data"
             __table_args__ = (
@@ -289,12 +289,7 @@ class ElementData(ElementBaseSchema):
                 type_key = "text-input"
                 type_name = "Text Input"
                 desc = "A text input element"
-                schema_def = {
-                    "type": "object",
-                    "properties": {
-                        "value": {"type": "string"}
-                    }
-                }
+                element_schema = TextInputData  # DataModel class for validation
             
             # Add custom columns as needed
             custom_field = sa.Column(sa.String, nullable=True)
@@ -394,14 +389,13 @@ class ElementData(ElementBaseSchema):
                 None
             )
         
-        if meta.schema_def:
-            # Use JSON schema validation if schema_def is provided
+        if meta.element_schema:
+            # Use DataModel validation if element_schema is provided
             try:
-                from jsonschema import validate, ValidationError
-                validate(instance=data, schema=meta.schema_def)
-            except ImportError:
-                # jsonschema not available, skip validation
-                pass
+                # Instantiate the DataModel class with the data to validate
+                validated_instance = meta.element_schema(**data)
+                # Convert back to dict for return
+                return validated_instance.model_dump()
             except Exception as e:
                 raise BadRequestError(
                     "F00.101",
@@ -415,6 +409,11 @@ class ElementData(ElementBaseSchema):
 # Registry for ElementData subclasses
 # Registration happens automatically via __init_subclass__
 ElementDataSchemaRegistry = ClassRegistry(ElementData)
+
+# Register ElementData in FormConnector's schema registry
+# This allows ElementDataManager to query the element_data table
+# Even though ElementData is abstract, it represents a real table that needs to be queryable
+FormConnector.register_schema(ElementData, name="element_data")
 
 
 def get_element_data_schema(type_key: str) -> Optional[type]:

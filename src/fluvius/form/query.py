@@ -122,7 +122,7 @@ class ElementTypeQuery(DomainQueryResource):
     type_key: str = StringField("Type Key")
     type_name: str = StringField("Type Name")
     desc: str = StringField("Description")
-    schema_def: dict = DictField("Schema Definition", hidden=True)
+    element_schema: dict = DictField("Schema Definition", hidden=True)
     attrs: dict = DictField("Attributes", hidden=True)
 
 

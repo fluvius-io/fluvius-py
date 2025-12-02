@@ -342,7 +342,7 @@ class DataAccessManager(DataAccessManagerBase):
         etag    = generate_etag(record)
         ts      = timestamp()
         changes = dict(_deleted=ts, _updated=ts, _etag=etag)
-        return await self.connector.update_one(model_name, query, **changes)
+        return await self.connector.update_data(model_name, query, **changes)
 
     async def update(self, record: DataModel, /, **updates):
         model_name = self.lookup_record_model(record)
@@ -350,7 +350,7 @@ class DataAccessManager(DataAccessManagerBase):
         etag = generate_etag(record)
         ts   = timestamp()
         changes = updates | dict(_updated=ts, _etag=etag)
-        return await self.connector.update_one(model_name, q, **changes)
+        return await self.connector.update_data(model_name, q, **changes)
 
     async def remove(self, record: DataModel):
         model_name = self.lookup_record_model(record)

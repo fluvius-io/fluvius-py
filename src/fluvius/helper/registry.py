@@ -77,8 +77,7 @@ def ClassRegistry(base_class, post_register=None):  # noqa: None
 
         raise NotFoundError(
             "H00.401",
-            f"Registry item [{key_or_class}] not found in registry [{registry_name}]",
-            None
+            f"Registry item [{key_or_class}] not found in registry [{registry_name}]"
         )
 
     def _items():

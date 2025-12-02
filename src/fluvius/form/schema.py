@@ -81,7 +81,7 @@ class ElementType(FormBaseSchema):
     type_key = sa.Column(sa.String, nullable=False)
     type_name = sa.Column(sa.String, nullable=False)
     desc = sa.Column(sa.String, nullable=True)
-    schema_def = sa.Column(FluviusJSONField, nullable=True)  # JSON schema for element validation
+    element_schema = sa.Column(FluviusJSONField, nullable=True)  # DataModel class name for element validation
     attrs = sa.Column(FluviusJSONField, nullable=True)  # Additional configuration
 
 
@@ -161,7 +161,12 @@ class DocumentForm(FormBaseSchema):
     )
 
     document_id = document_fk("document_form_document_id")
-    section_id = section_fk("document_form_section_id")
+    section_id = sa.Column(pg.UUID, sa.ForeignKey(
+        f'{DB_SCHEMA}.section._id',
+        ondelete='CASCADE',
+        onupdate='CASCADE',
+        name='fk_section_document_form_section_id'
+    ), nullable=True)  # Optional: forms can be added directly to documents
     form_id = data_form_fk("document_form_form_id")
     order = sa.Column(sa.Integer, nullable=False, default=0)
     attrs = sa.Column(FluviusJSONField, nullable=True)  # Relationship-specific configuration

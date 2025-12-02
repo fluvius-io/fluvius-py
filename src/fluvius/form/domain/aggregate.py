@@ -244,18 +244,17 @@ class FormAggregate(Aggregate):
                         await self.statemgr.insert(new_element)
                     
                     # Create document-form relationship with new form
-                    new_section_id = section_map.get(doc_form.section_id)
-                    if new_section_id:
-                        new_doc_form = self.init_resource(
-                            "document_form",
-                            _id=UUID_GENR(),
-                            document_id=new_document_id,
-                            section_id=new_section_id,
-                            form_id=new_form_id,
-                            order=doc_form.order,
-                            attrs=doc_form.attrs,
-                        )
-                        await self.statemgr.insert(new_doc_form)
+                    new_section_id = section_map.get(doc_form.section_id) if doc_form.section_id else None
+                    new_doc_form = self.init_resource(
+                        "document_form",
+                        _id=UUID_GENR(),
+                        document_id=new_document_id,
+                        section_id=new_section_id,  # Can be None if form is not in a section
+                        form_id=new_form_id,
+                        order=doc_form.order,
+                        attrs=doc_form.attrs,
+                    )
+                    await self.statemgr.insert(new_doc_form)
 
         # Add copied document to target collection if specified
         if data.target_collection_id:
@@ -442,7 +441,7 @@ class FormAggregate(Aggregate):
         # Get element type class for validation
         try:
             element_type_cls = get_element_type(element_type_record.type_key)
-        except RuntimeError:
+        except (RuntimeError, NotFoundError):
             # Element type not registered, skip validation
             element_type_cls = None
 
@@ -583,7 +582,7 @@ class FormAggregate(Aggregate):
                 try:
                     element_type_cls = get_element_type(element_type_record.type_key)
                     validated_data = element_type_cls.validate_data(element_data_dict)
-                except RuntimeError:
+                except (RuntimeError, NotFoundError):
                     # Element type not registered, skip validation
                     pass
 
@@ -689,7 +688,7 @@ class FormAggregate(Aggregate):
                 try:
                     element_type_cls = get_element_type(element_type_record.type_key)
                     validated_data = element_type_cls.validate_data(element_data_dict)
-                except RuntimeError:
+                except (RuntimeError, NotFoundError):
                     # Element type not registered, skip validation
                     pass
 
