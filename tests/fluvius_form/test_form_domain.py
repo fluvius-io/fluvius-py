@@ -564,8 +564,9 @@ async def test_move_document_remove_from_all(domain):
 
     # Create collection
     collection_id = UUID_GENR()
+    collection_key = f"test-collection-remove-{str(collection_id)[:8]}"
     collection_payload = {
-        "collection_key": "test-collection-remove",
+        "collection_key": collection_key,
         "collection_name": "Test Collection",
         "organization_id": FIXTURE_ORGANIZATION_ID,
     }

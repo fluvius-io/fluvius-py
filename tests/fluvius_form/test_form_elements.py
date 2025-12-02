@@ -129,7 +129,7 @@ async def test_data_element_creation(domain):
 async def test_form_instance_creation(domain):
     """Test creating form instances"""
 
-    form_id, _, _ = await create_test_form_with_element(domain)
+    form_id, _, _, _ = await create_test_form_with_element(domain)
     form_instance_id = UUID_GENR()
     
     from fluvius.form.element import ElementDataManager
@@ -153,7 +153,7 @@ async def test_form_instance_creation(domain):
 async def test_save_element_with_data(domain):
     """Test saving element data to a form instance"""
 
-    form_id, element_id, _ = await create_test_form_with_element(domain)
+    form_id, element_id, _, _ = await create_test_form_with_element(domain)
     form_instance_id = UUID_GENR()
     
     from fluvius.form.element import ElementDataManager
@@ -235,7 +235,7 @@ async def test_save_form_multiple_elements(domain):
 async def test_submit_form_locks_instance(domain):
     """Test that submitting a form locks the form instance"""
 
-    form_id, element_id, _ = await create_test_form_with_element(domain)
+    form_id, element_id, _, _ = await create_test_form_with_element(domain)
     form_instance_id = UUID_GENR()
     
     from fluvius.form.element import ElementDataManager
@@ -275,7 +275,7 @@ async def test_submit_form_locks_instance(domain):
 async def test_element_resource_fields(domain):
     """Test that elements can have resource_name and resource_id fields"""
 
-    form_id, _, element_type_id = await create_test_form_with_element(domain)
+    form_id, _, element_type_id, _ = await create_test_form_with_element(domain)
     element_id = UUID_GENR()
     resource_id = UUID_GENR()
     
