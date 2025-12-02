@@ -21,7 +21,7 @@ Error codes follow the format: `X##.###` where:
 - **S** = Security/Auth errors
 - **T** = Transform/Data Mapping (dmap) errors
 - **C** = Casbin errors
-- **O** = Ordinis errors
+- **R** = Ordinis/Rule errors
 - **W** = Worker errors
 - **M** = Media errors
 - **H** = Helper errors
@@ -54,7 +54,6 @@ Error codes follow the format: `X##.###` where:
 | D00.004 | CommandProcessingError | 500 | Command processing error |
 | D00.005 | EventReceivingError | 500 | Event receiving error |
 | D00.101 | DomainEntityError | 400 | Invalid resource specification |
-| D00.101 | InternalServerError | 500 | Overlapping context |
 | D00.102 | InternalServerError | 500 | All events must be consumed by command handler |
 | D00.103 | InternalServerError | 500 | Aggregate context not initialized |
 | D00.104 | InternalServerError | 500 | No command handler provided (domain.py) |
