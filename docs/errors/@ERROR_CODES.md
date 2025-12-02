@@ -21,7 +21,7 @@ Error codes follow the format: `X##.###` where:
 - **S** = Security/Auth errors
 - **T** = Transform/Data Mapping (dmap) errors
 - **C** = Casbin errors
-- **O** = Ordinis errors
+- **R** = Ordinis errors
 - **W** = Worker errors
 - **M** = Media errors
 - **H** = Helper errors
