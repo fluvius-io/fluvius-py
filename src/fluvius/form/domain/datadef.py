@@ -32,10 +32,11 @@ class CreateDocumentData(DataModel):
     """Data for creating a new document"""
     document_key: str
     document_name: str
-    collection_id: UUID_TYPE  # Required: collection to add document to
+    collection_id: Optional[UUID_TYPE] = None  # Optional: single collection to add document to
+    collection_ids: Optional[List[UUID_TYPE]] = None  # Optional: multiple collections to add document to
     desc: Optional[str] = None
     version: Optional[int] = 1
-    order: Optional[int] = None  # Optional order in collection
+    order: Optional[int] = None  # Optional order in collections
     attrs: Optional[Dict[str, Any]] = None
     owner_id: Optional[UUID_TYPE] = None
     organization_id: Optional[str] = None
@@ -76,6 +77,13 @@ class MoveDocumentData(DataModel):
     target_collection_id: UUID_TYPE
     source_collection_id: Optional[UUID_TYPE] = None  # If None, remove from any collection
     order: Optional[int] = None  # Optional order in target collection
+    attrs: Optional[Dict[str, Any]] = None
+
+
+class AddDocumentToCollectionData(DataModel):
+    """Data for adding a document to additional collections"""
+    collection_id: UUID_TYPE  # Collection to add document to
+    order: Optional[int] = None  # Optional order in collection
     attrs: Optional[Dict[str, Any]] = None
 
 

@@ -12,21 +12,8 @@ FIXTURE_ORGANIZATION_ID = "05e8bb7e-43e6-4766-98d9-8f8c779dbe45"
 FIXTURE_PROFILE_ID = UUID_GENR()
 
 
-@pytest.fixture
-def domain():
-    return FormDomain(None)
-
-
-async def setup_db(domain):
-    """Helper to setup database schema"""
-    from fluvius.form.schema import FormConnector
-
-    db = domain.statemgr.connector.engine
-    async with db.begin() as conn:
-        # Drop form schema second
-        await conn.run_sync(FormConnector.__data_schema_base__.metadata.drop_all)
-        # Create form schema first
-        await conn.run_sync(FormConnector.__data_schema_base__.metadata.create_all)
+# Domain and setup_db fixtures are now in conftest.py
+# setup_db runs once per session to preserve data for inspection
 
 
 async def create_test_collection(domain):
@@ -84,7 +71,6 @@ async def create_test_form(domain):
 @mark.asyncio
 async def test_query_collections(domain):
     """Test querying collections"""
-    await setup_db(domain)
     test_collection = await create_test_collection(domain)
     
     async with domain.statemgr.transaction():
@@ -102,7 +88,6 @@ async def test_query_collections(domain):
 @mark.asyncio
 async def test_query_documents(domain):
     """Test querying documents"""
-    await setup_db(domain)
     test_document = await create_test_document(domain)
     
     async with domain.statemgr.transaction():
@@ -121,7 +106,6 @@ async def test_query_documents(domain):
 @mark.asyncio
 async def test_query_forms(domain):
     """Test querying forms"""
-    await setup_db(domain)
     test_form = await create_test_form(domain)
     
     async with domain.statemgr.transaction():
@@ -139,7 +123,6 @@ async def test_query_forms(domain):
 @mark.asyncio
 async def test_query_document_by_resource(domain):
     """Test querying documents by resource_id"""
-    await setup_db(domain)
     test_document = await create_test_document(domain)
     
     async with domain.statemgr.transaction():
@@ -156,7 +139,6 @@ async def test_query_document_by_resource(domain):
 @mark.asyncio
 async def test_query_collection_by_organization(domain):
     """Test querying collections by organization_id"""
-    await setup_db(domain)
     test_collection = await create_test_collection(domain)
     
     async with domain.statemgr.transaction():

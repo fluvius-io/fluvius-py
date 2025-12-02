@@ -61,16 +61,7 @@ class FormAggregate(Aggregate):
 
     @action("document-created")
     async def create_document(self, data):
-        """Create a new document and add it to the specified collection"""
-        # Verify collection exists
-        collection = await self.statemgr.fetch('collection', data.collection_id)
-        if not collection:
-            raise NotFoundError(
-                "F00.201",
-                f"Collection not found: {data.collection_id}",
-                None
-            )
-        
+        """Create a new document and optionally add it to one or more collections"""
         document = self.init_resource(
             "document",
             _id=self.aggroot.identifier,
@@ -86,34 +77,72 @@ class FormAggregate(Aggregate):
         )
         await self.statemgr.insert(document)
         
-        # Determine order - if not specified, use max order + 1
-        if data.order is None:
-            max_order_docs = await self.statemgr.query(
+        # Collect collection IDs to add document to
+        collection_ids = []
+        if data.collection_id:
+            collection_ids.append(data.collection_id)
+        if data.collection_ids:
+            collection_ids.extend(data.collection_ids)
+        
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_collection_ids = []
+        for cid in collection_ids:
+            if cid not in seen:
+                seen.add(cid)
+                unique_collection_ids.append(cid)
+        
+        added_collection_ids = []
+        for collection_id in unique_collection_ids:
+            # Verify collection exists
+            collection = await self.statemgr.fetch('collection', collection_id)
+            if not collection:
+                raise NotFoundError(
+                    "F00.201",
+                    f"Collection not found: {collection_id}",
+                    None
+                )
+            
+            # Check if document is already in this collection
+            existing = await self.statemgr.query(
                 "document_collection",
-                where={"collection_id": data.collection_id},
-                sort=(("order", "desc"),),
+                where={
+                    "document_id": self.aggroot.identifier,
+                    "collection_id": collection_id
+                },
                 limit=1
             )
-            order = (max_order_docs[0].order + 1) if max_order_docs else 0
-        else:
-            order = data.order
-        
-        # Add document to collection
-        doc_collection = self.init_resource(
-            "document_collection",
-            _id=UUID_GENR(),
-            document_id=self.aggroot.identifier,
-            collection_id=data.collection_id,
-            order=order,
-            attrs=None,
-        )
-        await self.statemgr.insert(doc_collection)
+            
+            if not existing:
+                # Determine order - if not specified, use max order + 1
+                if data.order is None:
+                    max_order_docs = await self.statemgr.query(
+                        "document_collection",
+                        where={"collection_id": collection_id},
+                        sort=(("order", "desc"),),
+                        limit=1
+                    )
+                    order = (max_order_docs[0].order + 1) if max_order_docs else 0
+                else:
+                    order = data.order
+                
+                # Add document to collection
+                doc_collection = self.init_resource(
+                    "document_collection",
+                    _id=UUID_GENR(),
+                    document_id=self.aggroot.identifier,
+                    collection_id=collection_id,
+                    order=order,
+                    attrs=data.attrs,
+                )
+                await self.statemgr.insert(doc_collection)
+                added_collection_ids.append(collection_id)
         
         return {
             "document_id": str(self.aggroot.identifier),
             "document_key": document.document_key,
             "document_name": document.document_name,
-            "collection_id": str(data.collection_id),
+            "collection_ids": [str(cid) for cid in added_collection_ids],
         }
 
     @action("document-updated", resources="document")
@@ -393,6 +422,66 @@ class FormAggregate(Aggregate):
             "source_collection_id": str(data.source_collection_id) if data.source_collection_id else None,
             "target_collection_id": str(data.target_collection_id),
             "status": "moved",
+        }
+
+    @action("document-added-to-collection", resources="document")
+    async def add_document_to_collection(self, data):
+        """Add a document to an additional collection"""
+        document = self.rootobj
+        
+        # Verify collection exists
+        collection = await self.statemgr.fetch('collection', data.collection_id)
+        if not collection:
+            raise NotFoundError(
+                "F00.201",
+                f"Collection not found: {data.collection_id}",
+                None
+            )
+        
+        # Check if document is already in this collection
+        existing = await self.statemgr.query(
+            "document_collection",
+            where={
+                "document_id": document._id,
+                "collection_id": data.collection_id
+            },
+            limit=1
+        )
+        
+        if existing:
+            raise BadRequestError(
+                "F00.203",
+                f"Document is already in collection: {data.collection_id}",
+                None
+            )
+        
+        # Determine order - if not specified, use max order + 1
+        if data.order is None:
+            max_order_docs = await self.statemgr.query(
+                "document_collection",
+                where={"collection_id": data.collection_id},
+                sort=(("order", "desc"),),
+                limit=1
+            )
+            order = (max_order_docs[0].order + 1) if max_order_docs else 0
+        else:
+            order = data.order
+        
+        # Add document to collection
+        doc_collection = self.init_resource(
+            "document_collection",
+            _id=UUID_GENR(),
+            document_id=document._id,
+            collection_id=data.collection_id,
+            order=order,
+            attrs=data.attrs,
+        )
+        await self.statemgr.insert(doc_collection)
+        
+        return {
+            "document_id": str(document._id),
+            "collection_id": str(data.collection_id),
+            "status": "added",
         }
 
     @action("element-populated", resources="data_element")

@@ -1,6 +1,7 @@
 import pytest
 from pytest import mark
 from sqlalchemy import text
+from uuid import UUID
 from fluvius.form import FormDomain
 from fluvius.form.model import FormConnector
 from fluvius.data import UUID_GENR
@@ -43,37 +44,16 @@ async def command_handler(domain, cmd_key, payload, resource, identifier, scope=
         return await domain.process_command(command)
 
 
-@pytest.fixture
-def domain():
-    return FormDomain(None)
-
-
-async def setup_db(domain):
-    """Helper to setup database schema"""
-    from fluvius.form.schema import FormConnector
-    from sqlalchemy import text
-    
-    db = domain.statemgr.connector.engine
-    async with db.begin() as conn:
-        # Manually drop the problematic table first
-        try:
-            await conn.execute(text("DROP TABLE IF EXISTS fluvius_form.element_type CASCADE"))
-        except Exception:
-            pass
-        # Drop form schema second
-        await conn.run_sync(FormConnector.__data_schema_base__.metadata.drop_all)
-        # Create form schema first
-        await conn.run_sync(FormConnector.__data_schema_base__.metadata.create_all)
+# Domain and setup_db fixtures are now in conftest.py
+# setup_db runs once per session to preserve data for inspection
 
 
 @mark.asyncio
 async def test_create_collection(domain):
     """Test creating a collection"""
-    await setup_db(domain)
-
     collection_id = UUID_GENR()
     payload = {
-        "collection_key": "test-collection-01",
+        "collection_key": f"test-collection-{str(collection_id)[:8]}",
         "collection_name": "Test Collection",
         "desc": "A test collection",
         "organization_id": FIXTURE_ORGANIZATION_ID,
@@ -93,11 +73,10 @@ async def test_create_collection(domain):
 @mark.asyncio
 async def test_update_collection(domain):
     """Test updating a collection"""
-    await setup_db(domain)
 
     collection_id = UUID_GENR()
     create_payload = {
-        "collection_key": "test-collection-02",
+        "collection_key": f"test-collection-{str(collection_id)[:8]}",
         "collection_name": "Test Collection",
         "organization_id": FIXTURE_ORGANIZATION_ID,
     }
@@ -122,11 +101,10 @@ async def test_update_collection(domain):
 @mark.asyncio
 async def test_remove_collection(domain):
     """Test removing a collection"""
-    await setup_db(domain)
 
     collection_id = UUID_GENR()
     create_payload = {
-        "collection_key": "test-collection-03",
+        "collection_key": f"test-collection-{str(collection_id)[:8]}",
         "collection_name": "Test Collection",
         "organization_id": FIXTURE_ORGANIZATION_ID,
     }
@@ -146,13 +124,12 @@ async def test_remove_collection(domain):
 
 @mark.asyncio
 async def test_create_document(domain):
-    """Test creating a document with collection_id requirement"""
-    await setup_db(domain)
+    """Test creating a document and adding it to a collection"""
 
     # First create a collection
     collection_id = UUID_GENR()
     collection_payload = {
-        "collection_key": "test-collection-for-doc",
+        "collection_key": f"test-collection-{str(collection_id)[:8]}",
         "collection_name": "Test Collection",
         "organization_id": FIXTURE_ORGANIZATION_ID,
     }
@@ -163,9 +140,9 @@ async def test_create_document(domain):
     # Now create a document in the collection
     document_id = UUID_GENR()
     payload = {
-        "document_key": "test-document-01",
+        "document_key": f"test-document-{str(document_id)[:8]}",
         "document_name": "Test Document",
-        "collection_id": collection_id,  # Required
+        "collection_id": collection_id,  # Optional: add to single collection
         "desc": "A test document",
         "version": 1,
         "order": 0,
@@ -199,12 +176,11 @@ async def test_create_document(domain):
 @mark.asyncio
 async def test_update_document(domain):
     """Test updating a document"""
-    await setup_db(domain)
 
     # Create a collection first
     collection_id = UUID_GENR()
     collection_payload = {
-        "collection_key": "test-collection-for-update",
+        "collection_key": f"test-collection-{str(collection_id)[:8]}",
         "collection_name": "Test Collection",
         "organization_id": FIXTURE_ORGANIZATION_ID,
     }
@@ -214,7 +190,7 @@ async def test_update_document(domain):
 
     document_id = UUID_GENR()
     create_payload = {
-        "document_key": "test-document-02",
+        "document_key": f"test-document-{str(document_id)[:8]}",
         "document_name": "Test Document",
         "collection_id": collection_id,
         "organization_id": FIXTURE_ORGANIZATION_ID,
@@ -242,12 +218,11 @@ async def test_update_document(domain):
 @mark.asyncio
 async def test_remove_document(domain):
     """Test removing a document"""
-    await setup_db(domain)
 
     # Create a collection first
     collection_id = UUID_GENR()
     collection_payload = {
-        "collection_key": "test-collection-for-remove",
+        "collection_key": f"test-collection-{str(collection_id)[:8]}",
         "collection_name": "Test Collection",
         "organization_id": FIXTURE_ORGANIZATION_ID,
     }
@@ -257,7 +232,7 @@ async def test_remove_document(domain):
 
     document_id = UUID_GENR()
     create_payload = {
-        "document_key": "test-document-03",
+        "document_key": f"test-document-{str(document_id)[:8]}",
         "document_name": "Test Document",
         "collection_id": collection_id,
         "organization_id": FIXTURE_ORGANIZATION_ID,
@@ -279,12 +254,11 @@ async def test_remove_document(domain):
 @mark.asyncio
 async def test_copy_document(domain):
     """Test copying a document with forms, elements, and target collection"""
-    await setup_db(domain)
 
     # Create source collection
     source_collection_id = UUID_GENR()
     source_collection_payload = {
-        "collection_key": "source-collection",
+        "collection_key": f"test-collection-{str(collection_id)[:8]}",
         "collection_name": "Source Collection",
         "organization_id": FIXTURE_ORGANIZATION_ID,
     }
@@ -295,7 +269,7 @@ async def test_copy_document(domain):
     # Create a source document
     source_document_id = UUID_GENR()
     create_payload = {
-        "document_key": "source-document",
+        "document_key": f"test-document-{str(document_id)[:8]}",
         "document_name": "Source Document",
         "collection_id": source_collection_id,
         "organization_id": FIXTURE_ORGANIZATION_ID,
@@ -310,7 +284,7 @@ async def test_copy_document(domain):
         form = domain.statemgr.create(
             "data_form",
             _id=form_id,
-            form_key="source-form",
+            form_key=f"test-form-{str(form_id)[:8]}",
             form_name="Source Form",
             version=1,
             organization_id=FIXTURE_ORGANIZATION_ID,
@@ -322,7 +296,7 @@ async def test_copy_document(domain):
         element_type = domain.statemgr.create(
             "element_type",
             _id=element_type_id,
-            type_key="text-input",
+            type_key=f"test-element-type-{str(element_type_id)[:8]}",
             type_name="Text Input",
             desc="A text input element",
         )
@@ -335,7 +309,7 @@ async def test_copy_document(domain):
             _id=element_id,
             form_id=form_id,
             element_type_id=element_type_id,
-            element_key="test-element",
+            element_key=f"test-element-{str(element_id)[:8]}",
             element_label="Test Element",
             order=0,
             required=False,
@@ -355,7 +329,7 @@ async def test_copy_document(domain):
     # Create target collection
     target_collection_id = UUID_GENR()
     target_collection_payload = {
-        "collection_key": "target-collection",
+        "collection_key": f"test-collection-{str(collection_id)[:8]}",
         "collection_name": "Target Collection",
         "organization_id": FIXTURE_ORGANIZATION_ID,
     }
@@ -411,7 +385,6 @@ async def test_copy_document(domain):
 @mark.asyncio
 async def test_form_commands(domain):
     """Test form-related commands (populate, save, submit)"""
-    await setup_db(domain)
 
     # Note: These commands require form_instance tables which may need to be added
     # For now, we'll test that the commands can be invoked without errors
@@ -422,7 +395,7 @@ async def test_form_commands(domain):
         form = domain.statemgr.create(
             "data_form",
             _id=form_id,
-            form_key="test-form-01",
+            form_key=f"test-form-{str(form_id)[:8]}",
             form_name="Test Form",
             version=1,
         )
@@ -433,7 +406,7 @@ async def test_form_commands(domain):
         element_type = domain.statemgr.create(
             "element_type",
             _id=element_type_id,
-            type_key="test-element-type",
+            type_key=f"test-element-type-{str(element_type_id)[:8]}",
             type_name="Test Element Type",
             desc="A test element type",
         )
@@ -446,7 +419,7 @@ async def test_form_commands(domain):
             _id=element_id,
             form_id=form_id,
             element_type_id=element_type_id,
-            element_key="test-element",
+            element_key=f"test-element-{str(element_id)[:8]}",
             element_label="Test Element",
             order=0,
             required=False,
@@ -494,12 +467,11 @@ async def test_form_commands(domain):
 @mark.asyncio
 async def test_move_document(domain):
     """Test moving a document between collections"""
-    await setup_db(domain)
 
     # Create source collection
     source_collection_id = UUID_GENR()
     source_collection_payload = {
-        "collection_key": "source-collection-move",
+        "collection_key": f"test-collection-{str(collection_id)[:8]}",
         "collection_name": "Source Collection",
         "organization_id": FIXTURE_ORGANIZATION_ID,
     }
@@ -510,7 +482,7 @@ async def test_move_document(domain):
     # Create target collection
     target_collection_id = UUID_GENR()
     target_collection_payload = {
-        "collection_key": "target-collection-move",
+        "collection_key": f"test-collection-{str(collection_id)[:8]}",
         "collection_name": "Target Collection",
         "organization_id": FIXTURE_ORGANIZATION_ID,
     }
@@ -521,7 +493,7 @@ async def test_move_document(domain):
     # Create a document in source collection
     document_id = UUID_GENR()
     create_payload = {
-        "document_key": "document-to-move",
+        "document_key": f"test-document-{str(document_id)[:8]}",
         "document_name": "Document to Move",
         "collection_id": source_collection_id,
         "organization_id": FIXTURE_ORGANIZATION_ID,
@@ -570,12 +542,11 @@ async def test_move_document(domain):
 @mark.asyncio
 async def test_move_document_remove_from_all(domain):
     """Test moving a document by removing it from all collections"""
-    await setup_db(domain)
 
     # Create collection
     collection_id = UUID_GENR()
     collection_payload = {
-        "collection_key": "test-collection-remove",
+        "collection_key": f"test-collection-{str(collection_id)[:8]}",
         "collection_name": "Test Collection",
         "organization_id": FIXTURE_ORGANIZATION_ID,
     }
@@ -586,7 +557,7 @@ async def test_move_document_remove_from_all(domain):
     # Create a document in collection
     document_id = UUID_GENR()
     create_payload = {
-        "document_key": "document-to-remove",
+        "document_key": f"test-document-{str(document_id)[:8]}",
         "document_name": "Document to Remove",
         "collection_id": collection_id,
         "organization_id": FIXTURE_ORGANIZATION_ID,
@@ -598,7 +569,7 @@ async def test_move_document_remove_from_all(domain):
     # Create target collection
     target_collection_id = UUID_GENR()
     target_collection_payload = {
-        "collection_key": "target-collection-remove",
+        "collection_key": f"test-collection-{str(collection_id)[:8]}",
         "collection_name": "Target Collection",
         "organization_id": FIXTURE_ORGANIZATION_ID,
     }
@@ -627,7 +598,6 @@ async def test_move_document_remove_from_all(domain):
 @mark.asyncio
 async def test_populate_element(domain):
     """Test populating an element with prior data"""
-    await setup_db(domain)
 
     # Create form and element
     form_id = UUID_GENR()
@@ -638,7 +608,7 @@ async def test_populate_element(domain):
         form = domain.statemgr.create(
             "data_form",
             _id=form_id,
-            form_key="test-form-populate",
+            form_key=f"test-form-{str(form_id)[:8]}",
             form_name="Test Form",
             version=1,
             organization_id=FIXTURE_ORGANIZATION_ID,
@@ -648,7 +618,7 @@ async def test_populate_element(domain):
         element_type = domain.statemgr.create(
             "element_type",
             _id=element_type_id,
-            type_key="text-input",
+            type_key=f"test-element-type-{str(element_type_id)[:8]}",
             type_name="Text Input",
             desc="A text input element",
         )
@@ -659,7 +629,7 @@ async def test_populate_element(domain):
             _id=element_id,
             form_id=form_id,
             element_type_id=element_type_id,
-            element_key="test-element",
+            element_key=f"test-element-{str(element_id)[:8]}",
             element_label="Test Element",
             order=0,
             required=False,
@@ -679,7 +649,6 @@ async def test_populate_element(domain):
 @mark.asyncio
 async def test_save_element(domain):
     """Test saving element data"""
-    await setup_db(domain)
 
     # Create form, element type, and element
     form_id = UUID_GENR()
@@ -691,7 +660,7 @@ async def test_save_element(domain):
         form = domain.statemgr.create(
             "data_form",
             _id=form_id,
-            form_key="test-form-save",
+            form_key=f"test-form-{str(form_id)[:8]}",
             form_name="Test Form",
             version=1,
             organization_id=FIXTURE_ORGANIZATION_ID,
@@ -701,7 +670,7 @@ async def test_save_element(domain):
         element_type = domain.statemgr.create(
             "element_type",
             _id=element_type_id,
-            type_key="text-input",
+            type_key=f"test-element-type-{str(element_type_id)[:8]}",
             type_name="Text Input",
             desc="A text input element",
         )
@@ -712,7 +681,7 @@ async def test_save_element(domain):
             _id=element_id,
             form_id=form_id,
             element_type_id=element_type_id,
-            element_key="test-element",
+            element_key=f"test-element-{str(element_id)[:8]}",
             element_label="Test Element",
             order=0,
             required=False,
@@ -748,7 +717,6 @@ async def test_save_element(domain):
 @mark.asyncio
 async def test_populate_form(domain):
     """Test populating a form with prior data"""
-    await setup_db(domain)
 
     # Create form
     form_id = UUID_GENR()
@@ -756,7 +724,7 @@ async def test_populate_form(domain):
         form = domain.statemgr.create(
             "data_form",
             _id=form_id,
-            form_key="test-form-populate-form",
+            form_key=f"test-form-{str(form_id)[:8]}",
             form_name="Test Form",
             version=1,
             organization_id=FIXTURE_ORGANIZATION_ID,
@@ -774,37 +742,42 @@ async def test_populate_form(domain):
 
 
 @mark.asyncio
-async def test_create_document_without_collection_fails(domain):
-    """Test that creating a document without collection_id fails"""
-    await setup_db(domain)
+async def test_create_document_without_collection(domain):
+    """Test that creating a document without collection_id succeeds (collection_id is now optional)"""
 
     document_id = UUID_GENR()
     payload = {
-        "document_key": "test-document-no-collection",
+        "document_key": f"test-document-{str(document_id)[:8]}",
         "document_name": "Test Document",
         "organization_id": FIXTURE_ORGANIZATION_ID,
     }
     
-    # This should fail because collection_id is required
-    try:
-        await command_handler(
-            domain, "create-document", payload, "document", document_id
+    # This should succeed because collection_id is now optional
+    result = await command_handler(
+        domain, "create-document", payload, "document", document_id
+    )
+    
+    async with domain.statemgr.transaction():
+        document = await domain.statemgr.fetch('document', document_id)
+        assert document.document_key == "test-document-no-collection"
+        assert document.document_name == "Test Document"
+        
+        # Verify document is not in any collection
+        doc_collections = await domain.statemgr.query(
+            'document_collection',
+            where={'document_id': document_id}
         )
-        assert False, "Should have raised an error for missing collection_id"
-    except Exception as e:
-        # Expected to fail
-        assert True
+        assert len(doc_collections) == 0
 
 
 @mark.asyncio
 async def test_create_document_with_invalid_collection_fails(domain):
     """Test that creating a document with invalid collection_id fails"""
-    await setup_db(domain)
 
     document_id = UUID_GENR()
     invalid_collection_id = UUID_GENR()
     payload = {
-        "document_key": "test-document-invalid-collection",
+        "document_key": f"test-document-{str(document_id)[:8]}",
         "document_name": "Test Document",
         "collection_id": invalid_collection_id,
         "organization_id": FIXTURE_ORGANIZATION_ID,

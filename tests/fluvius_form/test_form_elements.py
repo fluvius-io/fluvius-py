@@ -42,30 +42,8 @@ async def command_handler(domain, cmd_key, payload, resource, identifier, scope=
         return await domain.process_command(command)
 
 
-@pytest.fixture
-def domain():
-    return FormDomain(None)
-
-
-async def setup_db(domain):
-    """Helper to setup database schema"""
-    from sqlalchemy import text
-    
-    db = domain.statemgr.connector.engine
-    # Drop schemas with CASCADE to handle foreign key constraints
-    async with db.begin() as conn:
-        await conn.execute(text("DROP SCHEMA IF EXISTS fluvius_element CASCADE"))
-        await conn.execute(text("DROP SCHEMA IF EXISTS fluvius_form CASCADE"))
-        await conn.execute(text("CREATE SCHEMA IF NOT EXISTS fluvius_element"))
-        await conn.execute(text("CREATE SCHEMA IF NOT EXISTS fluvius_form"))
-        await conn.commit()
-    
-    # Create all tables - FormConnector and ElementDataManager share the same metadata
-    # so we only need to call create_all once
-    async with db.begin() as conn:
-        def create_all_tables(sync_conn):
-            FormConnector.__data_schema_base__.metadata.create_all(sync_conn, checkfirst=False)
-        await conn.run_sync(create_all_tables)
+# Domain and setup_db fixtures are now in conftest.py
+# setup_db runs once per session to preserve data for inspection
 
 
 async def create_test_form_with_element(domain):
@@ -112,7 +90,6 @@ async def create_test_form_with_element(domain):
 @mark.asyncio
 async def test_element_type_creation(domain):
     """Test creating element types"""
-    await setup_db(domain)
 
     element_type_id = UUID_GENR()
     async with domain.statemgr.transaction():
@@ -133,7 +110,6 @@ async def test_element_type_creation(domain):
 @mark.asyncio
 async def test_data_element_creation(domain):
     """Test creating data elements"""
-    await setup_db(domain)
 
     form_id, element_id, element_type_id = await create_test_form_with_element(domain)
     
@@ -150,7 +126,6 @@ async def test_data_element_creation(domain):
 @mark.asyncio
 async def test_form_instance_creation(domain):
     """Test creating form instances"""
-    await setup_db(domain)
 
     form_id, _, _ = await create_test_form_with_element(domain)
     form_instance_id = UUID_GENR()
@@ -175,7 +150,6 @@ async def test_form_instance_creation(domain):
 @mark.asyncio
 async def test_save_element_with_data(domain):
     """Test saving element data to a form instance"""
-    await setup_db(domain)
 
     form_id, element_id, _ = await create_test_form_with_element(domain)
     form_instance_id = UUID_GENR()
@@ -208,7 +182,6 @@ async def test_save_element_with_data(domain):
 @mark.asyncio
 async def test_save_form_multiple_elements(domain):
     """Test saving form data with multiple elements"""
-    await setup_db(domain)
 
     form_id, element_id, element_type_id = await create_test_form_with_element(domain)
     
@@ -259,7 +232,6 @@ async def test_save_form_multiple_elements(domain):
 @mark.asyncio
 async def test_submit_form_locks_instance(domain):
     """Test that submitting a form locks the form instance"""
-    await setup_db(domain)
 
     form_id, element_id, _ = await create_test_form_with_element(domain)
     form_instance_id = UUID_GENR()
@@ -300,7 +272,6 @@ async def test_submit_form_locks_instance(domain):
 @mark.asyncio
 async def test_element_resource_fields(domain):
     """Test that elements can have resource_name and resource_id fields"""
-    await setup_db(domain)
 
     form_id, _, element_type_id = await create_test_form_with_element(domain)
     element_id = UUID_GENR()

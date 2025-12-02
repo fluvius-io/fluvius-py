@@ -4,6 +4,7 @@ from . import datadef
 from .datadef import (
     CreateCollectionData, UpdateCollectionData, RemoveCollectionData,
     CreateDocumentData, UpdateDocumentData, RemoveDocumentData, CopyDocumentData, MoveDocumentData,
+    AddDocumentToCollectionData,
     PopulateElementData, PopulateFormData, SaveElementData, SaveFormData, SubmitFormData
 )
 
@@ -153,6 +154,24 @@ class MoveDocument(Command):
 
     async def _process(self, agg, stm, payload):
         result = await agg.move_document(payload)
+        yield agg.create_response(serialize_mapping(result), _type="form-response")
+
+
+class AddDocumentToCollection(Command):
+    """Add a document to an additional collection"""
+
+    class Meta:
+        key = 'add-document-to-collection'
+        name = 'Add Document to Collection'
+        resources = ("document",)
+        tags = ["form", "document", "collection"]
+        auth_required = True
+        description = "Add a document to an additional collection (documents can be in multiple collections)"
+
+    Data = AddDocumentToCollectionData
+
+    async def _process(self, agg, stm, payload):
+        result = await agg.add_document_to_collection(payload)
         yield agg.create_response(serialize_mapping(result), _type="form-response")
 
 
