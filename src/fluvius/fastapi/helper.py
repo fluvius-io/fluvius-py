@@ -4,6 +4,7 @@ import secrets
 
 from fluvius.query.helper import SCOPING_SIGN, SCOPING_SEP, PATH_QUERY_SIGN
 from fluvius.fastapi import config
+from fluvius.error import BadRequestError
 
 SCOPE_SELECTOR = "{scope}"
 PATH_QUERY_SELECTOR = f"{PATH_QUERY_SIGN}{{path_query}}"
@@ -12,7 +13,7 @@ PATH_QUERY_SELECTOR = f"{PATH_QUERY_SIGN}{{path_query}}"
 def uri(*elements):
     for e in elements[1:]:
         if e.startswith('/'):
-            raise ValueError('Path elements must not start with `/`')
+            raise BadRequestError('S00.202', 'Path elements must not start with `/`')
 
     return os.path.join(*elements)
 

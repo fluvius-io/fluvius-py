@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Union, BinaryIO, Optional, Dict, Any
 from datetime import datetime, timezone
 from fluvius.helper import load_yaml
+from fluvius.error import NotFoundError
 
 from ._meta import config, logger
 from .model import MediaManager, MediaEntry, MediaFilesystem, FsSpecCompressionMethod
@@ -260,7 +261,7 @@ class MediaInterface:
         # Try to fetch filesystem configuration from manager. Let errors propagate.
         fs_spec = self._REGISTRY.get(fs_key)
         if not fs_spec:
-            raise ValueError(f"Filesystem {fs_key} not found")
+            raise NotFoundError("M00.101", f"Filesystem {fs_key} not found")
 
         fsys = fsspec.filesystem(fs_spec.protocol, **fs_spec.params)
 

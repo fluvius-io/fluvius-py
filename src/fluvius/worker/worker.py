@@ -20,6 +20,7 @@ from fluvius.helper.timeutil import timestamp
 from fluvius.data import UUID_GENR
 from fluvius.tracker import config as tracker_config
 from fluvius.domain.context import DomainTransport
+from fluvius.error import BadRequestError
 from . import config, event, logger
 from .serializer import default_deserializer, default_serializer
 from .helper import build_redis_settings
@@ -179,7 +180,7 @@ class FluviusWorker(object):
             client = client_cls(self)
             key = camel_to_lower_underscore(client_cls.__name__)
             if self.__queue_name__ == client.__queue_name__:
-                raise ValueError('Server and client must not in the same queue.')
+                raise BadRequestError('W00.101', 'Server and client must not in the same queue.')
 
             yield key, client
 
@@ -190,7 +191,7 @@ class FluviusWorker(object):
             return None
 
         if not isinstance(tracker, FluviusWorkerTracker):
-            raise ValueError(f'Invalid worker tracker: {tracker}')
+            raise BadRequestError('W00.102', f'Invalid worker tracker: {tracker}')
 
         return tracker
 
@@ -234,7 +235,7 @@ class FluviusWorker(object):
     async def _ping(self, ctx, upstream_time, upstreams: tuple[str]=tuple()):
         queue_name = self.__queue_name__
         if queue_name in upstreams:
-            raise ValueError(f'Loop back detected: {queue_name}')
+            raise BadRequestError('W00.103', f'Loop back detected: {queue_name}')
 
         response = {queue_name: (time() - upstream_time,)}
         upstreams += (queue_name, )

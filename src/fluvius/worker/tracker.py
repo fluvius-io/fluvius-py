@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from fluvius.data import exceptions, UUID_GENF, UUID_TYPE
 from fluvius.helper.timeutil import timestamp
 from fluvius.tracker import SQLTrackerManager, JobStatus, WorkerStatus, config as tracker_config
+from fluvius.error import BadRequestError
 
 from . import config, logger
 
@@ -36,7 +37,7 @@ class FluviusWorkerTracker(SQLTrackerManager):
             return func
 
         if not asyncio.iscoroutinefunction(func):
-            raise ValueError(f'Function is not a coroutine: {func}')
+            raise BadRequestError('W00.201', f'Function is not a coroutine: {func}')
 
         async def register_job_handle(context, *args, **kwargs):
             try:

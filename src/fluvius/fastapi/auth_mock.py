@@ -1,6 +1,7 @@
 import json
 from fastapi import Request
 from typing import Literal, Optional, Awaitable, Callable
+from fluvius.error import BadRequestError
 
 from .auth import FluviusAuthProfileProvider
 
@@ -44,7 +45,7 @@ class FluviusMockProfileProvider(FluviusAuthProfileProvider):
     def get_auth_token(self, request: Request) -> Optional[str]:
         auth_header = request.headers.get("Authorization")
         if auth_header and not auth_header.startswith("MockAuth "):
-            raise ValueError("Invalid mock authorization header")
+            raise BadRequestError("S00.201", "Invalid mock authorization header")
 
         if not auth_header:
             return self.TEMPLATE
