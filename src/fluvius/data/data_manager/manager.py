@@ -338,17 +338,18 @@ class DataAccessManager(DataAccessManagerBase):
 
     async def invalidate(self, record: DataModel):
         model_name = self.lookup_record_model(record)
-        query = BackendQuery.create(identifier=record._id, etag=record._etag)
-        etag = generate_etag(record)
-        changes = dict(_deleted=timestamp(), _updated=timestamp(), _etag=etag)
+        query   = BackendQuery.create(identifier=record._id, etag=record._etag)
+        etag    = generate_etag(record)
+        ts      = timestamp()
+        changes = dict(_deleted=ts, _updated=ts, _etag=etag)
         return await self.connector.update_one(model_name, query, **changes)
 
     async def update(self, record: DataModel, /, **updates):
         model_name = self.lookup_record_model(record)
-        q = BackendQuery.create(identifier=record._id, etag=record._etag)
+        q    = BackendQuery.create(identifier=record._id, etag=record._etag)
         etag = generate_etag(record)
-        changes = dict(_updated=timestamp(), _etag=etag)
-        changes.update(updates)
+        ts   = timestamp()
+        changes = updates | dict(_updated=ts, _etag=etag)
         return await self.connector.update_one(model_name, q, **changes)
 
     async def remove(self, record: DataModel):
