@@ -255,7 +255,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
     def validate_domain_config(self, config):
         from fluvius.domain.exceptions import DomainEntityError
         if not issubclass(self.__aggregate__, Aggregate):
-            raise DomainEntityError('D00.203', f'Domain has invalid aggregate [{self.__aggregate__}]')
+            raise DomainEntityError('D00.202', f'Domain has invalid aggregate [{self.__aggregate__}]')
 
         if not issubclass(self.__context__, DomainContextData):
             raise DomainEntityError('D00.204', f'Domain has invalid context [{self.__context__}]')
@@ -325,7 +325,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         cmd_cls = self.lookup_command(cmd_key)
 
         if cmd_cls.Meta.resources and aggroot.resource not in cmd_cls.Meta.resources:
-            raise ForbiddenError('D00.302', 'Command [%s] does not allow aggroot of resource [%s]' % (cmd_key, aggroot.resource))
+            raise ForbiddenError('D00.306', 'Command [%s] does not allow aggroot of resource [%s]' % (cmd_key, aggroot.resource))
 
         data = cmd_cls.Data.create(cmd_data)
 
@@ -362,7 +362,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
         resp = await self.policymgr.check_permission(reqs)
         if not resp.allowed:
-            raise ForbiddenError('D00.303', f'Permission Failed: [{resp.narration}]')
+            raise ForbiddenError('D00.307', f'Permission Failed: [{resp.narration}]')
 
         return command
 

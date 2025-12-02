@@ -62,7 +62,7 @@ def action(evt_key=None, resources=None):
         @wraps(func)
         async def wrapper(self, *args, **evt_args):
             if resource_spec is not None and self._aggroot.resource not in resource_spec:
-                raise ForbiddenError("D00.301", f'Action is not allowed on resource: {self._aggroot.resource}')
+                raise ForbiddenError("D00.308", f'Action is not allowed on resource: {self._aggroot.resource}')
 
             evt_data = await func(self, *args, **evt_args)
 
@@ -148,7 +148,7 @@ class Aggregate(object):
             if_match_value = self.context.headers.get(IF_MATCH_HEADER, None)
             if if_match_value is None:
                 raise BadRequestError(
-                    "D00.301",
+                    "D00.315",
                     f"[{IF_MATCH_HEADER}] header is required but not provided."
                 )
 
