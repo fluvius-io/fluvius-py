@@ -155,14 +155,14 @@ async def test_form_instance_creation(domain):
     form_id, _, _ = await create_test_form_with_element(domain)
     form_instance_id = UUID_GENR()
     
-    from fluvius.form.element_model import ElementDataManager, FormInstance
+    from fluvius.form.element import ElementDataManager
     element_data_mgr = ElementDataManager()
     
     async with element_data_mgr.transaction():
-        form_instance = FormInstance(
+        form_instance = element_data_mgr.create("form_instance",
             _id=form_instance_id,
             form_id=form_id,
-            organization_id=FIXTURE_ORGANIZATION_ID,
+            instance_key=f"instance-{str(form_instance_id)[:8]}", instance_name=None, organization_id=FIXTURE_ORGANIZATION_ID,
         )
         await element_data_mgr.insert(form_instance)
         
@@ -180,15 +180,15 @@ async def test_save_element_with_data(domain):
     form_id, element_id, _ = await create_test_form_with_element(domain)
     form_instance_id = UUID_GENR()
     
-    from fluvius.form.element_model import ElementDataManager, FormInstance
+    from fluvius.form.element import ElementDataManager
     element_data_mgr = ElementDataManager()
     
     # Create form instance
     async with element_data_mgr.transaction():
-        form_instance = FormInstance(
+        form_instance = element_data_mgr.create("form_instance",
             _id=form_instance_id,
             form_id=form_id,
-            organization_id=FIXTURE_ORGANIZATION_ID,
+            instance_key=f"instance-{str(form_instance_id)[:8]}", instance_name=None, organization_id=FIXTURE_ORGANIZATION_ID,
         )
         await element_data_mgr.insert(form_instance)
         form_instance = await element_data_mgr.fetch('form_instance', form_instance_id)
@@ -228,15 +228,15 @@ async def test_save_form_multiple_elements(domain):
         await domain.statemgr.insert(element_2)
 
     form_instance_id = UUID_GENR()
-    from fluvius.form.element_model import ElementDataManager, FormInstance
+    from fluvius.form.element import ElementDataManager
     element_data_mgr = ElementDataManager()
     
     # Create form instance
     async with element_data_mgr.transaction():
-        form_instance = FormInstance(
+        form_instance = element_data_mgr.create("form_instance",
             _id=form_instance_id,
             form_id=form_id,
-            organization_id=FIXTURE_ORGANIZATION_ID,
+            instance_key=f"instance-{str(form_instance_id)[:8]}", instance_name=None, organization_id=FIXTURE_ORGANIZATION_ID,
         )
         await element_data_mgr.insert(form_instance)
         form_instance = await element_data_mgr.fetch('form_instance', form_instance_id)
@@ -264,15 +264,15 @@ async def test_submit_form_locks_instance(domain):
     form_id, element_id, _ = await create_test_form_with_element(domain)
     form_instance_id = UUID_GENR()
     
-    from fluvius.form.element_model import ElementDataManager, FormInstance
+    from fluvius.form.element import ElementDataManager
     element_data_mgr = ElementDataManager()
     
     # Create form instance
     async with element_data_mgr.transaction():
-        form_instance = FormInstance(
+        form_instance = element_data_mgr.create("form_instance",
             _id=form_instance_id,
             form_id=form_id,
-            organization_id=FIXTURE_ORGANIZATION_ID,
+            instance_key=f"instance-{str(form_instance_id)[:8]}", instance_name=None, organization_id=FIXTURE_ORGANIZATION_ID,
         )
         await element_data_mgr.insert(form_instance)
         form_instance = await element_data_mgr.fetch('form_instance', form_instance_id)

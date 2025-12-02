@@ -293,8 +293,11 @@ class ElementData(ElementBaseSchema):
             
             # Add custom columns as needed
             custom_field = sa.Column(sa.String, nullable=True)
+    
+    Note: ElementData is a concrete table (not abstract) because it represents
+    the actual element_data table that stores element data. Subclasses can
+    override __tablename__ to create separate tables if needed.
     """
-    __abstract__ = True
     __tablename__ = "element_data"
     __table_args__ = (
         sa.UniqueConstraint('form_instance_id', 'element_id', name='uq_element_data_instance'),
@@ -410,37 +413,9 @@ class ElementData(ElementBaseSchema):
 # Registration happens automatically via __init_subclass__
 ElementDataSchemaRegistry = ClassRegistry(ElementData)
 
-# Register ElementData in FormConnector's schema registry
-# This allows ElementDataManager to query the element_data table
-# Even though ElementData is abstract, it represents a real table that needs to be queryable
-FormConnector.register_schema(ElementData, name="element_data")
-
-
-def get_element_data_schema(type_key: str) -> Optional[type]:
-    """
-    Get ElementData schema class by type_key.
-    
-    Args:
-        type_key: The element type key
-        
-    Returns:
-        ElementData subclass or None if not found
-    """
-    try:
-        return ElementDataSchemaRegistry.get(type_key)
-    except RuntimeError:
-        return None
-
-
-def get_all_element_data_schemas() -> Dict[str, type]:
-    """
-    Get all registered ElementData schemas.
-    
-    Returns:
-        Dictionary mapping type_key to ElementData subclass
-    """
-    return dict(ElementDataSchemaRegistry.items())
-
+# Note: ElementData is automatically registered with FormConnector via
+# __init_subclass__ in the SQLAlchemy schema base class, so no explicit
+# registration is needed here.
 
 async def populate_element_type_table_from_schemas(statemgr):
     """

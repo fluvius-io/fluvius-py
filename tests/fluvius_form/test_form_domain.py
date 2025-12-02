@@ -720,13 +720,15 @@ async def test_save_element(domain):
         await domain.statemgr.insert(element)
 
     # Create form instance first (required for save_element)
-    from fluvius.form.element_model import ElementDataManager
+    from fluvius.form.element import ElementDataManager
     element_data_mgr = ElementDataManager()
     async with element_data_mgr.transaction():
-        from fluvius.form.element_model import FormInstance
-        form_instance = FormInstance(
+        form_instance = element_data_mgr.create(
+            "form_instance",
             _id=form_instance_id,
             form_id=form_id,
+            instance_key=f"instance-{str(form_instance_id)[:8]}",
+            instance_name=None,
             organization_id=FIXTURE_ORGANIZATION_ID,
         )
         await element_data_mgr.insert(form_instance)
