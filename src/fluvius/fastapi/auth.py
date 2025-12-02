@@ -7,14 +7,18 @@ from authlib.integrations.starlette_client import OAuth
 from authlib.jose import jwt, JsonWebKey
 from authlib.jose.util import extract_header
 from fastapi import Request, Depends, HTTPException, Response
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from functools import wraps
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from types import SimpleNamespace
 
 
+<<<<<<< HEAD
 from fluvius.error import UnauthorizedError, BadRequestError
+=======
+from fluvius.error import UnauthorizedError, FluviusException
+>>>>>>> origin/main
 from fluvius.data import DataModel
 from fluvius.auth import AuthorizationContext, KeycloakTokenPayload, SessionProfile, SessionOrganization, event as auth_event
 from fluvius.helper import when
@@ -109,9 +113,24 @@ class FluviusAuthMiddleware(BaseHTTPMiddleware):
         try:
             auth_context = await self.get_auth_context(request)
             request.state.auth_context = auth_context
+        except FluviusException as e:
+            # Handle FluviusException directly in middleware to ensure proper status codes
+            # Exceptions raised in middleware may not always be caught by FastAPI's exception handlers
+            content = e.content
+            if DEVELOPER_MODE:
+                import traceback
+                content = content or {}
+                content['traceback'] = traceback.format_exc()
+            return JSONResponse(
+                status_code=e.status_code,
+                content=content
+            )
         except Exception as e:
             logger.exception(e)
-            raise
+            raise JSONResponse(
+                status_code=500,
+                content={"errcode": "A500000", "message": str(e)}
+            )
 
         response = await call_next(request)
 

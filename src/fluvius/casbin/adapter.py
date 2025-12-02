@@ -60,6 +60,14 @@ class PolicySchema:
                 },
                 {
                     ".and": [{
+                        "ptype": "p",
+                        "dom": "*",
+                        "res": "*",
+                        "act": "*"
+                    }]
+                },
+                {
+                    ".and": [{
                         "ptype": "g",
                         "sub": request.sub,
                         "org": request.org,
