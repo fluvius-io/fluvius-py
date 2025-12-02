@@ -36,7 +36,7 @@ class FormAggregate(Aggregate):
         collection = self.rootobj
         changes = data.model_dump(exclude_none=True)
         if not changes:
-            raise BadRequestError("D100-001", "No changes provided for collection update")
+            raise BadRequestError("F00.001", "No changes provided for collection update")
 
         await self.statemgr.update(collection, **changes)
 
@@ -89,7 +89,7 @@ class FormAggregate(Aggregate):
         document = self.rootobj
         changes = data.model_dump(exclude_none=True)
         if not changes:
-            raise BadRequestError("D100-002", "No changes provided for document update")
+            raise BadRequestError("F00.002", "No changes provided for document update")
 
         await self.statemgr.update(document, **changes)
 

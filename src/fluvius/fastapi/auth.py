@@ -14,7 +14,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from types import SimpleNamespace
 
 
-from fluvius.error import UnauthorizedError
+from fluvius.error import UnauthorizedError, BadRequestError
 from fluvius.data import DataModel
 from fluvius.auth import AuthorizationContext, KeycloakTokenPayload, SessionProfile, SessionOrganization, event as auth_event
 from fluvius.helper import when
@@ -101,7 +101,7 @@ class FluviusAuthMiddleware(BaseHTTPMiddleware):
         elif issubclass(auth_profile_provider, FluviusAuthProfileProvider):
             provider_cls = auth_profile_provider
         else:
-            raise ValueError(f'Invalid Auth Profile Provider: {auth_profile_provider}')
+            raise BadRequestError('S00.001', f'Invalid Auth Profile Provider: {auth_profile_provider}')
 
         self.get_auth_context = provider_cls(app).get_auth_context
 
@@ -129,7 +129,7 @@ class FluviusAuthProfileProvider(object):
 
         key = cls.__name__
         if key in FluviusAuthProfileProvider._REGISTRY:
-            raise ValueError(f'Auth Profile Provider is already registered: {key} => {FluviusAuthProfileProvider._REGISTRY[key]}')
+            raise BadRequestError('S00.002', f'Auth Profile Provider is already registered: {key} => {FluviusAuthProfileProvider._REGISTRY[key]}')
 
         FluviusAuthProfileProvider._REGISTRY[key] = cls
         DEVELOPER_MODE and logger.info('Registered Auth Profile Provider: %s', cls.__name__)
@@ -142,7 +142,7 @@ class FluviusAuthProfileProvider(object):
         try:
             return FluviusAuthProfileProvider._REGISTRY[key]
         except KeyError:
-            raise ValueError(f'Auth Profile Provider is not valid: {key}. Available: {list(FluviusAuthProfileProvider._REGISTRY.keys())}')
+            raise BadRequestError('S00.003', f'Auth Profile Provider is not valid: {key}. Available: {list(FluviusAuthProfileProvider._REGISTRY.keys())}')
 
     """ Lookup services for user related info """
     def __init__(self, app):
@@ -165,7 +165,7 @@ class FluviusAuthProfileProvider(object):
                 return None
             auth_user = self.authorize_claims(auth_token)
         except (KeyError, ValueError):
-            raise UnauthorizedError("Q4031216", "Authorization Failed: Missing or invalid  claims token")
+            raise UnauthorizedError("S00.004", "Authorization Failed: Missing or invalid claims token")
 
         auth_context = await self.setup_context(auth_user)
         auth_context.session_id = auth_token.get('session_id')

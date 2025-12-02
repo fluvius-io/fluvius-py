@@ -17,6 +17,7 @@ from fluvius.data.data_driver import DataDriver
 from fluvius.data.data_model import DataModel, BlankModel
 from fluvius.data.query import BackendQuery
 from fluvius.data.exceptions import ItemNotFoundError
+from fluvius.error import BadRequestError, InternalServerError
 
 from fluvius.data.constant import (
     INTRA_DOMAIN_ITEM_ID_FIELD, 
@@ -121,7 +122,7 @@ class DataAccessManagerBase(object):
 
     def generate_model(self, data_schema):
         if not isinstance(self.__automodel__, bool):
-            raise ValueError(f'__automodel__ only accept True / False: {self.__automodel__}')
+            raise BadRequestError('E00.201', f'__automodel__ only accept True / False: {self.__automodel__}')
 
         return type(f"{data_schema.__name__}_Model", (BlankModel, ), {})
 
@@ -176,7 +177,7 @@ class DataAccessManagerBase(object):
     async def transaction(self, *args):
         if self._transaction is not None:
             if RAISE_NESTED_TRANSACTION_ERROR:
-                raise RuntimeError(f'Nested transaction detected in {self.__class__.__name__}')
+                raise InternalServerError('E00.202', f'Nested transaction detected in {self.__class__.__name__}')
 
         async with self.connector.transaction(*args) as transaction:
             self._transaction = transaction
@@ -190,14 +191,14 @@ class DataAccessManagerBase(object):
     @property
     def context(self):
         if self._context is None:
-            raise RuntimeError('State Manager context is not initialized.')
+            raise InternalServerError('E00.203', 'State Manager context is not initialized.')
 
         return self._context
 
     def setup_connector(self, config):
         con_cls = self.__connector__
         if not con_cls or not issubclass(con_cls, DataDriver):
-            raise ValueError(f'Invalid data driver/connector: {con_cls}')
+            raise BadRequestError('E00.204', f'Invalid data driver/connector: {con_cls}')
 
         return con_cls(**config)
 
@@ -264,7 +265,7 @@ class DataFeedManager(DataAccessManagerBase):
     async def insert(self, record: DataModel):
         model_cls = self.lookup_record_model(record)
         data = self._serialize(model_cls, record)
-        result = await self.connector.insert(resource, data)
+        result = await self.connector.insert(model_cls, data)
         return result
 
     async def insert_data(self, model_name, data):
@@ -279,7 +280,7 @@ class DataFeedManager(DataAccessManagerBase):
 
     async def update(self, record: DataModel, updates: dict):
         model_cls = self.lookup_record_model(record)
-        query = BackendQuery(identifier=identifier)
+        query = BackendQuery(identifier=record._id)
         return await self.connector.update_record(model_cls, record, **updates)
 
 
@@ -310,7 +311,7 @@ class DataAccessManager(DataAccessManagerBase):
             Raises an error if there are 0 or multiple results """
         q = BackendQuery.create(q, **query, limit=1, offset=0)
         if q.limit != 1 or q.offset != 0:
-            raise ValueError(f'Invalid find_one query: {q}')
+            raise BadRequestError('E00.205', f'Invalid find_one query: {q}')
 
         try:
             item = await self.connector.find_one(model_name, q)

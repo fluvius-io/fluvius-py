@@ -13,7 +13,7 @@ from fluvius.data import UUID_GENR, DataModel
 from fluvius.helper import camel_to_lower, select_value, camel_to_title
 from fluvius.helper.timeutil import timestamp
 from fluvius.helper.registry import ClassRegistry
-from fluvius.error import ForbiddenError
+from fluvius.error import ForbiddenError, InternalServerError
 from fluvius.casbin import PolicyManager, PolicyRequest
 
 from . import logger, config  # noqa
@@ -55,7 +55,7 @@ def _setup_command_processor_selector(handler_list):
         try:
             return _hmap[bundle.command]
         except KeyError:
-            raise RuntimeError(f'No command handler provided for [{bundle.command}]')
+            raise InternalServerError('D00.104', f'No command handler provided for [{bundle.command}]')
 
     return _select
 
@@ -73,7 +73,7 @@ def _setup_message_dispatcher_selector(handler_list):
         try:
             return _hmap[bundle.message]
         except KeyError:
-            raise RuntimeError(f'No message dispatcher provided for [{bundle.message}]')
+            raise InternalServerError('D00.105', f'No message dispatcher provided for [{bundle.message}]')
 
     return _select
 
@@ -195,10 +195,12 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             setattr(cls, '__namespace__', camel_to_lower(cls.__name__))
 
         if cls.__namespace__ in Domain._REGISTRY:
-            raise ValueError(f'Domain already registered: {cls.__namespace__}')
+            from fluvius.domain.exceptions import DomainEntityError
+            raise DomainEntityError('D00.203', f'Domain already registered: {cls.__namespace__}')
 
         if not issubclass(cls.__aggregate__, Aggregate):
-            raise ValueError(f'Invalid domain aggregate: {cls.__aggregate__}')
+            from fluvius.domain.exceptions import DomainEntityError
+            raise DomainEntityError('D00.202', f'Invalid domain aggregate: {cls.__aggregate__}')
 
         Domain._REGISTRY[cls.__namespace__] = cls
 
@@ -251,23 +253,24 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
 
     def validate_domain_config(self, config):
+        from fluvius.domain.exceptions import DomainEntityError
         if not issubclass(self.__aggregate__, Aggregate):
-            raise ValueError(f'Domain has invalid aggregate [{self.__aggregate__}]')
+            raise DomainEntityError('D00.203', f'Domain has invalid aggregate [{self.__aggregate__}]')
 
         if not issubclass(self.__context__, DomainContextData):
-            raise ValueError(f'Domain has invalid context [{self.__context__}]')
+            raise DomainEntityError('D00.204', f'Domain has invalid context [{self.__context__}]')
 
         if not issubclass(self.__statemgr__, StateManager):
-            raise ValueError(f'Domain has invalid state manager [{self.__statemgr__}]')
+            raise DomainEntityError('D00.205', f'Domain has invalid state manager [{self.__statemgr__}]')
 
         if not issubclass(self.__logstore__, DomainLogStore):
-            raise ValueError(f'Domain has invalid log store [{self.__logstore__}]')
+            raise DomainEntityError('D00.206', f'Domain has invalid log store [{self.__logstore__}]')
 
         if not self.__namespace__:
-            raise ValueError('Domain does not have a name [__namespace__]')
+            raise DomainEntityError('D00.207', 'Domain does not have a name [__namespace__]')
 
         if self.__policymgr__ and not issubclass(self.__policymgr__, PolicyManager):
-            raise ValueError(f'Domain has invalid policy manager [{self.__policymgr__}]')
+            raise DomainEntityError('D00.208', f'Domain has invalid policy manager [{self.__policymgr__}]')
 
 
         return self.__config__(**config)
@@ -322,7 +325,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         cmd_cls = self.lookup_command(cmd_key)
 
         if cmd_cls.Meta.resources and aggroot.resource not in cmd_cls.Meta.resources:
-            raise ForbiddenError('D10011', 'Command [%s] does not allow aggroot of resource [%s]' % (cmd_key, aggroot.resource))
+            raise ForbiddenError('D00.302', 'Command [%s] does not allow aggroot of resource [%s]' % (cmd_key, aggroot.resource))
 
         data = cmd_cls.Data.create(cmd_data)
 
@@ -359,7 +362,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
         resp = await self.policymgr.check_permission(reqs)
         if not resp.allowed:
-            raise ForbiddenError('D10012', f'Permission Failed: [{resp.narration}]')
+            raise ForbiddenError('D00.303', f'Permission Failed: [{resp.narration}]')
 
         return command
 
@@ -385,7 +388,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
                 yield evt
 
         if no_handler:
-            raise RuntimeError(f'Command has no handler: {cmd}')
+            raise InternalServerError('D00.106', f'Command has no handler: {cmd_bundle.command}')
 
     async def process_command_internal(self, ctx, stm, cmd) -> Iterator[ce.Event]:
         await self.logstore.add_command(cmd)
@@ -393,9 +396,9 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         meta = self.lookup_command(cmd.command)
         async for particle in self.invoke_processors(ctx, stm, cmd, meta):
             if not isinstance(particle, (ce.EventRecord, cm.MessageRecord, cres.ResponseRecord, act.ActivityLog)):
-                raise RuntimeError(
-                    'Items returned from command processor must be a domain entity (event, messages, etc.). '
-                    'Got: [%s] while processing command: %s', particle, cmd)
+                msg = ('Items returned from command processor must be a domain entity (event, messages, etc.). ' +
+                       'Got: [%s] while processing command: %s' % (particle, cmd))
+                raise InternalServerError('D00.107', msg)
 
             # set trace values
             particle = particle.set(src_cmd=cmd._id)
@@ -436,7 +439,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
     def context(self):
         ctx = self._active_context.get()
         if ctx is None:
-            raise RuntimeError('Domain session is not started yet.')
+            raise InternalServerError('D00.108', 'Domain session is not started yet.')
 
         return ctx
 
@@ -477,7 +480,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
         for resp in consume_queue(ctx.rsp_queue):
             if resp.response in responses:
-                raise RuntimeError(f'Duplicated response: [{resp.response}].')
+                raise InternalServerError('D00.109', f'Duplicated response: [{resp.response}].')
 
             responses[resp.response] = resp.data
         return responses

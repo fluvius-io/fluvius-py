@@ -21,6 +21,7 @@ from . import config
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pg
 from fluvius.data import DomainSchema, FluviusJSONField
+from fluvius.error import BadRequestError
 
 # Import form schema tables to ensure they're registered in metadata
 # This is necessary for cross-schema foreign key references
@@ -74,9 +75,8 @@ class BaseElementType(DataModel):
                 # jsonschema not available, skip validation
                 pass
             except Exception as e:
-                from fluvius.error import BadRequestError
                 raise BadRequestError(
-                    "E100-001",
+                    "F00.101",
                     f"Element data validation failed: {str(e)}",
                     str(e)
                 )

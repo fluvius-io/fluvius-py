@@ -5,6 +5,7 @@ import hashlib
 import secrets
 
 from base64 import b64decode, b64encode
+from fluvius.error import BadRequestError
 
 # Parameters to PBKDF2. Only affect new passwords.
 SALT_LENGTH = 12
@@ -47,8 +48,8 @@ def make_hash(password, encoding="utf-8"):
     elif isinstance(password, (bytearray, bytes)):
         passwd = password
     else:
-        raise ValueError(
-            "Password must be either a string or bytes: {}".format(type(password)))
+        raise BadRequestError(
+            "S00.101", "Password must be either a string or bytes: {}".format(type(password)))
 
     salt = b64encode(os.urandom(SALT_LENGTH))
     hashbytes = hashlib.pbkdf2_hmac(
@@ -71,8 +72,8 @@ def check_hash(password, hash_value, encoding="utf-8"):
     elif isinstance(password, (bytearray, bytes)):
         passwd = password
     else:
-        raise ValueError(
-            "Password must be either a string or bytes: {}".format(type(password)))
+        raise BadRequestError(
+            "S00.101", "Password must be either a string or bytes: {}".format(type(password)))
 
     '''Check a password against an existing hash.'''
     algorithm, hash_function, cost_factor, salt, hash_a = hash_value.split("$")

@@ -1,7 +1,7 @@
 from fluvius.navis.engine.mutation import MutationEnvelop
 from fluvius.data import UUID_GENF
 from fluvius.helper import timestamp
-from fluvius.error import NotFoundError
+from fluvius.error import NotFoundError, BadRequestError
 
 
 from .datadef import WorkflowData, WorkflowStatus, WorkflowMessage, WorkflowActivity
@@ -272,7 +272,7 @@ class WorkflowManager(object):
     def register(cls, wf_cls):
         wfdef_key = wf_cls.Meta.key
         if wfdef_key in cls.__registry__:
-            raise ValueError(f'Worfklow already registered: {wfdef_key}')
+            raise BadRequestError('P00.501', f'Workflow already registered: {wfdef_key}')
 
         cls.__registry__[wfdef_key] = type(f'WFE_{wf_cls.__name__}', (cls.__runner__, ), {}, wf_def=wf_cls)
         logger.warning('Registered workflow: %s', wfdef_key)

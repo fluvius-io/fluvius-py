@@ -7,6 +7,7 @@ from .enforcer import FluviusEnforcer
 from .adapter import SqlAdapter
 from .datadef import PolicyRequest, PolicyResponse, PolicyData, PolicyNarration
 from ._meta import config, logger
+from fluvius.error import BadRequestError, ForbiddenError
 
 
 DEFAULT_CASBIN_TABLE = 'casbin_rule'
@@ -25,7 +26,7 @@ class PolicyManager:
             cls.__model__ = os.path.join(base_path, config.CASBIN_MODEL_PATH)
 
         if not cls.__adapter__:
-            raise ValueError("[__adapter__] is required! e.g. `policy.csv` or `SqlAdapter`. etc.")
+            raise BadRequestError("C00.201", "[__adapter__] is required! e.g. `policy.csv` or `SqlAdapter`. etc.")
 
     def __init__(self, dam=None):
         self._dam = dam
@@ -46,7 +47,7 @@ class PolicyManager:
         """Setup the policy storage adapter."""
         if issubclass(self.__adapter__, (AsyncAdapter)):
             if not self.__schema__:
-                raise ValueError("[__schema__ is required for Custom like SQLAdapter.]")
+                raise BadRequestError("C00.202", "[__schema__ is required for Custom like SQLAdapter.]")
             self._adapter = self.__adapter__(self._dam, self.__schema__)
         else:
             self._adapter = self.__adapter__
@@ -79,7 +80,7 @@ class PolicyManager:
                 narration=self._generate_narration(request, allowed, narration)
             )
         except Exception as e:
-            raise RuntimeError(f"Permission check failed: {str(e)}")
+            raise ForbiddenError("C00.203", f"Permission check failed: {str(e)}", str(e))
 
     def _generate_narration(self, request: PolicyRequest, allowed: bool, narration: list) -> str:
         """Generate a human readable explanation of the policy decision."""

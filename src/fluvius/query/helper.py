@@ -39,7 +39,7 @@ def scope_decoder(scoping_stmt, scope_schema=None):
 
             key, sep, value = part.partition(SCOPING_SEP)
             if not (RX_SCOPE_VALUE.match(value) and RX_SCOPE_VALUE.match(key)):
-                raise ValueError(f'Invalid scoping value: {part}')
+                raise BadRequestError('Q00.510', f'Invalid scoping value: {part}')
 
             if sep == '' and value == '':
                 value = key
@@ -66,7 +66,7 @@ def list_decoder(data: Optional[str]) -> Optional[List[str]]:
     try:
         return [v.strip() for v in data.split(',') if v.strip()]
     except Exception as e:
-        raise BadRequestError("Q101-503", f"Invalid list value: {data}", str(e))
+        raise BadRequestError("Q00.503", f"Invalid list value: {data}", str(e))
 
 
 def json_decoder(data: Optional[str]) -> Optional[Dict]:
@@ -77,11 +77,11 @@ def json_decoder(data: Optional[str]) -> Optional[Dict]:
         result = json.loads(data)
 
         if not isinstance(result, dict):
-            raise ValueError(f"Invalid query statement: {data}")
+            raise BadRequestError('Q00.511', f"Invalid query statement: {data}")
 
         return result
     except json.JSONDecodeError as e:
-        raise BadRequestError("Q101-503", "Invalid query value.", str(e))
+        raise BadRequestError("Q00.504", "Invalid query value.", str(e))
 
 
 def jurl_decoder(data):
@@ -100,6 +100,6 @@ def jurl_decoder(data):
     result = jsonurl_py.loads("(" + data + ")")
 
     if not isinstance(result, dict):
-        raise ValueError(f"Invalid path query: {data}")
+        raise BadRequestError('Q00.512', f"Invalid path query: {data}")
 
     return result

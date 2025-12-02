@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Callable
 from types import SimpleNamespace
 from fluvius.data import UUID_TYPE, UUID_GENR
-from fluvius.error import NotFoundError
+from fluvius.error import NotFoundError, BadRequestError
 from fluvius.navis.error import WorkflowConfigurationError
 
 from . import logger  # noqa
@@ -55,7 +55,7 @@ def _default_route_func(event_data):
 def connect(act_name, step=None, router=_default_route_func, priority=0):
     def decorator(func):
         if hasattr(func, '__wfevt_handler__'):
-            raise ValueError(f'Activity already connected: {act_name}')
+            raise BadRequestError('P00.301', f'Activity already connected: {act_name}')
 
         func.__wfevt_handler__ = (act_name, router, step, priority)
         return func
@@ -64,7 +64,7 @@ def connect(act_name, step=None, router=_default_route_func, priority=0):
 
 def validate_wfevt_handler(wfevt_handler):
     if not callable(wfevt_handler.routing_func):
-        raise ValueError("Invalid Workflow Event Router [%s] does not exists." % wfevt_handler.routing_func)
+        raise BadRequestError('P00.302', "Invalid Workflow Event Router [%s] does not exists." % wfevt_handler.routing_func)
     
     return wfevt_handler
 
@@ -103,7 +103,7 @@ class ActivityRouter(object):
         """
 
         if evt_name not in cls.ROUTING_TABLE:
-            raise NotFoundError('P018.81', f'Event [{evt_name}] does not have any handlers.')
+            raise NotFoundError('P00.081', f'Event [{evt_name}] does not have any handlers.')
 
         for route_entry in cls.ROUTING_TABLE[evt_name]:
             # Route is targeting a specific workflow step
@@ -124,7 +124,7 @@ class ActivityRouter(object):
                 continue
 
             if step_route_entry and (step_selector is None):
-                raise NotFoundError('P018.82', f'Step event must be routed to a specific step [{route_entry.step_key}/{step_selector}].')
+                raise NotFoundError('P00.082', f'Step event must be routed to a specific step [{route_entry.step_key}/{step_selector}].')
 
             yield WorkflowTrigger(
                 id=UUID_GENR(),
@@ -147,7 +147,7 @@ class ActivityRouter(object):
 
             evt_name, evt_router, evt_step_key, priority = handler_func.__wfevt_handler__
             if step_key and evt_step_key:  # connector is defined within step class definition
-                raise WorkflowConfigurationError('P018.83', f'Event handler is connected with step [{step_key}] via step context.')
+                raise WorkflowConfigurationError('P00.083', f'Event handler is connected with step [{step_key}] via step context.')
 
             step_key = step_key or evt_step_key
 

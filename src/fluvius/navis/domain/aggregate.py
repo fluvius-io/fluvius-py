@@ -7,7 +7,7 @@ from fluvius.navis import logger
 from ..status import WorkflowStatus, StepStatus
 from ..engine.manager import WorkflowManager
 from ..error import WorkflowCommandError
-from fluvius.error import NotFoundError
+from fluvius.error import NotFoundError, BadRequestError
 
 
 class WorkflowAggregate(Aggregate):
@@ -24,7 +24,7 @@ class WorkflowAggregate(Aggregate):
             """Get or load the workflow runner instance"""
 
             if self.aggroot.resource != 'workflow':
-                raise ValueError('Workflow instance only available on workflow aggroot.')
+                raise BadRequestError('P00.201', 'Workflow instance only available on workflow aggroot.')
 
             wf_data = self.rootobj
 
@@ -59,7 +59,7 @@ class WorkflowAggregate(Aggregate):
         # Build changes dictionary from provided data
         changes = data.model_dump(exclude_none=True)
         if not changes:
-            raise ValueError("No changes provided for workflow update")
+            raise BadRequestError('P00.202', "No changes provided for workflow update")
 
         wf_instance = await self.load_wf_instance()
 

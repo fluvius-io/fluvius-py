@@ -6,6 +6,7 @@ from fluvius.data import logger, config
 from fluvius.data import UUID_GENF, UUID_GENR,nullable, DataModel
 from fluvius.helper.registry import ClassRegistry
 from fluvius.helper import camel_to_lower
+from fluvius.error import BadRequestError
 
 from .router import connect
 from .datadef import WorkflowStep, WorkflowData, RX_STATE
@@ -31,7 +32,7 @@ class Role(object):
 
 def validate_state(state):
     if not RX_STATE.match(state):
-        raise ValueError(f'Invalid state: {state}')
+        raise BadRequestError('P00.401', f'Invalid state: {state}')
 
     return state
 
@@ -68,17 +69,17 @@ class Step(object):
 
             to_state, allowed_origins, unallowed_origins = func.__transition__
             if to_state not in cls.__states__:
-                raise WorkflowConfigurationError('P01301', f'State [{to_state}] is not define in Step states {cls.__states__}')
+                raise WorkflowConfigurationError('P00.031', f'State [{to_state}] is not define in Step states {cls.__states__}')
 
             if to_state in cls.__transitions__:
-                raise WorkflowConfigurationError('P01302', f'Duplicated transition handler to state [{to_state}]')
+                raise WorkflowConfigurationError('P00.032', f'Duplicated transition handler to state [{to_state}]')
 
             cls.__transitions__[to_state] = allowed_origins, unallowed_origins, func
 
 
     def __init__(self, step_data):
         if not isinstance(step_data, WorkflowStep):
-            raise ValueError(f'Invalid step data: {step_data}')
+            raise BadRequestError('P00.402', f'Invalid step data: {step_data}')
 
         self._data = step_data
 

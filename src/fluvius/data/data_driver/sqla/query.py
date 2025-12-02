@@ -96,7 +96,7 @@ def _iter_expression(statement):
             yield from _iter_expression(q)
         return
 
-    raise ValueError('Invalid statement [%s]' % statement)
+    raise BadRequestError("E00.505", 'Invalid statement [%s]' % statement)
 
 
 class QueryBuilder(object):
@@ -111,11 +111,11 @@ class QueryBuilder(object):
 
             return getattr(data_schema, field_name).label(alias)
         except AttributeError:
-            raise BadRequestError("D100-501", f"Type object {data_schema} has no attribute {field_name}", None)
+            raise BadRequestError("E00.501", f"Type object {data_schema} has no attribute {field_name}", None)
 
     def _build_expression(self, data_schema, expr: QueryStatement):
         if not isinstance(expr, QueryStatement):
-            raise ValueError(f'Invalid query expression: {expr}')
+            raise BadRequestError("E00.502", f'Invalid query expression: {expr}')
 
         def _gen_query(q):
             for stmt in _iter_expression(q):
@@ -178,7 +178,7 @@ class QueryBuilder(object):
 
         if q.text:
             if not hasattr(data_schema, '__ts_index__') or not isinstance(data_schema.__ts_index__, list):
-                raise BadRequestError("D100-502", "Data schema does not support text search")
+                raise BadRequestError("E00.503", "Data schema does not support text search")
 
             index = func.concat_ws(' ', *[self._field(data_schema, field) for field in data_schema.__ts_index__])
             yield (func.to_tsvector(DEFAULT_TEXT_SEARCH_LANG, index).op('@@')(DEFAULT_TEXT_SEARCH_ENGINE(DEFAULT_TEXT_SEARCH_LANG, q.text)))
@@ -196,7 +196,7 @@ class QueryBuilder(object):
         if isinstance(values, (list, tuple)):
             return sql.values(values)
 
-        raise ValueError(f'Unsupported values: {values}')
+        raise BadRequestError("E00.504", f'Unsupported values: {values}')
 
     def build_delete(self, data_schema, query: BackendQuery):
         sql = delete(data_schema)
