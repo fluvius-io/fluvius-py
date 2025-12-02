@@ -24,6 +24,7 @@ Error codes follow the format: `X##.###` where:
 - **O** = Ordinis errors
 - **W** = Worker errors
 - **M** = Media errors
+- **H** = Helper errors
 
 ## Error Codes
 
@@ -311,6 +312,22 @@ Error codes follow the format: `X##.###` where:
 | M00.602 | InternalServerError | 500 | Failed to decompress LZMA data |
 | M00.603 | InternalServerError | 500 | Failed to open LZMA compressed data |
 | M00.604 | InternalServerError | 500 | Failed to compress stream with LZMA |
+
+### Helper Errors (H00.###)
+
+| Code | Exception | Status | Description |
+|------|-----------|--------|-------------|
+| H00.101 | BadRequestError | 400 | Invalid lower-dash identifier |
+| H00.201 | BadRequestError | 400 | Both user value and class value provided |
+| H00.202 | BadRequestError | 400 | Value is required |
+| H00.301 | BadRequestError | 400 | Register a class with a different key is not allowed |
+| H00.302 | BadRequestError | 400 | Key already registered in registry |
+| H00.303 | BadRequestError | 400 | Registering class must be a subclass |
+| H00.401 | NotFoundError | 404 | Registry item not found in registry |
+| H00.501 | BadRequestError | 400 | Invalid date string |
+| H00.502 | BadRequestError | 400 | Invalid date object |
+| H00.503 | BadRequestError | 400 | Invalid iso datetime string |
+| H00.601 | BadRequestError | 400 | c_profiler is not working properly with generator/async function |
 
 ## Notes
 

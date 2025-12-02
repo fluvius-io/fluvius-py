@@ -11,7 +11,7 @@ from itertools import chain
 from operator import itemgetter
 from typing import Dict, List, Optional, Pattern, Tuple, Union
 
-from fluvius.error import AssertionFailed
+from fluvius.error import AssertionFailed, BadRequestError, InternalServerError
 from fluvius import logger
 
 from .timeutil import timestamp, str_to_datetime
@@ -25,7 +25,11 @@ def validate_lower_dash(value):
     if RX_LOWERCASE_DASH.match(value):
         return value
 
-    raise ValueError(f'Invalid lower-dash identifier: {value}')
+    raise BadRequestError(
+        "H00.101",
+        f"Invalid lower-dash identifier: {value}",
+        None
+    )
 
 
 def load_string(class_path):
@@ -266,7 +270,11 @@ def select_value(usr_value, cls_value=None, default=VALUE_REQUIRED):
 
     if usr_value is not None:
         if cls_value is not None:
-            raise RuntimeError(f'Both user value and class value provided: {usr_value} & {cls_value}.')
+            raise BadRequestError(
+                "H00.201",
+                f"Both user value and class value provided: {usr_value} & {cls_value}",
+                None
+            )
 
         return usr_value
 
@@ -274,6 +282,10 @@ def select_value(usr_value, cls_value=None, default=VALUE_REQUIRED):
         return cls_value
 
     if default is VALUE_REQUIRED:
-        raise RuntimeError('Value is required')
+        raise BadRequestError(
+            "H00.202",
+            "Value is required",
+            None
+        )
 
     return default

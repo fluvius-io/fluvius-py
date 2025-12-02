@@ -1,3 +1,4 @@
+from fluvius.error import BadRequestError, NotFoundError
 from fluvius import logger
 from fluvius.helper import camel_to_lower
 from pyrsistent import pmap
@@ -24,19 +25,24 @@ def ClassRegistry(base_class, post_register=None):  # noqa: None
             exist_key = getattr(cls, '__clsid__', None)
 
             if exist_key is not None and exist_key != _key:
-                raise ValueError(
-                    'Register a class with a different key is not allowed [__clsid__ = %s] != [%s]' % (exist_key, _key))
+                raise BadRequestError(
+                    "H00.301",
+                    f"Register a class with a different key is not allowed [__clsid__ = {exist_key}] != [{_key}]",
+                    None
+                )
 
             if _key in lookup_table:
-                raise ValueError(
-                    'Key [%s] already registered in registry [%s]' % (
-                        _key, registry_name
-                    )
+                raise BadRequestError(
+                    "H00.302",
+                    f"Key [{_key}] already registered in registry [{registry_name}]",
+                    None
                 )
 
             if not issubclass(cls, base_class):
-                raise ValueError(
-                    'Registering class [%s] must e a subclass of [%s]' % (cls.__name__, registry_name)
+                raise BadRequestError(
+                    "H00.303",
+                    f"Registering class [{cls.__name__}] must be a subclass of [{registry_name}]",
+                    None
                 )
 
             cls.__clsid__ = _key
@@ -69,7 +75,11 @@ def ClassRegistry(base_class, post_register=None):  # noqa: None
                 if key and lookup_table[key] is key_or_class:
                     return key_or_class
 
-        raise RuntimeError('Registry item [%s] not found in registry [%s]' % (key_or_class, registry_name))
+        raise NotFoundError(
+            "H00.401",
+            f"Registry item [{key_or_class}] not found in registry [{registry_name}]",
+            None
+        )
 
     def _items():
         return lookup_table.items()
