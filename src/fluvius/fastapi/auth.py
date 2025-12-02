@@ -14,11 +14,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from types import SimpleNamespace
 
 
-<<<<<<< HEAD
-from fluvius.error import UnauthorizedError, BadRequestError
-=======
-from fluvius.error import UnauthorizedError, FluviusException
->>>>>>> origin/main
+from fluvius.error import UnauthorizedError, FluviusException, BadRequestError
 from fluvius.data import DataModel
 from fluvius.auth import AuthorizationContext, KeycloakTokenPayload, SessionProfile, SessionOrganization, event as auth_event
 from fluvius.helper import when
