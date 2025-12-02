@@ -2,6 +2,7 @@ import os
 from enum import Enum
 from pyrsistent import PClass, field
 from collections import namedtuple
+from fluvius.error import BadRequestError
 from fluvius.helper import osutil
 
 
@@ -26,7 +27,11 @@ def _validate_list(v):
     if isinstance(v, (list, tuple)):
         return v
 
-    raise ValueError('%s is not a list' % v)
+    raise BadRequestError(
+        "T00.201",
+        f"{v} is not a list",
+        None
+    )
 
 
 def _validate_writer(w):
@@ -34,7 +39,11 @@ def _validate_writer(w):
         return {'name': w}
 
     if not isinstance(w, dict):
-        raise ValueError('Invalid writer config: %s', w)
+        raise BadRequestError(
+            "T00.202",
+            f"Invalid writer config: {w}",
+            None
+        )
 
     return w
 

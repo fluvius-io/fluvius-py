@@ -1,6 +1,7 @@
 import functools
 import queue
 
+from fluvius.error import BadRequestError
 from fluvius.dmap import logger, config, writer
 from fluvius.dmap.interface import OutputRow, DataElement, PipelineConfig, ReaderError, ReaderFinished, ResourceMeta
 from fluvius.dmap.typecast import get_coercer_profile, get_dtype, get_reducer
@@ -181,7 +182,11 @@ class ProcessPipeline(object):
                     fmap.setdefault(input_key, tuple())
                     fmap[input_key] += ((idx, output_key, None, None), )
                 else:
-                    raise ValueError('Invalid mapping spec: %s', spec)
+                    raise BadRequestError(
+                        "T00.401",
+                        f"Invalid mapping spec: {spec}",
+                        None
+                    )
 
                 dtype = get_dtype(reducer) if reducer else get_dtype(coercer)
                 yield output_key, dtype  # None is segment id
@@ -232,9 +237,10 @@ class ProcessPipeline(object):
                 elif key not in obj:
                     obj[key] = val
                 else:
-                    raise ValueError(
-                        f'No reducer specified yet there are multiple values: '
-                        f'{key} => {ele_id} : {ele_val} | {obj[key]}'
+                    raise BadRequestError(
+                        "T00.402",
+                        f"No reducer specified yet there are multiple values: {key} => {ele_id} : {ele_val} | {obj[key]}",
+                        None
                     )
 
         return OutputRow(obj.get(k) for k in self.field_hdr)

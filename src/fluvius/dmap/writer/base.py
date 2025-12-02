@@ -1,6 +1,7 @@
 import os
 from time import perf_counter
 
+from fluvius.error import BadRequestError
 from fluvius.helper import safe_filename
 from fluvius.dmap import logger
 from fluvius.dmap.interface import WriterConfig
@@ -28,7 +29,11 @@ class Writer(object):
 
     def setup_pipeline(self, pipeline):
         if self._pipeline is not None:
-            raise ValueError('Pipeline is set already.')
+            raise BadRequestError(
+                "T00.121",
+                "Pipeline is set already.",
+                None
+            )
         self._pipeline = pipeline
 
     def setup_headers(self, headers):
@@ -37,7 +42,11 @@ class Writer(object):
             return True
 
         if self._headers != headers:
-            raise ValueError('Inconsistent headers: %s', headers)
+            raise BadRequestError(
+                "T00.122",
+                f"Inconsistent headers: {headers}",
+                None
+            )
 
         return False
 
@@ -68,9 +77,10 @@ class FileWriter(Writer):
     def get_filepath(self, pipeline_key):
         ext = self.config.file_extension or self.default_extension
         if ext is None:
-            raise ValueError(
-                "No extension provided for current writer [%s]"
-                % str(self.__class__)
+            raise BadRequestError(
+                "T00.123",
+                f"No extension provided for current writer [{self.__class__}]",
+                None
             )
 
         output_dir = os.path.join(self.config.path or '', self.config.schema or '')

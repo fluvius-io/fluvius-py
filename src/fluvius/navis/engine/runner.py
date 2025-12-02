@@ -84,10 +84,10 @@ def validate_transaction(wf, action_name, allowed, unallowed):
         raise WorkflowExecutionError('P00.001', f'Unable to perform action [{action_name}] outside of a transaction')
 
     if allowed and wf.status not in allowed:
-        raise WorkflowExecutionError('P00.002', f'Unable to perform action [{action_name}] at workflow status [{wf.status}]')
+        raise WorkflowExecutionError('P00.002', f'Action [{action_name}] is not allowed at status [{wf.status}]')
 
     if unallowed and wf.status in unallowed:
-        raise WorkflowExecutionError('P00.003', f'Unable to perform action [{action_name}] at workflow status [{wf.status}]')
+        raise WorkflowExecutionError('P00.003', f'Action [{action_name}] is disabled at status [{wf.status}]')
 
 
 def workflow_action(activity_name, allow_statuses = None, unallow_statuses = None, hook_name = None, external=False):

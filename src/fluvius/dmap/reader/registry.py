@@ -1,4 +1,5 @@
 import importlib
+from fluvius.error import BadRequestError
 from .. import logger
 
 
@@ -29,8 +30,10 @@ def __closure__():
         try:
             return READER_REGISTRY[reader_key]
         except KeyError:
-            raise ValueError(
-                "Reader of type: [%s] is not supported" % reader_config.reader
+            raise BadRequestError(
+                "T00.111",
+                f"Reader of type: [{reader_key}] is not supported",
+                None
             )
 
     def init_reader(reader_config):
@@ -41,7 +44,11 @@ def __closure__():
     def register_reader(key):
         def _decorator(cls):
             if key in READER_REGISTRY:
-                raise ValueError("Reader key [%s] is already registered." % key)
+                raise BadRequestError(
+                    "T00.112",
+                    f"Reader key [{key}] is already registered.",
+                    None
+                )
 
             READER_REGISTRY[key] = cls
             return cls

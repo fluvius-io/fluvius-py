@@ -3,6 +3,7 @@
 from pyrsistent import PClass, field
 from sqlalchemy import types
 from sqlalchemy.dialects.postgresql import UUID
+from fluvius.error import BadRequestError
 from fluvius.data.data_driver.sqla.sync import SyncSqlDriver
 from fluvius.dmap import logger, config
 from fluvius.dmap.writer import register_writer, Writer
@@ -79,9 +80,11 @@ class SQLWriter(Writer):
         try:
             schema_name, table_name = data_pipeline.pipeline_key.split('.')
         except ValueError:
-            raise ValueError(
-                f'Table name must have schema prefixed (e.g. [data-icd10.order]).'
-                f' Got value: {data_pipeline.pipeline_key}')
+            raise BadRequestError(
+                "T00.171",
+                f"Table name must have schema prefixed (e.g. [data-icd10.order]). Got value: {data_pipeline.pipeline_key}",
+                None
+            )
 
         header, stream = self.pipeline.consume()
         schematics = self.generate_schematics(data_pipeline)

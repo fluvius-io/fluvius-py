@@ -3,6 +3,7 @@ import openpyxl
 from slugify import slugify
 from pyrsistent import field
 
+from fluvius.error import BadRequestError
 from fluvius.dmap.reader import register_reader
 from fluvius.dmap.reader.tabular import TabularReader, TabularReaderConfig, EMPTY_VALUES, RowValidationError
 from fluvius.dmap.interface import DataElement, DataLoop
@@ -38,7 +39,11 @@ def sheet_matcher(try_sheets):
 
         return matcher
 
-    raise ValueError(f'Invalid try_sheets values: {try_sheets}')
+    raise BadRequestError(
+        "T00.161",
+        f"Invalid try_sheets values: {try_sheets}",
+        None
+    )
 
 
 @register_reader('xlsx')
@@ -68,9 +73,11 @@ class XLSXReader(TabularReader):
                     yield shname, headers, rowiter
 
         if shobj is None:
-            raise ValueError(
-                f'No worksheets matches sheet selector: '
-                f'\n - worksheet: {self.config.worksheet}\n - try_sheets: {self.config.try_sheets}')
+            raise BadRequestError(
+                "T00.162",
+                f"No worksheets matches sheet selector: worksheet: {self.config.worksheet}, try_sheets: {self.config.try_sheets}",
+                None
+            )
         wbobj.close()
 
     def process_headers(self, headers):

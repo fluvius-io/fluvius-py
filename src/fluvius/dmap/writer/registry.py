@@ -1,4 +1,5 @@
 import importlib
+from fluvius.error import BadRequestError
 from . import logger
 
 WRITER_ALIASES = {
@@ -27,7 +28,11 @@ def __closure__():
         try:
             return WRITER_REGISTRY[writer_key](**writer_config)
         except KeyError:
-            raise ValueError("Writer of type: [%s] is not supported" % name)
+            raise BadRequestError(
+                "T00.101",
+                f"Writer of type: [{writer_key}] is not supported",
+                None
+            )
 
     def get_transformer(transformer_spec):
         output_type, _, param_str = transformer_spec.partition('|')
@@ -35,8 +40,10 @@ def __closure__():
             params = param_str.split(':') if param_str else []
             return TRANFORMERS[output_type](*params)
         except KeyError:
-            raise ValueError(
-                "Transformer of type: [%s] is not supported" % output_type
+            raise BadRequestError(
+                "T00.102",
+                f"Transformer of type: [{output_type}] is not supported",
+                None
             )
 
     def register_writer(key):

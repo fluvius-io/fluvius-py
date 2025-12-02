@@ -1,5 +1,6 @@
 import glob
 from dataclasses import dataclass
+from fluvius.error import BadRequestError
 from fluvius.dmap.interface import InputFile
 from fluvius.dmap.fetcher import DataFetcher
 from fluvius.dmap import logger
@@ -24,7 +25,11 @@ class FileFetcher(DataFetcher):
 
     def fetch(self):
         if self.args and self.config.paths:
-            raise ValueError('Both user supplied args and config paths are provided. Only one allowed.')
+            raise BadRequestError(
+                "T00.151",
+                "Both user supplied args and config paths are provided. Only one allowed.",
+                None
+            )
 
         input_globs = self.config.paths or self.args
 

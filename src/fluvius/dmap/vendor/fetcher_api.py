@@ -10,6 +10,7 @@ from enum import Enum
 from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from fluvius.error import BadRequestError
 from fluvius.dmap.fetcher import DataFetcher
 from fluvius.dmap.interface import InputFile
 from fluvius.dmap import logger
@@ -51,7 +52,11 @@ class APIFetcherRequest:
 
     def __post_init__(self):
         if not self.endpoint:
-            raise ValueError("Endpoint field must be set...")
+            raise BadRequestError(
+                "T00.141",
+                "Endpoint field must be set",
+                None
+            )
 
         self.params = self.params or {}
         self.headers = self.headers or {}
@@ -107,14 +112,22 @@ class APIFetcher(DataFetcher):
 
     def _handle_request(self, request: APIFetcherRequest):
         if not isinstance(request, APIFetcherRequest):
-            raise ValueError("[request] argument must be instances of class APIFetcherRequest...")
+            raise BadRequestError(
+                "T00.142",
+                "[request] argument must be instances of class APIFetcherRequest",
+                None
+            )
 
         if request.method.upper() == "GET":
             return self.request_session.get(url=request.endpoint, headers=request.headers, params=request.params)
         elif request.method.upper() == "POST":
             return self.request_session.post(url=request.endpoint, headers=request.headers, params=request.params, data=request.data)
         else:
-            raise ValueError(f"{self.config.method} is not supported!")
+            raise BadRequestError(
+                "T00.143",
+                f"{request.method} is not supported!",
+                None
+            )
 
     def _handle_response(self, request, response: requests.Response):
         def _detect_extension():
