@@ -270,13 +270,13 @@ Error codes follow the format: `X##.###` where:
 | C00.203 | ForbiddenError | 403 | Permission check failed |
 | C00.301 | BadRequestError | 400 | Unsupported policy type |
 
-### Ordinis Errors (O00.###)
+### Ordinis Errors (R00.###)
 
 | Code | Exception | Status | Description |
 |------|-----------|--------|-------------|
-| O00.101 | BadRequestError | 400 | Cannot change WorkingMemory reserved attributes |
-| O00.102 | InternalServerError | 500 | Reading callable attributes is not allowed |
-| O00.201 | BadRequestError | 400 | Invalid Narration |
+| R00.101 | BadRequestError | 400 | Cannot change WorkingMemory reserved attributes |
+| R00.102 | InternalServerError | 500 | Reading callable attributes is not allowed |
+| R00.201 | BadRequestError | 400 | Invalid Narration |
 
 ### Worker Errors (W00.###)
 

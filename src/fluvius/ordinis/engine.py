@@ -39,7 +39,7 @@ class WorkingMemory(object):
     if CHECK_WORKING_MEMORY_ATTRS:
         def __setattr__(self, name, value):
             if name in ('KE', 'Retract', 'RetractedRules'):
-                raise BadRequestError('O00.101', 'Cannot change WorkingMemory reserved attributes: %s' % name)
+                raise BadRequestError('R00.101', 'Cannot change WorkingMemory reserved attributes: %s' % name)
 
             return super(WorkingMemory, self).__setattr__(name, value)
 
@@ -49,7 +49,7 @@ def ReadonlyObjectProxy(wm):
         def __getattr__(self, key):
             val = getattr(wm, key)
             if callable(val):
-                raise InternalServerError('O00.102', 'Reading callable attributes is not allowed.')
+                raise InternalServerError('R00.102', 'Reading callable attributes is not allowed.')
             return val
         __setattr__ = None
     return ObjectClosure()
@@ -121,7 +121,7 @@ class KnowledgeEngine(object):
 
     def add_narration(self, narration):
         if not isinstance(narration, RuleNarration):
-            raise BadRequestError('O00.201', f'Invalid Narraton: {narration}')
+            raise BadRequestError('R00.201', f'Invalid Narraton: {narration}')
 
         self.narration_queue.put(narration)
         return narration
