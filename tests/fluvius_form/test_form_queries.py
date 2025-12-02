@@ -23,7 +23,7 @@ async def create_test_collection(domain):
         collection = domain.statemgr.create(
             "collection",
             _id=collection_id,
-            collection_key="test-collection",
+            collection_key=f"test-collection-{str(collection_id)[:8]}",
             collection_name="Test Collection",
             desc="A test collection",
             organization_id=FIXTURE_ORGANIZATION_ID,
@@ -39,7 +39,7 @@ async def create_test_document(domain):
         document = domain.statemgr.create(
             "document",
             _id=document_id,
-            document_key="test-document",
+            document_key=f"test-document-{str(document_id)[:8]}",
             document_name="Test Document",
             desc="A test document",
             version=1,
@@ -58,7 +58,7 @@ async def create_test_form(domain):
         form = domain.statemgr.create(
             "data_form",
             _id=form_id,
-            form_key="test-form",
+            form_key=f"test-form-{str(form_id)[:8]}",
             form_name="Test Form",
             desc="A test form",
             version=1,
@@ -78,7 +78,7 @@ async def test_query_collections(domain):
         assert len(collections) > 0
         found = False
         for collection in collections:
-            if collection.collection_key == "test-collection":
+            if collection.collection_key == test_collection.collection_key:
                 found = True
                 assert collection.collection_name == "Test Collection"
                 assert collection.organization_id == FIXTURE_ORGANIZATION_ID
@@ -95,7 +95,7 @@ async def test_query_documents(domain):
         assert len(documents) > 0
         found = False
         for document in documents:
-            if document.document_key == "test-document":
+            if document.document_key == test_document.document_key:
                 found = True
                 assert document.document_name == "Test Document"
                 assert document.organization_id == FIXTURE_ORGANIZATION_ID
@@ -113,7 +113,7 @@ async def test_query_forms(domain):
         assert len(forms) > 0
         found = False
         for form in forms:
-            if form.form_key == "test-form":
+            if form.form_key == test_form.form_key:
                 found = True
                 assert form.form_name == "Test Form"
                 assert form.organization_id == FIXTURE_ORGANIZATION_ID

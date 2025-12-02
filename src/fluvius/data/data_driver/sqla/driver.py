@@ -218,6 +218,14 @@ class SqlaDriver(DataDriver, QueryBuilder):
     def __init_subclass__(cls):
         cls.__data_schema_registry__ = {}
         cls.__data_schema_base__ = create_data_schema_base(cls)
+    
+    @classmethod
+    def pgmetadata(cls):
+        return cls.__data_schema_base__.metadata
+    
+    @classmethod
+    def pgschema(cls):
+        return cls.__data_schema_base__
 
     @property
     def dsn(self):

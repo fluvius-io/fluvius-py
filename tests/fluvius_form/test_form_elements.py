@@ -56,7 +56,7 @@ async def create_test_form_with_element(domain):
         form = domain.statemgr.create(
             "data_form",
             _id=form_id,
-            form_key="test-form",
+            form_key=f"test-form-{str(form_id)[:8]}",
             form_name="Test Form",
             version=1,
             organization_id=FIXTURE_ORGANIZATION_ID,
@@ -66,25 +66,26 @@ async def create_test_form_with_element(domain):
         element_type = domain.statemgr.create(
             "element_type",
             _id=element_type_id,
-            type_key="text-input",
+            type_key=f"text-input-{str(element_type_id)[:8]}",
             type_name="Text Input",
             desc="A text input element",
         )
         await domain.statemgr.insert(element_type)
         
+        element_key = f"test-element-{str(element_id)[:8]}"
         element = domain.statemgr.create(
             "data_element",
             _id=element_id,
             form_id=form_id,
             element_type_id=element_type_id,
-            element_key="test-element",
+            element_key=element_key,
             element_label="Test Element",
             order=0,
             required=False,
         )
         await domain.statemgr.insert(element)
     
-    return form_id, element_id, element_type_id
+    return form_id, element_id, element_type_id, element_key
 
 
 @mark.asyncio
@@ -92,18 +93,19 @@ async def test_element_type_creation(domain):
     """Test creating element types"""
 
     element_type_id = UUID_GENR()
+    type_key = f"test-type-{str(element_type_id)[:8]}"
     async with domain.statemgr.transaction():
         element_type = domain.statemgr.create(
             "element_type",
             _id=element_type_id,
-            type_key="test-type",
+            type_key=type_key,
             type_name="Test Type",
             desc="A test element type",
         )
         await domain.statemgr.insert(element_type)
         
         fetched = await domain.statemgr.fetch('element_type', element_type_id)
-        assert fetched.type_key == "test-type"
+        assert fetched.type_key == type_key
         assert fetched.type_name == "Test Type"
 
 
@@ -111,13 +113,13 @@ async def test_element_type_creation(domain):
 async def test_data_element_creation(domain):
     """Test creating data elements"""
 
-    form_id, element_id, element_type_id = await create_test_form_with_element(domain)
+    form_id, element_id, element_type_id, element_key = await create_test_form_with_element(domain)
     
     async with domain.statemgr.transaction():
         element = await domain.statemgr.fetch('data_element', element_id)
         assert element.form_id == form_id
         assert element.element_type_id == element_type_id
-        assert element.element_key == "test-element"
+        assert element.element_key == element_key
         assert element.element_label == "Test Element"
         assert element.order == 0
         assert element.required is False
@@ -183,7 +185,7 @@ async def test_save_element_with_data(domain):
 async def test_save_form_multiple_elements(domain):
     """Test saving form data with multiple elements"""
 
-    form_id, element_id, element_type_id = await create_test_form_with_element(domain)
+    form_id, element_id, element_type_id, element_key = await create_test_form_with_element(domain)
     
     # Create another element
     element_id_2 = UUID_GENR()
@@ -193,7 +195,7 @@ async def test_save_form_multiple_elements(domain):
             _id=element_id_2,
             form_id=form_id,
             element_type_id=element_type_id,
-            element_key="test-element-2",
+            element_key=f"test-element-2-{str(element_id_2)[:8]}",
             element_label="Test Element 2",
             order=1,
             required=False,
@@ -283,7 +285,7 @@ async def test_element_resource_fields(domain):
             _id=element_id,
             form_id=form_id,
             element_type_id=element_type_id,
-            element_key="test-element-resource",
+            element_key=f"test-element-resource-{str(element_id)[:8]}",
             element_label="Test Element with Resource",
             order=0,
             required=False,

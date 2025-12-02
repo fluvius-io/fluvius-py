@@ -25,21 +25,21 @@ class FluviusAsyncClient(AsyncClient):
         return await super().request(method, url, **kwargs)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def domain():
     """Domain fixture - created once per test session"""
     return FormDomain(None)
 
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
-async def setup_db_once(domain):
+async def setup_db_once():
     """
     Setup database schema once at the start of the test session.
     This ensures data persists after tests complete for inspection.
     """
     from fluvius.form.element import ElementDataManager
-    
-    db = domain.statemgr.connector.engine
+    form_domain = FormDomain(None)
+    db = form_domain.statemgr.connector.engine
     
     # Create schemas if they don't exist (don't drop existing data)
     async with db.begin() as conn:
@@ -50,14 +50,14 @@ async def setup_db_once(domain):
     # Create all tables if they don't exist (checkfirst=True preserves existing data)
     async with db.begin() as conn:
         def create_all_tables(sync_conn):
-            FormConnector.__data_schema_base__.metadata.create_all(sync_conn, checkfirst=True)
+            FormConnector.pgmetadata().create_all(sync_conn, checkfirst=True)
         await conn.run_sync(create_all_tables)
     
     # Also ensure element schema tables are created
     async with db.begin() as conn:
         element_mgr = ElementDataManager()
         def create_element_tables(sync_conn):
-            element_mgr.connector.__data_schema_base__.metadata.create_all(sync_conn, checkfirst=True)
+            element_mgr.connector.pgmetadata().create_all(sync_conn, checkfirst=True)
         await conn.run_sync(create_element_tables)
     
     # Dispose the engine to close all connections created in this event loop.
