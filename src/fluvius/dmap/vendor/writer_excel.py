@@ -112,8 +112,8 @@ class ExcelWriter(FileWriter):
         return 3  # header offset
 
     def output_repeated_value(self, field_map, index_map):
-        logger.warn("Field map: %s", field_map)
-        logger.warn("Index map: %s", index_map)
+        logger.warning("Field map: %s", field_map)
+        logger.warning("Index map: %s", index_map)
 
         # exist_on_fieldmap = []
 
@@ -121,25 +121,26 @@ class ExcelWriter(FileWriter):
         #     for index, _ in v:
         #         exist_on_fieldmap.append(index)
 
-        # logger.warn("Field to look into:")
+        # logger.warning("Field to look into:")
         # for key, value in index_map.items():
         #     if key not in exist_on_fieldmap:
-        #         logger.warn(value)
-        # logger.warn("----------------------")
+        #         logger.warning(value)
+        # logger.warning("----------------------")
 
     def check_unmapped_values(self, field_map, index_map):
         if len(field_map) == len(index_map):
             return
 
-        logger.warn(
-            "The mapping contain repeated"
-            " selector, please review and make sure they are unique."
+        logger.warning(
+            "The mapping contain repeated selector, please review and make sure they are unique."
         )
+
         fieldmap_idx = []
         for _, v in field_map.items():
             for i in list(v):
                 _, idx, _, _ = i
                 fieldmap_idx.append(idx)
+                
         for index_key in index_map:
             if index_key not in fieldmap_idx:
-                logger.warn(index_key)
+                logger.warning(index_key)

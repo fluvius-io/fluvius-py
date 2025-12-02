@@ -2,6 +2,7 @@ import queue
 from types import SimpleNamespace
 from typing import Callable, Iterable, List, Tuple, Optional, Any, Type, Union, Dict
 from fluvius.data import DataModel
+from fluvius.error import BadRequestError
 from .datadef import RuleNarration, RuleMeta, NARRATION_RULE_FAIL_PRECOND, NARRATION_RULE_RETRACTED
 from . import logger, config
 
@@ -119,7 +120,11 @@ class KnowledgeEngine(object):
 
     def add_narration(self, narration):
         if not isinstance(narration, RuleNarration):
-            raise ValueError(f'Invalid Narraton: {narration}')
+            raise BadRequestError(
+            "W00.101",
+            f"Invalid Narration: {narration}",
+            None
+        )
 
         self.narration_queue.put(narration)
         return narration

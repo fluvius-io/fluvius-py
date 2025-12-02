@@ -63,7 +63,7 @@ def _assert_domain_command(*cmd_classes):
             )
 
         if not hasattr(cmd_cls, DOMAIN_ENTITY_MARKER):
-            logger.warn(
+            logger.warning(
                 "[EA3F5] Command handler target is not a [domain_entity]."
                 " Handler may process multiple command types. [%s] [W0042]",
                 cmd_cls,
@@ -80,7 +80,7 @@ def _assert_domain_message(*msg_class):
 
 def _assert_domain_internal_event(evt_cls, domain_cls):
     if not domain_cls.entity_registered(evt_cls):
-        logger.warn(
+        logger.warning(
             f"[{evt_cls}] is not registered on [{domain_cls}] [W1700]"
         )
 
