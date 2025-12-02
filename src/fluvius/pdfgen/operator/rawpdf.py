@@ -1,8 +1,8 @@
 import os  # noqa: F401
 from pathlib import Path
 
-from fii_pdfgen.base import PdfOperator, register
-from fii_pdfgen.datadef import PDFEntry
+from fluvius.pdfgen.base import PdfOperator, register
+from fluvius.pdfgen.datadef import PDFEntry
 
 
 @register("raw-pdf")

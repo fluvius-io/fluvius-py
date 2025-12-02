@@ -4,10 +4,10 @@ import traceback
 
 import pdfkit
 
-from fii_pdfgen import config
-from fii_pdfgen.base import PdfOperator, TemplateSelectorMixin, register
-from fii_pdfgen.datadef import PDFEntry
-from fii_pdfgen.engine import jinja2renderer
+from fluvius.pdfgen import config
+from fluvius.pdfgen.base import PdfOperator, TemplateSelectorMixin, register
+from fluvius.pdfgen.datadef import PDFEntry
+from fluvius.pdfgen.engine import jinja2renderer
 
 
 @register("html2pdf")

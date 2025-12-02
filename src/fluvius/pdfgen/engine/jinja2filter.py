@@ -6,7 +6,7 @@ from dateutil import parser
 from fii.common import dget
 from phonenumbers import parse as parse_phone
 
-from fii_pdfgen import config
+from fluvius.pdfgen import config
 
 from .jinja2render import jinja2renderer
 from .mapping import PROVIDER_TAXONOMY, day_endings

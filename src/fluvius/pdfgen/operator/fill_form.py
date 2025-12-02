@@ -5,8 +5,8 @@ import tempfile
 
 import pypdftk
 
-from fii_pdfgen.base import PdfOperator, TemplateSelectorMixin, register
-from fii_pdfgen.datadef import PDFEntry
+from fluvius.pdfgen.base import PdfOperator, TemplateSelectorMixin, register
+from fluvius.pdfgen.datadef import PDFEntry
 
 
 @register("fill-form")

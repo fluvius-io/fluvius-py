@@ -1,10 +1,8 @@
 import os
 import tempfile
 
-import pypdftk
-
-from fii_pdfgen.base import PdfOperator, register
-from fii_pdfgen.datadef import PDFEntry
+from fluvius.pdfgen.base import PdfOperator, register
+from fluvius.pdfgen.datadef import PDFEntry
 
 
 @register("concatenate")
@@ -22,6 +20,8 @@ class PdftkConcatOperation(PdfOperator):
         return self._fixtures
 
     def execute(self, *inputs):
+        import pypdftk
+        
         pdf_file = os.path.join(tempfile.mkdtemp(), self._filename)
 
         files = []

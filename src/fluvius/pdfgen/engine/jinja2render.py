@@ -2,7 +2,7 @@ from typing import Any, Dict
 
 import jinja2
 
-from fii_pdfgen import config
+from fluvius.pdfgen import config
 
 
 class Jinja2TemplateRenderer(object):

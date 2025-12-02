@@ -1,4 +1,4 @@
-from fii_pdfgen import PdfAction, PdfPipeline, SignField, genpdf
+from fluvius.pdfgen import PdfAction, PdfPipeline, SignField, genpdf
 
 # @TODO: Add output validation
 

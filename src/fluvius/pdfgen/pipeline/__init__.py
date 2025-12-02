@@ -1,5 +1,5 @@
-from fii_pdfgen import logger
-from fii_pdfgen.base import PdfOperatorsMixin
+from fluvius.pdfgen import logger
+from fluvius.pdfgen.base import PdfOperatorsMixin
 
 
 def __closure__():

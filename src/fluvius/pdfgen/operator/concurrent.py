@@ -1,4 +1,4 @@
-from fii_pdfgen.base import PdfOperator, PdfOperatorsMixin, register
+from fluvius.pdfgen.base import PdfOperator, PdfOperatorsMixin, register
 
 
 @register("concurrent")

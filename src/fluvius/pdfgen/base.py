@@ -1,4 +1,4 @@
-from fii_pdfgen import logger  # isort: skip
+from fluvius.pdfgen import logger  # isort: skip
 
 from collections import namedtuple
 

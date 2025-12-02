@@ -1,4 +1,4 @@
-from fii_pdfgen import PdfAction, PdfPipeline, SignField, genpdf
+from fluvius.pdfgen import PdfAction, PdfPipeline, SignField, genpdf
 
 
 def setup_html2pdf_template(template_id):

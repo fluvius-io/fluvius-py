@@ -1,4 +1,4 @@
-from fii_pdfgen import PdfAction, PdfPipeline, genpdf
+from fluvius.pdfgen import PdfAction, PdfPipeline, genpdf
 
 
 def test_noop():

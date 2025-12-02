@@ -1,4 +1,4 @@
-from .cfg import config, logger  # isort: skip
+from ._meta import config, logger  # isort: skip
 from . import operator  # noqa: F401
 from .base import PdfAction
 from .datadef import SignField
