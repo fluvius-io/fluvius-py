@@ -3,7 +3,7 @@ from .domain import FormDomain
 from . import datadef
 from .datadef import (
     CreateCollectionData, UpdateCollectionData, RemoveCollectionData,
-    CreateDocumentData, UpdateDocumentData, RemoveDocumentData, CopyDocumentData,
+    CreateDocumentData, UpdateDocumentData, RemoveDocumentData, CopyDocumentData, MoveDocumentData,
     PopulateElementData, PopulateFormData, SaveElementData, SaveFormData, SubmitFormData
 )
 
@@ -121,7 +121,7 @@ class RemoveDocument(Command):
 
 
 class CopyDocument(Command):
-    """Copy a document"""
+    """Copy a document with all its forms and elements"""
 
     class Meta:
         key = 'copy-document'
@@ -129,12 +129,30 @@ class CopyDocument(Command):
         resources = ("document",)
         tags = ["form", "document", "copy"]
         auth_required = True
-        description = "Copy a document with its forms and sections"
+        description = "Copy a document with all its forms, sections, and elements"
 
     Data = CopyDocumentData
 
     async def _process(self, agg, stm, payload):
         result = await agg.copy_document(payload)
+        yield agg.create_response(serialize_mapping(result), _type="form-response")
+
+
+class MoveDocument(Command):
+    """Move a document between collections"""
+
+    class Meta:
+        key = 'move-document'
+        name = 'Move Document'
+        resources = ("document",)
+        tags = ["form", "document", "move"]
+        auth_required = True
+        description = "Move a document from one collection to another"
+
+    Data = MoveDocumentData
+
+    async def _process(self, agg, stm, payload):
+        result = await agg.move_document(payload)
         yield agg.create_response(serialize_mapping(result), _type="form-response")
 
 

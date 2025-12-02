@@ -126,6 +126,8 @@ Error codes follow the format: `X##.###` where:
 | F00.102 | BadRequestError | 400 | ElementData subclass must define a Meta class |
 | F00.103 | BadRequestError | 400 | ElementData subclass Meta must define type_key |
 | F00.104 | BadRequestError | 400 | ElementData subclass Meta must define type_name |
+| F00.201 | NotFoundError | 404 | Target collection not found |
+| F00.202 | NotFoundError | 404 | Source collection not found |
 
 ### Query Errors (Q00.###)
 

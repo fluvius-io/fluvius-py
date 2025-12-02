@@ -2,7 +2,6 @@ from fluvius.domain.aggregate import Aggregate, action
 from fluvius.data import UUID_GENR, timestamp
 from fluvius.error import NotFoundError, BadRequestError
 from fluvius.form.element import get_element_type, ElementDataManager
-from fluvius.data import UUID_GENR
 
 from .. import logger
 
@@ -62,7 +61,16 @@ class FormAggregate(Aggregate):
 
     @action("document-created")
     async def create_document(self, data):
-        """Create a new document"""
+        """Create a new document and add it to the specified collection"""
+        # Verify collection exists
+        collection = await self.statemgr.fetch('collection', data.collection_id)
+        if not collection:
+            raise NotFoundError(
+                "F00.201",
+                f"Collection not found: {data.collection_id}",
+                None
+            )
+        
         document = self.init_resource(
             "document",
             _id=self.aggroot.identifier,
@@ -77,10 +85,35 @@ class FormAggregate(Aggregate):
             resource_name=data.resource_name,
         )
         await self.statemgr.insert(document)
+        
+        # Determine order - if not specified, use max order + 1
+        if data.order is None:
+            max_order_docs = await self.statemgr.query(
+                "document_collection",
+                where={"collection_id": data.collection_id},
+                sort=(("order", "desc"),),
+                limit=1
+            )
+            order = (max_order_docs[0].order + 1) if max_order_docs else 0
+        else:
+            order = data.order
+        
+        # Add document to collection
+        doc_collection = self.init_resource(
+            "document_collection",
+            _id=UUID_GENR(),
+            document_id=self.aggroot.identifier,
+            collection_id=data.collection_id,
+            order=order,
+            attrs=None,
+        )
+        await self.statemgr.insert(doc_collection)
+        
         return {
             "document_id": str(self.aggroot.identifier),
             "document_key": document.document_key,
             "document_name": document.document_name,
+            "collection_id": str(data.collection_id),
         }
 
     @action("document-updated", resources="document")
@@ -115,7 +148,7 @@ class FormAggregate(Aggregate):
 
     @action("document-copied", resources="document")
     async def copy_document(self, data):
-        """Copy a document"""
+        """Copy a document with all its forms and elements"""
         source_document = self.rootobj
 
         # Create new document - use a new UUID for the copied document
@@ -130,6 +163,8 @@ class FormAggregate(Aggregate):
             attrs=data.attrs or source_document.attrs,
             owner_id=source_document.owner_id,
             organization_id=source_document.organization_id,
+            resource_id=source_document.resource_id,
+            resource_name=source_document.resource_name,
         )
         await self.statemgr.insert(new_document)
 
@@ -156,14 +191,59 @@ class FormAggregate(Aggregate):
                 await self.statemgr.insert(new_section)
                 section_map[section._id] = new_section_id
 
-            # Copy document-form relationships if requested
+            # Copy forms and their elements if requested
             if data.copy_forms:
                 doc_forms = await self.statemgr.query(
                     "document_form",
                     where={"document_id": source_document._id},
                     sort=(("order", "asc"),)
                 )
+                form_map = {}  # Map old form_id to new form_id
+                
                 for doc_form in doc_forms:
+                    # Get the source form
+                    source_form = await self.statemgr.fetch('data_form', doc_form.form_id)
+                    
+                    # Create new form
+                    new_form_id = UUID_GENR()
+                    new_form = self.init_resource(
+                        "data_form",
+                        _id=new_form_id,
+                        form_key=f"{source_form.form_key}-copy",
+                        form_name=source_form.form_name,
+                        desc=source_form.desc,
+                        version=source_form.version,
+                        attrs=source_form.attrs,
+                        owner_id=source_form.owner_id,
+                        organization_id=source_form.organization_id,
+                    )
+                    await self.statemgr.insert(new_form)
+                    form_map[source_form._id] = new_form_id
+                    
+                    # Copy all elements from the source form
+                    elements = await self.statemgr.query(
+                        "data_element",
+                        where={"form_id": source_form._id},
+                        sort=(("order", "asc"),)
+                    )
+                    for element in elements:
+                        new_element = self.init_resource(
+                            "data_element",
+                            _id=UUID_GENR(),
+                            form_id=new_form_id,
+                            element_type_id=element.element_type_id,
+                            element_key=element.element_key,
+                            element_label=element.element_label,
+                            order=element.order,
+                            required=element.required,
+                            attrs=element.attrs,
+                            validation_rules=element.validation_rules,
+                            resource_id=element.resource_id,
+                            resource_name=element.resource_name,
+                        )
+                        await self.statemgr.insert(new_element)
+                    
+                    # Create document-form relationship with new form
                     new_section_id = section_map.get(doc_form.section_id)
                     if new_section_id:
                         new_doc_form = self.init_resource(
@@ -171,17 +251,149 @@ class FormAggregate(Aggregate):
                             _id=UUID_GENR(),
                             document_id=new_document_id,
                             section_id=new_section_id,
-                            form_id=doc_form.form_id,
+                            form_id=new_form_id,
                             order=doc_form.order,
                             attrs=doc_form.attrs,
                         )
                         await self.statemgr.insert(new_doc_form)
 
+        # Add copied document to target collection if specified
+        if data.target_collection_id:
+            # Verify target collection exists
+            target_collection = await self.statemgr.fetch('collection', data.target_collection_id)
+            if not target_collection:
+                raise NotFoundError(
+                    "F00.201",
+                    f"Target collection not found: {data.target_collection_id}",
+                    None
+                )
+            
+            # Check if document is already in target collection
+            existing_in_target = await self.statemgr.query(
+                "document_collection",
+                where={
+                    "document_id": new_document_id,
+                    "collection_id": data.target_collection_id
+                },
+                limit=1
+            )
+            
+            if not existing_in_target:
+                # Determine order - if not specified, use max order + 1
+                if data.order is None:
+                    max_order_docs = await self.statemgr.query(
+                        "document_collection",
+                        where={"collection_id": data.target_collection_id},
+                        sort=(("order", "desc"),),
+                        limit=1
+                    )
+                    order = (max_order_docs[0].order + 1) if max_order_docs else 0
+                else:
+                    order = data.order
+                
+                # Add to target collection
+                doc_collection = self.init_resource(
+                    "document_collection",
+                    _id=UUID_GENR(),
+                    document_id=new_document_id,
+                    collection_id=data.target_collection_id,
+                    order=order,
+                    attrs=data.attrs,
+                )
+                await self.statemgr.insert(doc_collection)
+
         return {
             "source_document_id": str(source_document._id),
             "new_document_id": str(new_document_id),
             "document_key": new_document.document_key,
+            "target_collection_id": str(data.target_collection_id) if data.target_collection_id else None,
             "status": "copied",
+        }
+
+    @action("document-moved", resources="document")
+    async def move_document(self, data):
+        """Move a document between collections"""
+        document = self.rootobj
+        
+        # Verify target collection exists
+        target_collection = await self.statemgr.fetch('collection', data.target_collection_id)
+        if not target_collection:
+            raise NotFoundError(
+                "F00.201",
+                f"Target collection not found: {data.target_collection_id}",
+                None
+            )
+        
+        # Remove from source collection if specified
+        if data.source_collection_id:
+            # Verify source collection exists
+            source_collection = await self.statemgr.fetch('collection', data.source_collection_id)
+            if not source_collection:
+                raise NotFoundError(
+                    "F00.202",
+                    f"Source collection not found: {data.source_collection_id}",
+                    None
+                )
+            
+            # Find and remove existing document_collection relationship
+            existing = await self.statemgr.query(
+                "document_collection",
+                where={
+                    "document_id": document._id,
+                    "collection_id": data.source_collection_id
+                },
+                limit=1
+            )
+            if existing:
+                await self.statemgr.remove(existing[0])
+        else:
+            # Remove from all collections
+            all_collections = await self.statemgr.query(
+                "document_collection",
+                where={"document_id": document._id}
+            )
+            for doc_col in all_collections:
+                await self.statemgr.remove(doc_col)
+        
+        # Check if document is already in target collection
+        existing_in_target = await self.statemgr.query(
+            "document_collection",
+            where={
+                "document_id": document._id,
+                "collection_id": data.target_collection_id
+            },
+            limit=1
+        )
+        
+        if not existing_in_target:
+            # Determine order - if not specified, use max order + 1
+            if data.order is None:
+                max_order_docs = await self.statemgr.query(
+                    "document_collection",
+                    where={"collection_id": data.target_collection_id},
+                    sort=(("order", "desc"),),
+                    limit=1
+                )
+                order = (max_order_docs[0].order + 1) if max_order_docs else 0
+            else:
+                order = data.order
+            
+            # Add to target collection
+            doc_collection = self.init_resource(
+                "document_collection",
+                _id=UUID_GENR(),
+                document_id=document._id,
+                collection_id=data.target_collection_id,
+                order=order,
+                attrs=data.attrs,
+            )
+            await self.statemgr.insert(doc_collection)
+        
+        return {
+            "document_id": str(document._id),
+            "source_collection_id": str(data.source_collection_id) if data.source_collection_id else None,
+            "target_collection_id": str(data.target_collection_id),
+            "status": "moved",
         }
 
     @action("element-populated", resources="data_element")
