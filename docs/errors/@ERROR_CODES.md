@@ -19,6 +19,11 @@ Error codes follow the format: `X##.###` where:
 - **Q** = Query errors
 - **P** = Navis/Workflow/Process errors
 - **S** = Security/Auth errors
+- **T** = Transform/Data Mapping (dmap) errors
+- **C** = Casbin errors
+- **O** = Ordinis errors
+- **W** = Worker errors
+- **M** = Media errors
 
 ## Error Codes
 
@@ -118,6 +123,9 @@ Error codes follow the format: `X##.###` where:
 | F00.001 | BadRequestError | 400 | No changes provided for collection update |
 | F00.002 | BadRequestError | 400 | No changes provided for document update |
 | F00.101 | BadRequestError | 400 | Element data validation failed |
+| F00.102 | BadRequestError | 400 | ElementData subclass must define a Meta class |
+| F00.103 | BadRequestError | 400 | ElementData subclass Meta must define type_key |
+| F00.104 | BadRequestError | 400 | ElementData subclass Meta must define type_name |
 
 ### Query Errors (Q00.###)
 
@@ -197,6 +205,112 @@ Error codes follow the format: `X##.###` where:
 | S00.002 | BadRequestError | 400 | Auth Profile Provider already registered |
 | S00.003 | BadRequestError | 400 | Auth Profile Provider not valid |
 | S00.004 | UnauthorizedError | 401 | Authorization failed |
+| S00.101 | BadRequestError | 400 | Password must be either a string or bytes (hashes.py) |
+| S00.102 | BadRequestError | 400 | Invalid authentication token (auth.py) |
+| S00.103 | UnauthorizedError | 401 | Authentication failed (auth.py) |
+| S00.104 | BadRequestError | 400 | Invalid authentication header (auth.py) |
+| S00.201 | BadRequestError | 400 | Invalid mock authorization header (auth_mock.py) |
+| S00.202 | BadRequestError | 400 | Path elements must not start with / (helper.py) |
+| S00.203 | BadRequestError | 400 | Please input a valid email (kcadmin.py) |
+| S00.301 | InternalServerError | 500 | Domain manager already initialized (domain.py) |
+| S00.401 | BadRequestError | 400 | Keycloak token error (kcadmin.py) |
+| S00.402 | BadRequestError | 400 | Error request to Keycloak (kcadmin.py) |
+| S00.403 | ForbiddenError | 403 | Email not allowed (whitelist check) (kcadmin.py) |
+| S00.404 | ForbiddenError | 403 | Email not allowed (blacklist check) (kcadmin.py) |
+
+### Transform/Data Mapping Errors (T00.###)
+
+| Code | Exception | Status | Description |
+|------|-----------|--------|-------------|
+| T00.101 | BadRequestError | 400 | Writer of type not supported |
+| T00.102 | BadRequestError | 400 | Transformer of type not supported |
+| T00.201 | BadRequestError | 400 | Value is not a list |
+| T00.202 | BadRequestError | 400 | Invalid writer config |
+| T00.301 | BadRequestError | 400 | DataProcessManager already registered |
+| T00.302 | BadRequestError | 400 | DataProcessManager not registered |
+| T00.401 | BadRequestError | 400 | Invalid mapping spec |
+| T00.402 | BadRequestError | 400 | No reducer specified yet there are multiple values |
+| T00.501 | BadRequestError | 400 | Invalid transformers spec |
+| T00.502 | BadRequestError | 400 | Invalid transformer |
+| T00.503 | BadRequestError | 400 | Duplicated transformers key |
+| T00.601 | BadRequestError | 400 | Reducer already registered |
+| T00.602 | BadRequestError | 400 | Reducer has not been registered |
+| T00.701 | BadRequestError | 400 | Coercer already registered |
+| T00.702 | BadRequestError | 400 | Coercer has not been registered |
+| T00.801 | BadRequestError | 400 | Coercer do not support parameterization |
+| T00.901 | BadRequestError | 400 | Data type is not supported |
+| T00.111 | BadRequestError | 400 | Reader of type not supported |
+| T00.112 | BadRequestError | 400 | Reader key already registered |
+| T00.121 | BadRequestError | 400 | Pipeline is set already |
+| T00.122 | BadRequestError | 400 | Inconsistent headers |
+| T00.123 | BadRequestError | 400 | No extension provided for current writer |
+| T00.131 | BadRequestError | 400 | Datasource already registered |
+| T00.141 | BadRequestError | 400 | Endpoint field must be set |
+| T00.142 | BadRequestError | 400 | Request argument must be instances of class APIFetcherRequest |
+| T00.143 | BadRequestError | 400 | Method is not supported |
+| T00.151 | BadRequestError | 400 | Both user supplied args and config paths are provided |
+| T00.161 | BadRequestError | 400 | Invalid try_sheets values |
+| T00.162 | BadRequestError | 400 | No worksheets matches sheet selector |
+| T00.171 | BadRequestError | 400 | Table name must have schema prefixed |
+| T00.181 | BadRequestError | 400 | Cannot generate data of type |
+| T00.191 | BadRequestError | 400 | Readers have different variant |
+
+### Casbin Errors (C00.###)
+
+| Code | Exception | Status | Description |
+|------|-----------|--------|-------------|
+| C00.101 | ForbiddenError | 403 | Model is undefined |
+| C00.102 | BadRequestError | 400 | Invalid request size |
+| C00.103 | ForbiddenError | 403 | Invalid policy size |
+| C00.104 | ForbiddenError | 403 | Matcher result should be bool, int or float |
+| C00.105 | BadRequestError | 400 | Please make sure rule exists in policy when using eval() in matcher |
+| C00.201 | BadRequestError | 400 | __adapter__ is required |
+| C00.202 | BadRequestError | 400 | __schema__ is required for Custom like SQLAdapter |
+| C00.203 | ForbiddenError | 403 | Permission check failed |
+| C00.301 | BadRequestError | 400 | Unsupported policy type |
+
+### Ordinis Errors (O00.###)
+
+| Code | Exception | Status | Description |
+|------|-----------|--------|-------------|
+| O00.101 | BadRequestError | 400 | Cannot change WorkingMemory reserved attributes |
+| O00.102 | InternalServerError | 500 | Reading callable attributes is not allowed |
+| O00.201 | BadRequestError | 400 | Invalid Narration |
+
+### Worker Errors (W00.###)
+
+| Code | Exception | Status | Description |
+|------|-----------|--------|-------------|
+| W00.101 | BadRequestError | 400 | Server and client must not in the same queue |
+| W00.102 | BadRequestError | 400 | Invalid worker tracker |
+| W00.103 | BadRequestError | 400 | Loop back detected |
+| W00.201 | BadRequestError | 400 | Function is not a coroutine |
+| W00.301 | BadRequestError | 400 | Invalid job handle |
+| W00.302 | BadRequestError | 400 | Redis pool is already opened |
+| W00.303 | BadRequestError | 400 | Invalid worker configuration |
+
+### Media Errors (M00.###)
+
+| Code | Exception | Status | Description |
+|------|-----------|--------|-------------|
+| M00.101 | NotFoundError | 404 | Filesystem not found |
+| M00.201 | NotFoundError | 404 | MediaEntry not found |
+| M00.202 | NotFoundError | 404 | MediaFilesystem not found |
+| M00.203 | BadRequestError | 400 | Mock model not supported |
+| M00.301 | BadRequestError | 400 | Compression method already registered |
+| M00.302 | BadRequestError | 400 | Compression method not supported |
+| M00.401 | InternalServerError | 500 | Failed to compress data with GZIP |
+| M00.402 | InternalServerError | 500 | Failed to decompress GZIP data |
+| M00.403 | InternalServerError | 500 | Failed to open GZIP compressed data |
+| M00.404 | InternalServerError | 500 | Failed to compress stream with GZIP |
+| M00.501 | InternalServerError | 500 | Failed to compress data with BZ2 |
+| M00.502 | InternalServerError | 500 | Failed to decompress BZ2 data |
+| M00.503 | InternalServerError | 500 | Failed to open BZ2 compressed data |
+| M00.504 | InternalServerError | 500 | Failed to compress stream with BZ2 |
+| M00.601 | InternalServerError | 500 | Failed to compress data with LZMA |
+| M00.602 | InternalServerError | 500 | Failed to decompress LZMA data |
+| M00.603 | InternalServerError | 500 | Failed to open LZMA compressed data |
+| M00.604 | InternalServerError | 500 | Failed to compress stream with LZMA |
 
 ## Notes
 
@@ -206,20 +320,3 @@ Error codes follow the format: `X##.###` where:
 - Error codes are prefixed with a single letter module identifier
 - Some error codes may be used multiple times for the same error condition in different contexts (noted in descriptions)
 - Duplicate error codes have been identified and fixed where they represent different error conditions
-
-## Duplicate Error Codes (Fixed)
-
-The following duplicate error codes were identified and resolved:
-
-- **D00.001**: Split into D00.001 (DomainEntityError exception class) and D00.301 (ForbiddenError in aggregate)
-- **D00.002**: Split into D00.002 (DomainEventValidationError exception class) and D00.302 (ForbiddenError in domain)
-- **D00.003**: Split into D00.003 (DomainCommandValidationError exception class) and D00.303 (ForbiddenError in domain)
-- **D00.101**: Split into D00.101 (DomainEntityError) and D00.110 (InternalServerError - overlapping context)
-- **D00.104**: Split into D00.104 (domain.py) and D00.111 (aggregate.py - aggroot property)
-- **D00.105**: Split into D00.105 (domain.py) and D00.112 (aggregate.py - command property)
-- **D00.201**: Split into D00.201 (PreconditionFailedError) and D00.203 (DomainEntityError - domain registration)
-- **P00.005**: Used in 3 contexts - kept first, changed others to P00.006 and P00.007
-- **P00.015**: Split into P00.015 (workflow steps) and P00.016 (role registration)
-- **P00.501**: Split into P00.501 (BadRequestError in manager) and P00.502 (InternalServerError in runner)
-- **Q00.503**: Split into Q00.503 (invalid list value) and Q00.504 (invalid query value)
-
