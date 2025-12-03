@@ -4,9 +4,9 @@ from typing import Union, Optional, List, Dict, Any
 
 
 class PolicyScope(str, Enum):
-    SYSTEM = "SYSTEM"
-    TENANT = "TENANT"
-    DOMAIN = "DOMAIN"
+    SYSTEM   = "SYSTEM"
+    TENANT   = "TENANT"
+    RESOURCE = "RESOURCE"
 
 
 class ConditionLeaf(BaseModel):
@@ -35,7 +35,7 @@ ConditionNode.model_rebuild()
 class PolicyCondition(BaseModel):
     SYSTEM: Optional[ConditionNode] = Field(None)
     TENANT: Optional[ConditionNode] = Field(None)
-    DOMAIN: Optional[ConditionNode] = Field(None)
+    RESOURCE: Optional[ConditionNode] = Field(None)
 
 
 class PolicyRestriction(BaseModel):

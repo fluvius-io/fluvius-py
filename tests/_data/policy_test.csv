@@ -1,7 +1,7 @@
 ptype,role,usr,pro,org,rid,scope,act,cqrs,meta,_id,_deleted
 p,org-admin,,,,,TENANT,fluvius-project.view-project,QUERY,"(restriction:(condition:(TENANT:(ALL:((field:org,op:eq,value:'context(restriction.org)'))))))",f9cfc0b2-dff3-450c-92d8-c7b54a4b1f40,
-p,project-admin,,,,,DOMAIN,fluvius-project.view-project,QUERY,"(restriction:(condition:(DOMAIN:(ALL:((field:org,op:eq,value:'context(restriction.org)'),(field:project_id,op:in,value:'context(restriction.resource_ids)'))))))",f9cfc0b2-dff3-450c-92d8-c7b54a4b1f41,
-p,org-member,,,,,DOMAIN,fluvius-project.view-project,QUERY,"(restriction:(condition:(DOMAIN:(ALL:((field:org,op:eq,value:'context(restriction.org)'),(field:project_id,op:in,value:'context(restriction.resource_ids)'))))))",f9cfc0b2-dff3-450c-92d8-c7b54a4b1f42,
+p,project-admin,,,,,RESOURCE,fluvius-project.view-project,QUERY,"(restriction:(condition:(RESOURCE:(ALL:((field:org,op:eq,value:'context(restriction.org)'),(field:project_id,op:in,value:'context(restriction.resource_ids)'))))))",f9cfc0b2-dff3-450c-92d8-c7b54a4b1f41,
+p,org-member,,,,,RESOURCE,fluvius-project.view-project,QUERY,"(restriction:(condition:(RESOURCE:(ALL:((field:org,op:eq,value:'context(restriction.org)'),(field:project_id,op:in,value:'context(restriction.resource_ids)'))))))",f9cfc0b2-dff3-450c-92d8-c7b54a4b1f42,
 p,org-admin,,,,,TENANT,fluvius-project:update-project,COMMAND,(),a1fab943-9320-44c5-8538-2db8dc0bdc4e,
 p,project-admin,,,,,TENANT,fluvius-project:update-project,COMMAND,(),e0fe6f95-aef0-4d42-9c32-4328d4fd16d7,
 p,org-admin,,,,,TENANT,fluvius-project:create-project,COMMAND,(),0de21bcb-0b97-4d77-824c-2990958aee51,
