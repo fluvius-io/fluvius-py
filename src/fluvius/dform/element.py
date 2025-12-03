@@ -45,7 +45,7 @@ from fluvius.error import BadRequestError
 # This is necessary for cross-schema foreign key references
 # Even with use_alter=True, SQLAlchemy needs to know about the referenced tables
 from .schema import (
-    FormConnector, FormInstance, ElementInstance, ElementDefinition,
+    FormConnector, DocumentForm, ElementInstance, ElementDefinition,
     ElementGroupInstance, FormDefinition, DocumentSection  # noqa: F401
 )
 
@@ -201,7 +201,7 @@ class ElementDataManager(DataAccessManager):
     __automodel__ = True
 
 
-# FormInstance and ElementInstance are now defined in schema.py
+# DocumentForm and ElementInstance are now defined in schema.py
 # Import them for use in this module
 
 

@@ -28,4 +28,4 @@ LOG_COLORED = False
 
 # Print module configuration. Accept the name of a module. E.g. "fluvius.query"
 DEBUG_MODULE_CONFIG = None
-DEBUG_APP_EXCEPTION = True
+DEBUG_APP_EXCEPTION = False

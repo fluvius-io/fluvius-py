@@ -310,7 +310,7 @@ async def test_create_document(domain):
         
         # Verify section instances were created from template
         sections = await domain.statemgr.query(
-            'section',
+            'document_section',
             where={'document_id': document_id}
         )
         assert len(sections) >= 1
@@ -771,3 +771,245 @@ async def test_element_definition_with_schema(domain):
         assert fetched.element_schema["type"] == "select"
         assert len(fetched.element_schema["options"]) == 2
         assert fetched.element_schema["default"] == "opt1"
+
+
+@mark.asyncio
+async def test_create_document_with_complex_template(domain):
+    """Test creating a document from a template with multiple forms, groups, and elements"""
+    template_id = UUID_GENR()
+    template_key = f"complex-template-{str(template_id)[:8]}"
+    
+    async with domain.statemgr.transaction():
+        # Create collection for template
+        collection_id = UUID_GENR()
+        collection = domain.statemgr.create(
+            "collection",
+            _id=collection_id,
+            collection_key=f"collection-{str(collection_id)[:8]}",
+            collection_name="Complex Template Collection",
+            organization_id=FIXTURE_ORGANIZATION_ID,
+        )
+        await domain.statemgr.insert(collection)
+        
+        # Create template
+        template = domain.statemgr.create(
+            "template",
+            _id=template_id,
+            template_key=template_key,
+            template_name="Complex Template",
+            desc="A template with multiple forms, groups, and elements",
+            version=1,
+            organization_id=FIXTURE_ORGANIZATION_ID,
+            collection_id=collection_id,
+        )
+        await domain.statemgr.insert(template)
+        
+        # Create 2 sections
+        sections = []
+        for i in range(2):
+            section_id = UUID_GENR()
+            section_key = f"section-{i}-{str(section_id)[:8]}"
+            section = domain.statemgr.create(
+                "template_section",
+                _id=section_id,
+                template_id=template_id,
+                section_key=section_key,
+                section_name=f"Section {i + 1}",
+                desc=f"Section {i + 1} description",
+                order=i,
+            )
+            await domain.statemgr.insert(section)
+            sections.append({"id": section_id, "key": section_key})
+        
+        # Create 3 form definitions
+        forms = []
+        for i in range(3):
+            form_id = UUID_GENR()
+            form_key = f"form-{i}-{str(form_id)[:8]}"
+            form_def = domain.statemgr.create(
+                "form_definition",
+                _id=form_id,
+                form_key=form_key,
+                title=f"Form {i + 1}",
+                desc=f"Form {i + 1} description",
+            )
+            await domain.statemgr.insert(form_def)
+            
+            # Link form to template (forms 0,1 in section 0, form 2 in section 1)
+            section_idx = 0 if i < 2 else 1
+            template_form = domain.statemgr.create(
+                "template_form",
+                _id=UUID_GENR(),
+                template_id=template_id,
+                form_id=form_id,
+                section_key=sections[section_idx]["key"],
+            )
+            await domain.statemgr.insert(template_form)
+            
+            forms.append({
+                "id": form_id,
+                "key": form_key,
+                "section_key": sections[section_idx]["key"],
+                "groups": [],
+                "elements": [],
+            })
+        
+        # Create element groups for each form (2-3 groups per form)
+        for form_idx, form in enumerate(forms):
+            num_groups = 2 if form_idx == 0 else 3
+            for g in range(num_groups):
+                group_id = UUID_GENR()
+                group_key = f"group-{form_idx}-{g}-{str(group_id)[:8]}"
+                group = domain.statemgr.create(
+                    "form_element_group",
+                    _id=group_id,
+                    form_definition_id=form["id"],
+                    group_key=group_key,
+                    group_name=f"Group {g + 1} of Form {form_idx + 1}",
+                    desc=f"Element group {g + 1}",
+                    order=g,
+                )
+                await domain.statemgr.insert(group)
+                form["groups"].append({"id": group_id, "key": group_key})
+        
+        # Create element definitions and link them to forms
+        element_schemas = [
+            {"type": "text", "placeholder": "Enter text"},
+            {"type": "number", "min": 0, "max": 100},
+            {"type": "select", "options": ["A", "B", "C"]},
+            {"type": "checkbox", "label": "Agree?"},
+            {"type": "date", "format": "YYYY-MM-DD"},
+        ]
+        
+        element_counter = 0
+        for form_idx, form in enumerate(forms):
+            # Create 2-4 elements per form, distributed across groups
+            num_elements = 2 + form_idx  # Form 0: 2 elements, Form 1: 3, Form 2: 4
+            for e in range(num_elements):
+                element_id = UUID_GENR()
+                element_key = f"element-{form_idx}-{e}-{str(element_id)[:8]}"
+                
+                # Create element definition
+                element_def = domain.statemgr.create(
+                    "element_definition",
+                    _id=element_id,
+                    element_key=element_key,
+                    element_label=f"Element {e + 1} of Form {form_idx + 1}",
+                    element_schema=element_schemas[element_counter % len(element_schemas)],
+                )
+                await domain.statemgr.insert(element_def)
+                
+                # Link element to form via form_element
+                group_idx = e % len(form["groups"])
+                form_element = domain.statemgr.create(
+                    "form_element",
+                    _id=UUID_GENR(),
+                    form_definition_id=form["id"],
+                    group_key=form["groups"][group_idx]["key"],
+                    element_key=element_key,
+                    order=e,
+                    required=(e == 0),  # First element of each form is required
+                )
+                await domain.statemgr.insert(form_element)
+                
+                form["elements"].append({
+                    "id": element_id,
+                    "key": element_key,
+                    "group_key": form["groups"][group_idx]["key"],
+                })
+                element_counter += 1
+    
+    # Now create a document from this complex template
+    document_id = UUID_GENR()
+    document_key = f"complex-doc-{str(document_id)[:8]}"
+    payload = {
+        "template_id": template_id,
+        "document_key": document_key,
+        "document_name": "Complex Document",
+        "collection_id": collection_id,
+        "desc": "Document created from complex template",
+        "version": 1,
+        "organization_id": FIXTURE_ORGANIZATION_ID,
+    }
+    
+    result = await command_handler(
+        domain, "create-document", payload, "document", document_id
+    )
+    
+    # Verify all structures were copied correctly
+    async with domain.statemgr.transaction():
+        # Verify document was created
+        document = await domain.statemgr.fetch('document', document_id)
+        assert document.document_key == document_key
+        assert document.template_id == template_id
+        
+        # Verify document_sections were created (should be 2)
+        doc_sections = await domain.statemgr.query(
+            'document_section',
+            where={'document_id': document_id},
+            sort=(("order", "asc"),)
+        )
+        assert len(doc_sections) == 2
+        assert doc_sections[0].section_key == sections[0]["key"]
+        assert doc_sections[1].section_key == sections[1]["key"]
+        
+        # Verify form instances were created (should be 3)
+        form_instances = await domain.statemgr.query(
+            'document_form',
+            where={'document_id': document_id}
+        )
+        assert len(form_instances) == 3
+        
+        # Verify form keys match
+        form_keys = {f.form_key for f in form_instances}
+        expected_form_keys = {f["key"] for f in forms}
+        assert form_keys == expected_form_keys
+        
+        # Verify section_key assignments on forms
+        for fi in form_instances:
+            matching_form = next(f for f in forms if f["key"] == fi.form_key)
+            assert fi.section_key == matching_form["section_key"]
+        
+        # Verify element group instances were created
+        # Total groups: Form 0 has 2, Form 1 has 3, Form 2 has 3 = 8 groups
+        total_groups = 0
+        for fi in form_instances:
+            groups = await domain.statemgr.query(
+                'element_group',
+                where={'form_id': fi._id}
+            )
+            matching_form = next(f for f in forms if f["key"] == fi.form_key)
+            assert len(groups) == len(matching_form["groups"])
+            total_groups += len(groups)
+        assert total_groups == 8
+        
+        # Verify element instances were created
+        # Total elements: Form 0 has 2, Form 1 has 3, Form 2 has 4 = 9 elements
+        elements = await domain.statemgr.query(
+            'element',
+            where={'document_id': document_id}
+        )
+        assert len(elements) == 9
+        
+        # Verify element keys match
+        element_keys = {e.element_key for e in elements}
+        expected_element_keys = set()
+        for f in forms:
+            for elem in f["elements"]:
+                expected_element_keys.add(elem["key"])
+        assert element_keys == expected_element_keys
+        
+        # Verify elements are linked to correct forms and groups
+        for elem in elements:
+            # Find which form definition this element belongs to
+            form_instance = await domain.statemgr.fetch('document_form', elem.form_id)
+            matching_form = next(f for f in forms if f["key"] == form_instance.form_key)
+            
+            # Find the expected group_key for this element
+            matching_elem = next(e for e in matching_form["elements"] if e["key"] == elem.element_key)
+            assert elem.group_key == matching_elem["group_key"]
+            
+        # Verify element data is initialized (null is acceptable)
+        for elem in elements:
+            # data can be None or empty dict
+            assert elem.data is None or elem.data == {}

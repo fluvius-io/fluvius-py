@@ -7,7 +7,7 @@ Template Definitions (human-readable keys):
 - Collection -> Template -> TemplateSection -> FormDefinition -> FormElementGroup -> ElementDefinition
 
 Data Instances (instance keys):
-- Collection -> Document -> DocumentSection -> FormInstance -> ElementGroupInstance -> ElementInstance
+- Collection -> Document -> DocumentSection -> DocumentForm -> ElementGroupInstance -> ElementInstance
 """
 from . import config
 
@@ -97,13 +97,13 @@ def form_definition_fk(constraint_name, **kwargs):
     ), nullable=False, **kwargs)
 
 
-def form_fk(constraint_name, **kwargs):
-    """Create a foreign key reference to the form table"""
+def document_form_fk(constraint_name, **kwargs):
+    """Create a foreign key reference to the document_form table"""
     return sa.Column(pg.UUID, sa.ForeignKey(
-        f'{DFORM_DATA_DB_SCHEMA}.form._id',
+        f'{DFORM_DATA_DB_SCHEMA}.document_form._id',
         ondelete='CASCADE',
         onupdate='CASCADE',
-        name=f'fk_form_inst_{constraint_name}'
+        name=f'fk_doc_form_{constraint_name}'
     ), nullable=False, **kwargs)
 
 
@@ -308,9 +308,9 @@ class DocumentSection(FormDataBaseSchema):
     order = sa.Column(sa.Integer, nullable=False, default=0)
 
 
-class FormInstance(FormDataBaseSchema):
-    """Page instances created from page definitions"""
-    __tablename__ = "form"
+class DocumentForm(FormDataBaseSchema):
+    """Form instances created from form definitions"""
+    __tablename__ = "document_form"
     __table_args__ = (
         sa.UniqueConstraint('document_id', 'form_key', name='uq_form_inst_key'),
     )
@@ -331,7 +331,7 @@ class ElementGroupInstance(FormDataBaseSchema):
         sa.UniqueConstraint('form_id', 'group_key', name='uq_egrp_inst_key'),
     )
 
-    form_id = form_fk("egrp_inst_form")
+    form_id = document_form_fk("egrp_inst_doc_form")
     group_key = sa.Column(sa.String, nullable=False)
     title = sa.Column(sa.String, nullable=False)
     desc = sa.Column(sa.String, nullable=True)
@@ -346,7 +346,7 @@ class ElementInstance(FormDataBaseSchema):
     )
 
     document_id = document_fk("elem_inst_doc")
-    form_id = form_fk("elem_inst_form")
+    form_id = document_form_fk("elem_inst_doc_form")
     group_key = sa.Column(sa.String, nullable=False)
     element_key = sa.Column(sa.String, nullable=False)
-    data = sa.Column(FluviusJSONField, nullable=False)
+    data = sa.Column(FluviusJSONField, nullable=True)

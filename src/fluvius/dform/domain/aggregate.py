@@ -103,8 +103,7 @@ class FormAggregate(Aggregate):
 
         await self.statemgr.update(template, **changes)
 
-        async with self.statemgr.transaction():
-            updated_template = await self.statemgr.fetch('template', template._id)
+        updated_template = await self.statemgr.fetch('template', template._id)
 
         return {
             "template_id": str(updated_template._id),
@@ -152,8 +151,7 @@ class FormAggregate(Aggregate):
 
         await self.statemgr.update(section_def, **changes)
 
-        async with self.statemgr.transaction():
-            updated = await self.statemgr.fetch('template_section', section_def._id)
+        updated = await self.statemgr.fetch('template_section', section_def._id)
 
         return {
             "template_section_id": str(updated._id),
@@ -215,8 +213,7 @@ class FormAggregate(Aggregate):
 
         await self.statemgr.update(form_def, **changes)
 
-        async with self.statemgr.transaction():
-            updated = await self.statemgr.fetch('form_definition', form_def._id)
+        updated = await self.statemgr.fetch('form_definition', form_def._id)
 
         return {
             "form_definition_id": str(updated._id),
@@ -264,8 +261,7 @@ class FormAggregate(Aggregate):
 
         await self.statemgr.update(group_def, **changes)
 
-        async with self.statemgr.transaction():
-            updated = await self.statemgr.fetch('form_element_group', group_def._id)
+        updated = await self.statemgr.fetch('form_element_group', group_def._id)
 
         return {
             "form_element_group_id": str(updated._id),
@@ -327,8 +323,7 @@ class FormAggregate(Aggregate):
 
         await self.statemgr.update(element_def, **changes)
 
-        async with self.statemgr.transaction():
-            updated = await self.statemgr.fetch('element_definition', element_def._id)
+        updated = await self.statemgr.fetch('element_definition', element_def._id)
 
         return {
             "element_definition_id": str(updated._id),
@@ -380,8 +375,7 @@ class FormAggregate(Aggregate):
         await self.statemgr.update(collection, **changes)
 
         # Refresh the object to get updated values
-        async with self.statemgr.transaction():
-            updated_collection = await self.statemgr.fetch('collection', collection._id)
+        updated_collection = await self.statemgr.fetch('collection', collection._id)
 
         return {
             "collection_id": str(updated_collection._id),
@@ -467,7 +461,7 @@ class FormAggregate(Aggregate):
             
             form_instance_id = UUID_GENR()
             form_instance = self.init_resource(
-                "form",
+                "document_form",
                 _id=form_instance_id,
                 document_id=document._id,
                 form_key=form_def.form_key,
@@ -603,8 +597,7 @@ class FormAggregate(Aggregate):
         await self.statemgr.update(document, **changes)
 
         # Refresh the object to get updated values
-        async with self.statemgr.transaction():
-            updated_document = await self.statemgr.fetch('document', document._id)
+        updated_document = await self.statemgr.fetch('document', document._id)
 
         return {
             "document_id": str(updated_document._id),
@@ -673,7 +666,7 @@ class FormAggregate(Aggregate):
                 for old_section_id, new_section_id in section_map.items():
                     async with element_data_mgr.transaction():
                         forms = await element_data_mgr.query(
-                            "form",
+                            "document_form",
                             where={"section_id": old_section_id},
                         )
                         form_map = {}
@@ -681,7 +674,7 @@ class FormAggregate(Aggregate):
                         for form in forms:
                             new_form_id = UUID_GENR()
                             new_form = element_data_mgr.create(
-                                "form",
+                                "document_form",
                                 _id=new_form_id,
                                 section_id=new_section_id,
                                 form_definition_id=form.form_definition_id,
