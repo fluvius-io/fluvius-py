@@ -2,7 +2,7 @@ from fluvius.query import DomainQueryManager, DomainQueryResource
 from fluvius.query.field import StringField, UUIDField, DatetimeField, IntegerField, BooleanField, ListField, DictField, PrimaryID
 from fluvius.data import UUID_TYPE, DataModel
 
-from .domain.domain import FormDomain
+from .domain import FormDomain
 from .model import FormDataManager
 
 
@@ -45,7 +45,6 @@ class CollectionQuery(DomainQueryResource):
     collection_key: str = StringField("Collection Key")
     collection_name: str = StringField("Collection Name")
     desc: str = StringField("Description")
-    attrs: dict = DictField("Attributes", hidden=True)
     owner_id: UUID_TYPE = UUIDField("Owner ID")
     organization_id: str = StringField("Organization ID")
 
@@ -63,7 +62,6 @@ class DocumentQuery(DomainQueryResource):
     document_name: str = StringField("Document Name")
     desc: str = StringField("Description")
     version: int = IntegerField("Version")
-    attrs: dict = DictField("Attributes", hidden=True)
     owner_id: UUID_TYPE = UUIDField("Owner ID")
     organization_id: str = StringField("Organization ID")
     resource_id: UUID_TYPE = UUIDField("Resource ID")
@@ -80,10 +78,9 @@ class DataFormQuery(DomainQueryResource):
 
     id: UUID_TYPE = PrimaryID("Form ID")
     form_key: str = StringField("Form Key")
-    form_name: str = StringField("Form Name")
+    title: str = StringField("Form Name")
     desc: str = StringField("Description")
     version: int = IntegerField("Version")
-    attrs: dict = DictField("Attributes", hidden=True)
     owner_id: UUID_TYPE = UUIDField("Owner ID")
     organization_id: str = StringField("Organization ID")
 

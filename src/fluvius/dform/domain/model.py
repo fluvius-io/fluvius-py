@@ -1,5 +1,5 @@
 from fluvius.data import DataAccessManager
-from .schema import FormConnector
+from ..schema import FormConnector
 
 
 class FormDataManager(DataAccessManager):

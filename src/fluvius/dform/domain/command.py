@@ -181,7 +181,7 @@ class PopulateElement(Command):
     class Meta:
         key = 'populate-element'
         name = 'Populate Element'
-        resources = ("data_element",)
+        resources = ("element_definition",)
         tags = ["form", "element", "populate"]
         auth_required = True
         description = "Repopulate an element with prior data from a form instance"
@@ -199,7 +199,7 @@ class PopulateForm(Command):
     class Meta:
         key = 'populate-form'
         name = 'Populate Form'
-        resources = ("data_form",)
+        resources = ("form_definition",)
         tags = ["form", "populate"]
         auth_required = True
         description = "Repopulate a form (multiple elements) with prior data from a form instance"
@@ -217,7 +217,7 @@ class SaveElement(Command):
     class Meta:
         key = 'save-element'
         name = 'Save Element'
-        resources = ("data_element",)
+        resources = ("element_definition",)
         tags = ["form", "element", "save"]
         auth_required = True
         description = "Save element data but still allow further editing"
@@ -235,7 +235,7 @@ class SaveForm(Command):
     class Meta:
         key = 'save-form'
         name = 'Save Form'
-        resources = ("data_form",)
+        resources = ("form_definition",)
         tags = ["form", "save"]
         auth_required = True
         description = "Save form data (multiple elements) but still allow further editing"
@@ -253,7 +253,7 @@ class SubmitForm(Command):
     class Meta:
         key = 'submit-form'
         name = 'Submit Form'
-        resources = ("data_form",)
+        resources = ("form_definition",)
         tags = ["form", "submit"]
         auth_required = True
         description = "Save element data and lock it from further editing"

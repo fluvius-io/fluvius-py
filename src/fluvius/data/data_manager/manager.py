@@ -124,7 +124,7 @@ class DataAccessManagerBase(object):
         if not isinstance(self.__automodel__, bool):
             raise BadRequestError('E00.201', f'__automodel__ only accept True / False: {self.__automodel__}')
 
-        return type(f"{data_schema.__name__}_Model", (BlankModel, ), {})
+        return type(f"{data_schema.__name__}AccessModel", (BlankModel, ), {})
 
     @classmethod
     def register_model(cls, model_name: str):

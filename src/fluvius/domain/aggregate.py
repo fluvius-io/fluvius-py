@@ -184,7 +184,9 @@ class Aggregate(object):
     def create_response(self, data, _type=None, **kwargs):
         type_ = _type or DEFAULT_RESPONSE_TYPE
         rsp_cls = self.lookup_response(type_)
-        data = rsp_cls.Data.create(data, **kwargs)
+        if not isinstance(data, rsp_cls.Data):
+            data = rsp_cls.Data.create(data, **kwargs)
+
         return ResponseRecord(data=data, response=type_)
 
     def create_message(self, msg_key, data=None, **kwargs):
