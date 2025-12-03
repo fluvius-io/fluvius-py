@@ -19,12 +19,11 @@ class PolicySchema:
     usr = sa.Column(sa.String(255))
     pro = sa.Column(sa.String(255))
     org = sa.Column(sa.String(255))
-    dom = sa.Column(sa.String(255))
-    res = sa.Column(sa.String(255))
     rid = sa.Column(sa.String(255))
     act = sa.Column(sa.String(255))
     cqrs = sa.Column(sa.String(255))
-    meta = sa.Column(sa.String(1000))
+    meta = sa.Column(sa.TEXT)
+    scope = sa.Column(sa.String(255))
 
     _deleted = sa.Column(sa.DateTime)
 
@@ -33,19 +32,15 @@ class PolicySchema:
         ptype = p.ptype
         match ptype:
             case "p":
-                return [ptype, p.role, p.dom, p.res, p.act, p.cqrs, p.meta]
+                return [ptype, p.role, p.act, p.cqrs, p.meta, p.scope]
             case "g":
                 return [ptype, p.usr, p.pro]
             case "g2":
                 return [ptype, p.pro, p.role, p.org]
             case "g3":
-                return [ptype, p.org, p.res, p.rid]
-            case "g4":
                 return [ptype, p.pro, p.role, p.rid]
-            case "g5":
+            case "g4":
                 return [ptype, p.usr, p.role]
-            case "g6":
-                return [ptype, p.usr, p.res, p.rid]
             case _:
                 raise ValueError(f"Unsupported policy type: {ptype}")
 
@@ -55,33 +50,11 @@ class PolicySchema:
         return {
             ".or": [
                 {
-                    ".and": [
-                        {"ptype": "p"},
-                        {
-                            ".or": [
-                                {"dom": request.dom},
-                                {"dom": "*"}
-                            ]
-                        },
-                        {
-                            ".or": [
-                                {"res": request.res},
-                                {"res": "*"}
-                            ]
-                        },
-                        {
-                            ".or": [
-                                {"act": request.act},
-                                {"act": "*"}
-                            ]
-                        },
-                        {
-                            ".or": [
-                                {"cqrs": request.cqrs},
-                                {"cqrs": "*"}
-                            ]
-                        }
-                    ]
+                    ".and": [{
+                        "ptype": "p",
+                        "act": request.act,
+                        "cqrs": request.cqrs,
+                    }]
                 },
                 {
                     ".and": [{
@@ -100,28 +73,13 @@ class PolicySchema:
                 {
                     ".and": [{
                         "ptype": "g3",
-                        "org": request.org,
-                        "res": request.res,
+                        "pro": request.pro,
                     }]
                 },
                 {
                     ".and": [{
                         "ptype": "g4",
-                        "pro": request.pro,
-                        "rid": request.rid,
-                    }]
-                },
-                {
-                    ".and": [{
-                        "ptype": "g5",
                         "usr": request.usr,
-                    }]
-                },
-                {
-                    ".and": [{
-                        "ptype": "g6",
-                        "usr": request.usr,
-                        "res": request.res,
                     }]
                 },
             ]
@@ -155,6 +113,7 @@ class SqlAdapter(AsyncAdapter):
         """Load a policy line into the model."""
         values = self._schema.format_policy(policy)
         values = [str(v) for v in values if v is not None]
+        logger.info(f"Loading policy line: {values}")
         persist.load_policy_line(", ".join(values), model)
 
     def is_filtered(self) -> bool:

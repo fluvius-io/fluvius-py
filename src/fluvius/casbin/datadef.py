@@ -1,32 +1,81 @@
-from pyrsistent import PClass, field, pvector_field
+from pydantic import BaseModel, Field
 from enum import Enum
-
-class PolicyRequest(PClass):
-    usr = field(type=str, factory=str)
-    pro = field(type=str, factory=str)
-    org = field(type=str, factory=str)
-    dom = field(type=str, factory=str)
-    res = field(type=str, factory=str)
-    rid = field(type=str, factory=str)
-    act = field(type=str, factory=str)
-    cqrs = field(type=str, factory=str, initial="COMMAND")
+from typing import Union, Optional, List, Dict, Any
 
 
-class PolicyData(PClass):
-    role  = field(type=str, factory=str)
-    dom   = field(type=str, factory=str)
-    res   = field(type=str, factory=str)
-    act   = field(type=str, factory=str)
-    cqrs  = field(type=str, factory=str)
-    meta  = field(type=str, factory=str)
+class PolicyScope(str, Enum):
+    SYSTEM = "SYSTEM"
+    TENANT = "TENANT"
+    DOMAIN = "DOMAIN"
 
 
-class PolicyNarration(PClass):
-    message  = field(type=str, factory=str)
-    policies = pvector_field(PolicyData, initial=[])
-    trace    = pvector_field(dict, initial=[])
+class ConditionLeaf(BaseModel):
+    field: str
+    op: str
+    value: Union[str, Any]
+
+    def to_query_statement(self):
+        return {f"{self.field}:{self.op}": self.value}
+
+class ConditionNode(BaseModel):
+    ALL: Optional[List[Union["ConditionNode", ConditionLeaf]]] = Field(None)
+    ANY: Optional[List[Union["ConditionNode", ConditionLeaf]]] = Field(None)
+
+    def to_query_statement(self):
+        if self.ALL:
+            return {".and": [item.to_query_statement() for item in self.ALL]}
+        elif self.ANY:
+            return {".or": [item.to_query_statement() for item in self.ANY]}
+        else:
+            return {}
+
+ConditionNode.model_rebuild()
 
 
-class PolicyResponse(PClass):
-    allowed   = field(type=bool, factory=bool)
-    narration = field(type=PolicyNarration)
+class PolicyCondition(BaseModel):
+    SYSTEM: Optional[ConditionNode] = Field(None)
+    TENANT: Optional[ConditionNode] = Field(None)
+    DOMAIN: Optional[ConditionNode] = Field(None)
+
+
+class PolicyRestriction(BaseModel):
+    condition: PolicyCondition = Field(default_factory=PolicyCondition)
+
+
+class PolicyMeta(BaseModel):
+    restriction: PolicyRestriction
+
+
+class PolicyData(BaseModel):
+    role: str
+    cqrs: str
+    act: str
+    scope: PolicyScope
+    meta: Optional[str] = None
+    
+    def __post_init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.meta = self.meta or None
+
+
+class PolicyNarration(BaseModel):
+    policies: List[PolicyData] = Field(default_factory=list)
+    trace: List[dict] = Field(default_factory=list)
+    restriction: Dict = Field(default_factory=dict)
+
+
+class PolicyRequest(BaseModel):
+    usr: str
+    pro: str
+    org: str
+    act: str
+    rid: str
+    cqrs: str
+
+    def __post_init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.cqrs = self.cqrs or "COMMAND"
+
+class PolicyResponse(BaseModel):
+    allowed: bool
+    narration: PolicyNarration
