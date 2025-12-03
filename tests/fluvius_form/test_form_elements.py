@@ -1,7 +1,7 @@
 import pytest
 from pytest import mark
 from fluvius.form import FormDomain
-from fluvius.form.model import FormConnector
+from fluvius.form.schema import FormConnector
 from fluvius.data import UUID_GENR
 from fluvius.domain.context import DomainTransport
 
@@ -46,54 +46,171 @@ async def command_handler(domain, cmd_key, payload, resource, identifier, scope=
 # setup_db runs once per session to preserve data for inspection
 
 
-async def create_test_form_with_element(domain):
-    """Helper to create a form with an element"""
-    form_id = UUID_GENR()
-    element_type_id = UUID_GENR()
-    element_id = UUID_GENR()
+async def create_test_template_with_elements(domain):
+    """Helper to create a template with section, form, element group, and element definitions"""
+    template_id = UUID_GENR()
+    template_key = f"test-template-{str(template_id)[:8]}"
     
     async with domain.statemgr.transaction():
-        form = domain.statemgr.create(
-            "data_form",
-            _id=form_id,
-            form_key=f"test-form-{str(form_id)[:8]}",
-            form_name="Test Form",
+        # Create template
+        template = domain.statemgr.create(
+            "template",
+            _id=template_id,
+            template_key=template_key,
+            template_name="Test Template",
+            desc="A test template for element tests",
             version=1,
             organization_id=FIXTURE_ORGANIZATION_ID,
         )
-        await domain.statemgr.insert(form)
+        await domain.statemgr.insert(template)
         
+        # Create section definition
+        section_def_id = UUID_GENR()
+        section_def = domain.statemgr.create(
+            "section_definition",
+            _id=section_def_id,
+            template_id=template_id,
+            section_key=f"section-{str(section_def_id)[:8]}",
+            section_name="Test Section",
+            order=0,
+        )
+        await domain.statemgr.insert(section_def)
+        
+        # Create form definition
+        form_def_id = UUID_GENR()
+        form_def = domain.statemgr.create(
+            "form_definition",
+            _id=form_def_id,
+            section_definition_id=section_def_id,
+            form_key=f"form-{str(form_def_id)[:8]}",
+            title="Test Form",
+            order=0,
+        )
+        await domain.statemgr.insert(form_def)
+        
+        # Create element group definition
+        group_def_id = UUID_GENR()
+        group_def = domain.statemgr.create(
+            "element_group_definition",
+            _id=group_def_id,
+            form_definition_id=form_def_id,
+            group_key=f"group-{str(group_def_id)[:8]}",
+            group_name="Test Group",
+            order=0,
+        )
+        await domain.statemgr.insert(group_def)
+        
+        # Create element type
+        element_type_id = UUID_GENR()
+        element_type_key = f"text-input-{str(element_type_id)[:8]}"
         element_type = domain.statemgr.create(
             "element_type",
             _id=element_type_id,
-            type_key=f"text-input-{str(element_type_id)[:8]}",
+            type_key=element_type_key,
             type_name="Text Input",
             desc="A text input element",
         )
         await domain.statemgr.insert(element_type)
         
-        element_key = f"test-element-{str(element_id)[:8]}"
-        element = domain.statemgr.create(
-            "data_element",
-            _id=element_id,
-            form_id=form_id,
+        # Create element definition
+        element_def_id = UUID_GENR()
+        element_key = f"element-{str(element_def_id)[:8]}"
+        element_def = domain.statemgr.create(
+            "element_definition",
+            _id=element_def_id,
+            element_group_definition_id=group_def_id,
             element_type_id=element_type_id,
             element_key=element_key,
             element_label="Test Element",
             order=0,
             required=False,
         )
-        await domain.statemgr.insert(element)
+        await domain.statemgr.insert(element_def)
     
-    return form_id, element_id, element_type_id, element_key
+    return {
+        "template_id": template_id,
+        "template_key": template_key,
+        "section_def_id": section_def_id,
+        "form_def_id": form_def_id,
+        "group_def_id": group_def_id,
+        "element_type_id": element_type_id,
+        "element_type_key": element_type_key,
+        "element_def_id": element_def_id,
+        "element_key": element_key,
+    }
+
+
+async def create_document_with_instances(domain, template_data, collection_id=None):
+    """Helper to create a document with instances from a template"""
+    from fluvius.form.element import ElementDataManager
+    
+    # Create collection if not provided
+    if collection_id is None:
+        collection_id = UUID_GENR()
+        collection_key = f"test-collection-{str(collection_id)[:8]}"
+        await command_handler(
+            domain, "create-collection",
+            {"collection_key": collection_key, "collection_name": "Test Collection", "organization_id": FIXTURE_ORGANIZATION_ID},
+            "collection", collection_id
+        )
+    
+    # Create document
+    document_id = UUID_GENR()
+    document_key = f"test-document-{str(document_id)[:8]}"
+    payload = {
+        "template_id": template_data["template_id"],
+        "document_key": document_key,
+        "document_name": "Test Document",
+        "collection_id": collection_id,
+        "organization_id": FIXTURE_ORGANIZATION_ID,
+    }
+    await command_handler(
+        domain, "create-document", payload, "document", document_id
+    )
+    
+    # Get section instance
+    async with domain.statemgr.transaction():
+        section_instances = await domain.statemgr.query(
+            'section_instance',
+            where={'document_id': document_id}
+        )
+        section_instance = section_instances[0] if section_instances else None
+    
+    # Get form instance
+    element_data_mgr = ElementDataManager()
+    form_instance = None
+    element_group_instance = None
+    
+    if section_instance:
+        async with element_data_mgr.transaction():
+            form_instances = await element_data_mgr.query(
+                'form_instance',
+                where={'section_instance_id': section_instance._id}
+            )
+            form_instance = form_instances[0] if form_instances else None
+            
+            if form_instance:
+                element_group_instances = await element_data_mgr.query(
+                    'element_group_instance',
+                    where={'form_instance_id': form_instance._id}
+                )
+                element_group_instance = element_group_instances[0] if element_group_instances else None
+    
+    return {
+        "document_id": document_id,
+        "collection_id": collection_id,
+        "section_instance": section_instance,
+        "form_instance": form_instance,
+        "element_group_instance": element_group_instance,
+    }
 
 
 @mark.asyncio
 async def test_element_type_creation(domain):
     """Test creating element types"""
-
     element_type_id = UUID_GENR()
     type_key = f"test-type-{str(element_type_id)[:8]}"
+    
     async with domain.statemgr.transaction():
         element_type = domain.statemgr.create(
             "element_type",
@@ -110,191 +227,202 @@ async def test_element_type_creation(domain):
 
 
 @mark.asyncio
-async def test_data_element_creation(domain):
-    """Test creating data elements"""
-
-    form_id, element_id, element_type_id, element_key = await create_test_form_with_element(domain)
+async def test_element_definition_creation(domain):
+    """Test creating element definitions"""
+    template_data = await create_test_template_with_elements(domain)
     
     async with domain.statemgr.transaction():
-        element = await domain.statemgr.fetch('data_element', element_id)
-        assert element.form_id == form_id
-        assert element.element_type_id == element_type_id
-        assert element.element_key == element_key
-        assert element.element_label == "Test Element"
-        assert element.order == 0
-        assert element.required is False
+        element_def = await domain.statemgr.fetch('element_definition', template_data["element_def_id"])
+        assert element_def.element_group_definition_id == template_data["group_def_id"]
+        assert element_def.element_type_id == template_data["element_type_id"]
+        assert element_def.element_key == template_data["element_key"]
+        assert element_def.element_label == "Test Element"
+        assert element_def.order == 0
+        assert element_def.required is False
 
 
 @mark.asyncio
 async def test_form_instance_creation(domain):
-    """Test creating form instances"""
-
-    form_id, _, _, _ = await create_test_form_with_element(domain)
-    form_instance_id = UUID_GENR()
+    """Test creating form instances via document creation"""
+    template_data = await create_test_template_with_elements(domain)
+    doc_data = await create_document_with_instances(domain, template_data)
     
+    assert doc_data["form_instance"] is not None
+    assert doc_data["form_instance"].form_definition_id == template_data["form_def_id"]
+    assert doc_data["form_instance"].locked is False
+
+
+@mark.asyncio
+async def test_element_group_instance_creation(domain):
+    """Test creating element group instances via document creation"""
+    template_data = await create_test_template_with_elements(domain)
+    doc_data = await create_document_with_instances(domain, template_data)
+    
+    assert doc_data["element_group_instance"] is not None
+    assert doc_data["element_group_instance"].element_group_definition_id == template_data["group_def_id"]
+    assert doc_data["element_group_instance"].form_instance_id == doc_data["form_instance"]._id
+
+
+@mark.asyncio
+async def test_element_instance_creation(domain):
+    """Test creating element instances"""
     from fluvius.form.element import ElementDataManager
+    
+    template_data = await create_test_template_with_elements(domain)
+    doc_data = await create_document_with_instances(domain, template_data)
+    
     element_data_mgr = ElementDataManager()
     
+    # Create element instance manually
+    element_instance_id = UUID_GENR()
+    instance_key = f"instance-{str(element_instance_id)[:8]}"
+    
     async with element_data_mgr.transaction():
-        form_instance = element_data_mgr.create("form_instance",
-            _id=form_instance_id,
-            form_id=form_id,
-            instance_key=f"instance-{str(form_instance_id)[:8]}", instance_name=None, organization_id=FIXTURE_ORGANIZATION_ID,
+        element_instance = element_data_mgr.create(
+            "element_instance",
+            _id=element_instance_id,
+            element_group_instance_id=doc_data["element_group_instance"]._id,
+            element_definition_id=template_data["element_def_id"],
+            instance_key=instance_key,
+            data={"value": "test data"},
         )
-        await element_data_mgr.insert(form_instance)
+        await element_data_mgr.insert(element_instance)
         
-        fetched = await element_data_mgr.fetch('form_instance', form_instance_id)
-        assert fetched.form_id == form_id
-        assert fetched.organization_id == FIXTURE_ORGANIZATION_ID
-        assert fetched.locked is False
+        fetched = await element_data_mgr.fetch('element_instance', element_instance_id)
+        assert fetched.element_group_instance_id == doc_data["element_group_instance"]._id
+        assert fetched.element_definition_id == template_data["element_def_id"]
+        assert fetched.instance_key == instance_key
+        assert fetched.data == {"value": "test data"}
 
 
 @mark.asyncio
-async def test_save_element_with_data(domain):
-    """Test saving element data to a form instance"""
-
-    form_id, element_id, _, _ = await create_test_form_with_element(domain)
-    form_instance_id = UUID_GENR()
-    
-    from fluvius.form.element import ElementDataManager
-    element_data_mgr = ElementDataManager()
-    
-    # Create form instance
-    async with element_data_mgr.transaction():
-        form_instance = element_data_mgr.create("form_instance",
-            _id=form_instance_id,
-            form_id=form_id,
-            instance_key=f"instance-{str(form_instance_id)[:8]}", instance_name=None, organization_id=FIXTURE_ORGANIZATION_ID,
-        )
-        await element_data_mgr.insert(form_instance)
-        form_instance = await element_data_mgr.fetch('form_instance', form_instance_id)
-
-    # Save element data
-    save_payload = {
-        "element_id": element_id,
-        "form_instance_id": form_instance_id,
-        "data": {"value": "test data value"},
-    }
-    result = await command_handler(
-        domain, "save-element", save_payload, "data_element", element_id
-    )
-    assert result is not None
-
-
-@mark.asyncio
-async def test_save_form_multiple_elements(domain):
-    """Test saving form data with multiple elements"""
-
-    form_id, element_id, element_type_id, element_key = await create_test_form_with_element(domain)
-    
-    # Create another element
-    element_id_2 = UUID_GENR()
-    async with domain.statemgr.transaction():
-        element_2 = domain.statemgr.create(
-            "data_element",
-            _id=element_id_2,
-            form_id=form_id,
-            element_type_id=element_type_id,
-            element_key=f"test-element-2-{str(element_id_2)[:8]}",
-            element_label="Test Element 2",
-            order=1,
-            required=False,
-        )
-        await domain.statemgr.insert(element_2)
-
-    form_instance_id = UUID_GENR()
-    from fluvius.form.element import ElementDataManager
-    element_data_mgr = ElementDataManager()
-    
-    # Create form instance
-    async with element_data_mgr.transaction():
-        form_instance = element_data_mgr.create("form_instance",
-            _id=form_instance_id,
-            form_id=form_id,
-            instance_key=f"instance-{str(form_instance_id)[:8]}", instance_name=None, organization_id=FIXTURE_ORGANIZATION_ID,
-        )
-        await element_data_mgr.insert(form_instance)
-        form_instance = await element_data_mgr.fetch('form_instance', form_instance_id)
-
-    # Save form with multiple elements
-    save_payload = {
-        "form_id": form_id,
-        "form_instance_id": form_instance_id,
-        "elements": [
-            {"element_id": element_id, "data": {"value": "value 1"}},
-            {"element_id": element_id_2, "data": {"value": "value 2"}},
-        ],
-    }
-    result = await command_handler(
-        domain, "save-form", save_payload, "data_form", form_id
-    )
-    assert result is not None
-
-
-@mark.asyncio
-async def test_submit_form_locks_instance(domain):
-    """Test that submitting a form locks the form instance"""
-
-    form_id, element_id, _, _ = await create_test_form_with_element(domain)
-    form_instance_id = UUID_GENR()
-    
-    from fluvius.form.element import ElementDataManager
-    element_data_mgr = ElementDataManager()
-    
-    # Create form instance
-    async with element_data_mgr.transaction():
-        form_instance = element_data_mgr.create("form_instance",
-            _id=form_instance_id,
-            form_id=form_id,
-            instance_key=f"instance-{str(form_instance_id)[:8]}", instance_name=None, organization_id=FIXTURE_ORGANIZATION_ID,
-        )
-        await element_data_mgr.insert(form_instance)
-        form_instance = await element_data_mgr.fetch('form_instance', form_instance_id)
-        assert form_instance.locked is False
-
-    # Submit form
-    submit_payload = {
-        "form_id": form_id,
-        "form_instance_id": form_instance_id,
-        "elements": [
-            {"element_id": element_id, "data": {"value": "submitted value"}},
-        ],
-    }
-    result = await command_handler(
-        domain, "submit-form", submit_payload, "data_form", form_id
-    )
-    assert result is not None
-    
-    # Verify form instance is locked
-    async with element_data_mgr.transaction():
-        form_instance = await element_data_mgr.fetch('form_instance', form_instance_id)
-        assert form_instance.locked is True
-
-
-@mark.asyncio
-async def test_element_resource_fields(domain):
-    """Test that elements can have resource_name and resource_id fields"""
-
-    form_id, _, element_type_id, _ = await create_test_form_with_element(domain)
-    element_id = UUID_GENR()
+async def test_element_definition_resource_fields(domain):
+    """Test that element definitions can have resource_name and resource_id fields"""
+    template_data = await create_test_template_with_elements(domain)
     resource_id = UUID_GENR()
     
     async with domain.statemgr.transaction():
-        element = domain.statemgr.create(
-            "data_element",
-            _id=element_id,
-            form_id=form_id,
-            element_type_id=element_type_id,
-            element_key=f"test-element-resource-{str(element_id)[:8]}",
-            element_label="Test Element with Resource",
-            order=0,
+        element_def_id = UUID_GENR()
+        element_key = f"element-resource-{str(element_def_id)[:8]}"
+        element_def = domain.statemgr.create(
+            "element_definition",
+            _id=element_def_id,
+            element_group_definition_id=template_data["group_def_id"],
+            element_type_id=template_data["element_type_id"],
+            element_key=element_key,
+            element_label="Element with Resource",
+            order=1,
             required=False,
             resource_id=resource_id,
             resource_name="test-resource",
         )
-        await domain.statemgr.insert(element)
+        await domain.statemgr.insert(element_def)
         
-        fetched = await domain.statemgr.fetch('data_element', element_id)
+        fetched = await domain.statemgr.fetch('element_definition', element_def_id)
         assert fetched.resource_id == resource_id
         assert fetched.resource_name == "test-resource"
 
+
+@mark.asyncio
+async def test_multiple_element_definitions_in_group(domain):
+    """Test creating multiple element definitions in an element group"""
+    template_data = await create_test_template_with_elements(domain)
+    
+    async with domain.statemgr.transaction():
+        # Create additional element definitions
+        for i in range(3):
+            element_def_id = UUID_GENR()
+            element_def = domain.statemgr.create(
+                "element_definition",
+                _id=element_def_id,
+                element_group_definition_id=template_data["group_def_id"],
+                element_type_id=template_data["element_type_id"],
+                element_key=f"element-{i}-{str(element_def_id)[:8]}",
+                element_label=f"Test Element {i}",
+                order=i + 1,
+                required=False,
+            )
+            await domain.statemgr.insert(element_def)
+        
+        # Query all element definitions in the group
+        element_defs = await domain.statemgr.query(
+            'element_definition',
+            where={'element_group_definition_id': template_data["group_def_id"]}
+        )
+        # Should have original + 3 new ones
+        assert len(element_defs) >= 4
+
+
+@mark.asyncio
+async def test_multiple_element_groups_in_form(domain):
+    """Test creating multiple element groups in a form definition"""
+    template_data = await create_test_template_with_elements(domain)
+    
+    async with domain.statemgr.transaction():
+        # Create additional element groups
+        for i in range(2):
+            group_def_id = UUID_GENR()
+            group_def = domain.statemgr.create(
+                "element_group_definition",
+                _id=group_def_id,
+                form_definition_id=template_data["form_def_id"],
+                group_key=f"group-{i}-{str(group_def_id)[:8]}",
+                group_name=f"Test Group {i}",
+                order=i + 1,
+            )
+            await domain.statemgr.insert(group_def)
+        
+        # Query all element groups in the form
+        group_defs = await domain.statemgr.query(
+            'element_group_definition',
+            where={'form_definition_id': template_data["form_def_id"]}
+        )
+        # Should have original + 2 new ones
+        assert len(group_defs) >= 3
+
+
+@mark.asyncio
+async def test_form_instance_locking(domain):
+    """Test that form instances can be locked"""
+    from fluvius.form.element import ElementDataManager
+    
+    template_data = await create_test_template_with_elements(domain)
+    doc_data = await create_document_with_instances(domain, template_data)
+    
+    element_data_mgr = ElementDataManager()
+    
+    # Verify form instance is not locked initially
+    async with element_data_mgr.transaction():
+        form_instance = await element_data_mgr.fetch('form_instance', doc_data["form_instance"]._id)
+        assert form_instance.locked is False
+        
+        # Lock the form instance
+        await element_data_mgr.update(form_instance, locked=True)
+        
+        # Verify it's locked
+        form_instance = await element_data_mgr.fetch('form_instance', doc_data["form_instance"]._id)
+        assert form_instance.locked is True
+
+
+@mark.asyncio
+async def test_element_type_with_schema(domain):
+    """Test creating element types with element_schema"""
+    element_type_id = UUID_GENR()
+    type_key = f"test-type-schema-{str(element_type_id)[:8]}"
+    
+    async with domain.statemgr.transaction():
+        element_type = domain.statemgr.create(
+            "element_type",
+            _id=element_type_id,
+            type_key=type_key,
+            type_name="Test Type with Schema",
+            desc="A test element type with schema",
+            element_schema={"type": "object", "properties": {"value": {"type": "string"}}},
+            attrs={"custom": "attribute"},
+        )
+        await domain.statemgr.insert(element_type)
+        
+        fetched = await domain.statemgr.fetch('element_type', element_type_id)
+        assert fetched.type_key == type_key
+        assert fetched.element_schema is not None
+        assert fetched.attrs == {"custom": "attribute"}

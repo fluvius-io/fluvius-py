@@ -9,6 +9,333 @@ from .. import logger
 class FormAggregate(Aggregate):
     """Aggregate for form domain operations"""
 
+    # ============================================================================
+    # TEMPLATE DEFINITION METHODS
+    # ============================================================================
+
+    @action("template-created")
+    async def create_template(self, data):
+        """Create a new document template"""
+        template = self.init_resource(
+            "template",
+            _id=self.aggroot.identifier,
+            template_key=data.template_key,
+            template_name=data.template_name,
+            desc=data.desc,
+            version=data.version or 1,
+            owner_id=data.owner_id,
+            organization_id=data.organization_id,
+        )
+        await self.statemgr.insert(template)
+        
+        # Add template to collections if specified
+        collection_ids = []
+        if data.collection_id:
+            collection_ids.append(data.collection_id)
+        if data.collection_ids:
+            collection_ids.extend(data.collection_ids)
+        
+        # Remove duplicates
+        seen = set()
+        unique_collection_ids = []
+        for cid in collection_ids:
+            if cid not in seen:
+                seen.add(cid)
+                unique_collection_ids.append(cid)
+        
+        added_collection_ids = []
+        for collection_id in unique_collection_ids:
+            collection = await self.statemgr.fetch('collection', collection_id)
+            if not collection:
+                raise NotFoundError(
+                    "F00.201",
+                    f"Collection not found: {collection_id}",
+                    None
+                )
+            
+            # Check if template is already in this collection
+            existing = await self.statemgr.query(
+                "template_collection",
+                where={"template_id": template._id, "collection_id": collection_id},
+                limit=1
+            )
+            if existing:
+                raise BadRequestError(
+                    "F00.203",
+                    f"Template {template._id} is already in collection {collection_id}",
+                    None
+                )
+            
+            order = data.order
+            if order is None:
+                max_order = await self.statemgr.query(
+                    "template_collection",
+                    where={"collection_id": collection_id},
+                    sort=(("order", "desc"),),
+                    limit=1
+                )
+                order = (max_order[0].order + 1) if max_order else 0
+            
+            template_collection = self.init_resource(
+                "template_collection",
+                _id=UUID_GENR(),
+                template_id=template._id,
+                collection_id=collection_id,
+                order=order,
+            )
+            await self.statemgr.insert(template_collection)
+            added_collection_ids.append(collection_id)
+        
+        return {
+            "template_id": str(self.aggroot.identifier),
+            "template_key": template.template_key,
+            "template_name": template.template_name,
+            "collection_ids": [str(cid) for cid in added_collection_ids],
+        }
+
+    @action("template-updated", resources="template")
+    async def update_template(self, data):
+        """Update template properties"""
+        template = self.rootobj
+        changes = data.model_dump(exclude_none=True)
+        if not changes:
+            raise BadRequestError("F00.001", "No changes provided for template update")
+
+        await self.statemgr.update(template, **changes)
+
+        async with self.statemgr.transaction():
+            updated_template = await self.statemgr.fetch('template', template._id)
+
+        return {
+            "template_id": str(updated_template._id),
+            "template_key": updated_template.template_key,
+            "template_name": updated_template.template_name,
+        }
+
+    @action("template-removed", resources="template")
+    async def remove_template(self, data):
+        """Remove a template"""
+        template = self.rootobj
+        await self.statemgr.remove(template)
+        return {
+            "template_id": str(template._id),
+            "status": "removed",
+        }
+
+    @action("section-definition-created", resources="template")
+    async def create_section_definition(self, data):
+        """Create a section definition within a template"""
+        template = self.rootobj
+        section_def = self.init_resource(
+            "section_definition",
+            _id=UUID_GENR(),
+            template_id=template._id,
+            section_key=data.section_key,
+            section_name=data.section_name,
+            desc=data.desc,
+            order=data.order or 0,
+        )
+        await self.statemgr.insert(section_def)
+        return {
+            "section_definition_id": str(section_def._id),
+            "section_key": section_def.section_key,
+            "section_name": section_def.section_name,
+        }
+
+    @action("section-definition-updated", resources="section_definition")
+    async def update_section_definition(self, data):
+        """Update section definition properties"""
+        section_def = self.rootobj
+        changes = data.model_dump(exclude_none=True)
+        if not changes:
+            raise BadRequestError("F00.001", "No changes provided for section definition update")
+
+        await self.statemgr.update(section_def, **changes)
+
+        async with self.statemgr.transaction():
+            updated = await self.statemgr.fetch('section_definition', section_def._id)
+
+        return {
+            "section_definition_id": str(updated._id),
+            "section_key": updated.section_key,
+            "section_name": updated.section_name,
+        }
+
+    @action("section-definition-removed", resources="section_definition")
+    async def remove_section_definition(self, data):
+        """Remove a section definition"""
+        section_def = self.rootobj
+        await self.statemgr.remove(section_def)
+        return {
+            "section_definition_id": str(section_def._id),
+            "status": "removed",
+        }
+
+    @action("form-definition-created", resources="section_definition")
+    async def create_form_definition(self, data):
+        """Create a form definition within a section definition"""
+        section_def = self.rootobj
+        form_def = self.init_resource(
+            "form_definition",
+            _id=UUID_GENR(),
+            section_definition_id=section_def._id,
+            form_key=data.form_key,
+            title=data.title,
+            desc=data.desc,
+            order=data.order or 0,
+        )
+        await self.statemgr.insert(form_def)
+        return {
+            "form_definition_id": str(form_def._id),
+            "form_key": form_def.form_key,
+            "title": form_def.title,
+        }
+
+    @action("form-definition-updated", resources="form_definition")
+    async def update_form_definition(self, data):
+        """Update form definition properties"""
+        form_def = self.rootobj
+        changes = data.model_dump(exclude_none=True)
+        if not changes:
+            raise BadRequestError("F00.001", "No changes provided for form definition update")
+
+        await self.statemgr.update(form_def, **changes)
+
+        async with self.statemgr.transaction():
+            updated = await self.statemgr.fetch('form_definition', form_def._id)
+
+        return {
+            "form_definition_id": str(updated._id),
+            "form_key": updated.form_key,
+            "title": updated.title,
+        }
+
+    @action("form-definition-removed", resources="form_definition")
+    async def remove_form_definition(self, data):
+        """Remove a form definition"""
+        form_def = self.rootobj
+        await self.statemgr.remove(form_def)
+        return {
+            "form_definition_id": str(form_def._id),
+            "status": "removed",
+        }
+
+    @action("element-group-definition-created", resources="form_definition")
+    async def create_element_group_definition(self, data):
+        """Create an element group definition within a form definition"""
+        form_def = self.rootobj
+        group_def = self.init_resource(
+            "element_group_definition",
+            _id=UUID_GENR(),
+            form_definition_id=form_def._id,
+            group_key=data.group_key,
+            group_name=data.group_name,
+            desc=data.desc,
+            order=data.order or 0,
+        )
+        await self.statemgr.insert(group_def)
+        return {
+            "element_group_definition_id": str(group_def._id),
+            "group_key": group_def.group_key,
+            "group_name": group_def.group_name,
+        }
+
+    @action("element-group-definition-updated", resources="element_group_definition")
+    async def update_element_group_definition(self, data):
+        """Update element group definition properties"""
+        group_def = self.rootobj
+        changes = data.model_dump(exclude_none=True)
+        if not changes:
+            raise BadRequestError("F00.001", "No changes provided for element group definition update")
+
+        await self.statemgr.update(group_def, **changes)
+
+        async with self.statemgr.transaction():
+            updated = await self.statemgr.fetch('element_group_definition', group_def._id)
+
+        return {
+            "element_group_definition_id": str(updated._id),
+            "group_key": updated.group_key,
+            "group_name": updated.group_name,
+        }
+
+    @action("element-group-definition-removed", resources="element_group_definition")
+    async def remove_element_group_definition(self, data):
+        """Remove an element group definition"""
+        group_def = self.rootobj
+        await self.statemgr.remove(group_def)
+        return {
+            "element_group_definition_id": str(group_def._id),
+            "status": "removed",
+        }
+
+    @action("element-definition-created", resources="element_group_definition")
+    async def create_element_definition(self, data):
+        """Create an element definition within an element group definition"""
+        group_def = self.rootobj
+        
+        # Verify element type exists
+        element_type = await self.statemgr.fetch('element_type', data.element_type_id)
+        if not element_type:
+            raise NotFoundError(
+                "F00.204",
+                f"Element type not found: {data.element_type_id}",
+                None
+            )
+        
+        element_def = self.init_resource(
+            "element_definition",
+            _id=UUID_GENR(),
+            element_group_definition_id=group_def._id,
+            element_type_id=data.element_type_id,
+            element_key=data.element_key,
+            element_label=data.element_label,
+            order=data.order or 0,
+            required=data.required or False,
+            validation_rules=data.validation_rules,
+            resource_id=data.resource_id,
+            resource_name=data.resource_name,
+        )
+        await self.statemgr.insert(element_def)
+        return {
+            "element_definition_id": str(element_def._id),
+            "element_key": element_def.element_key,
+            "element_label": element_def.element_label,
+        }
+
+    @action("element-definition-updated", resources="element_definition")
+    async def update_element_definition(self, data):
+        """Update element definition properties"""
+        element_def = self.rootobj
+        changes = data.model_dump(exclude_none=True)
+        if not changes:
+            raise BadRequestError("F00.001", "No changes provided for element definition update")
+
+        await self.statemgr.update(element_def, **changes)
+
+        async with self.statemgr.transaction():
+            updated = await self.statemgr.fetch('element_definition', element_def._id)
+
+        return {
+            "element_definition_id": str(updated._id),
+            "element_key": updated.element_key,
+            "element_label": updated.element_label,
+        }
+
+    @action("element-definition-removed", resources="element_definition")
+    async def remove_element_definition(self, data):
+        """Remove an element definition"""
+        element_def = self.rootobj
+        await self.statemgr.remove(element_def)
+        return {
+            "element_definition_id": str(element_def._id),
+            "status": "removed",
+        }
+
+    # ============================================================================
+    # DATA INSTANCE METHODS
+    # ============================================================================
+
     @action("collection-created")
     async def create_collection(self, data):
         """Create a new collection"""
@@ -18,7 +345,6 @@ class FormAggregate(Aggregate):
             collection_key=data.collection_key,
             collection_name=data.collection_name,
             desc=data.desc,
-            attrs=data.attrs,
             owner_id=data.owner_id,
             organization_id=data.organization_id,
         )
@@ -61,21 +387,50 @@ class FormAggregate(Aggregate):
 
     @action("document-created")
     async def create_document(self, data):
-        """Create a new document and optionally add it to one or more collections"""
+        """Create a new document instance from a template and optionally add it to collections"""
+        # Verify template exists
+        template = await self.statemgr.fetch('template', data.template_id)
+        if not template:
+            raise NotFoundError(
+                "F00.205",
+                f"Template not found: {data.template_id}",
+                None
+            )
+        
         document = self.init_resource(
             "document",
             _id=self.aggroot.identifier,
+            template_id=data.template_id,
             document_key=data.document_key,
             document_name=data.document_name,
             desc=data.desc,
             version=data.version or 1,
-            attrs=data.attrs,
             owner_id=data.owner_id,
             organization_id=data.organization_id,
             resource_id=data.resource_id,
             resource_name=data.resource_name,
         )
         await self.statemgr.insert(document)
+        
+        # Create section instances from section definitions in the template
+        # Note: Form instances and element instances are created lazily when forms are populated/saved
+        section_definitions = await self.statemgr.query(
+            "section_definition",
+            where={"template_id": data.template_id},
+            sort=(("order", "asc"),)
+        )
+        
+        for section_def in section_definitions:
+            section_instance = self.init_resource(
+                "section_instance",
+                _id=UUID_GENR(),
+                document_id=document._id,
+                section_definition_id=section_def._id,
+                instance_key=section_def.section_key,  # Use section_key as default instance_key
+                instance_name=section_def.section_name,
+                order=section_def.order,
+            )
+            await self.statemgr.insert(section_instance)
         
         # Collect collection IDs to add document to
         collection_ids = []
@@ -133,7 +488,6 @@ class FormAggregate(Aggregate):
                     document_id=self.aggroot.identifier,
                     collection_id=collection_id,
                     order=order,
-                    attrs=data.attrs,
                 )
                 await self.statemgr.insert(doc_collection)
                 added_collection_ids.append(collection_id)
@@ -177,7 +531,7 @@ class FormAggregate(Aggregate):
 
     @action("document-copied", resources="document")
     async def copy_document(self, data):
-        """Copy a document with all its forms and elements"""
+        """Copy a document with all its section instances, form instances, and element instances"""
         source_document = self.rootobj
 
         # Create new document - use a new UUID for the copied document
@@ -185,11 +539,11 @@ class FormAggregate(Aggregate):
         new_document = self.init_resource(
             "document",
             _id=new_document_id,
+            template_id=source_document.template_id,  # Same template
             document_key=data.new_document_key,
             document_name=data.new_document_name or source_document.document_name,
             desc=source_document.desc,
             version=1,
-            attrs=data.attrs or source_document.attrs,
             owner_id=source_document.owner_id,
             organization_id=source_document.organization_id,
             resource_id=source_document.resource_id,
@@ -197,93 +551,97 @@ class FormAggregate(Aggregate):
         )
         await self.statemgr.insert(new_document)
 
-        # Copy sections if requested
+        element_data_mgr = ElementDataManager()
+
+        # Copy section instances if requested
         if data.copy_sections:
-            sections = await self.statemgr.query(
-                "section",
+            section_instances = await self.statemgr.query(
+                "section_instance",
                 where={"document_id": source_document._id},
                 sort=(("order", "asc"),)
             )
-            section_map = {}
-            for section in sections:
-                new_section_id = UUID_GENR()
-                new_section = self.init_resource(
-                    "section",
-                    _id=new_section_id,
+            section_instance_map = {}
+            for section_instance in section_instances:
+                new_section_instance_id = UUID_GENR()
+                new_section_instance = self.init_resource(
+                    "section_instance",
+                    _id=new_section_instance_id,
                     document_id=new_document_id,
-                    section_key=section.section_key,
-                    section_name=section.section_name,
-                    desc=section.desc,
-                    order=section.order,
-                    attrs=section.attrs,
+                    section_definition_id=section_instance.section_definition_id,
+                    instance_key=section_instance.instance_key,
+                    instance_name=section_instance.instance_name,
+                    order=section_instance.order,
                 )
-                await self.statemgr.insert(new_section)
-                section_map[section._id] = new_section_id
+                await self.statemgr.insert(new_section_instance)
+                section_instance_map[section_instance._id] = new_section_instance_id
 
-            # Copy forms and their elements if requested
+            # Copy form instances if requested
             if data.copy_forms:
-                doc_forms = await self.statemgr.query(
-                    "document_form",
-                    where={"document_id": source_document._id},
-                    sort=(("order", "asc"),)
-                )
-                form_map = {}  # Map old form_id to new form_id
-                
-                for doc_form in doc_forms:
-                    # Get the source form
-                    source_form = await self.statemgr.fetch('data_form', doc_form.form_id)
-                    
-                    # Create new form
-                    new_form_id = UUID_GENR()
-                    new_form = self.init_resource(
-                        "data_form",
-                        _id=new_form_id,
-                        form_key=f"{source_form.form_key}-copy",
-                        form_name=source_form.form_name,
-                        desc=source_form.desc,
-                        version=source_form.version,
-                        attrs=source_form.attrs,
-                        owner_id=source_form.owner_id,
-                        organization_id=source_form.organization_id,
-                    )
-                    await self.statemgr.insert(new_form)
-                    form_map[source_form._id] = new_form_id
-                    
-                    # Copy all elements from the source form
-                    elements = await self.statemgr.query(
-                        "data_element",
-                        where={"form_id": source_form._id},
-                        sort=(("order", "asc"),)
-                    )
-                    for element in elements:
-                        new_element = self.init_resource(
-                            "data_element",
-                            _id=UUID_GENR(),
-                            form_id=new_form_id,
-                            element_type_id=element.element_type_id,
-                            element_key=element.element_key,
-                            element_label=element.element_label,
-                            order=element.order,
-                            required=element.required,
-                            attrs=element.attrs,
-                            validation_rules=element.validation_rules,
-                            resource_id=element.resource_id,
-                            resource_name=element.resource_name,
+                for old_section_instance_id, new_section_instance_id in section_instance_map.items():
+                    async with element_data_mgr.transaction():
+                        form_instances = await element_data_mgr.query(
+                            "form_instance",
+                            where={"section_instance_id": old_section_instance_id},
                         )
-                        await self.statemgr.insert(new_element)
-                    
-                    # Create document-form relationship with new form
-                    new_section_id = section_map.get(doc_form.section_id) if doc_form.section_id else None
-                    new_doc_form = self.init_resource(
-                        "document_form",
-                        _id=UUID_GENR(),
-                        document_id=new_document_id,
-                        section_id=new_section_id,  # Can be None if form is not in a section
-                        form_id=new_form_id,
-                        order=doc_form.order,
-                        attrs=doc_form.attrs,
-                    )
-                    await self.statemgr.insert(new_doc_form)
+                        form_instance_map = {}
+                        
+                        for form_instance in form_instances:
+                            new_form_instance_id = UUID_GENR()
+                            new_form_instance = element_data_mgr.create(
+                                "form_instance",
+                                _id=new_form_instance_id,
+                                section_instance_id=new_section_instance_id,
+                                form_definition_id=form_instance.form_definition_id,
+                                instance_key=form_instance.instance_key,
+                                instance_name=form_instance.instance_name,
+                                locked=False,  # New instance is not locked
+                                attrs=form_instance.attrs,
+                                owner_id=form_instance.owner_id,
+                                organization_id=form_instance.organization_id,
+                            )
+                            await element_data_mgr.insert(new_form_instance)
+                            form_instance_map[form_instance._id] = new_form_instance_id
+                            
+                            # Copy element group instances if requested
+                            if data.copy_element_groups:
+                                element_group_instances = await element_data_mgr.query(
+                                    "element_group_instance",
+                                    where={"form_instance_id": form_instance._id},
+                                )
+                                element_group_instance_map = {}
+                                
+                                for group_instance in element_group_instances:
+                                    new_group_instance_id = UUID_GENR()
+                                    new_group_instance = element_data_mgr.create(
+                                        "element_group_instance",
+                                        _id=new_group_instance_id,
+                                        form_instance_id=new_form_instance_id,
+                                        element_group_definition_id=group_instance.element_group_definition_id,
+                                        instance_key=group_instance.instance_key,
+                                        instance_name=group_instance.instance_name,
+                                        order=group_instance.order,
+                                    )
+                                    await element_data_mgr.insert(new_group_instance)
+                                    element_group_instance_map[group_instance._id] = new_group_instance_id
+                                    
+                                    # Copy element instances if requested
+                                    if data.copy_elements:
+                                        element_instances = await element_data_mgr.query(
+                                            "element_instance",
+                                            where={"element_group_instance_id": group_instance._id},
+                                        )
+                                        
+                                        for element_instance in element_instances:
+                                            new_element_instance = element_data_mgr.create(
+                                                "element_instance",
+                                                _id=UUID_GENR(),
+                                                element_group_instance_id=new_group_instance_id,
+                                                element_definition_id=element_instance.element_definition_id,
+                                                instance_key=element_instance.instance_key,
+                                                data=element_instance.data,
+                                                attrs=element_instance.attrs,
+                                            )
+                                            await element_data_mgr.insert(new_element_instance)
 
         # Add copied document to target collection if specified
         if data.target_collection_id:
@@ -326,7 +684,6 @@ class FormAggregate(Aggregate):
                     document_id=new_document_id,
                     collection_id=data.target_collection_id,
                     order=order,
-                    attrs=data.attrs,
                 )
                 await self.statemgr.insert(doc_collection)
 
@@ -413,7 +770,6 @@ class FormAggregate(Aggregate):
                 document_id=document._id,
                 collection_id=data.target_collection_id,
                 order=order,
-                attrs=data.attrs,
             )
             await self.statemgr.insert(doc_collection)
         
@@ -474,7 +830,6 @@ class FormAggregate(Aggregate):
             document_id=document._id,
             collection_id=data.collection_id,
             order=order,
-            attrs=data.attrs,
         )
         await self.statemgr.insert(doc_collection)
         
@@ -484,48 +839,87 @@ class FormAggregate(Aggregate):
             "status": "added",
         }
 
-    @action("element-populated", resources="data_element")
+    @action("element-populated", resources="element_definition")
     async def populate_element(self, data):
-        """Populate element with prior data"""
-        element = self.rootobj
-
-        # Note: This assumes form_instance table exists or will be created
-        # For now, we'll return a placeholder response
-        # In a real implementation, you would query form_instance and element_data tables
+        """Populate element with prior data from an element group instance"""
+        element_def = self.rootobj
         
-        return {
-            "element_id": str(element._id),
-            "form_instance_id": str(data.form_instance_id) if data.form_instance_id else None,
+        element_data_mgr = ElementDataManager()
+        
+        result = {
+            "element_definition_id": str(element_def._id),
+            "element_group_instance_id": str(data.element_group_instance_id) if data.element_group_instance_id else None,
             "status": "populated",
-            "message": "Element populated with prior data",
+            "data": None,
         }
+        
+        if data.element_group_instance_id:
+            async with element_data_mgr.transaction():
+                # Find existing element instance data
+                element_instances = await element_data_mgr.query(
+                    "element_instance",
+                    where={
+                        "element_group_instance_id": data.element_group_instance_id,
+                        "element_definition_id": element_def._id
+                    },
+                    limit=1
+                )
+                if element_instances:
+                    result["data"] = element_instances[0].data
+        
+        return result
 
-    @action("form-populated", resources="data_form")
+    @action("form-populated", resources="form_definition")
     async def populate_form(self, data):
-        """Populate form with prior data"""
-        form = self.rootobj
-
-        # Note: This assumes form_instance table exists or will be created
-        # For now, we'll return a placeholder response
-        # In a real implementation, you would query form_instance and element_data tables
+        """Populate form with prior data from a form instance"""
+        form_def = self.rootobj
         
-        return {
-            "form_id": str(form._id),
+        element_data_mgr = ElementDataManager()
+        
+        result = {
+            "form_definition_id": str(form_def._id),
             "form_instance_id": str(data.form_instance_id) if data.form_instance_id else None,
-            "element_ids": [str(eid) for eid in data.element_ids] if data.element_ids else None,
+            "element_definition_ids": [str(eid) for eid in data.element_definition_ids] if data.element_definition_ids else None,
             "status": "populated",
-            "message": "Form populated with prior data",
+            "elements": [],
         }
+        
+        if data.form_instance_id:
+            async with element_data_mgr.transaction():
+                # Get all element group instances for this form instance
+                element_group_instances = await element_data_mgr.query(
+                    "element_group_instance",
+                    where={"form_instance_id": data.form_instance_id}
+                )
+                
+                for group_instance in element_group_instances:
+                    # Get all element instances for this group
+                    element_instances = await element_data_mgr.query(
+                        "element_instance",
+                        where={"element_group_instance_id": group_instance._id}
+                    )
+                    
+                    for element_instance in element_instances:
+                        # Filter by element_definition_ids if provided
+                        if data.element_definition_ids and element_instance.element_definition_id not in data.element_definition_ids:
+                            continue
+                        
+                        result["elements"].append({
+                            "element_definition_id": str(element_instance.element_definition_id),
+                            "element_group_instance_id": str(group_instance._id),
+                            "instance_key": element_instance.instance_key,
+                            "data": element_instance.data,
+                        })
+        
+        return result
 
-    @action("element-saved", resources="data_element")
+    @action("element-saved", resources="element_definition")
     async def save_element(self, data):
         """Save element data with validation"""
-        from fluvius.data import UUID_GENR
-
-        element = self.rootobj
+        element_def = self.rootobj
 
         # Get element type from database
-        element_type_record = await self.statemgr.fetch('element_type', element.element_type_id)
+        element_type_record = await self.statemgr.fetch('element_type', element_def.element_type_id)
 
         # Get element type class for validation
         try:
@@ -539,132 +933,87 @@ class FormAggregate(Aggregate):
         if element_type_cls:
             validated_data = element_type_cls.validate_data(data.data)
 
-        # Get element data manager (reuse connector config)
+        # Get element data manager
         element_data_mgr = ElementDataManager()
 
         # Use transaction context for element data operations
         async with element_data_mgr.transaction():
-            # Check if form instance exists, create if it doesn't
-            form_instances = await element_data_mgr.query(
-                "form_instance",
-                where={"_id": data.form_instance_id},
-                limit=1
-            )
-
-            if not form_instances:
-                # Create form instance if it doesn't exist
-                organization_id = None
-                if hasattr(self, 'context') and self.context.organization_id:
-                    organization_id = str(self.context.organization_id)
-                form_instance = element_data_mgr.create(
-                    "form_instance",
-                    _id=data.form_instance_id,
-                    form_id=element.form_id,
-                    instance_key=f"instance-{str(data.form_instance_id)[:8]}",
-                    instance_name=None,
-                    locked=False,
-                    attrs=data.attrs,
-                    owner_id=self.context.profile_id if hasattr(self, 'context') else None,
-                    organization_id=organization_id,
-                )
-                await element_data_mgr.insert(form_instance)
-                # Refresh to get _etag from database
-                form_instance = await element_data_mgr.fetch('form_instance', data.form_instance_id)
-            else:
-                form_instance = form_instances[0]
-
-            # Check if element data already exists
-            existing_data = await element_data_mgr.query(
-                "element_data",
+            # Check if element instance already exists
+            existing_instances = await element_data_mgr.query(
+                "element_instance",
                 where={
-                    "form_instance_id": data.form_instance_id,
-                    "element_id": element._id
+                    "element_group_instance_id": data.element_group_instance_id,
+                    "element_definition_id": element_def._id
                 },
                 limit=1
             )
 
-            if existing_data:
-                # Update existing element data
-                element_data = existing_data[0]
+            if existing_instances:
+                # Update existing element instance
+                element_instance = existing_instances[0]
                 await element_data_mgr.update(
-                    element_data,
+                    element_instance,
                     data=validated_data,
                     attrs=data.attrs,
                     **self.audit_updated()
                 )
             else:
-                # Create new element data
-                element_data = element_data_mgr.create(
-                    "element_data",
+                # Create new element instance
+                element_instance = element_data_mgr.create(
+                    "element_instance",
                     _id=UUID_GENR(),
-                    form_instance_id=data.form_instance_id,
-                    element_id=element._id,
+                    element_group_instance_id=data.element_group_instance_id,
+                    element_definition_id=element_def._id,
+                    instance_key=data.instance_key,
                     data=validated_data,
                     attrs=data.attrs,
                 )
-                await element_data_mgr.insert(element_data)
+                await element_data_mgr.insert(element_instance)
         
         return {
-            "element_id": str(element._id),
-            "form_instance_id": str(data.form_instance_id),
-            "element_data_id": str(element_data._id),
+            "element_definition_id": str(element_def._id),
+            "element_group_instance_id": str(data.element_group_instance_id),
+            "element_instance_id": str(element_instance._id),
             "status": "saved",
             "message": "Element data saved",
         }
 
-    @action("form-saved", resources="data_form")
+    @action("form-saved", resources="form_definition")
     async def save_form(self, data):
-        form = self.rootobj
+        """Save form data (multiple elements) but still allow further editing"""
+        form_def = self.rootobj
 
         # Get element data manager
         element_data_mgr = ElementDataManager()
 
         # Use transaction context for element data operations
         async with element_data_mgr.transaction():
-            # Check if form instance exists, create if it doesn't
-            form_instances = await element_data_mgr.query(
-                "form_instance",
-                where={"_id": data.form_instance_id},
-                limit=1
-            )
-
-            if not form_instances:
-                # Create form instance if it doesn't exist
-                organization_id = None
-                if hasattr(self, 'context') and self.context.organization_id:
-                    organization_id = str(self.context.organization_id)
-                form_instance = element_data_mgr.create(
-                    "form_instance",
-                    _id=data.form_instance_id,
-                    form_id=form._id,
-                    instance_key=f"instance-{str(data.form_instance_id)[:8]}",
-                    instance_name=None,
-                    locked=False,
-                    attrs=data.attrs,
-                    owner_id=self.context.profile_id if hasattr(self, 'context') else None,
-                    organization_id=organization_id,
+            # Verify form instance exists
+            form_instance = await element_data_mgr.fetch('form_instance', data.form_instance_id)
+            if not form_instance:
+                raise NotFoundError(
+                    "F00.206",
+                    f"Form instance not found: {data.form_instance_id}",
+                    None
                 )
-                await element_data_mgr.insert(form_instance)
-                # Refresh to get _etag from database
-                form_instance = await element_data_mgr.fetch('form_instance', data.form_instance_id)
-            else:
-                form_instance = form_instances[0]
 
             # Save each element data
             saved_count = 0
             for element_data in data.elements:
-                element_id = element_data.get("element_id")
+                element_definition_id = element_data.get("element_definition_id")
+                element_group_instance_id = element_data.get("element_group_instance_id")
+                instance_key = element_data.get("instance_key")
                 element_data_dict = element_data.get("data", {})
                 element_attrs = element_data.get("attrs")
 
-                if not element_id:
+                if not element_definition_id or not element_group_instance_id:
                     continue
 
-                # Get element from database
-                element = await self.statemgr.fetch('data_element', element_id)
+                # Get element definition from database
+                element_def = await self.statemgr.fetch('element_definition', element_definition_id)
 
                 # Get element type for validation
-                element_type_record = await self.statemgr.fetch('element_type', element.element_type_id)
+                element_type_record = await self.statemgr.fetch('element_type', element_def.element_type_id)
 
                 # Validate data
                 validated_data = element_data_dict
@@ -675,102 +1024,83 @@ class FormAggregate(Aggregate):
                     # Element type not registered, skip validation
                     pass
 
-                # Check if element data already exists
-                existing_data = await element_data_mgr.query(
-                    "element_data",
+                # Check if element instance already exists
+                existing_instances = await element_data_mgr.query(
+                    "element_instance",
                     where={
-                        "form_instance_id": data.form_instance_id,
-                        "element_id": element_id
+                        "element_group_instance_id": element_group_instance_id,
+                        "element_definition_id": element_definition_id
                     },
                     limit=1
                 )
 
-                if existing_data:
+                if existing_instances:
                     # Update existing
                     await element_data_mgr.update(
-                        existing_data[0],
+                        existing_instances[0],
                         data=validated_data,
                         attrs=element_attrs,
                         **self.audit_updated()
                     )
                 else:
                     # Create new
-                    new_element_data = element_data_mgr.create(
-                        "element_data",
+                    new_element_instance = element_data_mgr.create(
+                        "element_instance",
                         _id=UUID_GENR(),
-                        form_instance_id=data.form_instance_id,
-                        element_id=element_id,
+                        element_group_instance_id=element_group_instance_id,
+                        element_definition_id=element_definition_id,
+                        instance_key=instance_key or f"element-{str(element_definition_id)[:8]}",
                         data=validated_data,
                         attrs=element_attrs,
                     )
-                    await element_data_mgr.insert(new_element_data)
+                    await element_data_mgr.insert(new_element_instance)
 
                 saved_count += 1
         
         return {
-            "form_id": str(form._id),
+            "form_definition_id": str(form_def._id),
             "form_instance_id": str(data.form_instance_id),
             "elements_saved": saved_count,
             "status": "saved",
             "message": "Form data saved (editable)",
         }
 
-    @action("form-submitted", resources="data_form")
+    @action("form-submitted", resources="form_definition")
     async def submit_form(self, data):
         """Submit form (saves element data and locks from further editing)"""
-        from fluvius.data import UUID_GENR
-
-        form = self.rootobj
+        form_def = self.rootobj
 
         # Get element data manager
         element_data_mgr = ElementDataManager()
 
         # Use transaction context for element data operations
         async with element_data_mgr.transaction():
-            # Check if form instance exists, create if it doesn't
-            form_instances = await element_data_mgr.query(
-                "form_instance",
-                where={"_id": data.form_instance_id},
-                limit=1
-            )
-
-            if not form_instances:
-                # Create form instance if it doesn't exist
-                organization_id = None
-                if hasattr(self, 'context') and self.context.organization_id:
-                    organization_id = str(self.context.organization_id)
-                form_instance = element_data_mgr.create(
-                    "form_instance",
-                    _id=data.form_instance_id,
-                    form_id=form._id,
-                    instance_key=f"instance-{str(data.form_instance_id)[:8]}",
-                    instance_name=None,
-                    locked=False,
-                    attrs=data.attrs,
-                    owner_id=self.context.profile_id if hasattr(self, 'context') else None,
-                    organization_id=organization_id,
+            # Verify form instance exists
+            form_instance = await element_data_mgr.fetch('form_instance', data.form_instance_id)
+            if not form_instance:
+                raise NotFoundError(
+                    "F00.206",
+                    f"Form instance not found: {data.form_instance_id}",
+                    None
                 )
-                await element_data_mgr.insert(form_instance)
-                # Refresh to get _etag from database
-                form_instance = await element_data_mgr.fetch('form_instance', data.form_instance_id)
-            else:
-                form_instance = form_instances[0]
 
             # Save each element data
             saved_count = 0
             for element_data in data.elements:
-                element_id = element_data.get("element_id")
+                element_definition_id = element_data.get("element_definition_id")
+                element_group_instance_id = element_data.get("element_group_instance_id")
+                instance_key = element_data.get("instance_key")
                 element_data_dict = element_data.get("data", {})
                 element_attrs = element_data.get("attrs")
 
-                if not element_id:
+                if not element_definition_id or not element_group_instance_id:
                     continue
 
-                # Get element from database
-                element = await self.statemgr.fetch('data_element', element_id)
+                # Get element definition from database
+                element_def = await self.statemgr.fetch('element_definition', element_definition_id)
 
                 # Get element type for validation
-                element_type_record = await self.statemgr.fetch('element_type', element.element_type_id)
+                element_type_record = await self.statemgr.fetch('element_type', element_def.element_type_id)
 
                 # Validate data
                 validated_data = element_data_dict
@@ -781,35 +1111,36 @@ class FormAggregate(Aggregate):
                     # Element type not registered, skip validation
                     pass
 
-                # Check if element data already exists
-                existing_data = await element_data_mgr.query(
-                    "element_data",
+                # Check if element instance already exists
+                existing_instances = await element_data_mgr.query(
+                    "element_instance",
                     where={
-                        "form_instance_id": data.form_instance_id,
-                        "element_id": element_id
+                        "element_group_instance_id": element_group_instance_id,
+                        "element_definition_id": element_definition_id
                     },
                     limit=1
                 )
 
-                if existing_data:
+                if existing_instances:
                     # Update existing
                     await element_data_mgr.update(
-                        existing_data[0],
+                        existing_instances[0],
                         data=validated_data,
                         attrs=element_attrs,
                         **self.audit_updated()
                     )
                 else:
                     # Create new
-                    new_element_data = element_data_mgr.create(
-                        "element_data",
+                    new_element_instance = element_data_mgr.create(
+                        "element_instance",
                         _id=UUID_GENR(),
-                        form_instance_id=data.form_instance_id,
-                        element_id=element_id,
+                        element_group_instance_id=element_group_instance_id,
+                        element_definition_id=element_definition_id,
+                        instance_key=instance_key or f"element-{str(element_definition_id)[:8]}",
                         data=validated_data,
                         attrs=element_attrs,
                     )
-                    await element_data_mgr.insert(new_element_data)
+                    await element_data_mgr.insert(new_element_instance)
 
                 saved_count += 1
 
@@ -820,7 +1151,7 @@ class FormAggregate(Aggregate):
             )
         
         return {
-            "form_id": str(form._id),
+            "form_definition_id": str(form_def._id),
             "form_instance_id": str(data.form_instance_id),
             "elements_saved": saved_count,
             "status": "submitted",

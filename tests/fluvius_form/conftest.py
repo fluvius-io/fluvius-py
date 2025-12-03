@@ -27,7 +27,7 @@ class FluviusAsyncClient(AsyncClient):
 
 @pytest.fixture(scope="function")
 def domain():
-    """Domain fixture - created once per test session"""
+    """Domain fixture - created once per test function"""
     return FormDomain(None)
 
 
@@ -38,13 +38,15 @@ async def setup_db_once():
     This ensures data persists after tests complete for inspection.
     """
     from fluvius.form.element import ElementDataManager
+    from fluvius.form import config
+    
     form_domain = FormDomain(None)
     db = form_domain.statemgr.connector.engine
     
     # Create schemas if they don't exist (don't drop existing data)
     async with db.begin() as conn:
-        await conn.execute(text("CREATE SCHEMA IF NOT EXISTS fluvius_element"))
-        await conn.execute(text("CREATE SCHEMA IF NOT EXISTS fluvius_form"))
+        await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {config.DB_SCHEMA_ELEMENT}"))
+        await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {config.DB_SCHEMA}"))
         await conn.commit()
     
     # Create all tables if they don't exist (checkfirst=True preserves existing data)
@@ -64,4 +66,3 @@ async def setup_db_once():
     # This ensures that when tests run in their event loops, the engine will
     # create fresh connections tied to the correct event loop.
     await db.dispose(close=True)
-

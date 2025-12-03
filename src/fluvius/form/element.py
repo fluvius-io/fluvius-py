@@ -44,7 +44,10 @@ from fluvius.error import BadRequestError
 # Import form schema tables to ensure they're registered in metadata
 # This is necessary for cross-schema foreign key references
 # Even with use_alter=True, SQLAlchemy needs to know about the referenced tables
-from .schema import FormConnector, DataForm, DataElement  # noqa: F401
+from .schema import (
+    FormConnector, FormInstance, ElementInstance, ElementDefinition,
+    ElementGroupInstance, FormDefinition, SectionInstance  # noqa: F401
+)
 
 
 DB_SCHEMA_ELEMENT = config.DB_SCHEMA_ELEMENT
@@ -198,44 +201,8 @@ class ElementDataManager(DataAccessManager):
     __automodel__ = True
 
 
-class ElementBaseSchema(FormConnector.__data_schema_base__, DomainSchema):
-    __abstract__ = True
-
-
-# --- Helper Functions for Foreign Keys ---
-def data_element_fk(constraint_name, **kwargs):
-    """Create a foreign key reference to the data_element table"""
-    # NOTE: For cross-schema foreign keys with separate metadata, we define the column
-    # without a ForeignKey constraint initially. The constraint will be created manually
-    # after both schemas are created (see schema_setup.py)
-    return sa.Column(pg.UUID, nullable=False, **kwargs)
-
-
-def data_form_fk(constraint_name, **kwargs):
-    """Create a foreign key reference to the data_form table"""
-    # NOTE: For cross-schema foreign keys with separate metadata, we define the column
-    # without a ForeignKey constraint initially. The constraint will be created manually
-    # after both schemas are created (see schema_setup.py)
-    return sa.Column(pg.UUID, nullable=False, **kwargs)
-
-
-# --- Models ---
-class FormInstance(ElementBaseSchema):
-    """Instances of forms containing element data"""
-    __tablename__ = "form_instance"
-    __table_args__ = (
-        sa.UniqueConstraint('form_id', 'instance_key', name='uq_form_instance_key'), {
-            'schema': DB_SCHEMA_ELEMENT,
-        }
-    )
-
-    form_id = data_form_fk("form_instance_form_id")
-    instance_key = sa.Column(sa.String, nullable=False)
-    instance_name = sa.Column(sa.String, nullable=True)
-    locked = sa.Column(sa.Boolean, nullable=False, default=False)  # Lock from further editing
-    attrs = sa.Column(FluviusJSONField, nullable=True)  # Instance-level configuration
-    owner_id = sa.Column(pg.UUID, nullable=True)
-    organization_id = sa.Column(sa.String, nullable=True)
+# FormInstance and ElementInstance are now defined in schema.py
+# Import them for use in this module
 
 
 class ElementDataMeta(DataModel):
@@ -266,59 +233,29 @@ class ElementDataMeta(DataModel):
         }
 
 
-class ElementData(ElementBaseSchema):
+class ElementData:
     """
-    Base schema for storing element data.
+    Base class for element data schema registration.
     
-    Element types are created by inheriting this class with a new table name
-    and updated structure. Each subclass must define a Meta class containing
-    element type metadata.
+    This class is used for registering element types via Meta classes.
+    Element data is now stored in ElementInstance (defined in schema.py).
+    
+    Element types are registered by creating subclasses with Meta classes:
     
     Example:
         class TextInputData(DataModel):
             value: str
         
         class TextInputElementData(ElementData):
-            __tablename__ = "text_input_element_data"
-            __table_args__ = (
-                sa.UniqueConstraint('form_instance_id', 'element_id'),
-                {'schema': DB_SCHEMA_ELEMENT}
-            )
-            
             class Meta:
                 type_key = "text-input"
                 type_name = "Text Input"
                 desc = "A text input element"
-                element_schema = TextInputData  # DataModel class for validation
-            
-            # Add custom columns as needed
-            custom_field = sa.Column(sa.String, nullable=True)
+                element_schema = TextInputData
     
-    Note: ElementData is a concrete table (not abstract) because it represents
-    the actual element_data table that stores element data. Subclasses can
-    override __tablename__ to create separate tables if needed.
+    Note: ElementInstance (in schema.py) is used for actual data storage.
+    ElementData is only for registration purposes.
     """
-    __tablename__ = "element_data"
-    __table_args__ = (
-        sa.UniqueConstraint('form_instance_id', 'element_id', name='uq_element_data_instance'),
-        {
-            'schema': DB_SCHEMA_ELEMENT,
-        }
-    )
-
-    form_instance_id = sa.Column(
-        pg.UUID,
-        sa.ForeignKey(
-            f'{DB_SCHEMA_ELEMENT}.form_instance._id',
-            ondelete='CASCADE',
-            onupdate='CASCADE',
-            name='fk_element_data_form_instance'
-        ),
-        nullable=False
-    )
-    element_id = data_element_fk("element_data_element_id")
-    data = sa.Column(FluviusJSONField, nullable=False)  # Validated element data
-    attrs = sa.Column(FluviusJSONField, nullable=True)  # Additional metadata
     
     def __init_subclass__(cls, **kwargs):
         """Convert Meta class to ElementDataMeta instance and register schema"""
