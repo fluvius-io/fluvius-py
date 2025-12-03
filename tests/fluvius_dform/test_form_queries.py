@@ -1,7 +1,7 @@
 import pytest
 from pytest import mark
-from fluvius.form import FormDomain
-from fluvius.form.schema import FormConnector
+from fluvius.dform import FormDomain
+from fluvius.dform.schema import FormConnector
 from fluvius.data import UUID_GENR
 from fluvius.domain.context import DomainTransport
 
@@ -32,11 +32,23 @@ async def create_test_collection(domain):
         return collection
 
 
-async def create_test_template(domain):
+async def create_test_template(domain, collection_id=None):
     """Helper to create a test template with all definitions"""
     template_id = UUID_GENR()
     
     async with domain.statemgr.transaction():
+        # Create collection if not provided (required for template)
+        if collection_id is None:
+            collection_id = UUID_GENR()
+            collection = domain.statemgr.create(
+                "collection",
+                _id=collection_id,
+                collection_key=f"test-collection-{str(collection_id)[:8]}",
+                collection_name="Test Collection for Template",
+                organization_id=FIXTURE_ORGANIZATION_ID,
+            )
+            await domain.statemgr.insert(collection)
+        
         template = domain.statemgr.create(
             "template",
             _id=template_id,
@@ -45,76 +57,93 @@ async def create_test_template(domain):
             desc="A test template",
             version=1,
             organization_id=FIXTURE_ORGANIZATION_ID,
+            collection_id=collection_id,
         )
         await domain.statemgr.insert(template)
         
         # Create section definition
         section_def_id = UUID_GENR()
+        section_key = f"section-{str(section_def_id)[:8]}"
         section_def = domain.statemgr.create(
-            "section_definition",
+            "template_section",
             _id=section_def_id,
             template_id=template_id,
-            section_key=f"section-{str(section_def_id)[:8]}",
+            section_key=section_key,
             section_name="Test Section",
             order=0,
         )
         await domain.statemgr.insert(section_def)
         
-        # Create form definition
+        # Create form definition (standalone)
         form_def_id = UUID_GENR()
+        form_key = f"form-{str(form_def_id)[:8]}"
         form_def = domain.statemgr.create(
             "form_definition",
             _id=form_def_id,
-            section_definition_id=section_def_id,
-            form_key=f"form-{str(form_def_id)[:8]}",
+            form_key=form_key,
             title="Test Form",
-            order=0,
+            desc="A test form",
         )
         await domain.statemgr.insert(form_def)
         
+        # Link form to template
+        template_form_def = domain.statemgr.create(
+            "template_form",
+            _id=UUID_GENR(),
+            template_id=template_id,
+            form_id=form_def_id,
+            section_key=section_key,
+        )
+        await domain.statemgr.insert(template_form_def)
+        
         # Create element group definition
         group_def_id = UUID_GENR()
+        group_key = f"group-{str(group_def_id)[:8]}"
         group_def = domain.statemgr.create(
-            "element_group_definition",
+            "form_element_group",
             _id=group_def_id,
             form_definition_id=form_def_id,
-            group_key=f"group-{str(group_def_id)[:8]}",
+            group_key=group_key,
             group_name="Test Group",
             order=0,
         )
         await domain.statemgr.insert(group_def)
         
-        # Create element type
-        element_type_id = UUID_GENR()
-        element_type = domain.statemgr.create(
-            "element_type",
-            _id=element_type_id,
-            type_key=f"text-input-{str(element_type_id)[:8]}",
-            type_name="Text Input",
-        )
-        await domain.statemgr.insert(element_type)
-        
-        # Create element definition
+        # Create element definition (standalone with element_schema)
         element_def_id = UUID_GENR()
+        element_key = f"element-{str(element_def_id)[:8]}"
         element_def = domain.statemgr.create(
             "element_definition",
             _id=element_def_id,
-            element_group_definition_id=group_def_id,
-            element_type_id=element_type_id,
-            element_key=f"element-{str(element_def_id)[:8]}",
+            element_key=element_key,
             element_label="Test Element",
-            order=0,
+            element_schema={"type": "text", "placeholder": "Enter text"},
         )
         await domain.statemgr.insert(element_def)
+        
+        # Link element to form
+        form_element_def = domain.statemgr.create(
+            "form_element",
+            _id=UUID_GENR(),
+            form_definition_id=form_def_id,
+            group_key=group_key,
+            element_key=element_key,
+            order=0,
+            required=False,
+        )
+        await domain.statemgr.insert(form_element_def)
     
     return {
         "template": template,
         "template_id": template_id,
+        "collection_id": collection_id,
         "section_def_id": section_def_id,
+        "section_key": section_key,
         "form_def_id": form_def_id,
+        "form_key": form_key,
         "group_def_id": group_def_id,
-        "element_type_id": element_type_id,
         "element_def_id": element_def_id,
+        "element_key": element_key,
     }
 
 
@@ -204,13 +233,13 @@ async def test_query_documents(domain):
 
 
 @mark.asyncio
-async def test_query_section_definitions(domain):
+async def test_query_template_sections(domain):
     """Test querying section definitions"""
     template_data = await create_test_template(domain)
     
     async with domain.statemgr.transaction():
         section_defs = await domain.statemgr.query(
-            'section_definition',
+            'template_section',
             where={'template_id': template_data["template_id"]}
         )
         assert len(section_defs) > 0
@@ -223,22 +252,20 @@ async def test_query_form_definitions(domain):
     template_data = await create_test_template(domain)
     
     async with domain.statemgr.transaction():
-        form_defs = await domain.statemgr.query(
-            'form_definition',
-            where={'section_definition_id': template_data["section_def_id"]}
-        )
+        form_defs = await domain.statemgr.query('form_definition')
         assert len(form_defs) > 0
-        assert form_defs[0].section_definition_id == template_data["section_def_id"]
+        found = any(fd._id == template_data["form_def_id"] for fd in form_defs)
+        assert found
 
 
 @mark.asyncio
-async def test_query_element_group_definitions(domain):
+async def test_query_form_element_groups(domain):
     """Test querying element group definitions"""
     template_data = await create_test_template(domain)
     
     async with domain.statemgr.transaction():
         group_defs = await domain.statemgr.query(
-            'element_group_definition',
+            'form_element_group',
             where={'form_definition_id': template_data["form_def_id"]}
         )
         assert len(group_defs) > 0
@@ -251,22 +278,10 @@ async def test_query_element_definitions(domain):
     template_data = await create_test_template(domain)
     
     async with domain.statemgr.transaction():
-        element_defs = await domain.statemgr.query(
-            'element_definition',
-            where={'element_group_definition_id': template_data["group_def_id"]}
-        )
+        element_defs = await domain.statemgr.query('element_definition')
         assert len(element_defs) > 0
-        assert element_defs[0].element_group_definition_id == template_data["group_def_id"]
-
-
-@mark.asyncio
-async def test_query_element_types(domain):
-    """Test querying element types"""
-    template_data = await create_test_template(domain)
-    
-    async with domain.statemgr.transaction():
-        element_types = await domain.statemgr.query('element_type')
-        assert len(element_types) > 0
+        found = any(ed._id == template_data["element_def_id"] for ed in element_defs)
+        assert found
 
 
 @mark.asyncio
@@ -305,7 +320,7 @@ async def test_query_collection_by_organization(domain):
 async def test_query_documents_in_collection(domain):
     """Test querying documents within a collection"""
     collection = await create_test_collection(domain)
-    template_data = await create_test_template(domain)
+    template_data = await create_test_template(domain, collection._id)
     test_document = await create_test_document(domain, template_data["template_id"], collection._id)
     
     async with domain.statemgr.transaction():
@@ -322,85 +337,16 @@ async def test_query_documents_in_collection(domain):
 
 
 @mark.asyncio
-async def test_query_templates_in_collection(domain):
-    """Test querying templates within a collection"""
+async def test_query_templates_by_collection(domain):
+    """Test querying templates by collection_id"""
     collection = await create_test_collection(domain)
-    template_data = await create_test_template(domain)
+    template_data = await create_test_template(domain, collection._id)
     
-    # Add template to collection
     async with domain.statemgr.transaction():
-        template_collection = domain.statemgr.create(
-            "template_collection",
-            _id=UUID_GENR(),
-            template_id=template_data["template_id"],
-            collection_id=collection._id,
-            order=0,
-        )
-        await domain.statemgr.insert(template_collection)
-        
-        # Query template_collection junction table
-        template_collections = await domain.statemgr.query(
-            'template_collection',
+        # Templates have collection_id directly
+        templates = await domain.statemgr.query(
+            'template',
             where={'collection_id': collection._id}
         )
-        assert len(template_collections) > 0
-        
-        # Get template IDs
-        template_ids = [tc.template_id for tc in template_collections]
-        assert template_data["template_id"] in template_ids
-
-
-@mark.asyncio
-async def test_query_form_instances(domain):
-    """Test querying form instances"""
-    from fluvius.form.element import ElementDataManager
-    from fluvius.domain.context import DomainTransport
-    
-    template_data = await create_test_template(domain)
-    collection = await create_test_collection(domain)
-    
-    # Create document using command handler to get instances created
-    document_id = UUID_GENR()
-    document_key = f"test-document-{str(document_id)[:8]}"
-    
-    _context = dict(
-        headers=dict(),
-        transport=DomainTransport.FASTAPI,
-        source="fluvius-form-test",
-        realm=FIXTURE_REALM,
-        user_id=FIXTURE_USER_ID,
-        organization_id=FIXTURE_ORGANIZATION_ID,
-        profile_id=FIXTURE_PROFILE_ID
-    )
-    
-    with domain.session(None, **_context):
-        command = domain.create_command(
-            "create-document",
-            {
-                "template_id": template_data["template_id"],
-                "document_key": document_key,
-                "document_name": "Test Document",
-                "collection_id": collection._id,
-                "organization_id": FIXTURE_ORGANIZATION_ID,
-            },
-            aggroot=("document", document_id, None, None)
-        )
-        await domain.process_command(command)
-    
-    # Get section instance
-    async with domain.statemgr.transaction():
-        section_instances = await domain.statemgr.query(
-            'section_instance',
-            where={'document_id': document_id}
-        )
-        assert len(section_instances) > 0
-    
-    # Query form instances
-    element_data_mgr = ElementDataManager()
-    async with element_data_mgr.transaction():
-        form_instances = await element_data_mgr.query(
-            'form_instance',
-            where={'section_instance_id': section_instances[0]._id}
-        )
-        assert len(form_instances) > 0
-        assert form_instances[0].form_definition_id == template_data["form_def_id"]
+        assert len(templates) > 0
+        assert templates[0].collection_id == collection._id

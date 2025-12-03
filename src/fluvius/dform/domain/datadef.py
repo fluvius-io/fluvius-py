@@ -35,7 +35,7 @@ class RemoveTemplateData(DataModel):
 
 
 # Section Definition Commands
-class CreateSectionDefinitionData(DataModel):
+class CreateTemplateSectionData(DataModel):
     """Data for creating a section definition within a template"""
     section_key: str
     section_name: str
@@ -43,14 +43,14 @@ class CreateSectionDefinitionData(DataModel):
     order: Optional[int] = None
 
 
-class UpdateSectionDefinitionData(DataModel):
+class UpdateTemplateSectionData(DataModel):
     """Data for updating section definition properties"""
     section_name: Optional[str] = None
     desc: Optional[str] = None
     order: Optional[int] = None
 
 
-class RemoveSectionDefinitionData(DataModel):
+class RemoveTemplateSectionData(DataModel):
     """Data for removing a section definition"""
     pass  # Identifier is in aggroot
 
@@ -77,7 +77,7 @@ class RemoveFormDefinitionData(DataModel):
 
 
 # Element Group Definition Commands
-class CreateElementGroupDefinitionData(DataModel):
+class CreateFormElementGroupData(DataModel):
     """Data for creating an element group definition within a form definition"""
     group_key: str
     group_name: Optional[str] = None
@@ -85,14 +85,14 @@ class CreateElementGroupDefinitionData(DataModel):
     order: Optional[int] = None
 
 
-class UpdateElementGroupDefinitionData(DataModel):
+class UpdateFormElementGroupData(DataModel):
     """Data for updating element group definition properties"""
     group_name: Optional[str] = None
     desc: Optional[str] = None
     order: Optional[int] = None
 
 
-class RemoveElementGroupDefinitionData(DataModel):
+class RemoveFormElementGroupData(DataModel):
     """Data for removing an element group definition"""
     pass  # Identifier is in aggroot
 
@@ -213,7 +213,7 @@ class AddDocumentToCollectionData(DataModel):
 # Section Instance Commands
 class CreateSectionInstanceData(DataModel):
     """Data for creating a section instance from a section definition"""
-    section_definition_id: UUID_TYPE
+    template_section_id: UUID_TYPE
     instance_key: str
     instance_name: Optional[str] = None
     order: Optional[int] = None
@@ -252,7 +252,7 @@ class RemoveFormInstanceData(DataModel):
 # Element Group Instance Commands
 class CreateElementGroupInstanceData(DataModel):
     """Data for creating an element group instance from an element group definition"""
-    element_group_definition_id: UUID_TYPE
+    form_element_group_id: UUID_TYPE
     instance_key: str
     instance_name: Optional[str] = None
     order: Optional[int] = None
@@ -273,20 +273,20 @@ class RemoveElementGroupInstanceData(DataModel):
 class PopulateElementData(DataModel):
     """Data for populating an element instance with prior data"""
     element_definition_id: UUID_TYPE
-    element_group_instance_id: Optional[UUID_TYPE] = None  # If provided, populate from specific element group instance
+    element_group_id: Optional[UUID_TYPE] = None  # If provided, populate from specific element group instance
 
 
 class PopulateFormData(DataModel):
     """Data for populating a form instance with prior data"""
     form_definition_id: UUID_TYPE
-    form_instance_id: Optional[UUID_TYPE] = None  # If provided, populate from specific form instance
+    form_id: Optional[UUID_TYPE] = None  # If provided, populate from specific form instance
     element_definition_ids: Optional[List[UUID_TYPE]] = None  # If provided, only populate these element definitions
 
 
 class SaveElementData(DataModel):
     """Data for saving element instance data"""
     element_definition_id: UUID_TYPE
-    element_group_instance_id: UUID_TYPE
+    element_group_id: UUID_TYPE
     instance_key: str
     data: Dict[str, Any]
     attrs: Optional[Dict[str, Any]] = None
@@ -295,15 +295,15 @@ class SaveElementData(DataModel):
 class SaveFormData(DataModel):
     """Data for saving form instance data (multiple elements)"""
     form_definition_id: UUID_TYPE
-    form_instance_id: UUID_TYPE
-    elements: List[Dict[str, Any]]  # List of {element_definition_id, element_group_instance_id, instance_key, data, attrs}
+    form_id: UUID_TYPE
+    elements: List[Dict[str, Any]]  # List of {element_definition_id, element_group_id, instance_key, data, attrs}
     attrs: Optional[Dict[str, Any]] = None
 
 
 class SubmitFormData(DataModel):
     """Data for submitting form instance (saves and locks from further editing)"""
     form_definition_id: UUID_TYPE
-    form_instance_id: UUID_TYPE
-    elements: List[Dict[str, Any]]  # List of {element_definition_id, element_group_instance_id, instance_key, data, attrs}
+    form_id: UUID_TYPE
+    elements: List[Dict[str, Any]]  # List of {element_definition_id, element_group_id, instance_key, data, attrs}
     attrs: Optional[Dict[str, Any]] = None
 

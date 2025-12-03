@@ -6,8 +6,8 @@ from pytest import mark
 from fluvius_test import form_app
 from httpx import AsyncClient
 from fluvius.data.serializer import FluviusJSONEncoder
-from fluvius.form import FormDomain
-from fluvius.form.schema import FormConnector
+from fluvius.dform import FormDomain
+from fluvius.dform.schema import FormConnector
 from sqlalchemy import text
 
 
@@ -35,31 +35,35 @@ def domain():
 async def setup_db_once():
     """
     Setup database schema once at the start of the test session.
-    This ensures data persists after tests complete for inspection.
+    Drop and recreate schemas/tables to ensure schema changes are applied.
     """
-    from fluvius.form.element import ElementDataManager
-    from fluvius.form import config
+    from fluvius.dform.element import ElementDataManager
+    from fluvius.dform import config
     
     form_domain = FormDomain(None)
     db = form_domain.statemgr.connector.engine
     
-    # Create schemas if they don't exist (don't drop existing data)
+    # Drop and recreate schemas to ensure a clean state (use CASCADE to handle FK constraints)
     async with db.begin() as conn:
-        await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {config.DB_SCHEMA_ELEMENT}"))
-        await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {config.DB_SCHEMA}"))
+        # Drop schemas with CASCADE to remove all dependent objects
+        await conn.execute(text(f"DROP SCHEMA IF EXISTS {config.DEFINITION_DB_SCHEMA} CASCADE"))
+        await conn.execute(text(f"DROP SCHEMA IF EXISTS {config.DFORM_DATA_DB_SCHEMA} CASCADE"))
+        # Recreate schemas
+        await conn.execute(text(f"CREATE SCHEMA {config.DEFINITION_DB_SCHEMA}"))
+        await conn.execute(text(f"CREATE SCHEMA {config.DFORM_DATA_DB_SCHEMA}"))
         await conn.commit()
     
-    # Create all tables if they don't exist (checkfirst=True preserves existing data)
+    # Create all form tables
     async with db.begin() as conn:
-        def create_all_tables(sync_conn):
-            FormConnector.pgmetadata().create_all(sync_conn, checkfirst=True)
-        await conn.run_sync(create_all_tables)
+        def create_tables(sync_conn):
+            FormConnector.pgmetadata().create_all(sync_conn)
+        await conn.run_sync(create_tables)
     
-    # Also ensure element schema tables are created
+    # Create element schema tables
     async with db.begin() as conn:
         element_mgr = ElementDataManager()
         def create_element_tables(sync_conn):
-            element_mgr.connector.pgmetadata().create_all(sync_conn, checkfirst=True)
+            element_mgr.connector.pgmetadata().create_all(sync_conn)
         await conn.run_sync(create_element_tables)
     
     # Dispose the engine to close all connections created in this event loop.

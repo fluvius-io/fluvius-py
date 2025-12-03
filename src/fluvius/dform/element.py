@@ -46,12 +46,12 @@ from fluvius.error import BadRequestError
 # Even with use_alter=True, SQLAlchemy needs to know about the referenced tables
 from .schema import (
     FormConnector, FormInstance, ElementInstance, ElementDefinition,
-    ElementGroupInstance, FormDefinition, SectionInstance  # noqa: F401
+    ElementGroupInstance, FormDefinition, DocumentSection  # noqa: F401
 )
 
 
-DB_SCHEMA_ELEMENT = config.DB_SCHEMA_ELEMENT
-DB_SCHEMA_FORM = config.DB_SCHEMA
+DFORM_DATA_DB_SCHEMA = config.DFORM_DATA_DB_SCHEMA
+DEFINITION_DB_SCHEMA = config.DEFINITION_DB_SCHEMA
 DB_DSN = config.DB_DSN
 
 
