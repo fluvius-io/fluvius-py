@@ -16,9 +16,11 @@ class UserResponse(UserDomain.Response):
 
 
 class UserMessage(UserDomain.Message):
-    pass
+    async def _dispatch(dispatcher, bundle):
+        logger.warning(f'Dispatching message [route 1]: {dispatcher} => {bundle}')
 
 
 @MessageDispatcher.register(UserMessage)
 async def dispatch_user_message(dispatcher, bundle):
-    logger.warning(f'Dispatching message: {dispatcher} => {bundle}')
+    logger.warning(f'Dispatching message [route 2]: {dispatcher} => {bundle}')
+

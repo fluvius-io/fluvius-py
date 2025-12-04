@@ -262,8 +262,7 @@ class DomainEntityRegistry(object):
             domain_cls._register_entity(cls, key, DomainEntityType.MESSAGE)
 
             for name, msg_dispatch in _locate_handler(cls, MESSAGE_DISPATCHER_FUNC):
-                wrapper = domain_cls.message_dispatcher(cls)
-                setattr(cls, MESSAGE_DISPATCHER_FUNC, wrapper(msg_dispatch))
+                domain_cls.message_dispatcher(cls)(msg_dispatch)
 
             DEBUG and logger.info("[REGISTERED MESSAGE] %s/%d [%s]", domain_cls.__namespace__, DomainEntityType.MESSAGE, key)
             return cls
@@ -379,7 +378,11 @@ class DomainEntityRegistry(object):
             for msg_cls in msg_classes:
                 msg_key = getattr(msg_cls, DOMAIN_ENTITY_KEY)
                 dispatcher = _normalize_message_dispatcher(msg_cls, func)
-                cls._msg_dispatchers += ((_priority, msg_key, dispatcher), )
+                if cls.__dispatcher__ is None:
+                    logger.warning(f'No message dispatcher setup for domain [{cls}]. Ignore handler for {msg_key}')
+                    continue
+
+                cls.__dispatcher__.register(msg_cls)(func)
 
             def _error(*args, **kwargs):
                 raise RuntimeError('Domain Message Dispatchers are not meant to call directly.')
