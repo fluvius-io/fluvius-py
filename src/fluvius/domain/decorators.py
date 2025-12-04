@@ -76,7 +76,7 @@ def _assert_domain_message(*msg_class):
         if not issubclass(msg_cls, cm.Message):
             raise DomainEntityError(
                 "D00.303",
-                f"Handled event must be subclass of [fluvius.domain.MessageRecord] [{msg_cls}]"
+                f"Handled event must be subclass of [fluvius.domain.MessageBundle] [{msg_cls}]"
             )
 
 

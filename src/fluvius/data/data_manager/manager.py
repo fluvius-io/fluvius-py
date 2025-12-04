@@ -99,32 +99,35 @@ class DataAccessManagerBase(object):
 
         cls.__connector__ = select_value(connector, cls.__connector__)
         cls.__automodel__ = select_value(automodel, cls.__automodel__, default=True)
+        cls.setup_model()
 
     def __init__(self, app=None, **config):
         self._app = app
         self._transaction = None
         self._proxy = ReadonlyDataManagerProxy(self)
         self._connector = self.setup_connector(config)
-        self.setup_model()
 
-    def setup_model(self):
-        if not self.__automodel__:
+    @classmethod
+    def setup_model(cls):
+        if not cls.__automodel__:
             return
 
-        for model_name, data_schema in self.connector.__data_schema_registry__.items():
-            model = self.generate_model(data_schema)
+        for model_name, data_schema in cls.__connector__.__data_schema_registry__.items():
+            model = cls.generate_model(data_schema)
 
             try:
-                self.register_model(model_name)(model, is_generated=True)
+                cls.register_model(model_name)(model, is_generated=True)
             except ResourceAlreadyRegistered:
-                logger.warning(f'Model already registered: {model_name}')
+                logger.warning(f'[W12.931] Model already registered: {model_name}')
 
 
-    def generate_model(self, data_schema):
-        if not isinstance(self.__automodel__, bool):
-            raise BadRequestError('E00.201', f'__automodel__ only accept True / False: {self.__automodel__}')
+    @classmethod
+    def generate_model(cls, data_schema):
+        if not isinstance(cls.__automodel__, bool):
+            raise InternalServerError('E00.201', f'__automodel__ only accept True / False: {cls.__automodel__}')
 
-        return type(f"{data_schema.__name__}AccessModel", (BlankModel, ), {})
+        return data_schema
+        # return type(f"{data_schema.__name__}DAModel", (BlankModel, ), {})
 
     @classmethod
     def register_model(cls, model_name: str):
@@ -198,7 +201,7 @@ class DataAccessManagerBase(object):
     def setup_connector(self, config):
         con_cls = self.__connector__
         if not con_cls or not issubclass(con_cls, DataDriver):
-            raise BadRequestError('E00.204', f'Invalid data driver/connector: {con_cls}')
+            raise InternalServerError('E00.204', f'Invalid data driver/connector: {con_cls}')
 
         return con_cls(**config)
 
@@ -213,7 +216,8 @@ class DataAccessManagerBase(object):
     @classmethod
     def defaults(cls, model_name: str, data=None) -> dict:
         defvals = data or {}
-        defvals.update(_created=timestamp(), _updated=timestamp())
+        ts = timestamp()
+        defvals.update(_created=ts, _updated=ts)
         return defvals
 
     @classmethod

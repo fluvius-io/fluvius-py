@@ -19,6 +19,7 @@ class CreateUserCmd(Command):
 
 	async def _process(self, aggregate, statemgr, payload):
 		user = await aggregate.create_user(payload)
+		yield aggregate.create_message('user-message', test_message='sample-message-value')
 		yield aggregate.create_response(serialize_mapping(user), _type="user-response")
 
 

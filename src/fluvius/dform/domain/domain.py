@@ -23,3 +23,6 @@ class FormDomain(Domain):
 class FormResponse(FormDomain.Response):
     pass
 
+
+class DocumentResponse(FormDomain.Response):
+    Data = FormDataManager.lookup_model('document')

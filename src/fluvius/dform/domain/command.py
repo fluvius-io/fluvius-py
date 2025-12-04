@@ -82,7 +82,7 @@ class CreateDocument(Command):
 
     async def _process(self, agg, stm, payload):
         document = await agg.create_document(payload)
-        yield agg.create_response(serialize_mapping(document), _type="form-response")
+        yield agg.create_response(document, _type="document-response")
 
 
 class UpdateDocument(Command):
@@ -100,7 +100,7 @@ class UpdateDocument(Command):
 
     async def _process(self, agg, stm, payload):
         document = await agg.update_document(payload)
-        yield agg.create_response(serialize_mapping(document), _type="form-response")
+        yield agg.create_response(document, _type="document-response")
 
 
 class RemoveDocument(Command):

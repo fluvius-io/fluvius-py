@@ -2,7 +2,7 @@ import pytest
 from pytest import mark
 from sqlalchemy import text
 from uuid import UUID
-from fluvius.dform import FormDomain
+from fluvius.dform import FormDomain, logger
 from fluvius.dform.schema import FormConnector
 from fluvius.data import UUID_GENR
 from fluvius.domain.context import DomainTransport
@@ -288,7 +288,8 @@ async def test_create_document(domain):
     result = await command_handler(
         domain, "create-document", payload, "document", document_id
     )
-    
+
+
     async with domain.statemgr.transaction():
         document = await domain.statemgr.fetch('document', document_id)
         assert document.document_key == document_key
@@ -350,6 +351,8 @@ async def test_update_document(domain):
     result = await command_handler(
         domain, "update-document", update_payload, "document", document_id
     )
+
+    logger.warning('update: %s', result)
     
     async with domain.statemgr.transaction():
         document = await domain.statemgr.fetch('document', document_id)

@@ -10,7 +10,7 @@ from . import config, logger
 
 from .activity import ActivityType, ActivityLog
 from .event import Event, EventRecord
-from .message import MessageRecord
+from .message import MessageBundle
 from .response import DomainResponse, ResponseRecord
 from .helper import consume_queue
 
@@ -192,12 +192,19 @@ class Aggregate(object):
     def create_message(self, msg_key, data=None, **kwargs):
         msg_cls = self.lookup_message(msg_key)
 
-        return MessageRecord(
-            message=msg_key,
+        if data is None:
+            data = {}
+
+        if not isinstance(data, dict):
+            raise InternalServerError('D00.197', f"Invalid message data: {data}")
+
+        data = data | kwargs
+
+        return MessageBundle(
+            msg_key=msg_key,
             aggroot=self.aggroot,
             domain=self.domain_name,
-            data=msg_cls.Data.create(**data),
-            **kwargs
+            data=msg_cls.Data.create(**data)
         )
 
     def init_resource(self, resource, data=None, **kwargs):

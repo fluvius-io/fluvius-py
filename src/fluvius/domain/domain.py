@@ -26,7 +26,8 @@ from . import response as cres
 from .aggregate import Aggregate, RestrictedAggregateProxy, AggregateRoot
 from .context import DomainContext as DomainContextData
 from .decorators import DomainEntityRegistry
-from .exceptions import CommandProcessingError
+from .message import MessageDispatcher
+from .exceptions import CommandProcessingError, DomainEntityError
 from .helper import consume_queue
 from .logstore import DomainLogStore
 from .signal import DomainSignal as sig, DomainSignalManager
@@ -59,24 +60,6 @@ def _setup_command_processor_selector(handler_list):
 
     return _select
 
-def _setup_message_dispatcher_selector(handler_list):
-    ''' @TODO:
-        1) Collect handler list from all bases classes rather than just the active class,
-        since the handler list of the parent class may changed after the subclass is initialized.
-
-        2) DONE: Switch handler selector to use a dictionary mapping. If there are alot of registered
-        items, a dictionary lookup could be faster
-    '''
-    _hmap = _build_handler_map(handler_list)
-
-    def _select(bundle):
-        try:
-            return _hmap[bundle.message]
-        except KeyError:
-            raise InternalServerError('D00.105', f'No message dispatcher provided for [{bundle.message}]')
-
-    return _select
-
 
 class DomainMeta(DataModel):
     name: str = None
@@ -90,6 +73,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
     __namespace__   = None
     __aggregate__   = None
     __statemgr__    = StateManager
+    __dispatcher__  = None
     __logstore__    = DomainLogStore
     __revision__    = 0       # API compatibility revision number
     __config__      = SimpleNamespace
@@ -97,7 +81,6 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
     __policymgr__   = None
 
     _cmd_processors = tuple()
-    _msg_dispatchers = tuple()
     _entity_registry = dict()
 
     _REGISTRY = {}
@@ -191,16 +174,29 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             return self._data.realm
 
     def __init_subclass__(cls):
-        if not hasattr(cls, '__namespace__'):
-            setattr(cls, '__namespace__', camel_to_lower(cls.__name__))
+        if not issubclass(cls.__aggregate__, Aggregate):
+            raise DomainEntityError('D00.202', f'Invalid domain aggregate: {cls.__aggregate__}')
+
+        if not cls.__namespace__:
+            raise DomainEntityError('D00.207', 'Domain does not have a namespace (__namespace__ = ...)')
 
         if cls.__namespace__ in Domain._REGISTRY:
-            from fluvius.domain.exceptions import DomainEntityError
             raise DomainEntityError('D00.203', f'Domain already registered: {cls.__namespace__}')
 
-        if not issubclass(cls.__aggregate__, Aggregate):
-            from fluvius.domain.exceptions import DomainEntityError
-            raise DomainEntityError('D00.202', f'Invalid domain aggregate: {cls.__aggregate__}')
+        if cls.__dispatcher__ and not issubclass(cls.__dispatcher__, MessageDispatcher):
+            raise DomainEntityError('D00.204', f'Invalid message dispatcher: {cls.__dispatcher__}')
+
+        if not issubclass(cls.__context__, DomainContextData):
+            raise DomainEntityError('D00.204', f'Domain has invalid context [{cls.__context__}]')
+
+        if not issubclass(cls.__statemgr__, StateManager):
+            raise DomainEntityError('D00.205', f'Domain has invalid state manager [{cls.__statemgr__}]')
+
+        if not issubclass(cls.__logstore__, DomainLogStore):
+            raise DomainEntityError('D00.206', f'Domain has invalid log store [{cls.__logstore__}]')
+
+        if cls.__policymgr__ and not issubclass(cls.__policymgr__, PolicyManager):
+            raise DomainEntityError('D00.208', f'Domain has invalid policy manager [{cls.__policymgr__}]')
 
         Domain._REGISTRY[cls.__namespace__] = cls
 
@@ -247,32 +243,13 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         self._statemgr = self.__statemgr__(app, **config)
         self._policymgr = self.__policymgr__ and self.__policymgr__(self._statemgr)
         self._active_context = contextvars.ContextVar('domain_context', default=None)
+        self._dispatcher = self.__dispatcher__(self, **config) if self.__dispatcher__ else None
+
         self.cmd_processors = _setup_command_processor_selector(self._cmd_processors)
-        self.msg_dispatchers = _setup_message_dispatcher_selector(self._msg_dispatchers)
         self.register_signals()
 
 
     def validate_domain_config(self, config):
-        from fluvius.domain.exceptions import DomainEntityError
-        if not issubclass(self.__aggregate__, Aggregate):
-            raise DomainEntityError('D00.202', f'Domain has invalid aggregate [{self.__aggregate__}]')
-
-        if not issubclass(self.__context__, DomainContextData):
-            raise DomainEntityError('D00.204', f'Domain has invalid context [{self.__context__}]')
-
-        if not issubclass(self.__statemgr__, StateManager):
-            raise DomainEntityError('D00.205', f'Domain has invalid state manager [{self.__statemgr__}]')
-
-        if not issubclass(self.__logstore__, DomainLogStore):
-            raise DomainEntityError('D00.206', f'Domain has invalid log store [{self.__logstore__}]')
-
-        if not self.__namespace__:
-            raise DomainEntityError('D00.207', 'Domain does not have a name [__namespace__]')
-
-        if self.__policymgr__ and not issubclass(self.__policymgr__, PolicyManager):
-            raise DomainEntityError('D00.208', f'Domain has invalid policy manager [{self.__policymgr__}]')
-
-
         return self.__config__(**config)
 
     def validate_application(self, app):
@@ -317,8 +294,11 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
     async def dispatch_messages(self, msg_queue):
         for msg_record in consume_queue(msg_queue):
-            for dispatcher in self.msg_dispatchers(msg_record):
-                await dispatcher(msg_record)
+            if self._dispatcher is None:
+                logger.warning(f'No message dispatcher setup for domain [{self.__class__}]. Message [{msg_record}] ignored.')
+                continue
+
+            await self._dispatcher.dispatch(msg_record)
 
     def create_command(self, cmd_key, cmd_data, aggroot):
         aggroot = AggregateRoot(*aggroot) if not isinstance(aggroot, AggregateRoot) else aggroot
@@ -395,7 +375,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         await self.publish(sig.COMMAND_READY, cmd)
         meta = self.lookup_command(cmd.command)
         async for particle in self.invoke_processors(ctx, stm, cmd, meta):
-            if not isinstance(particle, (ce.EventRecord, cm.MessageRecord, cres.ResponseRecord, act.ActivityLog)):
+            if not isinstance(particle, (ce.EventRecord, cm.MessageBundle, cres.ResponseRecord, act.ActivityLog)):
                 msg = ('Items returned from command processor must be a domain entity (event, messages, etc.). ' +
                        'Got: [%s] while processing command: %s' % (particle, cmd))
                 raise InternalServerError('D00.107', msg)
@@ -408,7 +388,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
                 # and the mutations are generated.
                 await self.publish(sig.EVENT_COMMITED, cmd, event=particle)
                 yield particle
-            elif isinstance(particle, cm.MessageRecord):
+            elif isinstance(particle, cm.MessageBundle):
                 ctx.msg_queue.put(particle)
                 await self.publish(sig.MESSAGE_RECEIVED, cmd, message=particle)
             elif isinstance(particle, cres.ResponseRecord):
@@ -480,7 +460,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
         for resp in consume_queue(ctx.rsp_queue):
             if resp.response in responses:
-                raise InternalServerError('D00.109', f'Duplicated response: [{resp.response}].')
+                raise InternalServerError('D00.109', f'Duplicated responses: [{resp.response}].')
 
             responses[resp.response] = resp.data
         return responses

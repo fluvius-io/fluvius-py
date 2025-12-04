@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 from typing import Any
 from pydantic import BaseModel, Field, PrivateAttr, ConfigDict
+from sqlalchemy.orm import DeclarativeBase
 
 
 def _create(cls, data=None, defaults=None, **kwargs):
@@ -18,6 +19,9 @@ def _create(cls, data=None, defaults=None, **kwargs):
         base.update(data.__dict__)
     elif isinstance(data, BaseModel):
         base.update(data.model_dump())
+    elif hasattr(data, '__table__'):
+        # raise Exception(str(dir(data)))
+        base.update(data.serialize())
     elif data is not None:
         raise ValueError(f'Unable to extract data from object: {data}')
 

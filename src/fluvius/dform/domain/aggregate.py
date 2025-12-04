@@ -579,12 +579,7 @@ class FormAggregate(Aggregate):
                 await self.statemgr.insert(doc_collection)
                 added_collection_ids.append(collection_id)
         
-        return {
-            "document_id": str(self.aggroot.identifier),
-            "document_key": document.document_key,
-            "document_name": document.document_name,
-            "collection_ids": [str(cid) for cid in added_collection_ids],
-        }
+        return document
 
     @action("document-updated", resources="document")
     async def update_document(self, data):
