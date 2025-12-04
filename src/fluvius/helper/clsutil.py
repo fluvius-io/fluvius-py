@@ -8,3 +8,6 @@ class ImmutableNamespace(SimpleNamespace):
 
     def __delattr__(self, name):
         raise AttributeError(f"Cannot delete attribute '{name}'")
+
+
+

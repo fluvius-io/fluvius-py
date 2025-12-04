@@ -226,7 +226,7 @@ class WorkflowManager(object):
         values = wf_mut.mutation.model_dump(exclude_none=True)
         values['_id'] = wf_mut.workflow_id
         values['workflow_id'] = wf_mut.workflow_id
-        await tx.upsert_many('workflow_memory', values)
+        await tx.upsert_data('workflow_memory', values)
 
     async def _persist_add_participant(self, tx, wf_mut: MutationEnvelop):
         """Add a participant record."""

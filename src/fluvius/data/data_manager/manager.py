@@ -10,7 +10,7 @@ from functools import wraps, partial
 from types import SimpleNamespace
 from typing import List, Optional, Type, Union
 
-from fluvius.helper import select_value
+from fluvius.helper import select_value, ImmutableNamespace
 from fluvius.data import UUID_TYPE, UUID_GENR, logger, timestamp, config
 from fluvius.data.helper import serialize_mapping, generate_etag
 from fluvius.data.data_driver import DataDriver
@@ -81,6 +81,7 @@ class DataAccessManagerBase(object):
     # Instance of database driver that provides data to the manager
     __connector__ = None
     __automodel__ = None
+    __config__    = ImmutableNamespace
 
     """ Domain data access manager """
     def __init_subclass__(cls, connector=None, automodel=None):
@@ -101,11 +102,29 @@ class DataAccessManagerBase(object):
         cls.__automodel__ = select_value(automodel, cls.__automodel__, default=True)
         cls.setup_model()
 
-    def __init__(self, app=None, **config):
-        self._app = app
+    def __init__(self, domain=None, app=None, **config):
         self._transaction = None
         self._proxy = ReadonlyDataManagerProxy(self)
         self._connector = self.setup_connector(config)
+        self._app = app
+        self._domain = domain
+        self._config = self.validate_config(config)
+
+    def validate_config(self, config, **defaults):
+        config = defaults | config
+        return self.__config__(**{k.upper(): v for k, v in config.items()})
+
+    @property
+    def app(self):
+        return self._app
+
+    @property
+    def config(self):
+        return self._config
+
+    @property
+    def domain(self):
+        return self._domain
 
     @classmethod
     def setup_model(cls):
@@ -381,7 +400,7 @@ class DataAccessManager(DataAccessManagerBase):
             data['_etag'] = generate_etag(data)
             await self.connector.insert(model_name, data)
 
-    async def upsert_many(self, model_name: str, *records: list[dict]):
+    async def upsert_data(self, model_name: str, *records: list[dict]):
         updt = timestamp()
         for data in records:
             data['_updated'] = updt

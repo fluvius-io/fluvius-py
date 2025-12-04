@@ -62,7 +62,7 @@ async def test_manager():
     # =============== Test Upsert ==================
     async with manager.transaction():
         record = item
-        await manager.upsert('user', dict(_id=record._id, name="user-upsert"))
+        await manager.upsert_data('user', dict(_id=record._id, name="user-upsert"))
         item = await manager.fetch('user', user_id1)
     assert item.name == "user-upsert"
 
@@ -72,7 +72,7 @@ async def test_manager():
             dict(_id="3", name="user3-upsert"),
             dict(_id="2", name="user2-upsert"),
         ]
-        await manager.upsert_many('user', *values)
+        await manager.upsert_data('user', *values)
         item = await manager.fetch('user', "2")
     assert item.name == "user2-upsert"
 

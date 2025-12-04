@@ -30,14 +30,24 @@ class Message(DomainEntity):
 
 
 class MessageDispatcher(object):
-    _dispatch_map = {}
+    __dispatch_map__ = {}
+    __config__ = ImmutableNamespace
 
-    def __init__(self, domain, **config):
+    def __init__(self, domain, app=None, **config):
+        self._app = app
         self._domain = domain
-        self._config = ImmutableNamespace(**{k.upper(): v for k, v in config.items()})
+        self._config = self.validate_config(config)
+
+    def validate_config(self, config):
+        config = dict(SHOW_LOG=True) | config
+        return self.__config__(**{k.upper(): v for k, v in config.items()})
 
     def __init_subclass__(cls):
-        cls._dispatch_map = {}
+        cls.__dispatch_map__ = {}
+
+    @property
+    def app(self):
+        return self._app
 
     @property
     def config(self):
@@ -52,10 +62,10 @@ class MessageDispatcher(object):
         if not issubclass(msg_cls, Message):
             raise InternalServerError('D00.801', f'Invalid message class: {msg_cls}')
 
-        cls._dispatch_map.setdefault(msg_cls.Meta.key, tuple())
+        cls.__dispatch_map__.setdefault(msg_cls.Meta.key, tuple())
 
         def _decorator(func):
-            cls._dispatch_map[msg_cls.Meta.key] += (func,)
+            cls.__dispatch_map__[msg_cls.Meta.key] += (func,)
             return func
 
         return _decorator
@@ -66,7 +76,7 @@ class MessageDispatcher(object):
             raise InternalServerError('D00.803', f'Invalid message bundle: {msg_bundle}')
 
         try:
-            dispatchers = self._dispatch_map[msg_bundle.msg_key]
+            dispatchers = self.__dispatch_map__[msg_bundle.msg_key]
         except KeyError:
             raise InternalServerError('D00.802', f'There is no message dispatcher for message of type: [{msg_bundle.msg_key}]')
 

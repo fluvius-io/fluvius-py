@@ -10,7 +10,7 @@ from typing import Iterator, Optional, List, Type
 
 from fluvius.auth import AuthorizationContext
 from fluvius.data import UUID_GENR, DataModel
-from fluvius.helper import camel_to_lower, select_value, camel_to_title
+from fluvius.helper import camel_to_lower, select_value, camel_to_title, ImmutableNamespace
 from fluvius.helper.timeutil import timestamp
 from fluvius.helper.registry import ClassRegistry
 from fluvius.error import ForbiddenError, InternalServerError
@@ -76,7 +76,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
     __dispatcher__  = None
     __logstore__    = DomainLogStore
     __revision__    = 0       # API compatibility revision number
-    __config__      = SimpleNamespace
+    __config__      = ImmutableNamespace
     __context__     = DomainContextData
     __policymgr__   = None
 
@@ -238,19 +238,19 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
     def __init__(self, app=None, **config):
         self._app = self.validate_application(app)
-        self._config = self.validate_domain_config(config)
-        self._logstore = self.__logstore__(app, **config)
-        self._statemgr = self.__statemgr__(app, **config)
+        self._config = self.validate_config(config)
+        self._logstore = self.__logstore__(self, app, **config)
+        self._statemgr = self.__statemgr__(self, app, **config)
         self._policymgr = self.__policymgr__ and self.__policymgr__(self._statemgr)
         self._active_context = contextvars.ContextVar('domain_context', default=None)
-        self._dispatcher = self.__dispatcher__(self, **config) if self.__dispatcher__ else None
+        self._dispatcher = self.__dispatcher__(self, app, **config) if self.__dispatcher__ else None
 
         self.cmd_processors = _setup_command_processor_selector(self._cmd_processors)
         self.register_signals()
 
-
-    def validate_domain_config(self, config):
-        return self.__config__(**config)
+    def validate_config(self, config, **defaults):
+        config = defaults | config
+        return self.__config__(**{k.upper(): v for k, v in config.items()})
 
     def validate_application(self, app):
         return app
