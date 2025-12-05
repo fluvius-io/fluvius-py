@@ -39,7 +39,7 @@ def auth_required(inject_ctx=False, **auth_kwargs):
         @wraps(endpoint)
         async def wrapper(request: Request, *args, **kwargs):
             try:
-                auth_context = await request.app.state.get_auth_context(request, auth_kwargs)
+                auth_context = await request.app.state.get_auth_context(request, **auth_kwargs)
             except FluviusException as e:
                 # Handle FluviusException directly in middleware to ensure proper status codes
                 # Exceptions raised in middleware may not always be caught by FastAPI's exception handlers
@@ -126,7 +126,7 @@ class FluviusAuthProfileProvider(object):
 
         return request.session.get("user")
 
-    async def get_auth_context(self, request: Request) -> Optional[AuthorizationContext]:
+    async def get_auth_context(self, request: Request, **kwargs) -> Optional[AuthorizationContext]:
         try:
             auth_token = self.get_auth_token(request)
             if not auth_token:
@@ -139,7 +139,6 @@ class FluviusAuthProfileProvider(object):
         auth_context.session_id = auth_token.get('session_id')
         auth_context.client_token = auth_token.get('client_token')
         return auth_context
-
 
     async def setup_context(self, auth_user: KeycloakTokenPayload) -> AuthorizationContext:
         profile = SessionProfile(
