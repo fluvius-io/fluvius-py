@@ -169,18 +169,6 @@ class FluviusAuthProfileProvider(object):
             iamroles = iamroles
         )
 
-def setup_profile_provider(app, profile_provider):
-    if isinstance(profile_provider, str):
-        provider_cls = FluviusAuthProfileProvider.get(profile_provider)
-    elif issubclass(profile_provider, FluviusAuthProfileProvider):
-        provider_cls = profile_provider
-    else:
-        raise BadRequestError('S00.001', f'Invalid Auth Profile Provider: {profile_provider}')
-
-    app.state.get_auth_context = provider_cls(app).get_auth_context
-    return app
-
-
 @Pipe
 def configure_authentication(app, config=config, base_path="/auth", auth_profile_provider=config.AUTH_PROFILE_PROVIDER):
     def api(*paths, method=app.get, **kwargs):
@@ -212,7 +200,7 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
             same_site=config.COOKIE_SAME_SITE_POLICY
         )
 
-        return setup_profile_provider(app, auth_profile_provider)
+        return oauth
 
     def extract_jwt_kid(token: str) -> dict:
         header_segment = token.split('.')[0]
@@ -261,6 +249,18 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
             data = response.json()
 
         app.state.jwks_keyset = JsonWebKey.import_key_set(data)  # Store JWKS in app state
+
+    @on_startup
+    def setup_auth_profile_provider(app):
+        if isinstance(auth_profile_provider, str):
+            provider_cls = FluviusAuthProfileProvider.get(auth_profile_provider)
+        elif issubclass(auth_profile_provider, FluviusAuthProfileProvider):
+            provider_cls = auth_profile_provider
+        else:
+            raise BadRequestError('S00.001', f'Invalid Auth Profile Provider: {auth_profile_provider}')
+
+        app.state.get_auth_context = provider_cls(app).get_auth_context
+
 
     # === Routes ===
     @api()
@@ -350,7 +350,9 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
     KEYCLOAK_SIGNUP_URI = uri(KEYCLOAK_ISSUER, "protocol/openid-connect/registrations")
     KEYCLOAK_METADATA_URI = uri(KEYCLOAK_ISSUER, ".well-known/openid-configuration")
 
+    oauth = setup_oauth()
+
     if config.ALLOW_LOGOUT_GET_METHOD:
         api("logout")(sign_out)
 
-    return setup_oauth()
+    return app
