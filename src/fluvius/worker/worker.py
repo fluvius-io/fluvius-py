@@ -15,7 +15,7 @@ from arq.cron import CronJob, cron as arq_cron
 from arq.logs import default_log_config
 from arq.worker import func as arq_func
 
-from fluvius.helper import assert_, camel_to_lower_underscore, when
+from fluvius.helper import assert_, camel_to_lower, when
 from fluvius.helper.timeutil import timestamp
 from fluvius.data import UUID_GENR
 from fluvius.tracker import config as tracker_config
