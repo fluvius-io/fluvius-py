@@ -26,13 +26,12 @@ from typing import Literal, Optional, Awaitable, Callable
 from urllib.parse import urlparse
 
 from .setup import on_startup
-from .helper import uri, generate_client_token, generate_session_id
+from .helper import uri, generate_client_token, generate_session_id, validate_direct_url
 
 from . import config, logger
 
 IDEMPOTENCY_KEY = config.RESP_HEADER_IDEMPOTENCY
 DEVELOPER_MODE = config.DEVELOPER_MODE
-SAFE_REDIRECT_DOMAINS = config.SAFE_REDIRECT_DOMAINS
 
 
 def auth_required(inject_ctx=False, **auth_kwargs):
@@ -80,62 +79,7 @@ def auth_required(inject_ctx=False, **auth_kwargs):
     return decorator
 
 
-def is_safe_redirect_url(url: str) -> bool:
-    """
-    Validates if a given URL is a safe redirect:
-    - It's either relative (no scheme or netloc),
-    - Or it's an absolute URL pointing to a whitelisted domain.
-
-    Args:
-        url (str): The URL to validate.
-        whitelist_domains (list[str]): List of allowed domains (e.g. ["example.com"]).
-
-    Returns:
-        bool: True if safe, False otherwise.
-    """
-    try:
-        if not url:
-            return False
-
-        parsed = urlparse(url)
-
-        # Case 1: Relative URL (e.g., "/login")
-        if not parsed.netloc and not parsed.scheme:
-            return True
-
-        # Case 2: Absolute URL with whitelisted domain
-        domain = parsed.hostname
-
-        if '*' in SAFE_REDIRECT_DOMAINS:
-            return True
-
-        if domain and domain.lower() in SAFE_REDIRECT_DOMAINS:
-            return True
-
-        return False
-
-    except Exception:
-        return False
-
-def validate_direct_url(url: str, default: str) -> str:
-    if is_safe_redirect_url(url):
-        return url
-
-    return default
-
 class FluviusAuthMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, auth_profile_provider):
-        super().__init__(app)
-
-        if isinstance(auth_profile_provider, str):
-            provider_cls = FluviusAuthProfileProvider.get(auth_profile_provider)
-        elif issubclass(auth_profile_provider, FluviusAuthProfileProvider):
-            provider_cls = auth_profile_provider
-        else:
-            raise BadRequestError('S00.001', f'Invalid Auth Profile Provider: {auth_profile_provider}')
-
-        app.state.get_auth_context = provider_cls(app).get_auth_context
-
     async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         response = await call_next(request)
 
@@ -225,6 +169,17 @@ class FluviusAuthProfileProvider(object):
             iamroles = iamroles
         )
 
+def setup_profile_provider(app, profile_provider):
+    if isinstance(profile_provider, str):
+        provider_cls = FluviusAuthProfileProvider.get(profile_provider)
+    elif issubclass(profile_provider, FluviusAuthProfileProvider):
+        provider_cls = profile_provider
+    else:
+        raise BadRequestError('S00.001', f'Invalid Auth Profile Provider: {profile_provider}')
+
+    app.state.get_auth_context = provider_cls(app).get_auth_context
+    return app
+
 
 @Pipe
 def configure_authentication(app, config=config, base_path="/auth", auth_profile_provider=config.AUTH_PROFILE_PROVIDER):
@@ -248,8 +203,7 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
             client_kwargs={"scope": "openid profile email"},
             redirect_uri=config.DEFAULT_CALLBACK_URI,
         )
-
-        app.add_middleware(FluviusAuthMiddleware, auth_profile_provider=auth_profile_provider)
+        app.add_middleware(FluviusAuthMiddleware)
         app.add_middleware(
             SessionMiddleware,
             secret_key=config.APPLICATION_SECRET_KEY,
@@ -258,7 +212,7 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
             same_site=config.COOKIE_SAME_SITE_POLICY
         )
 
-        return oauth
+        return setup_profile_provider(app, auth_profile_provider)
 
     def extract_jwt_kid(token: str) -> dict:
         header_segment = token.split('.')[0]
@@ -396,8 +350,7 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
     KEYCLOAK_SIGNUP_URI = uri(KEYCLOAK_ISSUER, "protocol/openid-connect/registrations")
     KEYCLOAK_METADATA_URI = uri(KEYCLOAK_ISSUER, ".well-known/openid-configuration")
 
-    oauth = setup_oauth()
     if config.ALLOW_LOGOUT_GET_METHOD:
         api("logout")(sign_out)
 
-    return app
+    return setup_oauth()

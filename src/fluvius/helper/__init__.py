@@ -9,6 +9,7 @@ from .genutil import (
     index_of,
     load_class,
     load_string,
+    load_yaml,
     merge_order,
     relpath,
     select_value,
