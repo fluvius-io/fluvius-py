@@ -35,18 +35,49 @@ DEVELOPER_MODE = config.DEVELOPER_MODE
 SAFE_REDIRECT_DOMAINS = config.SAFE_REDIRECT_DOMAINS
 
 
-def auth_required(inject_ctx=True, **kwargs):
+def auth_required(inject_ctx=False, **auth_kwargs):
     def decorator(endpoint):
         @wraps(endpoint)
         async def wrapper(request: Request, *args, **kwargs):
-            if not getattr(request.state, 'auth_context', None):
-                raise HTTPException(status_code=401, detail="Not authenticated.")
+            try:
+                auth_context = await request.app.state.get_auth_context(request, auth_kwargs)
+            except FluviusException as e:
+                # Handle FluviusException directly in middleware to ensure proper status codes
+                # Exceptions raised in middleware may not always be caught by FastAPI's exception handlers
+                content = e.content
 
+                if DEVELOPER_MODE:
+                    import traceback
+                    content = content or {}
+                    content['traceback'] = traceback.format_exc()
+
+                return JSONResponse(
+                    status_code=e.status_code,
+                    content=content
+                )
+            except Exception as e:
+                if DEVELOPER_MODE:
+                    logger.exception(e)
+
+                return JSONResponse(
+                    status_code=500,
+                    content={"errcode": "S00.501", "message": str(e)}
+                )
+
+            if inject_ctx:
+                return await endpoint(request, auth_context, *args, **kwargs)
+
+            if not auth_context:
+                return JSONResponse(
+                    status_code=401,
+                    content={"errcode": "S00.401", "message": "User is not authenticated"}
+                )
+
+            request.state.auth_context = auth_context
             return await endpoint(request, *args, **kwargs)
 
         return wrapper
     return decorator
-
 
 
 def is_safe_redirect_url(url: str) -> bool:
@@ -103,31 +134,9 @@ class FluviusAuthMiddleware(BaseHTTPMiddleware):
         else:
             raise BadRequestError('S00.001', f'Invalid Auth Profile Provider: {auth_profile_provider}')
 
-        self.get_auth_context = provider_cls(app).get_auth_context
+        app.state.get_auth_context = provider_cls(app).get_auth_context
 
     async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
-        try:
-            auth_context = await self.get_auth_context(request)
-            request.state.auth_context = auth_context
-        except FluviusException as e:
-            # Handle FluviusException directly in middleware to ensure proper status codes
-            # Exceptions raised in middleware may not always be caught by FastAPI's exception handlers
-            content = e.content
-            if DEVELOPER_MODE:
-                import traceback
-                content = content or {}
-                content['traceback'] = traceback.format_exc()
-            return JSONResponse(
-                status_code=e.status_code,
-                content=content
-            )
-        except Exception as e:
-            logger.exception(e)
-            raise JSONResponse(
-                status_code=500,
-                content={"errcode": "A500000", "message": str(e)}
-            )
-
         response = await call_next(request)
 
         if idem_key := request.headers.get(IDEMPOTENCY_KEY):
@@ -360,7 +369,6 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
         return RedirectResponse(url=KEYCLOAK_SIGNUP_URI)
 
     @api("sign-out")
-    @auth_required()
     async def sign_out(request: Request):
         ''' Log out user globally (including Keycloak) '''
 

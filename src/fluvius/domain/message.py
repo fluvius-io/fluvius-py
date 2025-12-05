@@ -38,8 +38,8 @@ class MessageDispatcher(object):
         self._domain = domain
         self._config = self.validate_config(config)
 
-    def validate_config(self, config):
-        config = dict(SHOW_LOG=True) | config
+    def validate_config(self, config, **defaults):
+        config = defaults | config
         return self.__config__(**{k.upper(): v for k, v in config.items()})
 
     def __init_subclass__(cls):
@@ -85,4 +85,4 @@ class MessageDispatcher(object):
 
 
 
-__all__ = ("MessageBundle",)
+__all__ = ("MessageBundle", "MessageDispatcher")
