@@ -90,6 +90,8 @@ class FluviusAuthMiddleware(BaseHTTPMiddleware):
 
 
 class FluviusAuthProfileProvider(object):
+    """ Lookup services for user related info """
+
     _REGISTRY = {}
 
     def __init_subclass__(cls):
@@ -100,7 +102,17 @@ class FluviusAuthProfileProvider(object):
             raise BadRequestError('S00.002', f'Auth Profile Provider is already registered: {key} => {FluviusAuthProfileProvider._REGISTRY[key]}')
 
         FluviusAuthProfileProvider._REGISTRY[key] = cls
-        DEVELOPER_MODE and logger.info('Registered Auth Profile Provider: %s', cls.__name__)
+
+        if DEVELOPER_MODE:
+            logger.info('Registered Auth Profile Provider: %s', cls.__name__)
+
+
+    def __init__(self, app):
+        self._app = app
+
+    @property
+    def app(self):
+        return self._app
 
     @classmethod
     def get(cls, key):
@@ -111,10 +123,6 @@ class FluviusAuthProfileProvider(object):
             return FluviusAuthProfileProvider._REGISTRY[key]
         except KeyError:
             raise BadRequestError('S00.003', f'Auth Profile Provider is not valid: {key}. Available: {list(FluviusAuthProfileProvider._REGISTRY.keys())}')
-
-    """ Lookup services for user related info """
-    def __init__(self, app):
-        self._app = app
 
     def authorize_claims(self, claims_token: dict) -> KeycloakTokenPayload:
         return KeycloakTokenPayload(**claims_token)
@@ -331,7 +339,7 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
 
     @api("sign-out")
     async def sign_out(request: Request):
-        ''' Log out user globally (including Keycloak) '''
+        """ Log out user globally (including Keycloak) """
 
         redirect_uri = validate_direct_url(
             request.query_params.get('redirect_uri'),
@@ -339,8 +347,10 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
         )
         
         access_token = request.cookies.get(config.SES_ID_TOKEN_FIELD)
-        if not access_token:
-            raise HTTPException(status_code=400, detail="No access token found")
+
+        # # Allow sign-out even if the token is expired.
+        # if not access_token:
+        #     raise HTTPException(status_code=400, detail="No access token found")
 
         keycloak_logout_url = f"{KEYCLOAK_LOGOUT_URI}?{urlencode({'id_token_hint': access_token, 'post_logout_redirect_uri': redirect_uri})}"
         request.session.clear()

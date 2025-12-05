@@ -242,6 +242,9 @@ class DataAccessManagerBase(object):
     @classmethod
     def _serialize(cls, model_name, item):
         model = cls.lookup_model(model_name)
+        if not isinstance(item, model):
+            raise InternalServerError('E00.206', f'Cannot serialize item. It must be an instance of [{model}].')
+
         return model.serialize(item)
 
     @classmethod
