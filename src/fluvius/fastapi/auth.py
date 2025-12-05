@@ -171,6 +171,14 @@ class FluviusAuthProfileProvider(object):
 
 @Pipe
 def configure_authentication(app, config=config, base_path="/auth", auth_profile_provider=config.AUTH_PROFILE_PROVIDER):
+    # === Keycloak Configuration ===
+
+    KEYCLOAK_ISSUER = uri(config.KEYCLOAK_BASE_URL, "realms", config.KEYCLOAK_REALM)
+    KEYCLOAK_JWKS_URI = uri(KEYCLOAK_ISSUER, "protocol/openid-connect/certs")
+    KEYCLOAK_LOGOUT_URI = uri(KEYCLOAK_ISSUER, "protocol/openid-connect/logout")
+    KEYCLOAK_SIGNUP_URI = uri(KEYCLOAK_ISSUER, "protocol/openid-connect/registrations")
+    KEYCLOAK_METADATA_URI = uri(KEYCLOAK_ISSUER, ".well-known/openid-configuration")
+
     def api(*paths, method=app.get, **kwargs):
         return method(uri(base_path, *paths), tags=["Authentication"], **kwargs)
 
@@ -251,7 +259,7 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
         app.state.jwks_keyset = JsonWebKey.import_key_set(data)  # Store JWKS in app state
 
     @on_startup
-    def setup_auth_profile_provider(app):
+    async def setup_auth_profile_provider(app):
         if isinstance(auth_profile_provider, str):
             provider_cls = FluviusAuthProfileProvider.get(auth_profile_provider)
         elif issubclass(auth_profile_provider, FluviusAuthProfileProvider):
@@ -342,17 +350,9 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
 
         return response
 
-    # === Keycloak Configuration ===
-
-    KEYCLOAK_ISSUER = uri(config.KEYCLOAK_BASE_URL, "realms", config.KEYCLOAK_REALM)
-    KEYCLOAK_JWKS_URI = uri(KEYCLOAK_ISSUER, "protocol/openid-connect/certs")
-    KEYCLOAK_LOGOUT_URI = uri(KEYCLOAK_ISSUER, "protocol/openid-connect/logout")
-    KEYCLOAK_SIGNUP_URI = uri(KEYCLOAK_ISSUER, "protocol/openid-connect/registrations")
-    KEYCLOAK_METADATA_URI = uri(KEYCLOAK_ISSUER, ".well-known/openid-configuration")
-
-    oauth = setup_oauth()
-
     if config.ALLOW_LOGOUT_GET_METHOD:
         api("logout")(sign_out)
+
+    oauth = setup_oauth()
 
     return app
