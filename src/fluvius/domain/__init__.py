@@ -7,7 +7,7 @@ from .decorators import (
 )
 from .domain import Domain
 from .event import Event
-from .message import MessageRecord
+from .message import MessageBundle, MessageDispatcher
 from .record import DomainEntityRecord
 from .response import DomainResponse
 from .state import StateManager, data_query
@@ -23,7 +23,7 @@ __all__ = (
     "DomainContext",
     "DomainEntityRecord",
     "DomainEntityType",
-    "MessageRecord",
+    "MessageBundle",
     "DomainResponse",
     "Domain",
     "Event",

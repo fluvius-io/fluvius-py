@@ -26,8 +26,10 @@ def file_basename(filepath):
 def file_extension(filepath):
     basename = os.path.basename(filepath)
     _, extension = os.path.splitext(basename)
+
     if "." in extension:
         extension = extension[extension.index(".") + 1:]
+
     return extension
 
 

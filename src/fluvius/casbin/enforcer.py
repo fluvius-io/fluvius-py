@@ -2,6 +2,7 @@ from casbin.effect import Effector, effect_to_bool
 from casbin.util import generate_g_function, util, generate_conditional_g_function
 from casbin.core_enforcer import EnforceContext
 from casbin import AsyncEnforcer
+from fluvius.error import BadRequestError, ForbiddenError
 
 from fluvius.casbin import logger
 from fluvius.casbin.helper import enable_simpleeval_trace, extract_trace_log
@@ -41,16 +42,16 @@ class FluviusEnforcer(AsyncEnforcer):
                     rvals = rvals[1:]
 
             if "m" not in self.model.keys():
-                raise RuntimeError("model is undefined")
+                raise ForbiddenError("C00.101", "Model is undefined")
 
             if "m" not in self.model["m"].keys():
-                raise RuntimeError("model is undefined")
+                raise ForbiddenError("C00.103", "Sub-model is undefined")
 
             r_tokens = self.model["r"][rtype].tokens
             p_tokens = self.model["p"][ptype].tokens
 
             if len(r_tokens) != len(rvals):
-                raise RuntimeError("invalid request size")
+                raise BadRequestError("C00.102", "Invalid request size")
 
             exp_string = self.model["m"][mtype].value
             exp_has_eval = util.has_eval(exp_string)
@@ -69,7 +70,7 @@ class FluviusEnforcer(AsyncEnforcer):
             if not 0 == policy_len:
                 for i, pvals in enumerate(self.model["p"][ptype].policy):
                     if len(p_tokens) != len(pvals):
-                        raise RuntimeError("invalid policy size")
+                        raise ForbiddenError("C00.103", "Invalid policy size")
 
                     p_parameters = dict(zip(p_tokens, pvals))
                     parameters = dict(r_parameters, **p_parameters)
@@ -95,7 +96,7 @@ class FluviusEnforcer(AsyncEnforcer):
                             policy_effects.add(Effector.INDETERMINATE)
                             continue
                     else:
-                        raise RuntimeError("matcher result should be bool, int or float")
+                        raise ForbiddenError("C00.104", "Matcher result should be bool, int or float")
 
                     p_eft_key = ptype + "_eft"
                     if p_eft_key in parameters.keys():
@@ -118,7 +119,7 @@ class FluviusEnforcer(AsyncEnforcer):
 
             else:
                 if exp_has_eval:
-                    raise RuntimeError("please make sure rule exists in policy when using eval() in matcher")
+                    raise BadRequestError("C00.105", "Please make sure rule exists in policy when using eval() in matcher")
 
                 parameters = r_parameters.copy()
 

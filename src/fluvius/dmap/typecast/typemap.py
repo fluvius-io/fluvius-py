@@ -1,3 +1,5 @@
+from fluvius.error import BadRequestError
+
 DEFAULT_TYPE = 'string'
 SUPPORTED_TYPES = (
     'datetime',
@@ -16,7 +18,11 @@ SUPPORTED_TYPES = (
 
 def dtype(_type, default_value=None):
     if _type not in SUPPORTED_TYPES:
-        raise ValueError('Data type [%s] is not supported' % _type)
+        raise BadRequestError(
+            "T00.901",
+            f"Data type [{_type}] is not supported",
+            None
+        )
 
     def decorator(func):
         func.__dtype__ = _type

@@ -73,12 +73,12 @@ class QueryManager(object):
     def register_resource(cls, query_identifier):
         def _decorator(resource_cls):
             if getattr(resource_cls, '_identifier', None):
-                raise ValueError(f'QueryResource already registered with identifier: {resource_cls._identifier}')
+                raise BadRequestError('Q00.513', f'QueryResource already registered with identifier: {resource_cls._identifier}')
 
             resource_cls.initialize_resource(query_identifier)
 
             if query_identifier in cls.__resources__:
-                raise ValueError(f'Resource identifier is already registered: {query_identifier} => {resource_cls}')
+                raise BadRequestError('Q00.514', f'Resource identifier is already registered: {query_identifier} => {resource_cls}')
 
             cls.__resources__[query_identifier] = resource_cls
             return resource_cls
@@ -87,10 +87,10 @@ class QueryManager(object):
 
     def validate_fe_query(self, query_resource, fe_query):
         if fe_query.text and not query_resource.Meta.allow_text_search:
-            raise BadRequestError("Q100-502", f"Text search is not allowed for this resource [{query_resource.Meta.name}]")
+            raise BadRequestError("Q00.502", f"Text search is not allowed for this resource [{query_resource.Meta.name}]")
 
         if not isinstance(fe_query, FrontendQuery):
-            raise ValueError(f'Invalid query: {fe_query}')
+            raise BadRequestError('Q00.508', f'Invalid query: {fe_query}')
 
         return fe_query
 
@@ -114,7 +114,7 @@ class QueryManager(object):
         result, _ = self.process_result(data, meta)
 
         if len(result) == 0:
-            raise NotFoundError("Q102-501", f"Item not found!", None)
+            raise NotFoundError("Q00.501", f"Item not found!", None)
 
         return result[0]
 
@@ -146,10 +146,9 @@ class QueryManager(object):
             resp = await self._policymgr.check_permission(reqs)
 
         if not resp.allowed:
-            raise ForbiddenError('Q4031212', f'Permission Failed: [{resp.narration}]')
+            raise ForbiddenError('Q00.004', f'Permission Failed: [{resp.narration}]')
 
         return resp.narration.restriction
-
 
     def construct_backend_query(self,
         auth_ctx: Optional[AuthorizationContext],

@@ -42,7 +42,7 @@ class FastapiMQTTClient(MQTTClient):
             self, topic=topic, payload=payload, qos=qos, properties=properties
         )
         MQTT_DEBUG and logger.info(
-            f"/MQTT/ RECV MSG AT [{self._client_id}] TOPIC [{topic}] "
+            f"/MQTT/ RECV MSG AT [{self._client_id}] TOPIC [{topic}] " +            
             f"/MQTT/ QOS: {qos} PROPERTIES: {properties} PAYLOAD: {payload}"
         )
 
@@ -80,7 +80,7 @@ class FastapiMQTTClient(MQTTClient):
                 q.task_done()
             logger.info("/MQTT/ Published queued messages of context: %s", batch_id)
         except KeyError:
-            logger.warn("/MQTT/ Message queue for context_id: %s not found", batch_id)
+            logger.warning("/MQTT/ Message queue for context_id: %s not found", batch_id)
 
 
 def configure_mqtt_client(app, client_channel=None):
@@ -90,7 +90,7 @@ def configure_mqtt_client(app, client_channel=None):
 
     global MQTT_CLIENT_CHANNEL
     if not config.MQTT_BROKER_HOST:
-        logger.warn(
+        logger.warning(
             "/MQTT/ MQTT_BROKER_HOST is not set. MQTT client is not configured."
         )
         return app

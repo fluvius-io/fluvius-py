@@ -14,7 +14,7 @@ async def create_schema(connector_import: str, force: bool, tables_only: bool):
     """Create SQLAlchemy schema and tables for a SqlaDriver connector.
     
     CONNECTOR_IMPORT: Import string to the SqlaDriver connector class
-                      (e.g., 'riparius.WorkflowConnector')
+                      (e.g., 'fluvius.navis.WorkflowConnector')
     """
     try:
         # Load the connector class using shared function
@@ -39,7 +39,7 @@ async def create_schema(connector_import: str, force: bool, tables_only: bool):
 
             
             # Create all tables defined in the connector
-            click.echo(f"Create tables for schema '{schema_name}'.")
+            click.echo(f"Create all tables for connector: '{connector_import}'.")
             if hasattr(connector_class, '__data_schema_base__'):
                 base_schema = connector_class.__data_schema_base__
 

@@ -2,6 +2,7 @@ import uuid
 from dateutil import parser
 
 from datetime import datetime
+from fluvius.error import BadRequestError
 from .typemap import dtype
 from .constant import *
 from .base import BaseCoercerProfile
@@ -15,7 +16,11 @@ def __closure__():
     def _register(name):
         def _decorator(coercer_profile):
             if name in REGISTRY:
-                raise ValueError('Coercer already registered [%s]' % name)
+                raise BadRequestError(
+                    "T00.701",
+                    f"Coercer already registered [{name}]",
+                    None
+                )
             REGISTRY[name] = coercer_profile
             return coercer_profile
         return _decorator
@@ -24,7 +29,11 @@ def __closure__():
         try:
             return REGISTRY[name]()
         except KeyError:
-            raise ValueError("Coercer has not been registerd [%s]" % (name))
+            raise BadRequestError(
+                "T00.702",
+                f"Coercer has not been registerd [{name}]",
+                None
+            )
 
     return _register, _get
 

@@ -1,6 +1,7 @@
 from enum import IntEnum
+from fluvius.domain import logger
 from fluvius.data import BlankModel, DataModel
-from fluvius.helper import camel_to_title
+from fluvius.helper import camel_to_title, camel_to_lower
 from .mutation import MutationType  # noqa
 
 
@@ -71,10 +72,25 @@ class DomainEntity(object):
         if cls.__dict__.get('__abstract__'):
             return
 
-        meta = {"name": camel_to_title(cls.__name__), "desc": cls.__doc__} | cls.Meta.__dict__
+        # Get the metadata of the current class, not of its parents.
+        cls_meta = cls.__dict__.get('Meta')
+        if cls_meta is not None:
+            cls_meta = cls_meta.__dict__
+        else:
+            cls_meta = {}
+
+        # 1. Parent meta objects,
+        # 2. default values for current class
+        # 3. Custom meta defined by the class itself
+        meta = cls.Meta.__dict__ | {
+            "key": camel_to_lower(cls.__name__),
+            "name": camel_to_title(cls.__name__),
+            "desc": cls.__doc__
+        } | cls_meta
+
         cls.Meta = cls.__meta_schema__(**meta)
 
         if not issubclass(cls.Data, (DataModel, BlankModel)):
-            raise ValueError(f'Invalid Entity Data Model: {cls.Data}')
+            logger.warning(f'Unsupported Entity Data Model: {cls.__name__} => {cls.Data}')
 
 

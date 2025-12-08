@@ -12,6 +12,7 @@ from fluvius.domain.manager import DomainManager
 from fluvius.query import FrontendQuery, QueryResourceMeta
 from fluvius.query.helper import scope_decoder
 from fluvius.helper import load_class
+from fluvius.error import InternalServerError
 from pipe import Pipe
 
 from . import logger, config
@@ -62,7 +63,7 @@ class FastAPIDomainManager(DomainManager):
     @classmethod
     def setup_app(cls, app, *domains, **kwargs):
         if hasattr(app.state, 'domain_manager'):
-            raise RuntimeError("Domain manager already initialized")
+            raise InternalServerError("S00.301", "Domain manager already initialized")
         
         manager = cls(app)
         manager.register_domain(*domains, **kwargs)

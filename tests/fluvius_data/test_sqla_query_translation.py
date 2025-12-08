@@ -73,7 +73,7 @@ def test_build_select_simple(test_driver):
     assert_sql_equivalent(test_driver.compile_statement(stmt), expected_sql)
 
 def test_build_select_with_specific_fields(test_driver):
-    query = BackendQuery.create(select=['_id', 'name', 'email'])
+    query = BackendQuery.create(include=['_id', 'name', 'email'])
     stmt = test_driver.build_select(UserSchema, query)
     expected_sql = '''
         SELECT user._id, user.name, user.email
@@ -235,7 +235,7 @@ def test_build_select_with_limit_offset(test_driver):
     assert_sql_equivalent(test_driver.compile_statement(stmt), expected_sql)
 
 def test_build_select_with_sort(test_driver):
-    query_asc = BackendQuery.create(sort=['name']) # Default asc
+    query_asc = BackendQuery.create(sort=[('name', 'asc')]) # Default asc
     stmt_asc = test_driver.build_select(UserSchema, query_asc)
     expected_sql_asc = '''
         SELECT user._id, user.name, user.age, user.email, user.is_active, user.created_at
@@ -245,7 +245,7 @@ def test_build_select_with_sort(test_driver):
     '''
     assert_sql_equivalent(test_driver.compile_statement(stmt_asc), expected_sql_asc)
     
-    query_desc = BackendQuery.create(sort=['name.desc'])
+    query_desc = BackendQuery.create(sort=[('name', 'desc')])
     stmt_desc = test_driver.build_select(UserSchema, query_desc)
     expected_sql_desc = '''
         SELECT user._id, user.name, user.age, user.email, user.is_active, user.created_at
@@ -255,7 +255,7 @@ def test_build_select_with_sort(test_driver):
     '''
     assert_sql_equivalent(test_driver.compile_statement(stmt_desc), expected_sql_desc)
 
-    query_multi_sort = BackendQuery.create(sort=['age.desc', 'name.asc'])
+    query_multi_sort = BackendQuery.create(sort=[('age', 'desc'), ('name', 'asc')])
     stmt_multi_sort = test_driver.build_select(UserSchema, query_multi_sort)
     expected_sql_multi_sort = '''
         SELECT user._id, user.name, user.age, user.email, user.is_active, user.created_at
@@ -267,7 +267,7 @@ def test_build_select_with_sort(test_driver):
 
 def test_build_select_with_join(test_driver):
     query_for_join = BackendQuery.create(
-        select=['_id', 'name', 'department:name'], # Company._id, Company.name, Department.name
+        include=['_id', 'name', 'department:name'], # Company._id, Company.name, Department.name
         join=[
             JoinStatement(
                 local_field='_id',
@@ -302,9 +302,9 @@ def test_build_select_with_scope(test_driver):
 
 def test_build_select_with_field_mapping(test_driver):
     query = BackendQuery.create(
-        select=['user_name', 'user_age'],
-        mapping={"user_name": "name", "user_age": "age"},
-        where={"user_name": "Mapped Name"}
+        include=['name', 'age'],
+        alias={"name": "user_name", "age": "user_age"},
+        where={"name": "Mapped Name"}
     )
     stmt = test_driver.build_select(UserSchema, query)
     # Aliases in select are user_name, user_age. These are simple and likely unquoted by SQLite.

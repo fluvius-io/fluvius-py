@@ -95,7 +95,7 @@ class KCAdmin(object):
         )
         token_resp = await resp.json()
         if token_resp.get("error_description"):
-            raise ValueError(token_resp.get("error_description"))
+            raise BadRequestError("S00.401", token_resp.get("error_description"))
         return token_resp["access_token"]
 
     async def auth_header(self):
@@ -120,7 +120,7 @@ class KCAdmin(object):
 
         message = error_message if error_message else "Error request to keycloak"
         logger.info("/kcadmin/ %s: [%s] -> %s", message, resp.status, resp_message)
-        raise ValueError(f"{message}: {resp_message}")
+        raise BadRequestError("S00.402", f"{message}: {resp_message}")
 
 
     async def _get(self, endpoint, **kwargs):
@@ -269,14 +269,14 @@ class KCAdmin(object):
     def check_whitelist_email(self, domain):
         if domain not in config.WHITELIST_DOMAIN:
             raise ForbiddenError(
-                "F102-403",
+                "S00.403",
                 "To prevent member data exposure, this email address is not allowed to log in to the system."  # noqa: E501
             )
 
     def check_blacklist_email(self, domain):
         if domain in RESTRICTION:
             raise ForbiddenError(
-                "F103-403",
+                "S00.404",
                 "To prevent member data exposure, this email address is not allowed to log in to the system."  # noqa: E501
             )
 
@@ -291,7 +291,7 @@ class KCAdmin(object):
                 self.check_blacklist_email(domain)
         except AttributeError:
             raise BadRequestError(
-                "F100-400",
+                "S00.203",
                 "Please input a valid email"
             )
 

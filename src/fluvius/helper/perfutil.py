@@ -1,7 +1,9 @@
 import functools
+import inspect
 from contextlib import contextmanager
 from time import perf_counter
 from pathlib import Path
+from fluvius.error import BadRequestError
 from . import logger
 
 
@@ -145,8 +147,11 @@ def c_profiler(filepath, enabled=True, **profile_kwargs):
         if inspect.isgeneratorfunction(func) or \
                 inspect.isasyncgenfunction(func) or \
                 inspect.iscoroutinefunction(func):
-            raise ValueError(
-                'c_profiler is not working properly with generator/async function. Use yappi_profiler instead.')
+            raise BadRequestError(
+                "H00.601",
+                "c_profiler is not working properly with generator/async function. Use yappi_profiler instead.",
+                None
+            )
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):

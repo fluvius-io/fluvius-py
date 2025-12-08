@@ -1,4 +1,5 @@
 from pyrsistent import PClass, field
+from fluvius.error import BadRequestError
 from fluvius.dmap.interface import InputAlreadyProcessedError, InputFile
 from fluvius.dmap import logger, config
 
@@ -60,14 +61,22 @@ class DataProcessManager(object):
             return
 
         if cls.name in cls.__registry__:
-            raise ValueError(f"DataProcessManager [{cls.name}] is already registered!")
+            raise BadRequestError(
+                "T00.301",
+                f"DataProcessManager [{cls.name}] is already registered!",
+                None
+            )
 
         cls.__registry__[cls.name] = cls
 
     @classmethod
     def init_manager(cls, name, **kwargs):
         if name not in cls.__registry__:
-            raise ValueError(f"DataProcessManager [{name}] is not registered!")
+            raise BadRequestError(
+                "T00.302",
+                f"DataProcessManager [{name}] is not registered!",
+                None
+            )
 
         return cls.__registry__[name](**kwargs)
 
@@ -114,8 +123,8 @@ class PostgresFileProcessManager(DataProcessManager):
         process_name = process_name or self.process_name
         sql_query = text(
             f'SELECT * from {self.table_addr} WHERE '
-            '"checksum_sha256" = :checksum_sha256 AND '
-            '"process_name" = :process_name'
+            + '"checksum_sha256" = :checksum_sha256 AND '
+            + '"process_name" = :process_name'
         )
 
         try:
@@ -182,11 +191,11 @@ class PostgresFileProcessManager(DataProcessManager):
         set_stmt = ', '.join([f'"{key}" = :{key}' for key in kwargs.keys()])
         query = text(
             f'UPDATE {self.table_addr} SET '
-            f'  {set_stmt}, '
-            f'  "last_updated" = CURRENT_TIMESTAMP '
-            f'WHERE '
-            f'   checksum_sha256 = :checksum_sha256 AND '
-            f'   process_name = :process_name'
+            + f'  {set_stmt}, '
+            + f'  "last_updated" = CURRENT_TIMESTAMP '
+            + f'WHERE '
+            + f'   checksum_sha256 = :checksum_sha256 AND '
+            + f'   process_name = :process_name'
         )
 
         return self.run_query(

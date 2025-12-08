@@ -10,13 +10,14 @@ from functools import wraps, partial
 from types import SimpleNamespace
 from typing import List, Optional, Type, Union
 
-from fluvius.helper import select_value
+from fluvius.helper import select_value, ImmutableNamespace
 from fluvius.data import UUID_TYPE, UUID_GENR, logger, timestamp, config
 from fluvius.data.helper import serialize_mapping, generate_etag
 from fluvius.data.data_driver import DataDriver
 from fluvius.data.data_model import DataModel, BlankModel
 from fluvius.data.query import BackendQuery
 from fluvius.data.exceptions import ItemNotFoundError
+from fluvius.error import BadRequestError, InternalServerError
 
 from fluvius.data.constant import (
     INTRA_DOMAIN_ITEM_ID_FIELD, 
@@ -80,6 +81,7 @@ class DataAccessManagerBase(object):
     # Instance of database driver that provides data to the manager
     __connector__ = None
     __automodel__ = None
+    __config__    = ImmutableNamespace
 
     """ Domain data access manager """
     def __init_subclass__(cls, connector=None, automodel=None):
@@ -98,31 +100,53 @@ class DataAccessManagerBase(object):
 
         cls.__connector__ = select_value(connector, cls.__connector__)
         cls.__automodel__ = select_value(automodel, cls.__automodel__, default=True)
+        cls.setup_model()
 
-    def __init__(self, app, **config):
-        self._app = app
+    def __init__(self, domain=None, app=None, **config):
         self._transaction = None
         self._proxy = ReadonlyDataManagerProxy(self)
-        self.setup_connector(config)
-        self.setup_model()
+        self._connector = self.setup_connector(config)
+        self._app = app
+        self._domain = domain
+        self._config = self.validate_config(config)
 
-    def setup_model(self):
-        if not self.__automodel__:
+    def validate_config(self, config, **defaults):
+        config = defaults | config
+        return self.__config__(**{k.upper(): v for k, v in config.items()})
+
+    @property
+    def app(self):
+        return self._app
+
+    @property
+    def config(self):
+        return self._config
+
+    @property
+    def domain(self):
+        return self._domain
+
+    @classmethod
+    def setup_model(cls):
+        if not cls.__automodel__:
             return
 
-        for model_name, data_schema in self.connector.__data_schema_registry__.items():
-            model = self.generate_model(data_schema)
+        for model_name, data_schema in cls.__connector__.__data_schema_registry__.items():
+            model = cls.generate_model(data_schema)
+
             try:
-                self.register_model(model_name)(model, is_generated=True)
+                cls.register_model(model_name)(model, is_generated=True)
             except ResourceAlreadyRegistered:
-                logger.warning(f'Model already registered: {model_name}')
+                logger.warning(f'[W12.931] Model already registered: {model_name}')
 
 
-    def generate_model(self, data_schema):
-        if not isinstance(self.__automodel__, bool):
-            raise ValueError(f'__automodel__ only accept True / False: {self.__automodel__}')
+    @classmethod
+    def generate_model(cls, data_schema):
+        if not isinstance(cls.__automodel__, bool):
+            raise InternalServerError('E00.201', f'__automodel__ only accept True / False: {cls.__automodel__}')
 
-        return type(f"{data_schema.__name__}_Model", (BlankModel, ), {})
+        return data_schema
+        # return type(f"{data_schema.__name__}DAModel", (BlankModel, ), {})
 
     @classmethod
     def register_model(cls, model_name: str):
@@ -160,9 +184,12 @@ class DataAccessManagerBase(object):
 
         return self.__config__(**config)
 
+    @property
+    def connector(self):
+        return self._connector
+
     def connect(self, *args, **kwargs):
-        self.connector.connect(*args, **kwargs)
-        return self
+        return self.connector.connect(*args, **kwargs)
 
     async def disconnect(self):
         await self.connector.disconnect()
@@ -172,7 +199,7 @@ class DataAccessManagerBase(object):
     async def transaction(self, *args):
         if self._transaction is not None:
             if RAISE_NESTED_TRANSACTION_ERROR:
-                raise RuntimeError(f'Nested transaction detected in {self.__class__.__name__}')
+                raise InternalServerError('E00.202', f'Nested transaction detected in {self.__class__.__name__}')
 
         async with self.connector.transaction(*args) as transaction:
             self._transaction = transaction
@@ -186,20 +213,16 @@ class DataAccessManagerBase(object):
     @property
     def context(self):
         if self._context is None:
-            raise RuntimeError('State Manager context is not initialized.')
+            raise InternalServerError('E00.203', 'State Manager context is not initialized.')
 
         return self._context
-
-    @property
-    def connector(self):
-        return self._connector
 
     def setup_connector(self, config):
         con_cls = self.__connector__
         if not con_cls or not issubclass(con_cls, DataDriver):
-            raise ValueError(f'Invalid data driver/connector: {con_cls}')
+            raise InternalServerError('E00.204', f'Invalid data driver/connector: {con_cls}')
 
-        self._connector = con_cls(**config)
+        return con_cls(**config)
 
     @classmethod
     def create(cls, model_name: str, data: dict = None, / , **kwargs) -> DataModel:
@@ -212,12 +235,16 @@ class DataAccessManagerBase(object):
     @classmethod
     def defaults(cls, model_name: str, data=None) -> dict:
         defvals = data or {}
-        defvals.update(_created=timestamp(), _updated=timestamp())
+        ts = timestamp()
+        defvals.update(_created=ts, _updated=ts)
         return defvals
 
     @classmethod
     def _serialize(cls, model_name, item):
         model = cls.lookup_model(model_name)
+        if not isinstance(item, model):
+            raise InternalServerError('E00.206', f'Cannot serialize item. It must be an instance of [{model}].')
+
         return model.serialize(item)
 
     @classmethod
@@ -264,7 +291,7 @@ class DataFeedManager(DataAccessManagerBase):
     async def insert(self, record: DataModel):
         model_cls = self.lookup_record_model(record)
         data = self._serialize(model_cls, record)
-        result = await self.connector.insert(resource, data)
+        result = await self.connector.insert(model_cls, data)
         return result
 
     async def insert_data(self, model_name, data):
@@ -279,7 +306,7 @@ class DataFeedManager(DataAccessManagerBase):
 
     async def update(self, record: DataModel, updates: dict):
         model_cls = self.lookup_record_model(record)
-        query = BackendQuery(identifier=identifier)
+        query = BackendQuery(identifier=record._id)
         return await self.connector.update_record(model_cls, record, **updates)
 
 
@@ -310,7 +337,7 @@ class DataAccessManager(DataAccessManagerBase):
             Raises an error if there are 0 or multiple results """
         q = BackendQuery.create(q, **query, limit=1, offset=0)
         if q.limit != 1 or q.offset != 0:
-            raise ValueError(f'Invalid find_one query: {q}')
+            raise BadRequestError('E00.205', f'Invalid find_one query: {q}')
 
         try:
             item = await self.connector.find_one(model_name, q)
@@ -337,23 +364,24 @@ class DataAccessManager(DataAccessManagerBase):
 
     async def invalidate(self, record: DataModel):
         model_name = self.lookup_record_model(record)
-        query = BackendQuery.create(identifier=record._id, etag=record._etag)
-        etag = generate_etag(record)
-        defaults = dict(_deleted=timestamp(), _updated=timestamp(), _etag=etag)
-        return await self.connector.update_one(model_name, query, **defaults)
+        query   = BackendQuery.create(identifier=record._id, etag=record._etag)
+        etag    = generate_etag(record)
+        ts      = timestamp()
+        changes = dict(_deleted=ts, _updated=ts, _etag=etag)
+        return await self.connector.update_data(model_name, query, **changes)
 
     async def update(self, record: DataModel, /, **updates):
         model_name = self.lookup_record_model(record)
-        q = BackendQuery.create(identifier=record._id, etag=record._etag)
+        q    = BackendQuery.create(identifier=record._id, etag=record._etag)
         etag = generate_etag(record)
-        defaults = dict(_updated=timestamp(), _etag=etag)
-        defaults.update(updates)
-        return await self.connector.update_one(model_name, q, **defaults)
+        ts   = timestamp()
+        changes = updates | dict(_updated=ts, _etag=etag)
+        return await self.connector.update_data(model_name, q, **changes)
 
     async def remove(self, record: DataModel):
         model_name = self.lookup_record_model(record)
         query = BackendQuery.create(identifier=record._id, etag=record._etag)
-        return await self.connector.remove_record(model_name, query)
+        return await self.connector.remove_one(model_name, query)
 
     async def insert(self, record: DataModel):
         model_name = self.lookup_record_model(record)
@@ -364,35 +392,35 @@ class DataAccessManager(DataAccessManagerBase):
     async def upsert(self, model_name, record: DataModel):
         data = self._serialize(model_name, record)
         updt = timestamp()
-        data['_updated'] = updt
-        data['_etag'] = generate_etag(data)
+        # data['_updated'] = updt
+        # data['_etag'] = generate_etag(data)
         return await self.connector.upsert(model_name, data)
     
-    async def insert_many(self, model_name: str, *records: list[dict]):
+    async def insert_data(self, model_name: str, *records: list[dict]):
         updt = timestamp()
         for data in records:
             data['_updated'] = updt
             data['_etag'] = generate_etag(data)
             await self.connector.insert(model_name, data)
 
-    async def upsert_many(self, model_name: str, *records: list[dict]):
+    async def upsert_data(self, model_name: str, *records: list[dict]):
         updt = timestamp()
         for data in records:
             data['_updated'] = updt
             data['_etag'] = generate_etag(data)
             await self.connector.upsert(model_name, data)
 
-    async def invalidate_one(self, model_name: str, identifier: UUID_TYPE, etag=None, /, **updates):
+    async def invalidate_data(self, model_name: str, identifier: UUID_TYPE, etag=None, /, **updates):
         q = BackendQuery.create(identifier=identifier, etag=etag)
         updt = timestamp()
         etag = generate_etag(updates)
-        return await self.connector.update_one(model_name, q, _updated=updt, _deleted=updt, _etag=etag, **updates)
+        return await self.connector.update_data(model_name, q, _updated=updt, _deleted=updt, _etag=etag, **updates)
 
-    async def update_one(self, model_name: str, identifier: UUID_TYPE, etag=None, /, **updates):
+    async def update_data(self, model_name: str, identifier: UUID_TYPE, etag=None, /, **updates):
         query = BackendQuery.create(identifier=identifier, etag=etag)
         updt = timestamp()
         etag = generate_etag(updates)
-        return await self.connector.update_one(model_name, query, _updated=updt, _etag=etag, **updates)
+        return await self.connector.update_data(model_name, query, _updated=updt, _etag=etag, **updates)
 
 class ReadonlyDataManagerProxy(object):
     def __init__(self, data_manager):

@@ -59,7 +59,7 @@ def process_query_statement(statements, expr_schema=None, allowed_composites=('a
 
                     yield QueryExpression(*op_stmt, value)
         except KeyError as e:
-            raise BadRequestError("Q01-3939", f'Cannot locate operator: {e}')
+            raise BadRequestError("E00.302", f'Cannot locate operator: {e}')
 
     return QueryStatement(_process(statements))
 
@@ -78,7 +78,7 @@ def operator_statement(op_stmt: str, default_operator: str=DEFAULT_OPERATOR) -> 
     try:
         return OperatorStatement(field_name, operator, mode)
     except:
-        raise ValueError(f'Invalid query operator statement: {op_stmt}')
+        raise BadRequestError('E00.303', f'Invalid query operator statement: {op_stmt}')
 
 
 def validate_list(sort_stmt):
@@ -94,7 +94,7 @@ def validate_list(sort_stmt):
     if isinstance(sort_stmt, (list, set)):
         return tuple(sort_stmt)
 
-    raise ValueError('Invalid list value.')
+    raise BadRequestError('E00.304', 'Invalid list value.')
 
 
 def validate_query(query) -> QueryStatement:
@@ -145,6 +145,6 @@ class BackendQuery(PClass):
             return query_data.set(**kwargs) if kwargs else query_data
 
         if not isinstance(query_data, dict):
-            raise ValueError('Invalid query: %s' % str(query_data))
+            raise BadRequestError('E00.305', 'Invalid query: %s' % str(query_data))
 
         return cls(**query_data, **kwargs)

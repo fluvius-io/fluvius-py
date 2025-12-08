@@ -1,5 +1,6 @@
 import uuid
 from typing import Any
+from fluvius.error import NotFoundError, BadRequestError
 
 class NullMediaManager:
     """Mock MediaManager for testing without database connection"""
@@ -44,15 +45,15 @@ class NullMediaManager:
             if identifier in self._entries:
                 return self._entries[identifier]
             else:
-                raise ValueError(f"MediaEntry {identifier} not found")
+                raise NotFoundError("M00.201", f"MediaEntry {identifier} not found")
         elif model_name == 'MediaFilesystem':
             # For MediaFilesystem, identifier could be fskey
             if identifier in self._filesystems:
                 return self._filesystems[identifier]
             else:
-                raise ValueError(f"MediaFilesystem {identifier} not found")
+                raise NotFoundError("M00.202", f"MediaFilesystem {identifier} not found")
         else:
-            raise ValueError(f"Mock model {model_name} not supported")
+            raise BadRequestError("M00.203", f"Mock model {model_name} not supported")
     
     async def remove(self, record: Any) -> bool:
         """Remove a mock record (matches DataAccessManager interface)"""

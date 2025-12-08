@@ -15,7 +15,7 @@ async def drop_schema(connector_import: str, force: bool):
     """Drop SQLAlchemy schema for a SqlaDriver connector.
     
     CONNECTOR_IMPORT: Import string to the SqlaDriver connector class
-                      (e.g., 'riparius.WorkflowConnector')
+                      (e.g., 'fluvius.navis.WorkflowConnector')
     """
     try:
         # Load the connector class using shared function

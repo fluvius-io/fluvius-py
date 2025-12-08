@@ -1,3 +1,6 @@
+from fluvius.error import BadRequestError
+
+
 def process_tfspec(tfspec):
     if not tfspec:
         return tuple()
@@ -8,7 +11,11 @@ def process_tfspec(tfspec):
     if isinstance(tfspec, list):
         return tuple(get_transformer(t) for t in tfspec)
 
-    raise ValueError('Invalid transformers spec [%s]' % tfspec)
+    raise BadRequestError(
+        "T00.501",
+        f"Invalid transformers spec [{tfspec}]",
+        None
+    )
 
 
 def __closure__():
@@ -20,14 +27,20 @@ def __closure__():
             params = param_str.split(':') if param_str else []
             return TRANFORMERS[output_type](*params)
         except KeyError:
-            raise ValueError(
-                "Invalid transformer [%s]. Available transformsers: %s" % (output_type, str(list(TRANFORMERS.keys())))
+            raise BadRequestError(
+                "T00.502",
+                f"Invalid transformer [{output_type}]. Available transformsers: {list(TRANFORMERS.keys())}",
+                None
             )
 
     def register_transformer(key):
         def _decorator(func):
             if key in TRANFORMERS:
-                raise ValueError('Duplicated transformers key: %s' % key)
+                raise BadRequestError(
+                    "T00.503",
+                    f"Duplicated transformers key: {key}",
+                    None
+                )
 
             TRANFORMERS[key] = func
             return func

@@ -7,6 +7,7 @@ from casbin import persist
 
 from .datadef import PolicyRequest
 from . import logger
+from fluvius.error import BadRequestError
 
 
 MAX_POLICY_LINE = 10000
@@ -42,7 +43,7 @@ class PolicySchema:
             case "g4":
                 return [ptype, p.usr, p.role]
             case _:
-                raise ValueError(f"Unsupported policy type: {ptype}")
+                raise BadRequestError("C00.301", f"Unsupported policy type: {ptype}")
 
     @classmethod
     def get_filter_from_request(cls, request: PolicyRequest):

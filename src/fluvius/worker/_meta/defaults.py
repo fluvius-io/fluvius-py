@@ -1,3 +1,5 @@
+from fluvius.data import config
+
 DEBUG = False
 
 REDIS_HOST = "localhost"

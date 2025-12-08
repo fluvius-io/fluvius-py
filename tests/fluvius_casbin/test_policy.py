@@ -2,6 +2,7 @@ import re
 import pytest
 from fluvius.data import SqlaDriver, DataAccessManager
 from fluvius.casbin import PolicySchema, PolicyManager, PolicyRequest, logger
+from fluvius_test.helper import _csv
 
 RX_COMMA = re.compile(r"\s*[,;\s]\s*")
 
@@ -24,7 +25,7 @@ class TestPolicyManager(PolicyManager):
 
 
 async def copy_table_from_csv(engine, schema, table, source=None, columns=None, **options):
-    _source = source if source else f"tests/_data/{table}.csv"
+    _source = source if source else _csv(table)
     opts = dict(
         schema_name=schema,
         source=_source,

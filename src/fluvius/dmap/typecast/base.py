@@ -1,4 +1,5 @@
 from functools import wraps
+from fluvius.error import BadRequestError
 from .constant import PARAM_SEPARATOR, FORCE_INDICATOR
 
 
@@ -30,7 +31,11 @@ class BaseCoercerProfile(object):
             coercer_func = generator(coercer_param) if coercer_param else generator()
         else:
             if coercer_param:
-                raise ValueError('Coercer [%s] do not support parameterization.' % coercer_key)
+                raise BadRequestError(
+                    "T00.801",
+                    f"Coercer [{coercer_key}] do not support parameterization.",
+                    None
+                )
 
             coercer_func = getattr(self, f"coerce__{coercer_key}")
 

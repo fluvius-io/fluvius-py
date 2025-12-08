@@ -18,7 +18,7 @@ async def import_data(connector_import: str, data_folder: str, force: bool, batc
     """Import CSV files from a folder into database tables.
     
     CONNECTOR_IMPORT: Import string to the SqlaDriver connector class
-                      (e.g., 'riparius.WorkflowConnector')
+                      (e.g., 'fluvius.navis.WorkflowConnector')
     DATA_FOLDER: Path to folder containing CSV files
     """
     try:

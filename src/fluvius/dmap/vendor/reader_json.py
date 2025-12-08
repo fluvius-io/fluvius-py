@@ -1,4 +1,5 @@
 import json
+from fluvius.error import BadRequestError
 from fluvius.dmap.interface import DataLoop, DataElement
 from fluvius.dmap.reader import BaseReader, register_reader
 
@@ -27,8 +28,10 @@ class JsonReader(BaseReader):
         elif isinstance(data, list):
             yield from self.generate_list(data)
         else:
-            raise ValueError(
-                f"Can not generate data of type {type(data)}: {data}"
+            raise BadRequestError(
+                "T00.181",
+                f"Can not generate data of type {type(data)}: {data}",
+                None
             )
 
     def iter_data_loop(self, input_files):

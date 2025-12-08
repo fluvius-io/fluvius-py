@@ -1,4 +1,5 @@
 from abc import ABC
+from fluvius.error import BadRequestError
 
 
 class DataFetcher(ABC):
@@ -29,7 +30,11 @@ class DataFetcher(ABC):
             return
 
         if cls.name in DataFetcher._REGISTRY:
-            raise ValueError(f"Datasource [{cls.name}] is already registered with [{DataFetcher._REGISTRY[cls.name]}]")
+            raise BadRequestError(
+                "T00.131",
+                f"Datasource [{cls.name}] is already registered with [{DataFetcher._REGISTRY[cls.name]}]",
+                None
+            )
 
         DataFetcher._REGISTRY[cls.name] = cls
 
