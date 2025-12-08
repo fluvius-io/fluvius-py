@@ -337,10 +337,8 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             usr=ctx.data.user_id,
             pro=ctx.data.profile_id,
             org=ctx.data.organization_id,
-            dom=self.__namespace__,
-            res=command.resource,
             rid=rsid,
-            act=command.command,
+            act=f"{self.__namespace__}:{command.command}",
             cqrs='COMMAND'
         )
 
