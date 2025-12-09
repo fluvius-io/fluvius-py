@@ -27,6 +27,8 @@ class KeycloakTokenPayload(DataModel):
     email: EmailStr
     realm_access: dict
     resource_access: dict
+    session_id: Optional[str] = None
+    client_token: Optional[str] = None
 
     @property
     def id(self):

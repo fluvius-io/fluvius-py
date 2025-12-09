@@ -144,8 +144,6 @@ class FluviusAuthProfileProvider(object):
             raise UnauthorizedError("S00.004", "Authorization Failed: Missing or invalid claims token")
 
         auth_context = await self.setup_context(auth_user)
-        auth_context.session_id = auth_token.get('session_id')
-        auth_context.client_token = auth_token.get('client_token')
         return auth_context
 
     async def setup_context(self, auth_user: KeycloakTokenPayload) -> AuthorizationContext:
