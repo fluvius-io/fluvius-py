@@ -332,13 +332,11 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         if not self.policymgr or not cmdc.Meta.policy_required:
             return command
 
-        rsid = "" if cmdc.Meta.new_resource else command.identifier 
+        rid = "" if cmdc.Meta.new_resource else command.identifier 
         reqs = PolicyRequest(
-            usr=ctx.data.user_id,
-            pro=ctx.data.profile_id,
-            org=ctx.data.organization_id,
-            rid=rsid,
+            auth_ctx=ctx.authorization,
             act=f"{self.__namespace__}:{command.command}",
+            rid=rid,
             cqrs='COMMAND'
         )
 

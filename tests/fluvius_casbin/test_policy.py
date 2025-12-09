@@ -1,6 +1,7 @@
 import re
 import pytest
-from fluvius.data import SqlaDriver, DataAccessManager
+from fluvius.auth import AuthorizationContext, KeycloakTokenPayload, SessionProfile, SessionOrganization
+from fluvius.data import SqlaDriver, DataAccessManager, UUID_TYPE
 from fluvius.casbin import PolicySchema, PolicyManager, PolicyRequest, logger
 from fluvius_test.helper import _csv
 
@@ -54,7 +55,7 @@ async def test_project_admin_create_without_resource_id():
         schema="public",
         table="casbin_rule",
         columns="ptype,role,usr,pro,org,rid,scope,act,cqrs,meta,_id,_deleted",
-        source="tests/_data/policy_test.csv"
+        source=_csv("policy")
     )
     policy_manager = TestPolicyManager(dam)
     """
@@ -76,6 +77,20 @@ async def test_project_admin_create_without_resource_id():
                 - org-2: admin
                     - proj-2: project-admin
     """
+    mapping = {
+        "user-1": UUID_TYPE("123e4567-e89b-12d3-a456-426614174001"),
+        "user-2": UUID_TYPE("123e4567-e89b-12d3-a456-426614174002"),
+        "pro-1":  UUID_TYPE("123e4567-e89b-12d3-a456-426614174003"),
+        "pro-2":  UUID_TYPE("123e4567-e89b-12d3-a456-426614174004"),
+        "pro-3":  UUID_TYPE("123e4567-e89b-12d3-a456-426614174005"),
+        "pro-4":  UUID_TYPE("123e4567-e89b-12d3-a456-426614174006"),
+        "org-1":  UUID_TYPE("123e4567-e89b-12d3-a456-426614174007"),
+        "org-2":  UUID_TYPE("123e4567-e89b-12d3-a456-426614174008"),
+        "proj-1": UUID_TYPE("123e4567-e89b-12d3-a456-426614174009"),
+        "proj-2": UUID_TYPE("123e4567-e89b-12d3-a456-42661417400a"),
+        "proj-3": UUID_TYPE("123e4567-e89b-12d3-a456-42661417400b"),
+        "proj-4": UUID_TYPE("123e4567-e89b-12d3-a456-42661417400c"),
+    }
     test_cases = [
         ("user-1", "pro-1", "org-1", "", "fluvius-project:create-project", "COMMAND", True, "Allow admin to create project in org-1", {}),
         ("user-1", "pro-1", "org-1", "proj-1", "fluvius-project:update-project", "COMMAND", True, "Allow admin to update project-1 in org-1", {}),
@@ -84,18 +99,56 @@ async def test_project_admin_create_without_resource_id():
         ("user-1", "pro-2", "org-1", "", "fluvius-project:create-project", "COMMAND", False, "Deny member to create project in org-1", {}),
         ("user-1", "pro-1", "org-2", "", "fluvius-project:create-project", "COMMAND", False, "Deny admin to create project in org-2 (wrong organization)", {}),
         
-        ("user-1", "pro-1", "org-1", "", "fluvius-project.view-project", "QUERY", True, "Allow admin to view projects in org-1",{'.and': [{'.and': [{'org:eq': 'org-1'}]}]}),
-        # ("user-1", "pro-2", "org-1", "", "fluvius-project.view-project", "QUERY", True, "Allow member with project-admin, project-member role to view projects in org-1",{'.and': [{'.and': [{'org:eq': 'org-1'}, {'project_id:in': ['proj-1', 'proj-3', 'proj-4']}]}]}),
+        ("user-1", "pro-1", "org-1", "", "fluvius-project.view-project", "QUERY", True, "Allow admin to view projects in org-1",{'.and': [{'.and': [{'org:eq': '123e4567-e89b-12d3-a456-426614174007'}]}]}),
+        ("user-1", "pro-2", "org-1", "", "fluvius-project.view-project", "QUERY", True, "Allow member with project-admin, project-member role to view projects in org-1",{'.and': [{'.and': [{'org:eq': '123e4567-e89b-12d3-a456-426614174007'}, {'project_id:in': ['123e4567-e89b-12d3-a456-42661417400b', '123e4567-e89b-12d3-a456-42661417400c', '123e4567-e89b-12d3-a456-426614174009']}]}]}),
     ]
 
     for test_case in test_cases:
         usr, sub, org, rid, act, cqrs, allowed, message, restriction = test_case
+        usr = mapping[usr]
+        sub = mapping[sub]
+        org = mapping[org]
+        rid = str(mapping[rid] if rid else rid)
         request = PolicyRequest(
-            usr=usr,
-            pro=sub,
-            org=org,
-            rid=rid,
+            auth_ctx=AuthorizationContext(
+                user=KeycloakTokenPayload(
+                    sub=usr, 
+                    exp=1000,
+                    iat=1000,
+                    auth_time=1000,
+                    jti=UUID_TYPE('123e4567-e89b-12d3-a456-426614174000'),
+                    iss='https://example.com',
+                    aud='example',
+                    typ='ID',
+                    azp='example',
+                    nonce='example',
+                    session_state=UUID_TYPE('123e4567-e89b-12d3-a456-426614174000'),
+                    at_hash='example',
+                    acr='example',
+                    sid=UUID_TYPE('123e4567-e89b-12d3-a456-426614174000'),
+                    email_verified=True,
+                    name='example',
+                    preferred_username='example',
+                    given_name='example',
+                    family_name='example',
+                    email='example@example.com',
+                    realm_access={'roles': ['admin']},
+                    resource_access={'example': {'roles': ['admin']}}),
+                profile=SessionProfile(id=sub,
+                    name='example',
+                    family_name='example',
+                    given_name='example',
+                    email='example@example.com',
+                    username='example',
+                    roles=tuple(),
+                    org_id=org,
+                    usr_id=usr),
+                organization=SessionOrganization(id=org, name='example'),
+                iamroles=tuple(),
+                realm='example',
+            ),
             act=act,
+            rid=rid,
             cqrs=cqrs,
         )
         async with policy_manager._dam.transaction():
@@ -103,6 +156,6 @@ async def test_project_admin_create_without_resource_id():
             assert response.allowed is allowed, message
 
             if cqrs == "QUERY":
-                logger.info(f"Restriction: {response.narration.restriction}")
-                logger.info(f"Restriction: {restriction}")
+                logger.info(f"Actual Restriction: {restriction}")
+                logger.info(f"Policy Restriction: {response.narration.restriction}")
                 assert response.narration.restriction == restriction

@@ -131,14 +131,9 @@ class QueryManager(object):
         if not self.__policymgr__ or not qmeta.policy_required or not auth_ctx:
             return None
 
-        actx = auth_ctx
-        act = f"{self.Meta.prefix}.{query_resource._identifier}"
         reqs = PolicyRequest(
-            usr=actx.user._id,
-            pro=actx.profile._id,
-            org=actx.organization._id,
-            act=act,
-            rid=identifier or "",
+            auth_ctx=auth_ctx,
+            act=f"{self.Meta.prefix}.{query_resource._identifier}",
             cqrs='QUERY'
         )
 

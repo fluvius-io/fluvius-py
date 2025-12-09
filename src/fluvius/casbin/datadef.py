@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from enum import Enum
 from typing import Union, Optional, List, Dict, Any
+from fluvius.auth import AuthorizationContext
 
 
 class PolicyScope(str, Enum):
@@ -65,16 +66,11 @@ class PolicyNarration(BaseModel):
 
 
 class PolicyRequest(BaseModel):
-    usr: str
-    pro: str
-    org: str
+    auth_ctx: AuthorizationContext
     act: str
-    rid: str
     cqrs: str
+    rid: Optional[str] = None
 
-    def __post_init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.cqrs = self.cqrs or "COMMAND"
 
 class PolicyResponse(BaseModel):
     allowed: bool

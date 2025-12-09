@@ -59,27 +59,27 @@ class PolicySchema:
                 {
                     ".and": [{
                         "ptype": "g",
-                        "usr": request.usr,
-                        "pro": request.pro,
+                        "usr": str(request.auth_ctx.user.id),
+                        "pro": str(request.auth_ctx.profile.id),
                     }]
                 },
                 {
                     ".and": [{
                         "ptype": "g2",
-                        "pro": request.pro,
-                        "org": request.org,
+                        "pro": str(request.auth_ctx.profile.id),
+                        "org": str(request.auth_ctx.organization.id),
                     }]
                 },
                 {
                     ".and": [{
                         "ptype": "g3",
-                        "pro": request.pro,
+                        "pro": str(request.auth_ctx.profile.id),
                     }]
                 },
                 {
                     ".and": [{
                         "ptype": "g4",
-                        "usr": request.usr,
+                        "usr": str(request.auth_ctx.user.id),
                     }]
                 },
             ]

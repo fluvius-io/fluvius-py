@@ -69,14 +69,20 @@ class PolicyManager:
         return self._adapter.get_filter_from_request(request)
 
     async def check_permission(self, request: PolicyRequest) -> PolicyResponse:
+        if config.SUPER_ADMIN_ROLE_KEY in request.auth_ctx.iamroles:
+            return PolicyResponse(
+                allowed=True,
+                narration=PolicyNarration(policies=[], trace=[], restriction={})
+            )
+        
         try:
             fitler = self._get_filter_from_request(request)
             await self._enforcer.load_filtered_policy(fitler)
             allowed, narration, trace = self._enforcer.enforce_ex(
-                request.usr,
-                request.pro,
-                request.org,
-                request.rid,
+                str(request.auth_ctx.user.id),
+                str(request.auth_ctx.profile.id),
+                str(request.auth_ctx.organization.id),
+                str(request.rid),
                 request.cqrs,
                 request.act,
             )
@@ -150,20 +156,20 @@ class PolicyManager:
         if PolicyScope.TENANT in scopes:
             return PolicyScope.TENANT
         
-        if PolicyScope.DOMAIN in scopes:
-            return PolicyScope.DOMAIN
+        if PolicyScope.RESOURCE in scopes:
+            return PolicyScope.RESOURCE
         
         return PolicyScope.SYSTEM
 
     def _retrieve_resource(self, request: PolicyRequest) -> Dict[str, Set[str]]:
-        return set(rule[2] for rule in self._enforcer.get_filtered_named_grouping_policy("g3", 0, request.pro))
+        return set(rule[2] for rule in self._enforcer.get_filtered_named_grouping_policy("g3", 0, str(request.auth_ctx.profile.id)))
 
     def _build_context(self, request: PolicyRequest) -> Dict[str, Any]:
         res_ids = self._retrieve_resource(request)
         return {
             "request": request.model_dump(),
             "restriction": {
-                "org": request.org,
+                "org": str(request.auth_ctx.organization.id),
                 "resource_ids": list(res_ids),
             }
         }
@@ -226,16 +232,19 @@ class PolicyManager:
         return _render_node(condition)
         
     def _render_value(self, val: str, context: Dict[str, Any]) -> Any:
-        try:
-            if isinstance(val, str):
-                context_matched = re.match(r"^context\((.*?)\)$", val.replace(" ", ""))
-                if context_matched:
-                    path = context_matched.group(1)
-                    parts = path.split(".")
-                    result = context
-                    for part in parts:
-                        result = result[part]
-                    return result
+        if not isinstance(val, str):
             return val
+
+        try:
+            match = re.match(r"^context\(\s*([^)]+?)\s*\)$", val)
+            if not match:
+                return val
+
+            result = context
+            for part in match.group(1).split("."):
+                result = result[part]
+
+            return result
+
         except Exception as e:
             raise BadRequestError('C00.205', f"Failed to render value: {val}, error: {e}")

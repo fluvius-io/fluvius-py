@@ -61,11 +61,11 @@ class SessionOrganization(DataModel):
         return self.id
 
 
-AuthorizationContext = SimpleNamespace
+# AuthorizationContext = SimpleNamespace
 
-# class AuthorizationContext(DataModel):
-#     realm: str
-#     user: KeycloakTokenPayload
-#     profile: SessionProfile
-#     organization: SessionOrganization
-#     iamroles: tuple
+class AuthorizationContext(DataModel):
+    realm: str
+    user: KeycloakTokenPayload
+    profile: SessionProfile
+    organization: SessionOrganization
+    iamroles: tuple
