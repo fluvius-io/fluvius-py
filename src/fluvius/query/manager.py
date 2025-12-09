@@ -131,11 +131,8 @@ class QueryManager(object):
         if not self.__policymgr__ or not qmeta.policy_required or not auth_ctx:
             return None
 
-        reqs = PolicyRequest(
-            auth_ctx=auth_ctx,
-            act=f"{self.Meta.prefix}.{query_resource._identifier}",
-            cqrs='QUERY'
-        )
+        actn = f"{self.Meta.prefix}.{query_resource._identifier}"
+        reqs = PolicyRequest(auth_ctx=auth_ctx, act=actn, cqrs='QUERY')
 
         async with self.data_manager.transaction():
             resp = await self._policymgr.check_permission(reqs)

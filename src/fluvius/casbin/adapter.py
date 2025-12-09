@@ -35,13 +35,11 @@ class PolicySchema:
             case "p":
                 return [ptype, p.role, p.act, p.cqrs, p.meta, p.scope]
             case "g":
-                return [ptype, p.usr, p.pro]
+                return [ptype, p.usr, p.pro, p.org]
             case "g2":
-                return [ptype, p.pro, p.role, p.org]
+                return [ptype, p.pro, p.role]
             case "g3":
                 return [ptype, p.pro, p.role, p.rid]
-            case "g4":
-                return [ptype, p.usr, p.role]
             case _:
                 raise BadRequestError("C00.301", f"Unsupported policy type: {ptype}")
 
@@ -62,13 +60,13 @@ class PolicySchema:
                         "ptype": "g",
                         "usr": str(request.auth_ctx.user.id),
                         "pro": str(request.auth_ctx.profile.id),
+                        "org": str(request.auth_ctx.organization.id),
                     }]
                 },
                 {
                     ".and": [{
                         "ptype": "g2",
                         "pro": str(request.auth_ctx.profile.id),
-                        "org": str(request.auth_ctx.organization.id),
                     }]
                 },
                 {
@@ -76,13 +74,7 @@ class PolicySchema:
                         "ptype": "g3",
                         "pro": str(request.auth_ctx.profile.id),
                     }]
-                },
-                {
-                    ".and": [{
-                        "ptype": "g4",
-                        "usr": str(request.auth_ctx.user.id),
-                    }]
-                },
+                }
             ]
         }
     

@@ -332,17 +332,14 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         if not self.policymgr or not cmdc.Meta.policy_required:
             return command
 
-        rid = "" if cmdc.Meta.new_resource else command.identifier 
-        reqs = PolicyRequest(
-            auth_ctx=ctx.authorization,
-            act=f"{self.__namespace__}:{command.command}",
-            rid=rid,
-            cqrs='COMMAND'
-        )
+        rsid = str(command.identifier)
+        actn = f"{self.__namespace__}:{command.command}"
+        auth = ctx.authorization
+        reqs = PolicyRequest(auth_ctx=auth, act=actn, rid=rsid, cqrs='COMMAND')
 
         resp = await self.policymgr.check_permission(reqs)
         if not resp.allowed:
-            raise ForbiddenError('D00.307', f'Permission Failed: [{resp.narration}]')
+            raise ForbiddenError('D00.307', f'Permission Failed [{reqs}] => [{resp.narration}]')
 
         return command
 

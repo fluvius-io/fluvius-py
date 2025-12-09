@@ -70,8 +70,6 @@ async def test_project_admin_create_without_resource_id():
             - pro-3:
                 - org-1: member
                     - proj-1: project-member
-                    - proj-3: project-admin
-                    - proj-4: project-member
         user-2:
             - pro-4:
                 - org-2: admin
@@ -95,12 +93,12 @@ async def test_project_admin_create_without_resource_id():
         ("user-1", "pro-1", "org-1", "", "fluvius-project:create-project", "COMMAND", True, "Allow admin to create project in org-1", {}),
         ("user-1", "pro-1", "org-1", "proj-1", "fluvius-project:update-project", "COMMAND", True, "Allow admin to update project-1 in org-1", {}),
         ("user-1", "pro-2", "org-1", "proj-1", "fluvius-project:update-project", "COMMAND", True, "Allow project-admin to update project-1 in org-1", {}),
-        ("user-1", "pro-1", "org-1", "user-1", "fluvius-user:update-user", "COMMAND", True, "Allow user-admin to update user-1 in org-1", {}),
         ("user-1", "pro-2", "org-1", "", "fluvius-project:create-project", "COMMAND", False, "Deny member to create project in org-1", {}),
         ("user-1", "pro-1", "org-2", "", "fluvius-project:create-project", "COMMAND", False, "Deny admin to create project in org-2 (wrong organization)", {}),
         
         ("user-1", "pro-1", "org-1", "", "fluvius-project.view-project", "QUERY", True, "Allow admin to view projects in org-1",{'.and': [{'.and': [{'org:eq': '123e4567-e89b-12d3-a456-426614174007'}]}]}),
-        ("user-1", "pro-2", "org-1", "", "fluvius-project.view-project", "QUERY", True, "Allow member with project-admin, project-member role to view projects in org-1",{'.and': [{'.and': [{'org:eq': '123e4567-e89b-12d3-a456-426614174007'}, {'project_id:in': ['123e4567-e89b-12d3-a456-42661417400b', '123e4567-e89b-12d3-a456-42661417400c', '123e4567-e89b-12d3-a456-426614174009']}]}]}),
+        ("user-2", "pro-4", "org-2", "", "fluvius-project.view-project", "QUERY", True, "Allow admin with project-admin role to view projects in org-2",{'.and': [{'.and': [{'org:eq': '123e4567-e89b-12d3-a456-426614174008'}]}]}),
+        ("user-1", "pro-3", "org-1", "", "fluvius-project.view-project", "QUERY", True, "Allow member with project-member role to view projects in org-1",{'.and': [{'.and': [{'org:eq': '123e4567-e89b-12d3-a456-426614174007'}, {'project_id:in': ['123e4567-e89b-12d3-a456-426614174009']}]}]}),
     ]
 
     for test_case in test_cases:
