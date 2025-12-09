@@ -7,6 +7,7 @@ from casbin import persist
 
 from .datadef import PolicyRequest
 from fluvius.error import BadRequestError
+from ._meta import logger
 
 
 MAX_POLICY_LINE = 10000
@@ -113,6 +114,7 @@ class SqlAdapter(AsyncAdapter):
         """Load a policy line into the model."""
         values = self._schema.format_policy(policy)
         values = [str(v) for v in values if v is not None]
+        logger.info(f'Load policy line: {values}')
         persist.load_policy_line(", ".join(values), model)
 
     def is_filtered(self) -> bool:
