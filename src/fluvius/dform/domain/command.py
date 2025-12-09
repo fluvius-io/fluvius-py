@@ -1,4 +1,4 @@
-from fluvius.data import serialize_mapping
+from fluvius.data import serialize_mapping, UUID_GENR
 from .domain import FormDomain
 from . import datadef
 from .datadef import (
@@ -10,6 +10,7 @@ from .datadef import (
     SaveFormData,
     SubmitFormData
 )
+from fluvius.domain.event import EventRecord 
 
 Command = FormDomain.Command
 
@@ -85,7 +86,20 @@ class CreateDocument(Command):
 
     async def _process(self, agg, stm, payload):
         document = await agg.create_document(payload)
-        yield agg.create_response(document, _type="document-response")
+        document_dict = {
+            "_id": str(document._id),
+            "template_id": str(document.template_id),
+            "document_key": document.document_key,
+            "document_name": document.document_name,
+            "desc": document.desc,
+            "version": document.version,
+            "organization_id": str(document.organization_id),
+            "resource_id": str(document.resource_id) if document.resource_id else None,
+            "resource_name": document.resource_name,
+            "created_at": document.created_at.isoformat() if hasattr(document, 'created_at') and document.created_at else None,
+            "updated_at": document.updated_at.isoformat() if hasattr(document, 'updated_at') and document.updated_at else None,
+        }
+        yield agg.create_response(document_dict, _type="document-response")
 
 
 class UpdateDocument(Command):
@@ -247,5 +261,25 @@ class SubmitForm(Command):
 
     async def _process(self, agg, stm, payload):
         result = await agg.submit_form(payload)
-        yield agg.create_response(serialize_mapping(result), _type="form-response")
+       
+        yield EventRecord(
+            _id=UUID_GENR(),
+            event='start-assess',
+            src_cmd=agg.get_aggroot().identifier,
+            args={},
+            data={
+                "event_name": "approve-credit",
+                "event_data": {
+                    "resource_id": "a7e1c778-3ca5-405b-915d-f21aa30e8158",
+                    "resource_name": "workflow_definition",
+                    "step_selector": "f6f6fac6-4eb4-5939-894a-363bbd9a7b6f",
+                    "additionalProp1": {}
+                },
+                "target_step_id": "f6f6fac6-4eb4-5939-894a-363bbd9a7b6f",
+                "priority": "null"
+            }
+            
+        )
+        
+        yield agg.create_response(result, _type="form-response")
 
