@@ -6,7 +6,6 @@ from casbin.model import Model
 from casbin import persist
 
 from .datadef import PolicyRequest
-from . import logger
 from fluvius.error import BadRequestError
 
 
@@ -114,7 +113,6 @@ class SqlAdapter(AsyncAdapter):
         """Load a policy line into the model."""
         values = self._schema.format_policy(policy)
         values = [str(v) for v in values if v is not None]
-        logger.info(f"Loading policy line: {values}")
         persist.load_policy_line(", ".join(values), model)
 
     def is_filtered(self) -> bool:

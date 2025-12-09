@@ -71,10 +71,7 @@ class PolicyManager:
     async def check_permission(self, request: PolicyRequest) -> PolicyResponse:
         try:
             fitler = self._get_filter_from_request(request)
-            start = time()
             await self._enforcer.load_filtered_policy(fitler)
-            logger.info(f"Time taken to load filtered policy: {time() - start}")
-            start = time()
             allowed, narration, trace = self._enforcer.enforce_ex(
                 request.usr,
                 request.pro,
@@ -133,7 +130,7 @@ class PolicyManager:
                 meta = PolicyMeta(**meta_dict)
                 parsed_metas.append(meta)
             except (jsonurl_py.ParseError, KeyError, ValueError) as e:
-                raise ForbiddenError('C4031214', f'Failed to parse policy meta: {rendered_meta}, error: {e}')
+                raise BadRequestError('C00.204', f'Failed to parse policy meta: {policy.meta}, error: {e}')
 
         return parsed_metas
 
@@ -241,4 +238,4 @@ class PolicyManager:
                     return result
             return val
         except Exception as e:
-            raise ForbiddenError('C4031215', f"Failed to render value: {val}, error: {e}")
+            raise BadRequestError('C00.205', f"Failed to render value: {val}, error: {e}")
