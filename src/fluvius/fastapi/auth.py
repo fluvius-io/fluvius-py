@@ -16,19 +16,18 @@ from types import SimpleNamespace
 
 from fluvius.error import UnauthorizedError, FluviusException, BadRequestError
 from fluvius.data import DataModel
-from fluvius.auth import AuthorizationContext, KeycloakTokenPayload, SessionProfile, SessionOrganization, event as auth_event
+from fluvius.auth import (
+    AuthorizationContext, 
+    KeycloakTokenPayload, 
+    SessionProfile, 
+    SessionOrganization, event as auth_event, helper as auth_helper)
 from fluvius.helper import when
-
-from pydantic import AnyUrl, EmailStr
-from uuid import UUID
 from pipe import Pipe
-from typing import Literal, Optional, Awaitable, Callable
-from urllib.parse import urlparse
-
-from .setup import on_startup
-from .helper import uri, generate_client_token, generate_session_id, validate_direct_url
+from typing import Optional, Awaitable, Callable
 
 from . import config, logger
+from .setup import on_startup
+from .helper import uri, generate_client_token, generate_session_id, validate_direct_url
 
 IDEMPOTENCY_KEY = config.RESP_HEADER_IDEMPOTENCY
 DEVELOPER_MODE = config.DEVELOPER_MODE
@@ -180,11 +179,14 @@ class FluviusAuthProfileProvider(object):
 def configure_authentication(app, config=config, base_path="/auth", auth_profile_provider=config.AUTH_PROFILE_PROVIDER):
     # === Keycloak Configuration ===
 
+    KEYCLOAK_CLIENT_ID = config.KEYCLOAK_CLIENT_ID
+    KEYCLOAK_CLIENT_SECRET = config.KEYCLOAK_CLIENT_SECRET
     KEYCLOAK_ISSUER = uri(config.KEYCLOAK_BASE_URL, "realms", config.KEYCLOAK_REALM)
     KEYCLOAK_JWKS_URI = uri(KEYCLOAK_ISSUER, "protocol/openid-connect/certs")
     KEYCLOAK_LOGOUT_URI = uri(KEYCLOAK_ISSUER, "protocol/openid-connect/logout")
     KEYCLOAK_SIGNUP_URI = uri(KEYCLOAK_ISSUER, "protocol/openid-connect/registrations")
     KEYCLOAK_METADATA_URI = uri(KEYCLOAK_ISSUER, ".well-known/openid-configuration")
+    DEFAULT_CALLBACK_URI = config.DEFAULT_CALLBACK_URI
 
     def api(*paths, method=app.get, **kwargs):
         return method(uri(base_path, *paths), tags=["Authentication"], **kwargs)
@@ -201,10 +203,10 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
         oauth.register(
             name='keycloak',
             server_metadata_url=KEYCLOAK_METADATA_URI,
-            client_id=config.KEYCLOAK_CLIENT_ID,
-            client_secret=config.KEYCLOAK_CLIENT_SECRET,
+            client_id=KEYCLOAK_CLIENT_ID,
+            client_secret=KEYCLOAK_CLIENT_SECRET,
             client_kwargs={"scope": "openid profile email"},
-            redirect_uri=config.DEFAULT_CALLBACK_URI,
+            redirect_uri=DEFAULT_CALLBACK_URI,
         )
         app.add_middleware(FluviusAuthMiddleware)
         app.add_middleware(
@@ -217,48 +219,10 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
 
         return oauth
 
-    def extract_jwt_kid(token: str) -> dict:
-        header_segment = token.split('.')[0]
-        padded = header_segment + '=' * (-len(header_segment) % 4)
-        decoded = base64.urlsafe_b64decode(padded)
-        return json.loads(decoded)['kid']
-
-    def extract_jwt_key(jwks_keyset, token):
-        # This will parse the JWT and extract both the header and payload
-        kid = extract_jwt_kid(token)
-
-        # 🔍 Find the correct key by kid
-        try:
-            return next(k for k in jwks_keyset.keys if k.kid == kid)
-        except StopIteration:
-            raise HTTPException(status_code=401, detail="Public key not found for kid")
-
-    async def decode_ac_token(jwks_keyset, ac_token: str):
-        # This will parse the JWT and extract both the header and payload
-        key = extract_jwt_key(jwks_keyset, ac_token)
-        return jwt.decode(ac_token, key)
-
-    async def decode_id_token(jwks_keyset, id_token: str):
-        key = extract_jwt_key(jwks_keyset, id_token)
-
-        # Decode and validate
-        claims = jwt.decode(
-            id_token,
-            key=key,
-            claims_options={
-                "iss": {"essential": True, "value": KEYCLOAK_ISSUER},
-                "aud": {"essential": True, "value": config.KEYCLOAK_CLIENT_ID},
-                "exp": {"essential": True},
-            }
-        )
-
-        claims.validate()
-
-        return claims
 
     # Async code at server startup
     @on_startup
-    async def fetch_jwks_on_startup(app):
+    async def fetch_jwks_keyset_on_startup(app):
         async with httpx.AsyncClient() as client:
             response = await client.get(KEYCLOAK_JWKS_URI)
             data = response.json()
@@ -291,8 +255,8 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
         if not id_token:
             raise HTTPException(status_code=400, detail="Missing ID token")
 
-        id_data = await decode_id_token(request.app.state.jwks_keyset, id_token)
-        ac_data = await decode_ac_token(request.app.state.jwks_keyset, ac_token)
+        id_data = await auth_helper.decode_id_token(request.app.state.jwks_keyset, id_token, KEYCLOAK_ISSUER, KEYCLOAK_CLIENT_ID)
+        ac_data = await auth_helper.decode_ac_token(request.app.state.jwks_keyset, ac_token)
 
         id_data.update(
             realm_access=ac_data.get("realm_access"),

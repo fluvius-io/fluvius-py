@@ -99,15 +99,10 @@ class RemoveFormElementGroupData(DataModel):
 
 # Element Definition Commands
 class CreateElementDefinitionData(DataModel):
-    """Data for creating an element definition within an element group definition"""
-    element_type_id: UUID_TYPE
+    """Data for creating an element definition"""
     element_key: str
     element_label: Optional[str] = None
-    order: Optional[int] = None
-    required: Optional[bool] = False
-    validation_rules: Optional[Dict[str, Any]] = None
-    resource_id: Optional[UUID_TYPE] = None
-    resource_name: Optional[str] = None
+    element_schema: Dict[str, Any]  # Schema defining the element type and validation
 
 
 class UpdateElementDefinitionData(DataModel):
@@ -283,27 +278,12 @@ class PopulateFormData(DataModel):
     element_definition_ids: Optional[List[UUID_TYPE]] = None  # If provided, only populate these element definitions
 
 
-class SaveElementData(DataModel):
-    """Data for saving element instance data"""
-    element_definition_id: UUID_TYPE
-    element_group_id: UUID_TYPE
-    instance_key: str
-    data: Dict[str, Any]
-    attrs: Optional[Dict[str, Any]] = None
-
-
 class SaveFormData(DataModel):
     """Data for saving form instance data (multiple elements)"""
-    form_definition_id: UUID_TYPE
-    form_id: UUID_TYPE
-    elements: List[Dict[str, Any]]  # List of {element_definition_id, element_group_id, instance_key, data, attrs}
-    attrs: Optional[Dict[str, Any]] = None
+    data: Dict[str, Dict[str, Any]]  # {"<element_key>": {<element_data>}}
 
 
 class SubmitFormData(DataModel):
     """Data for submitting form instance (saves and locks from further editing)"""
-    form_definition_id: UUID_TYPE
-    form_id: UUID_TYPE
-    elements: List[Dict[str, Any]]  # List of {element_definition_id, element_group_id, instance_key, data, attrs}
-    attrs: Optional[Dict[str, Any]] = None
+    data: Dict[str, Dict[str, Any]]  # {"<element_key>": {<element_data>}}
 

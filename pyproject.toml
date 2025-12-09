@@ -37,6 +37,7 @@ dependencies = [
     "pipe>=2.2",
     "pydantic[email]>=2.11.4",
     "pypika",
+    "sqlmodel",
     "pyrsistent>=0.20.0",
     "ruff>=0.9.1",
     "sqlalchemy>=2.0.37",

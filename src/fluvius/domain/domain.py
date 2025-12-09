@@ -464,13 +464,15 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
             responses[resp.response] = resp.data
         return responses
-
+    
+    async def process(self, command_name, command_data, aggroot):
+        cmd_bundle = self.create_command(command_name, command_data, aggroot)
+        return await self.process_command(cmd_bundle)
 
     async def trigger_reconciliation(self, cmd_queue, aggregate):
         # This trigger run after statemgr committed.
         for cmd in consume_queue(cmd_queue):
             await self.publish(sig.TRIGGER_RECONCILIATION, cmd, aggregate=aggregate)
-
 
     def metadata(self, **kwargs):
         return {
