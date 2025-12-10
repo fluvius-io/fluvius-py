@@ -264,11 +264,13 @@ class SubmitForm(Command):
        
         yield EventRecord(
             _id=UUID_GENR(),
-            event='start-assess',
+            event='approve-credit',
             src_cmd=agg.get_aggroot().identifier,
             args={},
             data={
                 "event_name": "approve-credit",
+                "wfdef_key": "loan-application-process",
+                "workflow_id": "feee59ce-4f29-4a58-ae89-8c3cb4b856bf",
                 "event_data": {
                     "resource_id": "a7e1c778-3ca5-405b-915d-f21aa30e8158",
                     "resource_name": "workflow_definition",

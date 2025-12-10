@@ -302,15 +302,9 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         for evt in consume_queue(evt_queue):
             if self._evthandler is None:
                 continue
-
-            try:
-                await self._evthandler.process_event(evt, self.statemgr)
-            except Exception as e:
-                logger.error(
-                    f"Error processing event [{evt.event}] with handler: {e}",
-                    exc_info=True
-                )
-
+            
+            await self._evthandler.process_event(evt, self.statemgr)
+        
     async def dispatch_messages(self, msg_queue):
         for msg_record in consume_queue(msg_queue):
             if self._dispatcher is None:
