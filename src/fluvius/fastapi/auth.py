@@ -344,16 +344,15 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
             config.DEFAULT_LOGOUT_REDIRECT_URI
         )
         
-        access_token = request.cookies.get(config.SES_ID_TOKEN_FIELD)
+        id_data = request.session.get(config.SES_USER_FIELD)
+        id_token = request.cookies.get(config.SES_ID_TOKEN_FIELD)
+        keycloak_logout_url = f"{KEYCLOAK_LOGOUT_URI}?{urlencode({'id_token_hint': id_token, 'post_logout_redirect_uri': redirect_uri})}"
 
-        # # Allow sign-out even if the token is expired.
-        # if not access_token:
-        #     raise HTTPException(status_code=400, detail="No access token found")
-
-        keycloak_logout_url = f"{KEYCLOAK_LOGOUT_URI}?{urlencode({'id_token_hint': access_token, 'post_logout_redirect_uri': redirect_uri})}"
         request.session.clear()
         response = RedirectResponse(url=keycloak_logout_url)
         response.delete_cookie(config.SES_ID_TOKEN_FIELD)
+
+        auth_event.user_logout.send(request, user=id_data)
 
         return response
 
