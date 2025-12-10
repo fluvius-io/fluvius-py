@@ -82,4 +82,6 @@ class QueryResourceMeta(DataModel):  # We need DataModel.create method
     include_all: bool = False
     excluded_fields: List = tuple()
 
+    # @TODO: Remove resource, policy_required str
     policy_required: Union[bool, str] = False
+    resource: str = None
