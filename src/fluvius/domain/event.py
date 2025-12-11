@@ -1,4 +1,5 @@
 from fluvius.data import UUID_GENR, UUID_TYPE, identifier_factory, field, nullable, BlankModel, DataModel
+from fluvius.helper import ImmutableNamespace
 from .record import DomainEntityRecord
 from .entity import DomainEntity
 

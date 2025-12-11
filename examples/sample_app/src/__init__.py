@@ -25,5 +25,5 @@ async def notify(request: Request):
 
 @app.get("/error")
 async def error(request: Request):
-    raise RuntimeError("A00.500", "Test error Something went wrong")
+    raise RuntimeError("A00.500", "Testing Runtime Error")
     
