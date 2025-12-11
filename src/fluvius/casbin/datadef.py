@@ -76,3 +76,4 @@ class PolicyRequest(BaseModel):
 
 class PolicyResponse(BaseModel):
     allowed: bool
+    narration: PolicyNarration
