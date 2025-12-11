@@ -80,7 +80,6 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
     __config__      = ImmutableNamespace
     __context__     = DomainContextData
     __policymgr__   = None
-    __evthandler__  = None
 
     _cmd_processors = tuple()
     _entity_registry = dict()
@@ -188,11 +187,8 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         if cls.__dispatcher__ and not issubclass(cls.__dispatcher__, MessageDispatcher):
             raise DomainEntityError('D00.204', f'Invalid message dispatcher: {cls.__dispatcher__}')
 
-        if cls.__evthandler__ and not issubclass(cls.__evthandler__, EventHandler):
-            raise DomainEntityError('D00.207', f'Invalid event handler: {cls.__evthandler__}')
-
         if not issubclass(cls.__context__, DomainContextData):
-            raise DomainEntityError('D00.209', f'Domain has invalid context [{cls.__context__}]')
+            raise DomainEntityError('D00.204', f'Domain has invalid context [{cls.__context__}]')
 
         if not issubclass(cls.__statemgr__, StateManager):
             raise DomainEntityError('D00.205', f'Domain has invalid state manager [{cls.__statemgr__}]')
@@ -249,7 +245,6 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         self._policymgr = self.__policymgr__ and self.__policymgr__(self._statemgr)
         self._active_context = contextvars.ContextVar('domain_context', default=None)
         self._dispatcher = self.__dispatcher__(self, app, **config) if self.__dispatcher__ else None
-        self._evthandler = self.__evthandler__(self, app, **config) if self.__evthandler__ else None
 
         self.cmd_processors = _setup_command_processor_selector(self._cmd_processors)
         self.register_signals()
@@ -338,24 +333,21 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         Override this method to authorize the command
         and set the selector scope in order to fetch the aggroot
         '''
+        if not config.COMMAND_PERMISSION:
+            return command
+
         cmdc = self.lookup_command(command.command)
         if not self.policymgr or not cmdc.Meta.policy_required:
             return command
 
-        rsid = "" if cmdc.Meta.new_resource else command.identifier 
-        reqs = PolicyRequest(
-            usr=ctx.data.user_id,
-            sub=ctx.data.profile_id,
-            org=ctx.data.organization_id,
-            dom=self.__namespace__,
-            res=command.resource,
-            rid=rsid,
-            act=command.command
-        )
+        rsid = str(command.identifier)
+        actn = f"{self.__namespace__}:{command.command}"
+        auth = ctx.authorization
+        reqs = PolicyRequest(auth_ctx=auth, act=actn, rid=rsid, cqrs='COMMAND', msg=f"Command [{actn}] on [{command.resource}]")
 
         resp = await self.policymgr.check_permission(reqs)
         if not resp.allowed:
-            raise ForbiddenError('D00.307', f'Permission Failed: [{resp.narration}]')
+            raise ForbiddenError('D00.307', f'Insufficient permission to execute {resp.narration.message}', resp.narration.model_dump())
 
         return command
 
@@ -462,7 +454,6 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
                 )
                 auth_cmd = await self.authorize_command(ctx, preauth_cmd)
                 async for evt in self.process_command_internal(ctx, stm, auth_cmd):
-                    ctx.evt_queue.put(evt)
                     await self.logstore.add_event(evt)
             
             # Before exiting transaction manager context                    
@@ -470,7 +461,6 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             await self.publish(sig.TRANSACTION_COMMITTING, self, aggregate=agg)
 
         await self.publish(sig.TRANSACTION_COMMITTED, self)
-        await self.handle_events(ctx.evt_queue)
         await self.dispatch_messages(ctx.msg_queue)
 
         for resp in consume_queue(ctx.rsp_queue):
@@ -480,14 +470,12 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             responses[resp.response] = resp.data
         return responses
 
-    async def process(self, command_name, command_data, aggroot):
-        cmd_bundle = self.create_command(command_name, command_data, aggroot)
-        return await self.process_command(cmd_bundle)
 
     async def trigger_reconciliation(self, cmd_queue, aggregate):
         # This trigger run after statemgr committed.
         for cmd in consume_queue(cmd_queue):
             await self.publish(sig.TRIGGER_RECONCILIATION, cmd, aggregate=aggregate)
+
 
     def metadata(self, **kwargs):
         return {

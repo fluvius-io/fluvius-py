@@ -6,8 +6,8 @@ from casbin.model import Model
 from casbin import persist
 
 from .datadef import PolicyRequest
-from . import logger
 from fluvius.error import BadRequestError
+from ._meta import logger
 
 
 MAX_POLICY_LINE = 10000
@@ -17,14 +17,14 @@ class PolicySchema:
     _id = sa.Column(UUID, primary_key=True, nullable=False)
     ptype = sa.Column(sa.String(255))
     role = sa.Column(sa.String(255))
-    sub = sa.Column(sa.String(255))
+    usr = sa.Column(sa.String(255))
+    pro = sa.Column(sa.String(255))
     org = sa.Column(sa.String(255))
-    dom = sa.Column(sa.String(255))
-    res = sa.Column(sa.String(255))
     rid = sa.Column(sa.String(255))
     act = sa.Column(sa.String(255))
     cqrs = sa.Column(sa.String(255))
-    meta = sa.Column(sa.String(1000))
+    meta = sa.Column(sa.TEXT)
+    scope = sa.Column(sa.String(255))
 
     _deleted = sa.Column(sa.DateTime)
 
@@ -33,15 +33,13 @@ class PolicySchema:
         ptype = p.ptype
         match ptype:
             case "p":
-                return [ptype, p.role, p.dom, p.res, p.act, p.cqrs, p.meta]
+                return [ptype, p.role, p.act, p.cqrs, p.meta, p.scope]
             case "g":
-                return [ptype, p.sub, p.role, p.org]
+                return [ptype, p.usr, p.pro, p.org]
             case "g2":
-                return [ptype, p.org, p.res, p.rid]
+                return [ptype, p.pro, p.role]
             case "g3":
-                return [ptype, p.sub, p.role]
-            case "g4":
-                return [ptype, p.sub, p.res, p.rid]
+                return [ptype, p.pro, p.role, p.rid]
             case _:
                 raise BadRequestError("C00.301", f"Unsupported policy type: {ptype}")
 
@@ -53,48 +51,30 @@ class PolicySchema:
                 {
                     ".and": [{
                         "ptype": "p",
-                        "dom": request.dom,
-                        "res": request.res,
-                        "act": request.act
-                    }]
-                },
-                {
-                    ".and": [{
-                        "ptype": "p",
-                        "dom": "*",
-                        "res": "*",
-                        "act": "*"
+                        "act": request.act,
+                        "cqrs": request.cqrs,
                     }]
                 },
                 {
                     ".and": [{
                         "ptype": "g",
-                        "sub": request.sub,
-                        "org": request.org,
+                        "usr": str(request.auth_ctx.user.id),
+                        "pro": str(request.auth_ctx.profile.id),
+                        "org": str(request.auth_ctx.organization.id),
                     }]
                 },
                 {
                     ".and": [{
                         "ptype": "g2",
-                        "org": request.org,
-                        "res": request.res,
-                        "rid": request.rid,
+                        "pro": str(request.auth_ctx.profile.id),
                     }]
                 },
                 {
                     ".and": [{
                         "ptype": "g3",
-                        "sub": request.usr,
+                        "pro": str(request.auth_ctx.profile.id),
                     }]
-                },
-                {
-                    ".and": [{
-                        "ptype": "g4",
-                        "sub": request.usr,
-                        "res": request.res,
-                        "rid": request.rid,
-                    }]
-                },
+                }
             ]
         }
     
@@ -126,6 +106,7 @@ class SqlAdapter(AsyncAdapter):
         """Load a policy line into the model."""
         values = self._schema.format_policy(policy)
         values = [str(v) for v in values if v is not None]
+        logger.info(f'Load policy line: {values}')
         persist.load_policy_line(", ".join(values), model)
 
     def is_filtered(self) -> bool:

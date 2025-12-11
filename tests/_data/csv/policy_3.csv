@@ -1,6 +1,0 @@
-p, admin, org-1, data1, read
-p, admin, org-1, data1, write
-p, user, org-1, data1, read
-
-g, alice, admin, org-1
-g, bob, user, org-1
