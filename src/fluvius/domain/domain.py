@@ -15,6 +15,7 @@ from fluvius.helper.timeutil import timestamp
 from fluvius.helper.registry import ClassRegistry
 from fluvius.error import ForbiddenError, InternalServerError
 from fluvius.casbin import PolicyManager, PolicyRequest
+from fluvius.domain.event import EventHandler
 
 from . import logger, config  # noqa
 from . import activity as act
@@ -292,6 +293,13 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
     def cmdpath(cls, command, resource, identifier="", dataset=None):
         return os.path.join(cls.__namespace__, f"@{command}", resource, str(identifier))
 
+    async def handle_events(self, evt_queue):
+        for evt in consume_queue(evt_queue):
+            if self._evthandler is None:
+                continue
+            
+            await self._evthandler.process_event(evt, self.statemgr)
+        
     async def dispatch_messages(self, msg_queue):
         for msg_record in consume_queue(msg_queue):
             if self._dispatcher is None:
