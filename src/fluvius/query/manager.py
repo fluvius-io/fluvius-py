@@ -123,61 +123,24 @@ class QueryManager(object):
         handler = MethodType(func, self)
         return handler(**kwargs)
 
-    async def authorize_by_policy(self, auth_ctx: Optional[AuthorizationContext], query_resource, fe_query, identifier=None):
+    async def authorize_by_policy(self, auth_ctx: Optional[AuthorizationContext], query_resource, fe_query, identifier=None) -> dict:
         qmeta = query_resource.Meta
-        base_scope = query_resource.base_query(auth_ctx, fe_query.scope)
+        if not config.QUERY_PERMISSION:
+            return None
 
         if not self.__policymgr__ or not qmeta.policy_required or not auth_ctx:
-            return base_scope
+            return None
 
-        try:
-            if qmeta.policy_required == 'id':
-                rid = identifier or ""
-            elif qmeta.policy_required in (fe_query.scope or {}):
-                rid = fe_query.scope[qmeta.policy_required]
-            else:
-                raise BadRequestError('Q00.509', f"scope_required must include the {qmeta.policy_required} field")
+        actn = f"{self.Meta.prefix}.{query_resource._identifier}"
+        reqs = PolicyRequest(auth_ctx=auth_ctx, act=actn, cqrs='QUERY', msg=query_resource.Meta.name)
 
-            res = qmeta.resource
-            actx = auth_ctx
-            reqs = PolicyRequest(
-                msg=f"Query [{query_resource}]",
-                usr=actx.user._id,
-                sub=actx.profile._id,
-                org=actx.organization._id,
-                dom=self.Meta.prefix,
-                res=res,
-                rid=rid,
-                act=query_resource._identifier
-            )
+        async with self.data_manager.transaction():
+            resp = await self._policymgr.check_permission(reqs)
 
-            async with self.data_manager.transaction():
-                resp = await self._policymgr.check_permission(reqs)
+        if not resp.allowed:
+            raise ForbiddenError('Q00.004', f'Insufficient permission to query {resp.narration.message}', resp.narration.model_dump())
 
-            if not resp.allowed:
-                raise ForbiddenError('Q00.004', f'Insufficient permission to access {resp.narration.message}', resp.narration.model_dump())
-
-            auth_scope = []
-            for policy in resp.narration.policies:
-                if policy.role == 'sys-admin':
-                    return base_scope
-
-                if policy.meta:
-                    if not isinstance(policy.meta, str):
-                        raise ForbiddenError('Q00.005', f'{policy.meta} must be str with jsonurl format.')
-
-                    format_meta = policy.meta.format(**reqs.serialize())
-                    scope_meta = jsonurl_py.loads(format_meta)
-                    auth_scope.append(scope_meta)
-
-            scope = [_scope for _scope in [auth_scope, base_scope] if _scope]
-
-            if not scope:
-                return None
-
-            return {".and": scope}
-        except (jsonurl_py.ParseError, KeyError) as e:
-            raise InternalServerError('Q00.006', f"Internal Error: {e}")
+        return resp.narration.restriction
 
     def construct_backend_query(self,
         auth_ctx: Optional[AuthorizationContext],
@@ -187,18 +150,23 @@ class QueryManager(object):
         policy_scope=None
     ):
         """ Convert from the frontend query to the backend query """
-        scope   = (fe_query.scope or {}) | (policy_scope or {})
-        query   = query_resource.process_query(fe_query.user_query, fe_query.path_query)
-        limit   = fe_query.limit
-        offset  = (fe_query.page - 1) * fe_query.limit
-        sort    = query_resource.process_sort(*fe_query.sort if fe_query.sort else tuple())
+
+        # developer defined restrictions
+        base_query = query_resource.base_query(auth_ctx, fe_query.scope)
+
+        # consumer defined restrictions
+        query      = query_resource.process_query(fe_query.user_query, fe_query.path_query, base_query)
+
+        limit      = fe_query.limit
+        offset     = (fe_query.page - 1) * fe_query.limit
+        sort       = query_resource.process_sort(*fe_query.sort if fe_query.sort else tuple())
         include, exclude = query_resource.process_select(fe_query.include, fe_query.exclude)
 
         backend_query = BackendQuery.create(
             identifier=identifier,
             limit=limit,
             offset=offset,
-            scope=scope,
+            scope=policy_scope,  # frame work defined restriction of resource
             include=include,
             exclude=exclude,
             sort=sort,

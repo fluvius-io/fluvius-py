@@ -268,7 +268,9 @@ Error codes follow the format: `X##.###` where:
 | C00.105 | BadRequestError | 400 | Please make sure rule exists in policy when using eval() in matcher |
 | C00.201 | BadRequestError | 400 | __adapter__ is required |
 | C00.202 | BadRequestError | 400 | __schema__ is required for Custom like SQLAdapter |
-| C00.203 | ForbiddenError | 403 | Permission check failed |
+| C00.203 | BadRequestError | 400 | Permission check failed |
+| C00.204 | BadRequestError | 400 | Failed to parse policy meta |
+| C00.205 | BadRequestError | 400 | Failed to render value |
 | C00.301 | BadRequestError | 400 | Unsupported policy type |
 
 ### Ordinis Errors (R00.###)

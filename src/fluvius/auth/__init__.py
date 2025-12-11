@@ -27,6 +27,8 @@ class KeycloakTokenPayload(DataModel):
     email: EmailStr
     realm_access: dict
     resource_access: dict
+    session_id: Optional[str] = None
+    client_token: Optional[str] = None
 
     @property
     def id(self):
@@ -61,11 +63,11 @@ class SessionOrganization(DataModel):
         return self.id
 
 
-AuthorizationContext = SimpleNamespace
+# AuthorizationContext = SimpleNamespace
 
-# class AuthorizationContext(DataModel):
-#     realm: str
-#     user: KeycloakTokenPayload
-#     profile: SessionProfile
-#     organization: SessionOrganization
-#     iamroles: tuple
+class AuthorizationContext(DataModel):
+    realm: str
+    user: KeycloakTokenPayload
+    profile: SessionProfile
+    organization: SessionOrganization
+    iamroles: tuple
