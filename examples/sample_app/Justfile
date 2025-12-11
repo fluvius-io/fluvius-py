@@ -8,6 +8,9 @@ help:
 dev:
     uvicorn src:app --host 0.0.0.0 --reload --reload-dir="../../src" --reload-dir="./"
 
+worker:
+    python src/worker.py
+
 up:
     docker compose up -d
 

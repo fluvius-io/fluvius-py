@@ -56,4 +56,4 @@ MQTT_PERMISSIONS = [
 MQTT_DEBUG = True
 ALLOW_LOGOUT_GET_METHOD = False
 
-ERROR_TRACKER = "NullTracker" # "PosthogTracker" or "SentryTracker"
+ERROR_TRACKING_PROVIDER = "NullTracker" # "PosthogTracker" or "SentryTracker"

@@ -62,10 +62,10 @@ def create_app(config=config, **kwargs) -> FastAPI:
 
 
 def setup_exception_handler(app: FastAPI) -> FastAPI:
-    if not config.ERROR_TRACKER:
+    if not config.ERROR_TRACKING_PROVIDER:
         return app.exception_handler
 
-    tracker_name = config.ERROR_TRACKER
+    tracker_name = config.ERROR_TRACKING_PROVIDER
     tracker = ErrorTracker.get_tracker(tracker_name)
 
     def exception_handler(exc_class_or_status_code):
