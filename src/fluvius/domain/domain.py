@@ -343,18 +343,19 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
         rsid = "" if cmdc.Meta.new_resource else command.identifier 
         reqs = PolicyRequest(
+            msg=f"Command [{command.command}] @ {self.Meta.name}",
             usr=ctx.data.user_id,
             sub=ctx.data.profile_id,
             org=ctx.data.organization_id,
             dom=self.__namespace__,
             res=command.resource,
             rid=rsid,
-            act=command.command
+            act=command.command,
         )
 
         resp = await self.policymgr.check_permission(reqs)
         if not resp.allowed:
-            raise ForbiddenError('D00.307', f'Permission Failed: [{resp.narration}]')
+            raise ForbiddenError('D00.307', f'Insufficient permission for {resp.narration.message}', resp.narration.model_dump())
 
         return command
 

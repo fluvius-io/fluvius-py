@@ -65,7 +65,6 @@ class PolicyManager:
             start = time()
             await self._enforcer.load_filtered_policy(fitler)
             logger.info(f"Time taken to load filtered policy: {time() - start}")
-            start = time()
             allowed, narration = self._enforcer.enforce_ex(
                 request.usr,
                 request.sub,
@@ -80,17 +79,15 @@ class PolicyManager:
                 narration=self._generate_narration(request, allowed, narration)
             )
         except Exception as e:
-            raise ForbiddenError("C00.203", f"Permission check failed: {str(e)}", str(e))
+            raise ForbiddenError("C00.203", f"Permission check error: {str(e)}", str(e))
 
     def _generate_narration(self, request: PolicyRequest, allowed: bool, narration: list) -> str:
         """Generate a human readable explanation of the policy decision."""
-        message = f"Request: {request}"
 
         policies = []
         if narration:
             policies = []
             for policy in narration:
-                print(policy)
                 prule = PolicyData(
                     role=policy[0],
                     dom=policy[1],
@@ -101,4 +98,4 @@ class PolicyManager:
                 )
                 policies.append(prule)
 
-        return PolicyNarration(message=message, policies=policies)
+        return PolicyNarration(message=request.msg, policies=policies)

@@ -1,31 +1,33 @@
-from pyrsistent import PClass, field, pvector_field
+from typing import List
+from pydantic import BaseModel
 
 
-class PolicyRequest(PClass):
-    usr = field(type=str, factory=str)
-    sub = field(type=str, factory=str)
-    org = field(type=str, factory=str)
-    dom = field(type=str, factory=str)
-    res = field(type=str, factory=str)
-    rid = field(type=str, factory=str)
-    act = field(type=str, factory=str)
-    cqrs = field(type=str, factory=str, initial="COMMAND")
+class PolicyRequest(BaseModel):
+    msg: str        # Short description of the request for easier tracing.
+    usr: str
+    sub: str = ""
+    org: str = ""
+    dom: str = ""
+    res: str = ""
+    rid: str = ""
+    act: str = ""
+    cqrs: str = "COMMAND"
 
 
-class PolicyData(PClass):
-    role  = field(type=str, factory=str)
-    dom   = field(type=str, factory=str)
-    res   = field(type=str, factory=str)
-    act   = field(type=str, factory=str)
-    cqrs  = field(type=str, factory=str)
-    meta  = field(type=str, factory=str)
+class PolicyData(BaseModel):
+    role: str = ""
+    dom: str = ""
+    res: str = ""
+    act: str = ""
+    cqrs: str = ""
+    meta: str = ""
 
 
-class PolicyNarration(PClass):
-    message  = field(type=str, factory=str)
-    policies = pvector_field(PolicyData, initial=[])
+class PolicyNarration(BaseModel):
+    message: str = ""
+    policies: List[PolicyData] = []
 
 
-class PolicyResponse(PClass):
-    allowed   = field(type=bool, factory=bool)
-    narration = field(type=PolicyNarration)
+class PolicyResponse(BaseModel):
+    allowed: bool = False
+    narration: PolicyNarration

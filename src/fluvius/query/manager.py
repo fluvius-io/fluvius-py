@@ -141,6 +141,7 @@ class QueryManager(object):
             res = qmeta.resource
             actx = auth_ctx
             reqs = PolicyRequest(
+                msg=f"Query [{query_resource}]",
                 usr=actx.user._id,
                 sub=actx.profile._id,
                 org=actx.organization._id,
@@ -154,7 +155,7 @@ class QueryManager(object):
                 resp = await self._policymgr.check_permission(reqs)
 
             if not resp.allowed:
-                raise ForbiddenError('Q00.004', f'Permission Failed: [{resp.narration}]')
+                raise ForbiddenError('Q00.004', f'Insufficient permission to access {resp.narration.message}', resp.narration.model_dump())
 
             auth_scope = []
             for policy in resp.narration.policies:
