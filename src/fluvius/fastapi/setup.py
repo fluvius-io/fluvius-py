@@ -1,6 +1,6 @@
 import traceback
 import fluvius
-from fluvius.error import FluviusException
+from fluvius.error import FluviusException, ErrorTracker
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
@@ -61,33 +61,31 @@ def create_app(config=config, **kwargs) -> FastAPI:
     return setup_error_handler(app)
 
 
-def setup_error_tracker(app: FastAPI) -> FastAPI:
-    from fluvius.error.tracker import ErrorTracker
+def setup_exception_handler(app: FastAPI) -> FastAPI:
+    if not config.ERROR_TRACKER:
+        return app.exception_handler
 
     tracker_name = config.ERROR_TRACKER
     tracker = ErrorTracker.get_tracker(tracker_name)
-    original_handler = app.exception_handler
 
-    def tracker_handler(exc_class_or_status_code):
+    def exception_handler(exc_class_or_status_code):
         def decorator(func):
             @wraps(func)
             async def wrapper(request, exc, *args, **kwargs):
                 tracker.capture_exception(exc)
                 return await func(request, exc, *args, **kwargs)
-            return original_handler(exc_class_or_status_code)(wrapper)
+            return app.exception_handler(exc_class_or_status_code)(wrapper)
         return decorator
 
-    app.exception_handler = tracker_handler
-    return app
+    return exception_handler
 
 
 def setup_error_handler(app: FastAPI) -> FastAPI:
     DEVELOPER_MODE = config.DEVELOPER_MODE
 
-    if config.ERROR_TRACKER:
-        app = setup_error_tracker(app)
+    exception_handler = setup_exception_handler(app)
 
-    @app.exception_handler(FluviusException)
+    @exception_handler(FluviusException)
     async def fluvius_exception_handler(request: Request, exc: FluviusException):
         content = exc.content
 
@@ -100,7 +98,7 @@ def setup_error_handler(app: FastAPI) -> FastAPI:
             content=content
         )
     
-    @app.exception_handler(ValidationError)
+    @exception_handler(ValidationError)
     async def validation_error_exception_handler(request: Request, exc: ValidationError):
         content = {
             "errcode": "A422.01",
@@ -116,7 +114,7 @@ def setup_error_handler(app: FastAPI) -> FastAPI:
             content=content
         )
 
-    @app.exception_handler(ValueError)
+    @exception_handler(ValueError)
     async def value_error_exception_handler(request: Request, exc: ValueError):
         content = {
             "message": str(exc),
@@ -131,7 +129,7 @@ def setup_error_handler(app: FastAPI) -> FastAPI:
             content=content
         )
 
-    @app.exception_handler(RuntimeError)
+    @exception_handler(RuntimeError)
     async def runtime_error_exception_handler(request: Request, exc: RuntimeError):
         content = {
             "message": str(exc),
@@ -146,7 +144,7 @@ def setup_error_handler(app: FastAPI) -> FastAPI:
             content=content
         )
 
-    @app.exception_handler(ResponseValidationError)
+    @exception_handler(ResponseValidationError)
     async def response_validation_exception_handler(request: Request, exc: ResponseValidationError):
         logger.error(f"Response validation failed: {exc}")
         content = {
