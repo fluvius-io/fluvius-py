@@ -4,7 +4,6 @@ import json
 import jwt
 
 from fluvius.error import UnauthorizedError
-from fluvius.auth import config
 
 def extract_jwt_kid(token: str) -> dict:
     header_segment = token.split('.')[0]
