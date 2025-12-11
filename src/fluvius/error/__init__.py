@@ -1,4 +1,5 @@
 from fluvius import config, logger
+from .tracker import ErrorTracker
 
 
 DEBUG_APP_EXCEPTION = config.DEBUG_APP_EXCEPTION

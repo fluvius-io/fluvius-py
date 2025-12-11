@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import ResponseValidationError
+from functools import wraps
 from pydantic import ValidationError
 
 from . import config, logger
@@ -60,8 +61,31 @@ def create_app(config=config, **kwargs) -> FastAPI:
     return setup_error_handler(app)
 
 
+def setup_error_tracker(app: FastAPI) -> FastAPI:
+    from fluvius.error.tracker import ErrorTracker
+
+    tracker_name = config.ERROR_TRACKER
+    tracker = ErrorTracker.get_tracker(tracker_name)
+    original_handler = app.exception_handler
+
+    def tracker_handler(exc_class_or_status_code):
+        def decorator(func):
+            @wraps(func)
+            async def wrapper(request, exc, *args, **kwargs):
+                tracker.capture_exception(exc)
+                return await func(request, exc, *args, **kwargs)
+            return original_handler(exc_class_or_status_code)(wrapper)
+        return decorator
+
+    app.exception_handler = tracker_handler
+    return app
+
+
 def setup_error_handler(app: FastAPI) -> FastAPI:
     DEVELOPER_MODE = config.DEVELOPER_MODE
+
+    if config.ERROR_TRACKER:
+        app = setup_error_tracker(app)
 
     @app.exception_handler(FluviusException)
     async def fluvius_exception_handler(request: Request, exc: FluviusException):
