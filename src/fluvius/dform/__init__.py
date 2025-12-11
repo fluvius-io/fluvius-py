@@ -2,8 +2,9 @@ from ._meta import config, logger
 from .domain.domain import FormDomain, FormResponse
 from .domain.query import FormQueryManager
 from .domain.model import FormDataManager
-from .element import BaseElementType, ElementTypeRegistry, register_element_type, get_element_type, populate_element_type_table, ElementDataManager
+from .element import ElementDataManager, ElementBase, ElementModel, ElementSchemaRegistry
 from .schema import FormConnector
+from .fastapi import setup_dform
 
 # Import commands to ensure they are registered
 from .domain import command, datadef
@@ -11,8 +12,6 @@ from .domain import command, datadef
 __all__ = [
     "config", "logger",
     "FormDomain", "FormResponse", "FormConnector", "FormQueryManager",
-    "FormDataManager", "ElementDataManager",
-    "BaseElementType", "ElementTypeRegistry", "register_element_type",
-    "get_element_type", "populate_element_type_table"
+    "FormDataManager", "ElementDataManager", "ElementBase", "ElementModel",
+    "ElementSchemaRegistry", "setup_dform",
 ]
-

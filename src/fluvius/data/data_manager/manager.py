@@ -31,6 +31,7 @@ ATTR_QUERY_MARKER = '__domain_query__'
 BACKEND_QUERY_LIMIT = config.BACKEND_QUERY_INTERNAL_LIMIT
 RAISE_NESTED_TRANSACTION_ERROR = False
 
+
 def list_unwrapper(cursor):
     return tuple(SimpleNamespace(**row._asdict()) for row in cursor.all())
 
@@ -241,11 +242,11 @@ class DataAccessManagerBase(object):
 
     @classmethod
     def _serialize(cls, model_name, item):
-        model = cls.lookup_model(model_name)
-        if not isinstance(item, model):
+        model_cls = cls.lookup_model(model_name)
+        if not isinstance(item, model_cls):
             raise InternalServerError('E00.206', f'Cannot serialize item. It must be an instance of [{model}].')
 
-        return model.serialize(item)
+        return model_cls.serialize(item)
 
     @classmethod
     def _wrap_item(cls, model_name, data):

@@ -148,6 +148,7 @@ async def test_project_admin_create_without_resource_id():
             act=act,
             rid=rid,
             cqrs=cqrs,
+            msg="Test Request"
         )
         async with policy_manager._dam.transaction():
             response = await policy_manager.check_permission(request)

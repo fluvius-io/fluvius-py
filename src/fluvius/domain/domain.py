@@ -335,11 +335,11 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         rsid = str(command.identifier)
         actn = f"{self.__namespace__}:{command.command}"
         auth = ctx.authorization
-        reqs = PolicyRequest(auth_ctx=auth, act=actn, rid=rsid, cqrs='COMMAND')
+        reqs = PolicyRequest(auth_ctx=auth, act=actn, rid=rsid, cqrs='COMMAND', msg=f"Command [{actn}] on [{command.resource}]")
 
         resp = await self.policymgr.check_permission(reqs)
         if not resp.allowed:
-            raise ForbiddenError('D00.307', f'Permission Failed [{reqs}] => [{resp.narration}]')
+            raise ForbiddenError('D00.307', f'Insufficient permission to execute {resp.narration.message}', resp.narration.model_dump())
 
         return command
 

@@ -53,19 +53,21 @@ class PolicyData(BaseModel):
     act: str
     scope: PolicyScope
     meta: Optional[str] = None
-    
+
     def __post_init__(self, **kwargs):
         super().__init__(**kwargs)
         self.meta = self.meta or None
 
 
 class PolicyNarration(BaseModel):
+    message: Optional[str] = None
     policies: List[PolicyData] = Field(default_factory=list)
     trace: List[dict] = Field(default_factory=list)
     restriction: Dict = Field(default_factory=dict)
 
 
 class PolicyRequest(BaseModel):
+    msg: str        # Short description of the request for easier tracing.
     auth_ctx: AuthorizationContext
     act: str
     cqrs: str

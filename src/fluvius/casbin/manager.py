@@ -72,9 +72,9 @@ class PolicyManager:
         if config.SUPER_ADMIN_ROLE_KEY in request.auth_ctx.iamroles:
             return PolicyResponse(
                 allowed=True,
-                narration=PolicyNarration(policies=[], trace=[], restriction={})
+                narration=PolicyNarration(policies=[], trace=[], restriction={}, message=None)
             )
-        
+
         try:
             fitler = self._get_filter_from_request(request)
             await self._enforcer.load_filtered_policy(fitler)
@@ -112,12 +112,12 @@ class PolicyManager:
         if request.cqrs == "QUERY":
             restriction = await self._generate_restriction(request, policies) if policies else {}
 
-        return PolicyNarration(policies=policies, trace=trace, restriction=restriction)
+        return PolicyNarration(policies=policies, trace=trace, restriction=restriction, message=request.msg)
 
     async def _generate_restriction(self, request: PolicyRequest, policies: List[PolicyData]) -> dict:
         if not policies:
             return {}
-        
+
         context      = self._build_context(request)
         scope, metas = self._reconcile_policies(policies)
         conditions   = self._reconcile_condition(scope, metas, context)
@@ -152,13 +152,13 @@ class PolicyManager:
         scopes = [policy.scope for policy in policies]
         if PolicyScope.SYSTEM in scopes:
             return PolicyScope.SYSTEM
-        
+
         if PolicyScope.TENANT in scopes:
             return PolicyScope.TENANT
-        
+
         if PolicyScope.RESOURCE in scopes:
             return PolicyScope.RESOURCE
-        
+
         return PolicyScope.SYSTEM
 
     def _retrieve_resource(self, request: PolicyRequest) -> Dict[str, Set[str]]:
@@ -185,7 +185,7 @@ class PolicyManager:
             meta_cond = meta.restriction.condition
             if not meta_cond:
                 continue
-            
+
             scope_cond = getattr(meta_cond, scope, None)
             if not scope_cond:
                 continue
@@ -211,26 +211,26 @@ class PolicyManager:
                 op=leaf.op,
                 value=self._render_value(leaf.value, context)
             )
-        
+
         def _render_node(node: ConditionNode) -> ConditionNode:
             result = ConditionNode()
-            
+
             if node.ALL:
                 result.ALL = [
                     _render_leaf(item) if isinstance(item, ConditionLeaf) else _render_node(item)
                     for item in node.ALL
                 ]
-            
+
             if node.ANY:
                 result.ANY = [
                     _render_leaf(item) if isinstance(item, ConditionLeaf) else _render_node(item)
                     for item in node.ANY
                 ]
-            
+
             return result
-        
+
         return _render_node(condition)
-        
+
     def _render_value(self, val: str, context: Dict[str, Any]) -> Any:
         if not isinstance(val, str):
             return val

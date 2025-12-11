@@ -5,7 +5,10 @@ from .datadef import (
     CreateCollectionData, UpdateCollectionData, RemoveCollectionData,
     CreateDocumentData, UpdateDocumentData, RemoveDocumentData, CopyDocumentData, MoveDocumentData,
     AddDocumentToCollectionData,
-    PopulateElementData, PopulateFormData, SaveElementData, SaveFormData, SubmitFormData
+    PopulateElementData,
+    PopulateFormData,
+    SaveFormData,
+    SubmitFormData
 )
 
 Command = FormDomain.Command
@@ -211,31 +214,13 @@ class PopulateForm(Command):
         yield agg.create_response(serialize_mapping(result), _type="form-response")
 
 
-class SaveElement(Command):
-    """Save element data"""
-
-    class Meta:
-        key = 'save-element'
-        name = 'Save Element'
-        resources = ("element_definition",)
-        tags = ["form", "element", "save"]
-        auth_required = True
-        description = "Save element data but still allow further editing"
-
-    Data = SaveElementData
-
-    async def _process(self, agg, stm, payload):
-        result = await agg.save_element(payload)
-        yield agg.create_response(serialize_mapping(result), _type="form-response")
-
-
 class SaveForm(Command):
     """Save form data (multiple elements) but still allow further editing"""
 
     class Meta:
         key = 'save-form'
         name = 'Save Form'
-        resources = ("form_definition",)
+        resources = ("document_form",)
         tags = ["form", "save"]
         auth_required = True
         description = "Save form data (multiple elements) but still allow further editing"
@@ -253,7 +238,7 @@ class SubmitForm(Command):
     class Meta:
         key = 'submit-form'
         name = 'Submit Form'
-        resources = ("form_definition",)
+        resources = ("document_form",)
         tags = ["form", "submit"]
         auth_required = True
         description = "Save element data and lock it from further editing"

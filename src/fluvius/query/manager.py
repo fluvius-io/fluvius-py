@@ -132,13 +132,13 @@ class QueryManager(object):
             return None
 
         actn = f"{self.Meta.prefix}.{query_resource._identifier}"
-        reqs = PolicyRequest(auth_ctx=auth_ctx, act=actn, cqrs='QUERY')
+        reqs = PolicyRequest(auth_ctx=auth_ctx, act=actn, cqrs='QUERY', msg=query_resource.Meta.name)
 
         async with self.data_manager.transaction():
             resp = await self._policymgr.check_permission(reqs)
 
         if not resp.allowed:
-            raise ForbiddenError('Q00.004', f'Permission Failed: [{resp.narration}]')
+            raise ForbiddenError('Q00.004', f'Insufficient permission to query {resp.narration.message}', resp.narration.model_dump())
 
         return resp.narration.restriction
 

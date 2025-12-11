@@ -1,7 +1,7 @@
 from fluvius.domain.aggregate import Aggregate, action
 from fluvius.data import UUID_GENR, timestamp
 from fluvius.error import NotFoundError, BadRequestError
-from fluvius.dform.element import get_element_type, ElementDataManager
+from fluvius.dform.element import ElementDataManager
 
 from .. import logger
 
@@ -279,32 +279,15 @@ class FormAggregate(Aggregate):
             "status": "removed",
         }
 
-    @action("element-definition-created", resources="form_element_group")
+    @action("element-definition-created")
     async def create_element_definition(self, data):
-        """Create an element definition within an element group definition"""
-        group_def = self.rootobj
-        
-        # Verify element type exists
-        element_type = await self.statemgr.fetch('element_type', data.element_type_id)
-        if not element_type:
-            raise NotFoundError(
-                "F00.204",
-                f"Element type not found: {data.element_type_id}",
-                None
-            )
-        
+        """Create an element definition"""
         element_def = self.init_resource(
             "element_definition",
-            _id=UUID_GENR(),
-            form_element_group_id=group_def._id,
-            element_type_id=data.element_type_id,
+            _id=self.aggroot.identifier,
             element_key=data.element_key,
             element_label=data.element_label,
-            order=data.order or 0,
-            required=data.required or False,
-            validation_rules=data.validation_rules,
-            resource_id=data.resource_id,
-            resource_name=data.resource_name,
+            element_schema=data.element_schema,
         )
         await self.statemgr.insert(element_def)
         return {
@@ -994,249 +977,193 @@ class FormAggregate(Aggregate):
         
         return result
 
-    @action("element-saved", resources="element_definition")
+    @action("element-saved", resources="document_form")
     async def save_element(self, data):
-        """Save element data with validation"""
-        element_def = self.rootobj
-
-        # Get element type from database
-        element_type_record = await self.statemgr.fetch('element_type', element_def.element_type_id)
-
-        # Get element type class for validation
-        try:
-            element_type_cls = get_element_type(element_type_record.type_key)
-        except (RuntimeError, NotFoundError):
-            # Element type not registered, skip validation
-            element_type_cls = None
-
-        # Validate data using element type class
-        validated_data = data.data
-        if element_type_cls:
-            validated_data = element_type_cls.validate_data(data.data)
-
-        # Get element data manager
-        element_data_mgr = ElementDataManager()
-
-        # Use transaction context for element data operations
-        async with element_data_mgr.transaction():
-            # Check if element instance already exists
-            existing_instances = await element_data_mgr.query(
+        """Save element data within a document form
+        
+        Data format: {"data": {"<element_key>": {<element_data>}}}
+        """
+        document_form = self.rootobj
+        
+        saved_elements = []
+        
+        # Process each element in the data
+        for element_key, element_data in data.data.items():
+            # Find the element instance for this form and element_key
+            existing_elements = await self.statemgr.query(
                 "element",
                 where={
-                    "element_group_id": data.element_group_id,
-                    "element_definition_id": element_def._id
+                    "form_id": document_form._id,
+                    "element_key": element_key,
                 },
                 limit=1
             )
-
-            if existing_instances:
+            
+            if existing_elements:
                 # Update existing element instance
-                element = existing_instances[0]
-                await element_data_mgr.update(
+                element = existing_elements[0]
+                await self.statemgr.update(
                     element,
-                    data=validated_data,
-                    attrs=data.attrs,
+                    data=element_data,
                     **self.audit_updated()
                 )
+                saved_elements.append({
+                    "element_key": element_key,
+                    "element_id": str(element._id),
+                    "status": "updated",
+                })
             else:
-                # Create new element instance
-                element = element_data_mgr.create(
+                # Element instance doesn't exist - this shouldn't happen if document was created properly
+                # but we can create it if needed
+                element = self.init_resource(
                     "element",
                     _id=UUID_GENR(),
-                    element_group_id=data.element_group_id,
-                    element_definition_id=element_def._id,
-                    instance_key=data.instance_key,
-                    data=validated_data,
-                    attrs=data.attrs,
+                    document_id=document_form.document_id,
+                    form_id=document_form._id,
+                    group_key="",  # Would need to look up from form_element
+                    element_key=element_key,
+                    data=element_data,
                 )
-                await element_data_mgr.insert(element)
+                await self.statemgr.insert(element)
+                saved_elements.append({
+                    "element_key": element_key,
+                    "element_id": str(element._id),
+                    "status": "created",
+                })
         
         return {
-            "element_definition_id": str(element_def._id),
-            "element_group_id": str(data.element_group_id),
-            "element_id": str(element._id),
+            "document_form_id": str(document_form._id),
+            "form_key": document_form.form_key,
+            "elements": saved_elements,
             "status": "saved",
-            "message": "Element data saved",
         }
 
-    @action("form-saved", resources="form_definition")
+    @action("form-saved", resources="document_form")
     async def save_form(self, data):
         """Save form data (multiple elements) but still allow further editing"""
-        form_def = self.rootobj
-
-        # Get element data manager
-        element_data_mgr = ElementDataManager()
-
-        # Use transaction context for element data operations
-        async with element_data_mgr.transaction():
-            # Verify form instance exists
-            form = await element_data_mgr.fetch('form', data.form_id)
-            if not form:
-                raise NotFoundError(
-                    "F00.206",
-                    f"Form instance not found: {data.form_id}",
-                    None
+        document_form = self.rootobj
+        
+        saved_elements = []
+        
+        # Process each element in the data
+        for element_key, element_data in data.data.items():
+            # Find the element instance for this form and element_key
+            existing_elements = await self.statemgr.query(
+                "element",
+                where={
+                    "form_id": document_form._id,
+                    "element_key": element_key,
+                },
+                limit=1
+            )
+            
+            if existing_elements:
+                # Update existing element instance
+                element = existing_elements[0]
+                await self.statemgr.update(
+                    element,
+                    data=element_data,
+                    **self.audit_updated()
                 )
-
-            # Save each element data
-            saved_count = 0
-            for element_data in data.elements:
-                element_definition_id = element_data.get("element_definition_id")
-                element_group_id = element_data.get("element_group_id")
-                instance_key = element_data.get("instance_key")
-                element_data_dict = element_data.get("data", {})
-                element_attrs = element_data.get("attrs")
-
-                if not element_definition_id or not element_group_id:
-                    continue
-
-                # Get element definition from database
-                element_def = await self.statemgr.fetch('element_definition', element_definition_id)
-
-                # Get element type for validation
-                element_type_record = await self.statemgr.fetch('element_type', element_def.element_type_id)
-
-                # Validate data
-                validated_data = element_data_dict
-                try:
-                    element_type_cls = get_element_type(element_type_record.type_key)
-                    validated_data = element_type_cls.validate_data(element_data_dict)
-                except (RuntimeError, NotFoundError):
-                    # Element type not registered, skip validation
-                    pass
-
-                # Check if element instance already exists
-                existing_instances = await element_data_mgr.query(
+                saved_elements.append({
+                    "element_key": element_key,
+                    "element_id": str(element._id),
+                    "status": "updated",
+                })
+            else:
+                # Element instance doesn't exist - create it
+                element = self.init_resource(
                     "element",
-                    where={
-                        "element_group_id": element_group_id,
-                        "element_definition_id": element_definition_id
-                    },
-                    limit=1
+                    _id=UUID_GENR(),
+                    document_id=document_form.document_id,
+                    form_id=document_form._id,
+                    group_key="",
+                    element_key=element_key,
+                    data=element_data,
                 )
-
-                if existing_instances:
-                    # Update existing
-                    await element_data_mgr.update(
-                        existing_instances[0],
-                        data=validated_data,
-                        attrs=element_attrs,
-                        **self.audit_updated()
-                    )
-                else:
-                    # Create new
-                    new_element = element_data_mgr.create(
-                        "element",
-                        _id=UUID_GENR(),
-                        element_group_id=element_group_id,
-                        element_definition_id=element_definition_id,
-                        instance_key=instance_key or f"element-{str(element_definition_id)[:8]}",
-                        data=validated_data,
-                        attrs=element_attrs,
-                    )
-                    await element_data_mgr.insert(new_element)
-
-                saved_count += 1
+                await self.statemgr.insert(element)
+                saved_elements.append({
+                    "element_key": element_key,
+                    "element_id": str(element._id),
+                    "status": "created",
+                })
         
         return {
-            "form_definition_id": str(form_def._id),
-            "form_id": str(data.form_id),
-            "elements_saved": saved_count,
+            "document_form_id": str(document_form._id),
+            "form_key": document_form.form_key,
+            "elements": saved_elements,
             "status": "saved",
-            "message": "Form data saved (editable)",
         }
 
-    @action("form-submitted", resources="form_definition")
+    @action("form-submitted", resources="document_form")
     async def submit_form(self, data):
         """Submit form (saves element data and locks from further editing)"""
-        form_def = self.rootobj
-
-        # Get element data manager
-        element_data_mgr = ElementDataManager()
-
-        # Use transaction context for element data operations
-        async with element_data_mgr.transaction():
-            # Verify form instance exists
-            form = await element_data_mgr.fetch('form', data.form_id)
-            if not form:
-                raise NotFoundError(
-                    "F00.206",
-                    f"Form instance not found: {data.form_id}",
-                    None
-                )
-
-            # Save each element data
-            saved_count = 0
-            for element_data in data.elements:
-                element_definition_id = element_data.get("element_definition_id")
-                element_group_id = element_data.get("element_group_id")
-                instance_key = element_data.get("instance_key")
-                element_data_dict = element_data.get("data", {})
-                element_attrs = element_data.get("attrs")
-
-                if not element_definition_id or not element_group_id:
-                    continue
-
-                # Get element definition from database
-                element_def = await self.statemgr.fetch('element_definition', element_definition_id)
-
-                # Get element type for validation
-                element_type_record = await self.statemgr.fetch('element_type', element_def.element_type_id)
-
-                # Validate data
-                validated_data = element_data_dict
-                try:
-                    element_type_cls = get_element_type(element_type_record.type_key)
-                    validated_data = element_type_cls.validate_data(element_data_dict)
-                except (RuntimeError, NotFoundError):
-                    # Element type not registered, skip validation
-                    pass
-
-                # Check if element instance already exists
-                existing_instances = await element_data_mgr.query(
-                    "element",
-                    where={
-                        "element_group_id": element_group_id,
-                        "element_definition_id": element_definition_id
-                    },
-                    limit=1
-                )
-
-                if existing_instances:
-                    # Update existing
-                    await element_data_mgr.update(
-                        existing_instances[0],
-                        data=validated_data,
-                        attrs=element_attrs,
-                        **self.audit_updated()
-                    )
-                else:
-                    # Create new
-                    new_element = element_data_mgr.create(
-                        "element",
-                        _id=UUID_GENR(),
-                        element_group_id=element_group_id,
-                        element_definition_id=element_definition_id,
-                        instance_key=instance_key or f"element-{str(element_definition_id)[:8]}",
-                        data=validated_data,
-                        attrs=element_attrs,
-                    )
-                    await element_data_mgr.insert(new_element)
-
-                saved_count += 1
-
-            # Lock form instance
-            await element_data_mgr.update(
-                form,
-                locked=True
+        document_form = self.rootobj
+        
+        # Check if form is already locked
+        if document_form.locked:
+            raise BadRequestError(
+                "F00.207",
+                f"Form is already locked and cannot be modified: {document_form._id}"
             )
         
+        saved_elements = []
+        
+        # Process each element in the data
+        for element_key, element_data in data.data.items():
+            # Find the element instance for this form and element_key
+            existing_elements = await self.statemgr.query(
+                "element",
+                where={
+                    "form_id": document_form._id,
+                    "element_key": element_key,
+                },
+                limit=1
+            )
+            
+            if existing_elements:
+                # Update existing element instance
+                element = existing_elements[0]
+                await self.statemgr.update(
+                    element,
+                    data=element_data,
+                    **self.audit_updated()
+                )
+                saved_elements.append({
+                    "element_key": element_key,
+                    "element_id": str(element._id),
+                    "status": "updated",
+                })
+            else:
+                # Element instance doesn't exist - create it
+                element = self.init_resource(
+                    "element",
+                    _id=UUID_GENR(),
+                    document_id=document_form.document_id,
+                    form_id=document_form._id,
+                    group_key="",
+                    element_key=element_key,
+                    data=element_data,
+                )
+                await self.statemgr.insert(element)
+                saved_elements.append({
+                    "element_key": element_key,
+                    "element_id": str(element._id),
+                    "status": "created",
+                })
+        
+        # Lock the form
+        await self.statemgr.update(
+            document_form,
+            locked=True,
+            **self.audit_updated()
+        )
+        
         return {
-            "form_definition_id": str(form_def._id),
-            "form_id": str(data.form_id),
-            "elements_saved": saved_count,
+            "document_form_id": str(document_form._id),
+            "form_key": document_form.form_key,
+            "elements": saved_elements,
             "status": "submitted",
             "locked": True,
-            "message": "Form submitted and locked from further editing",
         }
 
