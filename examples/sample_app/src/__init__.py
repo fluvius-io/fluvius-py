@@ -6,7 +6,7 @@ from fluvius.fastapi import (
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from fluvius.fastapi.auth import FluviusAuthProfileProvider
-
+from fluvius.error import AssertionFailed
 
 from fluvius.error._meta import config, logger
 
@@ -25,5 +25,5 @@ async def notify(request: Request):
 
 @app.get("/error")
 async def error(request: Request):
-    raise RuntimeError("A00.500", "Testing Runtime Error")
+    raise AssertionFailed("APP00.400", "Test error Assertion Failed")
     

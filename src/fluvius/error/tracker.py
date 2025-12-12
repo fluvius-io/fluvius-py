@@ -1,4 +1,5 @@
 import traceback
+from uuid import uuid4
 from typing import Optional
 from ._meta import config, logger
 
@@ -70,6 +71,7 @@ class PosthogTracker(ErrorTracker):
                 "exception_type": type(exception).__name__,
                 "exception_message": str(exception),
                 "exception_traceback": traceback.format_exc(),
+                "exception_fingerprint": str(uuid4()),
             }
             
             self.posthog.capture_exception(

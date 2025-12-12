@@ -5,10 +5,10 @@ export FLUVIUS_CONFIG_FILE := "config.ini"
 help:
     just --list
 
-dev:
+run-app:
     uvicorn src:app --host 0.0.0.0 --reload --reload-dir="../../src" --reload-dir="./"
 
-worker:
+run-worker:
     python src/worker.py
 
 up:
