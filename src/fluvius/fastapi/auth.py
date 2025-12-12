@@ -100,6 +100,10 @@ class FluviusAuthMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         try:
+            # @TODO: Hot fix. This issue already fixed on `develop` branch.
+            if request.url.path.endswith('sign-out'):
+                return await call_next(request)
+
             auth_context = await self.get_auth_context(request)
             request.state.auth_context = auth_context
         except FluviusException as e:
