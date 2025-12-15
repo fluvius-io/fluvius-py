@@ -2,7 +2,7 @@
 Tests for Element Schema Registration and FastAPI Endpoints
 
 This module tests:
-- Creating custom elements by inheriting ElementBase
+- Creating custom elements by inheriting ElementModel
 - Registering element schemas
 - Querying element JSON schemas via the FastAPI endpoint
 """
@@ -15,76 +15,55 @@ from fastapi import FastAPI
 from httpx import AsyncClient, ASGITransport
 
 from fluvius.dform.element import (
-    ElementBase, 
     ElementModel, 
     ElementSchemaRegistry,
 )
 from fluvius.dform.fastapi import setup_dform
+from fluvius.fastapi.setup import setup_error_handler
 
 
 # ============================================================================
 # Sample Element Definitions for Testing
 # ============================================================================
 
-class TextInputModel(ElementModel):
-    """Model for text input element data"""
+class TextInputElementModel(ElementModel):
+    """A simple text input element"""
     value: str = Field(default="", description="The text input value")
     placeholder: Optional[str] = Field(default=None, description="Placeholder text")
     max_length: Optional[int] = Field(default=None, description="Maximum character length")
-
-
-class TextInputElement(ElementBase):
-    """A simple text input element"""
-    __tablename__ = "text_input_element"
     
     class Meta:
         key = "text-input"
         name = "Text Input"
         desc = "A single-line text input element"
-    
-    class Model(TextInputModel):
-        pass
+        table_name = "text_input_element"
 
 
-class NumberInputModel(ElementModel):
-    """Model for number input element data"""
+class NumberInputElementModel(ElementModel):
+    """A number input element with min/max bounds"""
     value: float = Field(default=0.0, description="The numeric value")
     min_value: Optional[float] = Field(default=None, description="Minimum allowed value")
     max_value: Optional[float] = Field(default=None, description="Maximum allowed value")
     step: Optional[float] = Field(default=1.0, description="Step increment")
-
-
-class NumberInputElement(ElementBase):
-    """A number input element with min/max bounds"""
-    __tablename__ = "number_input_element"
     
     class Meta:
         key = "number-input"
         name = "Number Input"
         desc = "A numeric input element with optional bounds"
-    
-    class Model(NumberInputModel):
-        pass
+        table_name = "number_input_element"
 
 
-class SelectOptionModel(ElementModel):
-    """Model for select/dropdown element data"""
+class SelectElementModel(ElementModel):
+    """A select/dropdown element"""
     value: str = Field(default="", description="The selected value")
     options: List[str] = Field(default_factory=list, description="Available options")
     allow_multiple: bool = Field(default=False, description="Allow multiple selections")
-
-
-class SelectElement(ElementBase):
-    """A select/dropdown element"""
-    __tablename__ = "select_element"
     
     class Meta:
         key = "select"
         name = "Select"
         desc = "A dropdown selection element"
-    
-    class Model(SelectOptionModel):
-        pass
+        table_name = "select_element"
 
 
 # ============================================================================
@@ -92,13 +71,13 @@ class SelectElement(ElementBase):
 # ============================================================================
 
 class TestElementRegistration:
-    """Test element registration via ElementBase inheritance"""
+    """Test element registration via ElementModel inheritance"""
     
     def test_element_registration(self):
         """Test that elements are registered in the registry"""
-        assert "text-input" in ElementSchemaRegistry
-        assert "number-input" in ElementSchemaRegistry
-        assert "select" in ElementSchemaRegistry
+        assert "text-input" in ElementSchemaRegistry.keys()
+        assert "number-input" in ElementSchemaRegistry.keys()
+        assert "select" in ElementSchemaRegistry.keys()
     
     def test_element_meta_attributes(self):
         """Test that Meta attributes are correctly set"""
@@ -106,26 +85,34 @@ class TestElementRegistration:
         assert text_input.Meta.key == "text-input"
         assert text_input.Meta.name == "Text Input"
         assert text_input.Meta.desc == "A single-line text input element"
+        assert text_input.Meta.table_name == "text_input_element"
     
     def test_element_model_is_pydantic(self):
-        """Test that Model is a valid Pydantic model"""
+        """Test that ElementModel is a valid Pydantic model"""
         text_input = ElementSchemaRegistry.get("text-input")
-        assert hasattr(text_input.Model, 'model_json_schema')
+        assert hasattr(text_input, 'model_json_schema')
         
         # Create an instance to verify the model works
-        data = text_input.Model(value="hello", placeholder="Enter text")
+        data = text_input(value="hello", placeholder="Enter text")
         assert data.value == "hello"
         assert data.placeholder == "Enter text"
     
     def test_element_model_json_schema(self):
-        """Test that Model produces valid JSON schema"""
+        """Test that ElementModel produces valid JSON schema"""
         text_input = ElementSchemaRegistry.get("text-input")
-        schema = text_input.Model.model_json_schema()
+        schema = text_input.model_json_schema()
         
         assert "properties" in schema
         assert "value" in schema["properties"]
         assert "placeholder" in schema["properties"]
         assert "max_length" in schema["properties"]
+    
+    def test_element_schema_auto_generated(self):
+        """Test that SQLAlchemy Schema is auto-generated from the model"""
+        text_input = ElementSchemaRegistry.get("text-input")
+        assert text_input.Schema is not None
+        assert hasattr(text_input.Schema, '__tablename__')
+        assert text_input.Schema.__tablename__ == "text_input_element"
 
 
 @mark.asyncio
@@ -136,6 +123,7 @@ class TestElementSchemaAPI:
     def app(self):
         """Create a FastAPI app with dform endpoints"""
         app = FastAPI()
+        setup_error_handler(app)  # Add error handlers for proper HTTP responses
         setup_dform(app)
         return app
     
@@ -207,34 +195,33 @@ class TestElementSchemaAPI:
     async def test_get_element_schema_not_found(self, client):
         """Test getting schema for non-existent element type"""
         response = await client.get("/dform/element-schema/non-existent")
-        assert response.status_code == 422  # NotFoundError returns 422
+        assert response.status_code == 404  # NotFoundError returns 404
 
 
-@mark.asyncio 
 class TestElementModelValidation:
     """Test element model data validation"""
     
     def test_text_input_validation(self):
-        """Test TextInputModel validation"""
+        """Test TextInputElementModel validation"""
         # Valid data
-        data = TextInputModel(value="hello world")
+        data = TextInputElementModel(value="hello world")
         assert data.value == "hello world"
         
         # With optional fields
-        data = TextInputModel(value="test", placeholder="Enter text", max_length=100)
+        data = TextInputElementModel(value="test", placeholder="Enter text", max_length=100)
         assert data.placeholder == "Enter text"
         assert data.max_length == 100
     
     def test_number_input_validation(self):
-        """Test NumberInputModel validation"""
-        data = NumberInputModel(value=42.5, min_value=0, max_value=100)
+        """Test NumberInputElementModel validation"""
+        data = NumberInputElementModel(value=42.5, min_value=0, max_value=100)
         assert data.value == 42.5
         assert data.min_value == 0
         assert data.max_value == 100
     
     def test_select_validation(self):
-        """Test SelectOptionModel validation"""
-        data = SelectOptionModel(
+        """Test SelectElementModel validation"""
+        data = SelectElementModel(
             value="option1",
             options=["option1", "option2", "option3"],
             allow_multiple=True
@@ -245,10 +232,9 @@ class TestElementModelValidation:
     
     def test_model_serialization(self):
         """Test model serialization to dict"""
-        data = TextInputModel(value="test", placeholder="hint")
+        data = TextInputElementModel(value="test", placeholder="hint")
         serialized = data.model_dump()
         
         assert serialized["value"] == "test"
         assert serialized["placeholder"] == "hint"
-        assert serialized["max_length"] is None
-
+        assert serialized.get("max_length") is None
