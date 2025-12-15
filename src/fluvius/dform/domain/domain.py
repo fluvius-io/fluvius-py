@@ -1,8 +1,10 @@
 from fluvius.domain.domain import Domain
+from fluvius.navis.domain import WorkflowEvent
+
 from .aggregate import FormAggregate
 from .model import FormDataManager
 from .. import config, logger
-from fluvius.navis.domain import WorkflowEvent
+
 
 class FormDomain(Domain):
     """Form Management Domain"""

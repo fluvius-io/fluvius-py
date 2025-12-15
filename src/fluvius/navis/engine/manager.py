@@ -288,7 +288,7 @@ class WorkflowManager(object):
         return wf
 
     @classmethod
-    def gen_wfdefs(cls, *repositories):
+    def gen_wfdefs(cls):
         """
         Generate workflow definitions from all registered workflows.
         
@@ -298,11 +298,6 @@ class WorkflowManager(object):
         Returns:
             list: List of workflow metadata dicts compatible with WorkflowDefinition schema
         """
-        import importlib
-        repos = repositories or config.WORKFLOW_REPOSITORIES
-        for wf_repo in repos:
-            importlib.import_module(wf_repo)
-        
         wfdefs = []
         for wfdef_key, wf_engine_cls in cls.__registry__.items():
             # Extract the original workflow definition class
