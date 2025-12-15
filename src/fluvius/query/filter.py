@@ -200,4 +200,5 @@ class DateFilterPreset(FilterPreset, name="date"):
 
 class EnumFilterPreset(FilterPreset, name="enum"):
     eq = Filter("Equals", dtype="string", input="string", default=True)
+    ne = Filter("Not Equals", dtype="string", input="string")
     in_ = Filter("In List", "string")
