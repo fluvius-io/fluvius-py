@@ -9,6 +9,7 @@ from .engine.workflow import Workflow, Stage, Step, Role, connect, transition, F
 from .engine.router import ActivityRouter
 from .engine.manager import WorkflowManager
 from . import viewdef
+from .domain import WorkflowDomain
 
 __all__ = [
     "ActivityRouter",
@@ -24,4 +25,5 @@ __all__ = [
     "Workflow",
     "WorkflowDataManager",
     "WorkflowManager",
+    "WorkflowDomain",
 ]
