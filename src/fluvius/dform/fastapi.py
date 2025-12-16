@@ -24,8 +24,8 @@ def setup_dform(app, base_path="/dform"):
             "element_types": [
                 {
                     "key": key,
-                    "name": cls.Meta.name,
-                    "desc": cls.Meta.desc,
+                    "title": cls.Meta.title,
+                    "description": cls.Meta.description,
                 }
                 for key, cls in ElementModelRegistry.items()
             ]
@@ -40,8 +40,8 @@ def setup_dform(app, base_path="/dform"):
         # Return the Pydantic model's JSON schema
         return {
             "key": element_cls.Meta.key,
-            "name": element_cls.Meta.name,
-            "desc": element_cls.Meta.desc,
+            "title": element_cls.Meta.title,
+            "description": element_cls.Meta.description,
             "schema": element_cls.model_json_schema(),
         }
     

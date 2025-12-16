@@ -9,14 +9,14 @@ from datetime import date
 from pydantic import Field, EmailStr
 from enum import Enum
 
-from fluvius.dform.element import ElementModel
+from fluvius.dform.element import DataElementModel
 
 
 # ============================================================================
 # Personal Information Elements
 # ============================================================================
 
-class PersonalInfoElement(ElementModel):
+class PersonalInfoElement(DataElementModel):
     """Personal information element for collecting name, DOB, etc."""
     first_name: str = Field(description="First name")
     last_name: str = Field(description="Last name")
@@ -26,12 +26,12 @@ class PersonalInfoElement(ElementModel):
     
     class Meta:
         key = "personal-info"
-        name = "Personal Information"
-        desc = "Collects personal information including name and date of birth"
+        title = "Personal Information"
+        description = "Collects personal information including name and date of birth"
         table_name = "elem_personal_info"
 
 
-class AddressElement(ElementModel):
+class AddressElement(DataElementModel):
     """Address element for collecting physical addresses."""
     street_line1: str = Field(description="Street address line 1")
     street_line2: Optional[str] = Field(default=None, description="Street address line 2")
@@ -42,12 +42,12 @@ class AddressElement(ElementModel):
     
     class Meta:
         key = "address"
-        name = "Address"
-        desc = "Collects physical address information"
+        title = "Address"
+        description = "Collects physical address information"
         table_name = "elem_address"
 
 
-class PhoneNumberElement(ElementModel):
+class PhoneNumberElement(DataElementModel):
     """Phone number element with type classification."""
     phone_number: str = Field(description="Phone number")
     country_code: str = Field(default="+1", description="Country dialing code")
@@ -56,12 +56,12 @@ class PhoneNumberElement(ElementModel):
     
     class Meta:
         key = "phone-number"
-        name = "Phone Number"
-        desc = "Collects phone number with type classification"
+        title = "Phone Number"
+        description = "Collects phone number with type classification"
         table_name = "elem_phone_number"
 
 
-class EmailElement(ElementModel):
+class EmailElement(DataElementModel):
     """Email address element."""
     email: str = Field(description="Email address")
     email_type: str = Field(default="personal", description="Email type (personal, work)")
@@ -69,8 +69,8 @@ class EmailElement(ElementModel):
     
     class Meta:
         key = "email"
-        name = "Email Address"
-        desc = "Collects email address information"
+        title = "Email Address"
+        description = "Collects email address information"
         table_name = "elem_email"
 
 
@@ -78,7 +78,7 @@ class EmailElement(ElementModel):
 # Form Input Elements
 # ============================================================================
 
-class TextFieldElement(ElementModel):
+class TextFieldElement(DataElementModel):
     """Single-line text input field."""
     value: str = Field(default="", description="Text value")
     placeholder: Optional[str] = Field(default=None, description="Placeholder text")
@@ -88,12 +88,12 @@ class TextFieldElement(ElementModel):
     
     class Meta:
         key = "text-field"
-        name = "Text Field"
-        desc = "Single-line text input field"
+        title = "Text Field"
+        description = "Single-line text input field"
         table_name = "elem_text_field"
 
 
-class TextAreaElement(ElementModel):
+class TextAreaElement(DataElementModel):
     """Multi-line text input field."""
     value: str = Field(default="", description="Text value")
     placeholder: Optional[str] = Field(default=None, description="Placeholder text")
@@ -102,12 +102,12 @@ class TextAreaElement(ElementModel):
     
     class Meta:
         key = "text-area"
-        name = "Text Area"
-        desc = "Multi-line text input field"
+        title = "Text Area"
+        description = "Multi-line text input field"
         table_name = "elem_text_area"
 
 
-class NumberFieldElement(ElementModel):
+class NumberFieldElement(DataElementModel):
     """Numeric input field with optional bounds."""
     value: Optional[float] = Field(default=None, description="Numeric value")
     min_value: Optional[float] = Field(default=None, description="Minimum allowed value")
@@ -117,12 +117,12 @@ class NumberFieldElement(ElementModel):
     
     class Meta:
         key = "number-field"
-        name = "Number Field"
-        desc = "Numeric input field with optional bounds"
+        title = "Number Field"
+        description = "Numeric input field with optional bounds"
         table_name = "elem_number_field"
 
 
-class DateFieldElement(ElementModel):
+class DateFieldElement(DataElementModel):
     """Date input field."""
     value: Optional[date] = Field(default=None, description="Selected date")
     min_date: Optional[date] = Field(default=None, description="Minimum selectable date")
@@ -131,12 +131,12 @@ class DateFieldElement(ElementModel):
     
     class Meta:
         key = "date-field"
-        name = "Date Field"
-        desc = "Date picker input field"
+        title = "Date Field"
+        description = "Date picker input field"
         table_name = "elem_date_field"
 
 
-class SelectFieldElement(ElementModel):
+class SelectFieldElement(DataElementModel):
     """Dropdown select field."""
     value: Optional[str] = Field(default=None, description="Selected value")
     options: List[dict] = Field(default_factory=list, description="List of {value, label} options")
@@ -145,24 +145,24 @@ class SelectFieldElement(ElementModel):
     
     class Meta:
         key = "select-field"
-        name = "Select Field"
-        desc = "Dropdown select field"
+        title = "Select Field"
+        description = "Dropdown select field"
         table_name = "elem_select_field"
 
 
-class CheckboxElement(ElementModel):
+class CheckboxElement(DataElementModel):
     """Checkbox input element."""
     checked: bool = Field(default=False, description="Whether the checkbox is checked")
     label: str = Field(default="", description="Checkbox label text")
     
     class Meta:
         key = "checkbox"
-        name = "Checkbox"
-        desc = "Single checkbox input"
+        title = "Checkbox"
+        description = "Single checkbox input"
         table_name = "elem_checkbox"
 
 
-class RadioGroupElement(ElementModel):
+class RadioGroupElement(DataElementModel):
     """Radio button group element."""
     value: Optional[str] = Field(default=None, description="Selected option value")
     options: List[dict] = Field(default_factory=list, description="List of {value, label} options")
@@ -170,8 +170,8 @@ class RadioGroupElement(ElementModel):
     
     class Meta:
         key = "radio-group"
-        name = "Radio Group"
-        desc = "Radio button group for single selection"
+        title = "Radio Group"
+        description = "Radio button group for single selection"
         table_name = "elem_radio_group"
 
 
@@ -179,7 +179,7 @@ class RadioGroupElement(ElementModel):
 # File Upload Elements
 # ============================================================================
 
-class FileUploadElement(ElementModel):
+class FileUploadElement(DataElementModel):
     """File upload element."""
     file_id: Optional[str] = Field(default=None, description="Uploaded file ID")
     file_name: Optional[str] = Field(default=None, description="Original file name")
@@ -190,12 +190,12 @@ class FileUploadElement(ElementModel):
     
     class Meta:
         key = "file-upload"
-        name = "File Upload"
-        desc = "File upload input"
+        title = "File Upload"
+        description = "File upload input"
         table_name = "elem_file_upload"
 
 
-class ImageUploadElement(ElementModel):
+class ImageUploadElement(DataElementModel):
     """Image upload element with preview support."""
     image_id: Optional[str] = Field(default=None, description="Uploaded image ID")
     image_url: Optional[str] = Field(default=None, description="Image URL for preview")
@@ -206,8 +206,8 @@ class ImageUploadElement(ElementModel):
     
     class Meta:
         key = "image-upload"
-        name = "Image Upload"
-        desc = "Image upload with preview"
+        title = "Image Upload"
+        description = "Image upload with preview"
         table_name = "elem_image_upload"
 
 
@@ -215,7 +215,7 @@ class ImageUploadElement(ElementModel):
 # Special Elements
 # ============================================================================
 
-class SignatureElement(ElementModel):
+class SignatureElement(DataElementModel):
     """Digital signature capture element."""
     signature_data: Optional[str] = Field(default=None, description="Base64 encoded signature image")
     signed_at: Optional[str] = Field(default=None, description="ISO timestamp when signed")
@@ -223,12 +223,12 @@ class SignatureElement(ElementModel):
     
     class Meta:
         key = "signature"
-        name = "Signature"
-        desc = "Digital signature capture"
+        title = "Signature"
+        description = "Digital signature capture"
         table_name = "elem_signature"
 
 
-class RatingElement(ElementModel):
+class RatingElement(DataElementModel):
     """Star rating element."""
     value: Optional[int] = Field(default=None, description="Selected rating value")
     max_value: int = Field(default=5, description="Maximum rating value")
@@ -236,6 +236,6 @@ class RatingElement(ElementModel):
     
     class Meta:
         key = "rating"
-        name = "Rating"
-        desc = "Star rating input"
+        title = "Rating"
+        description = "Star rating input"
         table_name = "elem_rating"

@@ -20,32 +20,15 @@ from fluvius.data import DataModel
 from fluvius.helper import ClassRegistry
 from fluvius.error import InternalServerError
 
-from .element import ElementModelRegistry, ElementModel
+from .element import ElementModelRegistry, DataElementModel, DataElementModel
 from pydantic import Field
-
-
-class FormElementMeta:
-    """Metadata for form element annotations"""
-    def __init__(self, elem_key: str, label: Optional[str] = None, required: bool = False, param: dict = None):
-        self.elem_key = elem_key
-        self.label = label
-        self.required = required
-        self.param = param or {}
-
-    def to_dict(self) -> dict:
-        return {
-            "elem_key": self.elem_key,
-            "label": self.label,
-            "required": self.required,
-            "param": self.param,
-        }
 
 
 def FormElement(
     elem_key: str,
-    label: Optional[str] = None,
-    required: bool = False,
-    param: dict = None,
+    title: Optional[str] = None,
+    description: Optional[str] = None,
+    param: Optional[dict] = None,
     **kwargs
 ) -> Any:
     """
@@ -57,7 +40,8 @@ def FormElement(
 
     Args:
         elem_key: Key of the ElementModel to use
-        label: Display label for the element
+        title: Title of the element
+        description: Description of the element
         required: Whether the element is required
         param: Additional element parameters
 
@@ -66,19 +50,19 @@ def FormElement(
     """
     # Create metadata
     element = ElementModelRegistry.get(elem_key)
-    # meta = FormElementMeta(
-    #     elem_key=elem_key,
-    #     label=label,
-    #     required=required,
-    #     param=param or {}
-    # )
+    json_schema_extra = param or {}
 
     # Return Annotated type with metadata
     # Use Any as base type - the element model lookup happens at schema generation time
-    return Annotated[element, Field(title=element.Meta.name, **kwargs)]
+    return Annotated[element, Field(
+        title=title or element.Meta.title,
+        description=description or element.Meta.description,
+        json_schema_extra=json_schema_extra,
+        **kwargs
+    )]
 
 
-def _extract_form_elements(cls) -> Dict[str, FormElementMeta]:
+def _extract_form_elements(cls) -> Dict[str, DataElementModel]:
     """Extract FormElementMeta from class annotations"""
     elements = {}
 
@@ -96,7 +80,7 @@ def _extract_form_elements(cls) -> Dict[str, FormElementMeta]:
             continue
 
         # Look for FormElementMeta in the metadata
-        if issubclass(args[0], ElementModel):
+        if issubclass(args[0], DataElementModel):
             elements[name] = args[0]
     
     return elements
@@ -142,7 +126,7 @@ class FormModel(DataModel):
         pass
 
     # Store elements extracted from annotations
-    _form_elements: ClassVar[Dict[str, ElementModel]] = {}
+    _form_elements: ClassVar[Dict[str, DataElementModel]] = {}
 
     def __init_subclass__(cls, **kwargs):
         """Convert Meta class to FormMeta instance and register form"""
@@ -191,12 +175,12 @@ class FormModel(DataModel):
         FormModelRegistry.register(cls.Meta.key)(cls)
     
     @classmethod
-    def get_elements(cls) -> Dict[str, ElementModel]:
+    def get_elements(cls) -> Dict[str, DataElementModel]:
         """Get all form elements defined on this form"""
         return cls._form_elements
     
     @classmethod
-    def get_element(cls, name: str) -> Optional[ElementModel]:
+    def get_element(cls, name: str) -> Optional[DataElementModel]:
         """Get a specific form element by name"""
         return cls._form_elements.get(name)
     
@@ -215,48 +199,6 @@ class FormModel(DataModel):
             }
         }
 
-    # @classmethod
-    # def model_json_schema(cls) -> dict:
-    #     """Generate JSON schema for the form including all elements"""
-    #     from .element import ElementModelRegistry
-
-    #     properties = {}
-    #     required = []
-
-    #     for name, elem_meta in cls._form_elements.items():
-    #         elem_cls = ElementModelRegistry.get(elem_meta.elem_key)
-    #         if elem_cls is not None:
-    #             # Get the element's JSON schema
-    #             elem_schema = elem_cls.model_json_schema()
-    #             properties[name] = {
-    #                 **elem_schema,
-    #                 "title": elem_meta.label or name,
-    #                 "x-elem-key": elem_meta.elem_key,
-    #                 "x-param": elem_meta.param,
-    #             }
-    #         else:
-    #             # Element not registered - use a placeholder
-    #             properties[name] = {
-    #                 "type": "object",
-    #                 "title": elem_meta.label or name,
-    #                 "x-elem-key": elem_meta.elem_key,
-    #                 "x-param": elem_meta.param,
-    #             }
-
-    #         if elem_meta.required:
-    #             required.append(name)
-
-    #     return {
-    #         "type": "object",
-    #         "title": cls.Meta.name,
-    #         "description": cls.Meta.desc,
-    #         "properties": properties,
-    #         "required": required if required else None,
-    #         "x-form-key": cls.Meta.key,
-    #         "x-header": cls.Meta.header,
-    #         "x-footer": cls.Meta.footer,
-    #     }
-
 
 # Registry for FormModel subclasses
 # Registration happens automatically via __init_subclass__
@@ -268,5 +210,5 @@ __all__ = [
     "FormMeta",
     "FormModel",
     "FormModelRegistry",
-    "ElementModel"
+    "DataElementModel"
 ]

@@ -78,8 +78,8 @@ class ElementMeta(DataModel):
     - attrs: Additional configuration (optional)
     """
     key: str
-    name: str
-    desc: Optional[str] = None
+    title: str
+    description: Optional[str] = None
     table_name: Optional[str] = None
 
 
@@ -112,7 +112,7 @@ class ElementDataProvider(object):
         return {}
 
 
-class ElementModel(DataModel):
+class DataElementModel(DataModel):
     """
     Base class for element data schema registration.
     
@@ -138,7 +138,7 @@ class ElementModel(DataModel):
     class Meta:
         pass
 
-    class Provider(ElementDataProvider):
+    class DataProvider(ElementDataProvider):
         pass
 
 
@@ -166,7 +166,8 @@ class ElementModel(DataModel):
         meta_cls = cls.Meta
         cls.Meta = ElementMeta.create(meta_cls, defaults={
             'key': getattr(meta_cls, 'key', None),
-            'name': getattr(meta_cls, 'name', cls.__name__),
+            'title': getattr(meta_cls, 'title', cls.__name__),
+            'description': getattr(meta_cls, 'description', cls.__doc__),
             'table_name': getattr(meta_cls, 'table_name', camel_to_lower(cls.__name__)),
         })
 
@@ -183,10 +184,10 @@ class ElementModel(DataModel):
                 None
             )
         
-        if not cls.Meta.name:
+        if not cls.Meta.title:
             raise InternalServerError(
                 "F00.104",
-                f"ElementModel subclass {cls.__name__} Meta must define name",
+                f"ElementModel subclass {cls.__name__} Meta must define title",
                 None
             )
         
@@ -194,8 +195,8 @@ class ElementModel(DataModel):
         if cls.Schema is not None and not issubclass(cls.Schema, ElementSchema):
             raise InternalServerError('F00.201', f'Invalid element schema: {cls.Schema}')
 
-        if not issubclass(cls.Provider, ElementDataProvider):
-            raise InternalServerError('F00.203', f'Invalid element data provider: {cls.Provider}')
+        if not issubclass(cls.DataProvider, ElementDataProvider):
+            raise InternalServerError('F00.203', f'Invalid element data provider: {cls.DataProvider}')
 
         # Automatically register the schema in the registry using key
         # Use register() method with the key
@@ -204,4 +205,4 @@ class ElementModel(DataModel):
 
 # Registry for ElementModel subclasses
 # Registration happens automatically via __init_subclass__
-ElementModelRegistry = ClassRegistry(ElementModel)
+ElementModelRegistry = ClassRegistry(DataElementModel)

@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from httpx import AsyncClient, ASGITransport
 
 from fluvius.dform.element import (
-    ElementModel, 
+    DataElementModel,
     ElementModelRegistry,
 )
 from fluvius.dform.fastapi import setup_dform
@@ -26,7 +26,7 @@ from fluvius.fastapi.setup import setup_error_handler
 # Sample Element Definitions for Testing
 # ============================================================================
 
-class TextInputElementModel(ElementModel):
+class TextInputElementModel(DataElementModel):
     """A simple text input element"""
     value: str = Field(default="", description="The text input value")
     placeholder: Optional[str] = Field(default=None, description="Placeholder text")
@@ -34,12 +34,12 @@ class TextInputElementModel(ElementModel):
     
     class Meta:
         key = "text-input"
-        name = "Text Input"
-        desc = "A single-line text input element"
+        title = "Text Input"
+        description = "A single-line text input element"
         table_name = "text_input_element"
 
 
-class NumberInputElementModel(ElementModel):
+class NumberInputElementModel(DataElementModel):
     """A number input element with min/max bounds"""
     value: float = Field(default=0.0, description="The numeric value")
     min_value: Optional[float] = Field(default=None, description="Minimum allowed value")
@@ -48,12 +48,12 @@ class NumberInputElementModel(ElementModel):
     
     class Meta:
         key = "number-input"
-        name = "Number Input"
-        desc = "A numeric input element with optional bounds"
+        title = "Number Input"
+        description = "A numeric input element with optional bounds"
         table_name = "number_input_element"
 
 
-class SelectElementModel(ElementModel):
+class SelectElementModel(DataElementModel):
     """A select/dropdown element"""
     value: str = Field(default="", description="The selected value")
     options: List[str] = Field(default_factory=list, description="Available options")
@@ -61,8 +61,8 @@ class SelectElementModel(ElementModel):
     
     class Meta:
         key = "select"
-        name = "Select"
-        desc = "A dropdown selection element"
+        title = "Select"
+        description = "A dropdown selection element"
         table_name = "select_element"
 
 
@@ -83,8 +83,8 @@ class TestElementRegistration:
         """Test that Meta attributes are correctly set"""
         text_input = ElementModelRegistry.get("text-input")
         assert text_input.Meta.key == "text-input"
-        assert text_input.Meta.name == "Text Input"
-        assert text_input.Meta.desc == "A single-line text input element"
+        assert text_input.Meta.title == "Text Input"
+        assert text_input.Meta.description == "A single-line text input element"
         assert text_input.Meta.table_name == "text_input_element"
     
     def test_element_model_is_pydantic(self):
@@ -155,8 +155,8 @@ class TestElementSchemaAPI:
         
         data = response.json()
         assert data["key"] == "text-input"
-        assert data["name"] == "Text Input"
-        assert data["desc"] == "A single-line text input element"
+        assert data["title"] == "Text Input"
+        assert data["description"] == "A single-line text input element"
         assert "schema" in data
         
         # Verify JSON schema structure
