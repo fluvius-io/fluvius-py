@@ -3,7 +3,6 @@ import pytest
 import pytest_asyncio
 from pytest import mark
 
-from fluvius_test import form_app
 from httpx import AsyncClient
 from fluvius.data.serializer import FluviusJSONEncoder
 from fluvius.dform import FormDomain

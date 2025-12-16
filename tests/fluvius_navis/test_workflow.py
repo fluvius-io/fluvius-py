@@ -2,7 +2,7 @@ import pytest
 from pprint import pformat
 from types import SimpleNamespace
 from fluvius.navis import logger, config
-from fluvius.navis import Workflow, Stage, Step, Role, connect, transition, FINISH_STATE, ActivityRouter, WorkflowManager
+from fluvius.navis import Workflow, Stage, Step, Role, connect, transition, FINISH_STATE, WorkflowEventRouter, WorkflowManager
 from fluvius.data import UUID_GENF, UUID_GENR
 
 selector01 = UUID_GENF('ST01')

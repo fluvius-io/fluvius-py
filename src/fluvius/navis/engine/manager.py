@@ -5,7 +5,7 @@ from fluvius.error import NotFoundError, BadRequestError
 
 
 from .datadef import WorkflowData, WorkflowStatus, WorkflowMessage, WorkflowActivity
-from .router import ActivityRouter, WorkflowSelector
+from .router import WorkflowEventRouter, WorkflowSelector
 from .runner import WorkflowRunner
 from .mutation import MutationEnvelop
 
@@ -14,7 +14,7 @@ from .. import logger, config
 
 
 class WorkflowManager(object):
-    __router__ = ActivityRouter
+    __router__ = WorkflowEventRouter
     __runner__ = WorkflowRunner
     __registry__ = {}
 
@@ -26,7 +26,7 @@ class WorkflowManager(object):
         assert isinstance(self._datamgr, WorkflowDataManager), "Workflow manager requires WorkflowDataManager"
 
     def __init_subclass__(cls, router, engine):
-        assert issubclass(router, ActivityRouter), f"Invalid event router {router}"
+        assert issubclass(router, WorkflowEventRouter), f"Invalid event router {router}"
         assert issubclass(engine, WorkflowRunner), f"Invalid workflow engine {engine}"
 
         cls.__router__ = router

@@ -6,7 +6,7 @@ from fluvius.helper import ImmutableNamespace
 from fluvius.error import NotFoundError, BadRequestError
 from .. import logger
 
-class WorkflowEvent(EventHandler):
+class WorkflowEventHandler(EventHandler):
     """
     Event handler to integrate DForm domain with Navis (Workflow) domain
     """
