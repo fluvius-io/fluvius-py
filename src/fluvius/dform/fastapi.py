@@ -1,4 +1,4 @@
-from fluvius.dform.element import ElementSchemaRegistry
+from fluvius.dform.element import ElementModelRegistry
 
 
 def setup_dform(app, base_path="/dform"):
@@ -27,7 +27,7 @@ def setup_dform(app, base_path="/dform"):
                     "name": cls.Meta.name,
                     "desc": cls.Meta.desc,
                 }
-                for key, cls in ElementSchemaRegistry.items()
+                for key, cls in ElementModelRegistry.items()
             ]
         }
     
@@ -35,7 +35,7 @@ def setup_dform(app, base_path="/dform"):
     async def get_element_schema(element_key: str):
         """Get JSON schema for a specific element type"""
         # Registry.get raises NotFoundError if not found
-        element_cls = ElementSchemaRegistry.get(element_key)
+        element_cls = ElementModelRegistry.get(element_key)
         
         # Return the Pydantic model's JSON schema
         return {

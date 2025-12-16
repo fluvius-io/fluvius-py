@@ -25,14 +25,14 @@ async def create_schema(force: bool, repositories: tuple[str, ...]):
     the schema. This ensures all ElementModel subclasses are registered.
     
     Example:
-        fluvius df create-schema
-        fluvius df create-schema --force
-        fluvius df create-schema -r myapp.elements
-        fluvius df create-schema -r myapp.elements.text -r myapp.elements.number
+        fluvius dform create-schema
+        fluvius dform create-schema --force
+        fluvius dform create-schema -r myapp.elements
+        fluvius dform create-schema -r myapp.elements.text -r myapp.elements.number
+        fluvius dform create-schema --repositories myapp.elements.text myapp.elements.number
     """
-    # Import dform modules inside function to avoid circular imports
     from fluvius.dform.schema import FormConnector
-    from fluvius.dform.element import ElementSchemaRegistry, ElementDataManager
+    from fluvius.dform.element import ElementModelRegistry, ElementDataManager
     from fluvius.dform import config
     
     try:
@@ -40,11 +40,8 @@ async def create_schema(force: bool, repositories: tuple[str, ...]):
         click.echo("DForm Schema Creation")
         click.echo("=" * 60)
         
-        # Get repositories from config if not provided
-        repos = repositories or getattr(config, 'DFORM_REPOSITORIES', [])
-        if repos:
-            click.echo(f"\nImporting element repositories...")
-            import_modules(list(repos))
+        # Import element repositories if specified
+        import_modules(repositories or config.DFORM_REPOSITORIES)
         
         # Get DSN and create async engine
         dsn = config.DB_DSN
@@ -80,11 +77,11 @@ async def create_schema(force: bool, repositories: tuple[str, ...]):
             click.echo(f"  ✓ Element data tables created")
             
             # Show registered element types
-            element_types = list[str](ElementSchemaRegistry.keys())
+            element_types = list[str](ElementModelRegistry.keys())
             if element_types:
                 click.echo(f"\nRegistered element types ({len(element_types)}):")
                 for key in element_types:
-                    elem_cls = ElementSchemaRegistry.get(key)
+                    elem_cls = ElementModelRegistry.get(key)
                     table_name = elem_cls.Meta.table_name
                     click.echo(f"  • {key} -> {config.DFORM_DATA_DB_SCHEMA}.{table_name}")
             else:

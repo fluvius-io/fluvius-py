@@ -2,7 +2,8 @@ from ._meta import config, logger
 from .domain.domain import FormDomain, FormResponse
 from .domain.query import FormQueryManager
 from .domain.model import FormDataManager
-from .element import ElementDataManager, ElementModel, ElementSchemaRegistry
+from .element import ElementDataManager, ElementModel, ElementModelRegistry
+from .form import FormModel, FormModelRegistry, FormElement
 from .schema import FormConnector
 from .fastapi import setup_dform
 
@@ -13,5 +14,6 @@ __all__ = [
     "config", "logger",
     "FormDomain", "FormResponse", "FormConnector", "FormQueryManager",
     "FormDataManager", "ElementDataManager", "ElementModel",
-    "ElementSchemaRegistry", "setup_dform",
+    "ElementModelRegistry", "FormModel", "FormModelRegistry", "FormElement",
+    "setup_dform",
 ]

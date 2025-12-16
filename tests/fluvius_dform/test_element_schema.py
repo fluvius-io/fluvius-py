@@ -16,7 +16,7 @@ from httpx import AsyncClient, ASGITransport
 
 from fluvius.dform.element import (
     ElementModel, 
-    ElementSchemaRegistry,
+    ElementModelRegistry,
 )
 from fluvius.dform.fastapi import setup_dform
 from fluvius.fastapi.setup import setup_error_handler
@@ -75,13 +75,13 @@ class TestElementRegistration:
     
     def test_element_registration(self):
         """Test that elements are registered in the registry"""
-        assert "text-input" in ElementSchemaRegistry.keys()
-        assert "number-input" in ElementSchemaRegistry.keys()
-        assert "select" in ElementSchemaRegistry.keys()
+        assert "text-input" in ElementModelRegistry.keys()
+        assert "number-input" in ElementModelRegistry.keys()
+        assert "select" in ElementModelRegistry.keys()
     
     def test_element_meta_attributes(self):
         """Test that Meta attributes are correctly set"""
-        text_input = ElementSchemaRegistry.get("text-input")
+        text_input = ElementModelRegistry.get("text-input")
         assert text_input.Meta.key == "text-input"
         assert text_input.Meta.name == "Text Input"
         assert text_input.Meta.desc == "A single-line text input element"
@@ -89,7 +89,7 @@ class TestElementRegistration:
     
     def test_element_model_is_pydantic(self):
         """Test that ElementModel is a valid Pydantic model"""
-        text_input = ElementSchemaRegistry.get("text-input")
+        text_input = ElementModelRegistry.get("text-input")
         assert hasattr(text_input, 'model_json_schema')
         
         # Create an instance to verify the model works
@@ -99,7 +99,7 @@ class TestElementRegistration:
     
     def test_element_model_json_schema(self):
         """Test that ElementModel produces valid JSON schema"""
-        text_input = ElementSchemaRegistry.get("text-input")
+        text_input = ElementModelRegistry.get("text-input")
         schema = text_input.model_json_schema()
         
         assert "properties" in schema
@@ -109,7 +109,7 @@ class TestElementRegistration:
     
     def test_element_schema_auto_generated(self):
         """Test that SQLAlchemy Schema is auto-generated from the model"""
-        text_input = ElementSchemaRegistry.get("text-input")
+        text_input = ElementModelRegistry.get("text-input")
         assert text_input.Schema is not None
         assert hasattr(text_input.Schema, '__tablename__')
         assert text_input.Schema.__tablename__ == "text_input_element"

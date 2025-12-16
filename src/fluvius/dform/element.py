@@ -199,9 +199,9 @@ class ElementModel(DataModel):
 
         # Automatically register the schema in the registry using key
         # Use register() method with the key
-        ElementSchemaRegistry.register(cls.Meta.key)(cls)
+        ElementModelRegistry.register(cls.Meta.key)(cls)
 
 
 # Registry for ElementModel subclasses
 # Registration happens automatically via __init_subclass__
-ElementSchemaRegistry = ClassRegistry(ElementModel)
+ElementModelRegistry = ClassRegistry(ElementModel)
