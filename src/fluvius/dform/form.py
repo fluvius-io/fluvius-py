@@ -1,46 +1,105 @@
 """
 Form Type System
 
-Form types are created by inheriting FormModel with element definitions.
-Each form model defines a reusable form structure with elements.
+Form types are created by inheriting FormModel with element definitions
+using annotation syntax.
 
 Usage:
-    class ApplicantInfoFormModel(FormModel):
+    class ApplicantInfoForm(FormModel):
+        personal_info: FormElement("personal-info", param={"required": True})
+        address: FormElement("address", param={"required": True})
+
         class Meta:
             key = "applicant-info"
             name = "Applicant Information"
             desc = "Primary applicant personal details"
-            elements = {
-                "personal_info": FormElement(elem_key="personal-info", param={"required": True}),
-                "address": FormElement(elem_key="address", param={"required": True}),
-            }
 """
-from typing import Optional, Dict, Any, ClassVar, Type, Annotated
-from pydantic import Field as PydanticField
-
+from typing import Optional, Dict, Any, ClassVar, get_origin, get_args, Annotated
 
 from fluvius.data import DataModel
-from fluvius.helper import ClassRegistry, camel_to_lower
+from fluvius.helper import ClassRegistry
 from fluvius.error import InternalServerError
-from .element import ElementModelRegistry
+
+from .element import ElementModelRegistry, ElementModel
+from pydantic import Field
+
+
+class FormElementMeta:
+    """Metadata for form element annotations"""
+    def __init__(self, elem_key: str, label: Optional[str] = None, required: bool = False, param: dict = None):
+        self.elem_key = elem_key
+        self.label = label
+        self.required = required
+        self.param = param or {}
+
+    def to_dict(self) -> dict:
+        return {
+            "elem_key": self.elem_key,
+            "label": self.label,
+            "required": self.required,
+            "param": self.param,
+        }
 
 
 def FormElement(
-    elem_key,
-    label=None,
-    required=False,
+    elem_key: str,
+    label: Optional[str] = None,
+    required: bool = False,
+    param: dict = None,
     **kwargs
-):
-    elem_def = ElementModelRegistry.get(elem_key)
-    if not elem_def:
-        raise InternalServerError(
-            "F00.305",
-            f"Element definition not found for key: {elem_key}",
-            None
-        )
+) -> Any:
+    """
+    Define a form element as a type annotation.
+
+    Usage:
+        class MyForm(FormModel):
+            field_name: FormElement("text-field", label="Field Label")
+
+    Args:
+        elem_key: Key of the ElementModel to use
+        label: Display label for the element
+        required: Whether the element is required
+        param: Additional element parameters
+
+    Returns:
+        Annotated type with FormElementMeta
+    """
+    # Create metadata
+    element = ElementModelRegistry.get(elem_key)
+    # meta = FormElementMeta(
+    #     elem_key=elem_key,
+    #     label=label,
+    #     required=required,
+    #     param=param or {}
+    # )
+
+    # Return Annotated type with metadata
+    # Use Any as base type - the element model lookup happens at schema generation time
+    return Annotated[element, Field(title=element.Meta.name, **kwargs)]
+
+
+def _extract_form_elements(cls) -> Dict[str, FormElementMeta]:
+    """Extract FormElementMeta from class annotations"""
+    elements = {}
+
+    # Get annotations from the class (not inherited)
+    annotations = getattr(cls, '__annotations__', {})
+
+    for name, annotation in annotations.items():
+        # Skip if not an Annotated type
+        if get_origin(annotation) is not Annotated:
+            continue
         
+        # Get the args of Annotated[base_type, *metadata]
+        args = get_args(annotation)
+        if len(args) < 2:
+            continue
+
+        # Look for FormElementMeta in the metadata
+        if issubclass(args[0], ElementModel):
+            elements[name] = args[0]
     
-    return Annotated[elem_def, PydanticField(label=label, required=required, **kwargs)]
+    return elements
 
 
 class FormMeta(DataModel):
@@ -53,39 +112,37 @@ class FormMeta(DataModel):
     - desc: Description (optional)
     - header: Form header text (optional)
     - footer: Form footer text (optional)
-    - elements: Dictionary of form elements (optional)
     """
     key: str
     name: str
     desc: Optional[str] = None
     header: Optional[str] = None
     footer: Optional[str] = None
-    elements: Dict[str, FormElement] = {}
 
 
 class FormModel(DataModel):
     """
     Base class for form type registration.
     
-    This class is used for registering form types via Meta classes.
-    Elements are defined in the Meta class as a dictionary.
-    
-    Form types are registered by creating subclasses with Meta classes:
+    Form types are registered by creating subclasses with Meta classes
+    and element definitions as type annotations:
     
     Example:
-        class ApplicantInfoFormModel(FormModel):
+        class ApplicantInfoForm(FormModel):
+            personal_info: FormElement("personal-info", param={"required": True})
+            address: FormElement("address", param={"required": True})
+
             class Meta:
                 key = "applicant-info"
                 name = "Applicant Information"
                 desc = "Primary applicant personal details"
-                elements = {
-                    "personal_info": FormElement(elem_key="personal-info", param={"required": True}),
-                    "address": FormElement(elem_key="address", param={"required": True}),
-                }
     """
 
     class Meta:
         pass
+
+    # Store elements extracted from annotations
+    _form_elements: ClassVar[Dict[str, ElementModel]] = {}
 
     def __init_subclass__(cls, **kwargs):
         """Convert Meta class to FormMeta instance and register form"""
@@ -101,11 +158,11 @@ class FormModel(DataModel):
                 None
             )
         
+        # Extract elements from annotations
+        cls._form_elements = _extract_form_elements(cls)
+
         # Convert Meta class to FormMeta instance
         meta_cls = cls.Meta
-        
-        # Get elements from Meta class
-        elements = getattr(meta_cls, 'elements', {})
         
         cls.Meta = FormMeta.create(meta_cls, defaults={
             'key': getattr(meta_cls, 'key', None),
@@ -113,7 +170,6 @@ class FormModel(DataModel):
             'desc': getattr(meta_cls, 'desc', None),
             'header': getattr(meta_cls, 'header', None),
             'footer': getattr(meta_cls, 'footer', None),
-            'elements': elements,
         })
         
         # Validate required fields
@@ -135,14 +191,14 @@ class FormModel(DataModel):
         FormModelRegistry.register(cls.Meta.key)(cls)
     
     @classmethod
-    def get_elements(cls) -> Dict[str, FormElement]:
+    def get_elements(cls) -> Dict[str, ElementModel]:
         """Get all form elements defined on this form"""
-        return cls.Meta.elements
+        return cls._form_elements
     
     @classmethod
-    def get_element(cls, name: str) -> Optional[FormElement]:
+    def get_element(cls, name: str) -> Optional[ElementModel]:
         """Get a specific form element by name"""
-        return cls.Meta.elements.get(name)
+        return cls._form_elements.get(name)
     
     @classmethod
     def to_dict(cls) -> dict:
@@ -154,15 +210,52 @@ class FormModel(DataModel):
             "header": cls.Meta.header,
             "footer": cls.Meta.footer,
             "elements": {
-                name: {
-                    "elem_key": elem.elem_key,
-                    "param": elem.param,
-                    "label": elem.label,
-                    "required": elem.required,
-                }
-                for name, elem in cls.Meta.elements.items()
+                name: elem.Meta.model_dump()
+                for name, elem in cls._form_elements.items()
             }
         }
+
+    # @classmethod
+    # def model_json_schema(cls) -> dict:
+    #     """Generate JSON schema for the form including all elements"""
+    #     from .element import ElementModelRegistry
+
+    #     properties = {}
+    #     required = []
+
+    #     for name, elem_meta in cls._form_elements.items():
+    #         elem_cls = ElementModelRegistry.get(elem_meta.elem_key)
+    #         if elem_cls is not None:
+    #             # Get the element's JSON schema
+    #             elem_schema = elem_cls.model_json_schema()
+    #             properties[name] = {
+    #                 **elem_schema,
+    #                 "title": elem_meta.label or name,
+    #                 "x-elem-key": elem_meta.elem_key,
+    #                 "x-param": elem_meta.param,
+    #             }
+    #         else:
+    #             # Element not registered - use a placeholder
+    #             properties[name] = {
+    #                 "type": "object",
+    #                 "title": elem_meta.label or name,
+    #                 "x-elem-key": elem_meta.elem_key,
+    #                 "x-param": elem_meta.param,
+    #             }
+
+    #         if elem_meta.required:
+    #             required.append(name)
+
+    #     return {
+    #         "type": "object",
+    #         "title": cls.Meta.name,
+    #         "description": cls.Meta.desc,
+    #         "properties": properties,
+    #         "required": required if required else None,
+    #         "x-form-key": cls.Meta.key,
+    #         "x-header": cls.Meta.header,
+    #         "x-footer": cls.Meta.footer,
+    #     }
 
 
 # Registry for FormModel subclasses
@@ -175,4 +268,5 @@ __all__ = [
     "FormMeta",
     "FormModel",
     "FormModelRegistry",
+    "ElementModel"
 ]
