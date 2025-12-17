@@ -69,13 +69,16 @@ def build_dsn(config):
     )
 
 def sqla_error_handler(code_prefix):
+    """ We need to standardize (ie. mapping) the driver exceptions to standard Fluvius Data Driver Exceptions
+        so the error handling code on the data manager layer can be consistent """
+
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
             try:
                 return await func(*args, **kwargs)
             except Exception as e:
-                logger.exception('SQLAlchemy Exception: %s', e)
+                logger.exception('SQLAlchemy Operation Error: %s', e)
 
                 match e.__class__:
                     case asyncpg.exceptions.UniqueViolationError:
