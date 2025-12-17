@@ -249,7 +249,7 @@ def create_data_schema_base(driver_cls=None):
                                 )
                             else:
                                 ret_data[key] = getattr(self, key)
-            if show_properies:
+            if show_properties:
                 properties = dir(self)
                 for key in list(set(properties) - set(columns) - set(relationships)):
                     if key.startswith('_'):
