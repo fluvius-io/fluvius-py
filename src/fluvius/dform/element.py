@@ -42,13 +42,12 @@ from .mapper import PydanticSQLAlchemyMapper
 # This is necessary for cross-schema foreign key references
 # Even with use_alter=True, SQLAlchemy needs to know about the referenced tables
 from .schema import (
-    FormConnector, DocumentForm, ElementInstance, ElementDefinition,
-    ElementGroupInstance, FormDefinition, DocumentSection  # noqa: F401
+    FormConnector  # noqa: F401
 )
 
 
-DFORM_DATA_DB_SCHEMA = config.DFORM_DATA_DB_SCHEMA
-DEFINITION_DB_SCHEMA = config.DEFINITION_DB_SCHEMA
+DFORM_DATA_SCHEMA = config.DFORM_DATA_SCHEMA
+DFORM_DEFS_SCHEMA = config.DFORM_DEFS_SCHEMA
 DB_DSN = config.DB_DSN
 
 
@@ -63,7 +62,7 @@ class ElementSchema(FormConnector.pgschema(), DomainSchema):
     __abstract__ = True
 
 
-model_mapper = PydanticSQLAlchemyMapper(ElementSchema, schema=DFORM_DATA_DB_SCHEMA)
+model_mapper = PydanticSQLAlchemyMapper(ElementSchema, schema=DFORM_DATA_SCHEMA)
 
 
 class ElementMeta(DataModel):
@@ -117,7 +116,7 @@ class DataElementModel(DataModel):
     Base class for element data schema registration.
     
     This class is used for registering element types via Meta classes.
-    Element data is now stored in ElementInstance (defined in schema.py).
+    Element data is stored in FormElement (defined in schema.py).
     
     Element types are registered by creating subclasses with Meta classes:
     
@@ -131,7 +130,7 @@ class DataElementModel(DataModel):
                 name = "Text Input"
                 desc = "A text input element"
     
-    Note: ElementInstance (in schema.py) is used for actual data storage.
+    Note: FormElement (in schema.py) is used for actual data storage.
     ElementModel is only for registration purposes.
     """
 

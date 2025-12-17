@@ -406,7 +406,7 @@ class FormAggregate(Aggregate):
         # Copy structure from template:
         # 1. template_section -> document_section
         # 2. template_form + form_definition -> form (FormInstance)
-        # 3. form_element_group -> element_group (ElementGroupInstance)
+        # 3. form_element -> element (ElementInstance)
         # 4. form_element + element_definition -> element (ElementInstance)
         
         # 1. Create document sections from template sections

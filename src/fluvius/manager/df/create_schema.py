@@ -53,7 +53,7 @@ async def create_schema(force: bool, repositories: tuple[str, ...]):
         async with engine.begin() as conn:
             # Create schemas if they don't exist
             click.echo(f"\nCreating database schemas...")
-            for schema_name in [config.DEFINITION_DB_SCHEMA, config.DFORM_DATA_DB_SCHEMA]:
+            for schema_name in [config.DFORM_DEFS_SCHEMA, config.DFORM_DATA_SCHEMA]:
                 if not await schema_exists(conn, schema_name):
                     await conn.execute(CreateSchema(schema_name))
                     click.echo(f"  ✓ Created schema: {schema_name}")
@@ -83,7 +83,7 @@ async def create_schema(force: bool, repositories: tuple[str, ...]):
                 for key in element_types:
                     elem_cls = ElementModelRegistry.get(key)
                     table_name = elem_cls.Meta.table_name
-                    click.echo(f"  • {key} -> {config.DFORM_DATA_DB_SCHEMA}.{table_name}")
+                    click.echo(f"  • {key} -> {config.DFORM_DATA_SCHEMA}.{table_name}")
             else:
                 click.echo(f"\nNo element types registered.")
                 click.echo("  Hint: Use -r to import element repository modules")
