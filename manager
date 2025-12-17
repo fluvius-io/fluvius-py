@@ -1,4 +1,4 @@
 #!/bin/sh
 
-export PYTHONPATH="./src"
+export PYTHONPATH=${PYTHONPATH:-"./src"}
 python -m fluvius.manager -- $*

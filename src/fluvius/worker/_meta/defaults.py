@@ -1,3 +1,5 @@
+from fluvius.data import config
+
 DEBUG = False
 
 REDIS_HOST = "localhost"
@@ -10,3 +12,5 @@ REDIS_RETRY_ON_TIMEOUT = True
 
 PENDING_COMMAND_TIMEOUT = 999999
 COLLECT_TRACEBACK = True
+
+ERROR_TRACKING_PROVIDER = "NullTracker" # "PosthogTracker" or "SentryTracker"

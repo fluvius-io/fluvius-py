@@ -2,15 +2,15 @@ import queue
 
 from functools import wraps
 from contextlib import asynccontextmanager
-from fluvius.error import BadRequestError, PreconditionFailedError, ForbiddenError
+from fluvius.error import BadRequestError, PreconditionFailedError, ForbiddenError, InternalServerError
 from fluvius.data import UUID_TYPE, generate_etag, field, timestamp
-from typing import NamedTuple
+from typing import NamedTuple, Optional
 
 from . import config, logger
 
 from .activity import ActivityType, ActivityLog
 from .event import Event, EventRecord
-from .message import MessageRecord
+from .message import MessageBundle
 from .response import DomainResponse, ResponseRecord
 from .helper import consume_queue
 
@@ -19,7 +19,6 @@ from . import mutation
 IF_MATCH_HEADER = config.IF_MATCH_HEADER
 IF_MATCH_VERIFY = config.IF_MATCH_VERIFY
 DEFAULT_RESPONSE_TYPE = config.DEFAULT_RESPONSE_TYPE
-ALL_RESOURCES = '_ALL'
 
 NoneType = type(None)
 
@@ -30,20 +29,21 @@ class AggregateRoot(NamedTuple):
     domain_iid: UUID_TYPE = None
 
 
-def validate_resource_spec(resources):
-    if not resources:
+def validate_resource_spec(resource_spec: Optional[str | list[str] | tuple[str]]) -> tuple[str]:
+    if not resource_spec:
         return None
 
-    if isinstance(resources, list):
-        return tuple(resources)
+    if isinstance(resource_spec, str):
+        return (resource_spec,)
 
-    if isinstance(resources, str):
-        return (resources,)
+    if isinstance(resource_spec, list):
+        return tuple[str](resource_spec)
 
-    if isinstance(resources, tuple):
-        return resources
+    if isinstance(resource_spec, tuple):
+        return resource_spec
 
-    raise ValueError(f"Invalid resource specification: {resources}")
+    from fluvius.domain.exceptions import DomainEntityError
+    raise DomainEntityError("D00.101", f"Invalid resource specification: {resource_spec}")
 
 
 def action(evt_key=None, resources=None):
@@ -62,7 +62,7 @@ def action(evt_key=None, resources=None):
         @wraps(func)
         async def wrapper(self, *args, **evt_args):
             if resource_spec is not None and self._aggroot.resource not in resource_spec:
-                raise ForbiddenError("D100-001", f'Action is not allowed on resource: {self._aggroot.resource}')
+                raise ForbiddenError("D00.308", f'Action is not allowed on resource: {self._aggroot.resource}')
 
             evt_data = await func(self, *args, **evt_args)
 
@@ -101,7 +101,7 @@ class Aggregate(object):
     @asynccontextmanager
     async def command_aggregate(self, context, command_bundle, command_meta):
         if getattr(self, '_context', None):
-            raise RuntimeError('Overlapping context: %s' % str(context))
+            raise InternalServerError('D00.110', 'Overlapping context: %s' % str(context))
 
         self._evt_queue = queue.Queue()
         self._context = context
@@ -118,23 +118,23 @@ class Aggregate(object):
             await self.fetch_command_rootobj(self._aggroot)
         )
 
-        self.before_command(context, command_bundle, command_meta)
+        await self.before_command(context, command_bundle, command_meta)
         yield RestrictedAggregateProxy(self)
         
         if not self._evt_queue.empty():
-            raise RuntimeError('All events must be consumed by the command handler.')
+            raise InternalServerError('D00.102', 'All events must be consumed by the command handler.')
 
-        self.after_command(context, command_bundle, command_meta)
+        await self.after_command(context, command_bundle, command_meta)
         self._command = None
         self._cmdmeta = None
         self._aggroot = None
         self._rootobj = None
         self._context = None
     
-    def before_command(self, context, command_bundle, command_meta):
+    async def before_command(self, context, command_bundle, command_meta):
         pass
 
-    def after_command(self, context, command_bundle, command_meta):
+    async def after_command(self, context, command_bundle, command_meta):
         pass
 
     async def fetch_command_rootobj(self, aggroot):
@@ -148,7 +148,7 @@ class Aggregate(object):
             if_match_value = self.context.headers.get(IF_MATCH_HEADER, None)
             if if_match_value is None:
                 raise BadRequestError(
-                    403648,
+                    "D00.315",
                     f"[{IF_MATCH_HEADER}] header is required but not provided."
                 )
 
@@ -161,11 +161,7 @@ class Aggregate(object):
             item = await self.statemgr.fetch_with_domain_sid(aggroot.resource, aggroot.identifier, aggroot.domain_sid)
 
         if if_match_value and item._etag != if_match_value:
-            raise PreconditionFailedError(
-                412649,
-                "Un-matched document signatures. "
-                "The document might be modified since it was loaded. [%s]" % if_match_value
-            )
+            raise PreconditionFailedError("D00.201", f"Un-matched document signatures. The document might be modified since it was loaded. [{if_match_value}]")
 
         return item
 
@@ -188,18 +184,27 @@ class Aggregate(object):
     def create_response(self, data, _type=None, **kwargs):
         type_ = _type or DEFAULT_RESPONSE_TYPE
         rsp_cls = self.lookup_response(type_)
-        data = rsp_cls.Data.create(data, **kwargs)
+        if not isinstance(data, rsp_cls.Data):
+            data = rsp_cls.Data.create(data, **kwargs)
+
         return ResponseRecord(data=data, response=type_)
 
     def create_message(self, msg_key, data=None, **kwargs):
         msg_cls = self.lookup_message(msg_key)
 
-        return MessageRecord(
-            message=msg_key,
+        if data is None:
+            data = {}
+
+        if not isinstance(data, dict):
+            raise InternalServerError('D00.197', f"Invalid message data: {data}")
+
+        data = data | kwargs
+
+        return MessageBundle(
+            msg_key=msg_key,
             aggroot=self.aggroot,
             domain=self.domain_name,
-            data=msg_cls.Data.create(**data),
-            **kwargs
+            data=msg_cls.Data.create(**data)
         )
 
     def init_resource(self, resource, data=None, **kwargs):
@@ -248,7 +253,7 @@ class Aggregate(object):
     @property
     def context(self):
         if self._context is None:
-            raise RuntimeError('Aggregate context is not initialized.')
+            raise InternalServerError('D00.103', 'Aggregate context is not initialized.')
 
         return self._context
 
@@ -259,14 +264,14 @@ class Aggregate(object):
     @property
     def aggroot(self):
         if self._aggroot is None:
-            raise RuntimeError('Aggregate context is not initialized.')
+            raise InternalServerError('D00.111', 'Aggregate context is not initialized.')
 
         return self._aggroot
 
     @property
     def command(self):
         if self._command is None:
-            raise RuntimeError('Aggregate context is not initialized.')
+            raise InternalServerError('D00.112', 'Aggregate context is not initialized.')
 
         return self._command
 

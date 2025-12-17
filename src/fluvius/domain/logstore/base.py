@@ -1,30 +1,40 @@
 from contextlib import asynccontextmanager
-from types import SimpleNamespace
 
 from fluvius.domain import logger, config
 from fluvius.domain.activity import ActivityLog
 from fluvius.domain.entity import DomainEntityType
+from fluvius.helper import ImmutableNamespace
 
 
 DEBUG_LOG = config.DEBUG
 
 
 class DomainLogStore(object):
-    __config__ = SimpleNamespace
+    __config__ = ImmutableNamespace
 
-    def __init__(self, app, showlog=False, **config):
+    def __init__(self, domain, app=None, **config):
         self._app = app
-        self._config = self.validate_config(config)
-        self._showlog = showlog
+        self._domain = domain
+        self._config = self.validate_config(config, show_log=True)
 
-    def validate_config(self, config):
-        if isinstance(config, self.__config__):
-            return config
-
-        return self.__config__(**config)
+    def validate_config(self, config, **defaults):
+        config = defaults | config
+        return self.__config__(**{k.upper(): v for k, v in config.items()})
 
     def reset(self):
         pass
+
+    @property
+    def app(self):
+        return self._app
+
+    @property
+    def config(self):
+        return self._config
+
+    @property
+    def domain(self):
+        return self._domain
 
     @asynccontextmanager
     async def transaction(self, context):
@@ -34,7 +44,7 @@ class DomainLogStore(object):
         raise NotImplementedError("DomainLogStore.commit")
 
     async def _add_entry(self, resource, entry):
-        self._showlog and logger.info('[DOMAIN LOG] %s => %s', resource, entry)
+        self.config.SHOW_LOG and logger.info('[DOMAIN LOG] %s => %s', resource, entry)
         return entry
 
     async def add_activity(self, activity):

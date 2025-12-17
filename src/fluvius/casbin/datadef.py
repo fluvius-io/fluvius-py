@@ -1,31 +1,79 @@
-from pyrsistent import PClass, field, pvector_field
+from pydantic import BaseModel, Field
+from enum import Enum
+from typing import Union, Optional, List, Dict, Any
+from fluvius.auth import AuthorizationContext
 
 
-class PolicyRequest(PClass):
-    usr = field(type=str, factory=str)
-    sub = field(type=str, factory=str)
-    org = field(type=str, factory=str)
-    dom = field(type=str, factory=str)
-    res = field(type=str, factory=str)
-    rid = field(type=str, factory=str)
-    act = field(type=str, factory=str)
-    cqrs = field(type=str, factory=str, initial="COMMAND")
+class PolicyScope(str, Enum):
+    SYSTEM   = "SYSTEM"
+    TENANT   = "TENANT"
+    RESOURCE = "RESOURCE"
 
 
-class PolicyData(PClass):
-    role  = field(type=str, factory=str)
-    dom   = field(type=str, factory=str)
-    res   = field(type=str, factory=str)
-    act   = field(type=str, factory=str)
-    cqrs  = field(type=str, factory=str)
-    meta  = field(type=str, factory=str)
+class ConditionLeaf(BaseModel):
+    field: str
+    op: str
+    value: Union[str, Any]
+
+    def to_query_statement(self):
+        return {f"{self.field}:{self.op}": self.value}
+
+class ConditionNode(BaseModel):
+    ALL: Optional[List[Union["ConditionNode", ConditionLeaf]]] = Field(None)
+    ANY: Optional[List[Union["ConditionNode", ConditionLeaf]]] = Field(None)
+
+    def to_query_statement(self):
+        if self.ALL:
+            return {".and": [item.to_query_statement() for item in self.ALL]}
+        elif self.ANY:
+            return {".or": [item.to_query_statement() for item in self.ANY]}
+        else:
+            return {}
+
+ConditionNode.model_rebuild()
 
 
-class PolicyNarration(PClass):
-    message  = field(type=str, factory=str)
-    policies = pvector_field(PolicyData, initial=[])
+class PolicyCondition(BaseModel):
+    SYSTEM: Optional[ConditionNode] = Field(None)
+    TENANT: Optional[ConditionNode] = Field(None)
+    RESOURCE: Optional[ConditionNode] = Field(None)
 
 
-class PolicyResponse(PClass):
-    allowed   = field(type=bool, factory=bool)
-    narration = field(type=PolicyNarration)
+class PolicyRestriction(BaseModel):
+    condition: PolicyCondition = Field(default_factory=PolicyCondition)
+
+
+class PolicyMeta(BaseModel):
+    restriction: PolicyRestriction
+
+
+class PolicyData(BaseModel):
+    role: str
+    cqrs: str
+    act: str
+    scope: PolicyScope
+    meta: Optional[str] = None
+
+    def __post_init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.meta = self.meta or None
+
+
+class PolicyNarration(BaseModel):
+    message: Optional[str] = None
+    policies: List[PolicyData] = Field(default_factory=list)
+    trace: List[dict] = Field(default_factory=list)
+    restriction: Dict = Field(default_factory=dict)
+
+
+class PolicyRequest(BaseModel):
+    msg: str        # Short description of the request for easier tracing.
+    auth_ctx: AuthorizationContext
+    act: str
+    cqrs: str
+    rid: Optional[str] = None
+
+
+class PolicyResponse(BaseModel):
+    allowed: bool
+    narration: PolicyNarration

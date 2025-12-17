@@ -8,14 +8,17 @@ DEFAULT_RECORD_INVALIDATE_FIELD = "_deleted"
 IGNORE_COMMAND_EXTRA_FIELDS = True
 UUID5_NAMESPACE = 'f853f38d-83f8-4ef4-9e1b-12b9e27bc1ad'
 
-DB_DSN = "sqlite+aiosqlite:////tmp/fluvius_pyiac.sqlite"
-DB_POOL_SIZE = 10
-DB_POOL_TIMEOUT = 10
-DB_MAX_OVERFLOW = 20
-DB_ISOLATION_LEVEL = 'READ COMMITTED'
-DB_POOL_RECYCLE = 1800
-
-SCHEMA_BASE = "fluvius--base"
 SQLALCHEMY_DIALECT = 'sqlite'  # sqlite | postgresql
 BACKEND_QUERY_DEFAULT_LIMIT = 100
 BACKEND_QUERY_INTERNAL_LIMIT = 1000
+
+DB_DSN = "sqlite+aiosqlite:////tmp/fluvius_data.sqlite"
+
+# This only works with postgres, for sqlite set DB_CONFIG = {}
+DB_CONFIG = dict(
+    isolation_level='READ COMMITTED',
+    pool_recycle=1800,
+    pool_size=10,
+    pool_timeout=10,
+    max_overflow=20
+)

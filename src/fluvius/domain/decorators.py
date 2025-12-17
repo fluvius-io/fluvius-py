@@ -51,7 +51,8 @@ def _class_domain_key_infer(cls):
 def _assert_coroutine_func(func):
     if not inspect.iscoroutinefunction(func):
         raise DomainEntityError(
-            f"Function must be an async (i.e. async def ): {func} [E14005]"
+            "D00.301",
+            f"Function must be an async (i.e. async def ): {func}"
         )
 
 
@@ -59,13 +60,13 @@ def _assert_domain_command(*cmd_classes):
     for cmd_cls in cmd_classes:
         if not issubclass(cmd_cls, cc.Command):
             raise DomainEntityError(
-                f"Command must be subclass of [fluvius.domain.Command] [{cmd_cls}] [E14001]"
+                "D00.302",
+                f"Command must be subclass of [fluvius.domain.Command] [{cmd_cls}]"
             )
 
         if not hasattr(cmd_cls, DOMAIN_ENTITY_MARKER):
-            logger.warn(
-                "[EA3F5] Command handler target is not a [domain_entity]."
-                " Handler may process multiple command types. [%s] [W0042]",
+            logger.warning(
+                "[EA3F5] Command handler target is not a [domain_entity]. Handler may process multiple command types. [%s] [W0042]",
                 cmd_cls,
             )
 
@@ -74,13 +75,14 @@ def _assert_domain_message(*msg_class):
     for msg_cls in msg_class:
         if not issubclass(msg_cls, cm.Message):
             raise DomainEntityError(
-                f"Handled event must be subclass of [fluvius.domain.MessageRecord] [{msg_cls}] [E1400]"
+                "D00.303",
+                f"Handled event must be subclass of [fluvius.domain.MessageBundle] [{msg_cls}]"
             )
 
 
 def _assert_domain_internal_event(evt_cls, domain_cls):
     if not domain_cls.entity_registered(evt_cls):
-        logger.warn(
+        logger.warning(
             f"[{evt_cls}] is not registered on [{domain_cls}] [W1700]"
         )
 
@@ -88,7 +90,8 @@ def _assert_domain_internal_event(evt_cls, domain_cls):
 def _assert_domain_external_event(evt_cls, domain_cls):
     if domain_cls.entity_registered(evt_cls):
         raise DomainEntityError(
-            f"Invalid event class for event handler. [{evt_cls}] must NOT be registered on [{domain_cls}] [E1701]"
+            "D00.304",
+            f"Invalid event class for event handler. [{evt_cls}] must NOT be registered on [{domain_cls}]"
         )
 
 
@@ -96,12 +99,15 @@ def _validate_domain_command(cls):
     for bcls in cls.__bases__:
         if hasattr(bcls, DOMAIN_ENTITY_MARKER):
             raise DomainEntityError(
-                "[E14002] CQRS Entity [%s] must not inherit another CQRS Entity [%s]",
-                (cls, bcls),
+                "D00.305",
+                f"CQRS Entity [{cls}] must not inherit another CQRS Entity [{bcls}]"
             )
 
     if not issubclass(cls, cc.Command):
-        raise ValueError(f"Invalid CQRS command class: {cls}")
+        raise DomainEntityError(
+            "D00.309",
+            f"Invalid CQRS command class: {cls}"
+        )
 
     return cls
 
@@ -110,21 +116,24 @@ def _validate_domain_message(cls):
     for bcls in cls.__bases__:
         if hasattr(bcls, DOMAIN_ENTITY_MARKER):
             raise DomainEntityError(
-                "[E14002] CQRS Entity [%s] must not inherit another CQRS Entity [%s]",
-                (cls, bcls),
+                "D00.305",
+                f"CQRS Entity [{cls}] must not inherit another CQRS Entity [{bcls}]"
             )
 
     if issubclass(cls, cm.Message):
         return cls
 
-    raise ValueError(f"Invalid CQRS message class: {cls}")
+    raise DomainEntityError(
+        "D00.310",
+        f"Invalid CQRS message class: {cls}"
+    )
 
 def _validate_domain_entity(cls):
     for bcls in cls.__bases__:
         if hasattr(bcls, DOMAIN_ENTITY_MARKER):
             raise DomainEntityError(
-                "[E14002] CQRS Entity [%s] must not inherit another CQRS Entity [%s]",
-                (cls, bcls),
+                "D00.305",
+                f"CQRS Entity [{cls}] must not inherit another CQRS Entity [{bcls}]"
             )
 
     if issubclass(cls, ce.Event):
@@ -136,7 +145,10 @@ def _validate_domain_entity(cls):
     if issubclass(cls, ct.DomainContext):
         return DomainEntityType.CONTEXT, cls
 
-    raise ValueError(f"Invalid CQRS entity class: {cls}")
+    raise DomainEntityError(
+        "D00.311",
+        f"Invalid CQRS entity class: {cls}"
+    )
 
 
 def _locate_handler(cls, name_match=None, domain_cls=None):
@@ -193,7 +205,10 @@ def _normalize_command_processor(cmd_def, func):
 
         return wrapped_func
 
-    raise ValueError(f'Invalid command processor: {func}')
+    raise DomainEntityError(
+        "D00.312",
+        f'Invalid command processor: {func}'
+    )
 
 def _normalize_message_dispatcher(cmd_def, func):
     return func
@@ -206,12 +221,17 @@ class DomainEntityRegistry(object):
             domain_name = domain_cls.__namespace__
             kind, cls = _validate_domain_entity(cls)
             if validate_kind and validate_kind != kind:
-                raise ValueError(f'Invalid entity type: {validate_kind} != {kind}')
+                raise DomainEntityError(
+                    "D00.313",
+                    f'Invalid entity type: {validate_kind} != {kind}'
+                )
 
             identifier = (key, kind)
             if identifier in domain_cls._entity_registry:
-                raise ValueError(
-                    '[E14007] Entity already registered [%s] within domain [%s]', identifier, cls.__namespace__)
+                raise DomainEntityError(
+                    "D00.314",
+                    f'Entity already registered [{identifier}] within domain [{cls.__namespace__}]'
+                )
 
             setattr(cls, DOMAIN_ENTITY_MARKER, (key, kind, domain_name))
             setattr(cls, DOMAIN_ENTITY_KEY, key)
@@ -242,8 +262,7 @@ class DomainEntityRegistry(object):
             domain_cls._register_entity(cls, key, DomainEntityType.MESSAGE)
 
             for name, msg_dispatch in _locate_handler(cls, MESSAGE_DISPATCHER_FUNC):
-                wrapper = domain_cls.message_dispatcher(cls)
-                setattr(cls, MESSAGE_DISPATCHER_FUNC, wrapper(msg_dispatch))
+                domain_cls.message_dispatcher(cls)(msg_dispatch)
 
             DEBUG and logger.info("[REGISTERED MESSAGE] %s/%d [%s]", domain_cls.__namespace__, DomainEntityType.MESSAGE, key)
             return cls
@@ -286,8 +305,10 @@ class DomainEntityRegistry(object):
         identifier = (key, kind)
 
         if identifier in domain_cls._entity_registry:
-            raise ValueError(
-                '[E14007] Entity already registered [%s] within domain [%s]', identifier, domain_name)
+            raise DomainEntityError(
+                "D00.314",
+                f'Entity already registered [{identifier}] within domain [{domain_name}]'
+            )
 
         setattr(entity_cls, DOMAIN_ENTITY_MARKER, (key, kind, domain_name))
         setattr(entity_cls, DOMAIN_ENTITY_KEY, key)
@@ -357,7 +378,11 @@ class DomainEntityRegistry(object):
             for msg_cls in msg_classes:
                 msg_key = getattr(msg_cls, DOMAIN_ENTITY_KEY)
                 dispatcher = _normalize_message_dispatcher(msg_cls, func)
-                cls._msg_dispatchers += ((_priority, msg_key, dispatcher), )
+                if cls.__dispatcher__ is None:
+                    logger.warning(f'No message dispatcher setup for domain [{cls}]. Ignore handler for {msg_key}')
+                    continue
+
+                cls.__dispatcher__.register(msg_cls)(func)
 
             def _error(*args, **kwargs):
                 raise RuntimeError('Domain Message Dispatchers are not meant to call directly.')

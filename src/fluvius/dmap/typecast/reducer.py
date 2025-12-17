@@ -1,5 +1,6 @@
 import json
 import uuid
+from fluvius.error import BadRequestError
 from fluvius.dmap.typecast import dtype
 from .constant import UUID5_NAMESPACE
 
@@ -10,7 +11,11 @@ def __closure__():
     def _register(name):
         def _decorator(reducer):
             if name in REGISTRY:
-                raise ValueError('Reducer already registered [%s]' % name)
+                raise BadRequestError(
+                    "T00.601",
+                    f"Reducer already registered [{name}]",
+                    None
+                )
             REGISTRY[name] = reducer
             return reducer
         return _decorator
@@ -19,7 +24,11 @@ def __closure__():
         try:
             return REGISTRY[name]
         except KeyError:
-            raise ValueError(f"Reducer has not been registerd [{name}]")
+            raise BadRequestError(
+                "T00.602",
+                f"Reducer has not been registerd [{name}]",
+                None
+            )
 
     @_register('array')
     @dtype('list')

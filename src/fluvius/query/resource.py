@@ -49,7 +49,7 @@ class QueryResource(BaseModel):
     @classmethod
     def initialize_resource(cls, identifier):
         if hasattr(cls, '_identifier'):
-            raise ValueError(f'Resource already initialized: {cls._identifier}')
+            raise BadRequestError('Q00.701', f'Resource already initialized: {cls._identifier}')
 
         idfield = SimpleNamespace(name=None)
         include_fields, excluded_fields = [], []
@@ -74,7 +74,7 @@ class QueryResource(BaseModel):
 
                 if field_extra.get('identifier'):
                     if idfield.name:
-                        raise ValueError(f'Multiple identifier for query resource [{cls}]: {idfield["value"]} & {name}')
+                        raise BadRequestError('Q00.702', f'Multiple identifier for query resource [{cls}]: {idfield["value"]} & {name}')
 
                     idfield.name = name
 
@@ -100,7 +100,7 @@ class QueryResource(BaseModel):
         cls._excluded_fields = tuple(excluded_fields + list(cls.Meta.excluded_fields))
 
         if not idfield.name:
-            raise ValueError(f'No identifier provided for query resource [{cls}]')
+            raise BadRequestError('Q00.703', f'No identifier provided for query resource [{cls}]')
 
         cls._default_order = cls.Meta.default_order or ("id.desc",)
         cls._identifier = identifier
@@ -147,7 +147,7 @@ class QueryResource(BaseModel):
                     fn, dr = sort
 
                 if isinstance(fn, list):
-                    raise ValueError('INVALID: %s' % str(sorts))
+                    raise BadRequestError('Q00.704', 'INVALID: %s' % str(sorts))
                 yield (fmap.get(fn, fn), dr)
 
         return tuple(gen(sorts or cls._default_order))
@@ -177,7 +177,7 @@ class QueryResource(BaseModel):
 
     @classmethod
     def base_query(self, context, scope):
-        return None
+        return scope
 
 
     def model_dump(self, **kwargs):

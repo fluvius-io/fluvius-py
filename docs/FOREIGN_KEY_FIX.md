@@ -4,7 +4,7 @@
 
 **Error Message:**
 ```
-sqlalchemy.exc.InvalidRequestError: This ForeignKey already has a parent ! in riparius.schema
+sqlalchemy.exc.InvalidRequestError: This ForeignKey already has a parent ! in fluvius.navis.schema
 ```
 
 **Root Cause:**
@@ -86,13 +86,13 @@ The following tables were updated with unique foreign key constraints:
 
 ### **Test Import:**
 ```python
-from riparius.schema import WorkflowSchema, WorkflowStep, WorkflowStage
+from fluvius.navis.schema import WorkflowSchema, WorkflowStep, WorkflowStage
 # ✅ No more SQLAlchemy errors
 ```
 
 ### **Test Foreign Key Creation:**
 ```python
-from riparius.schema import workflow_foreign_key
+from fluvius.navis.schema import workflow_foreign_key
 fk = workflow_foreign_key('test_constraint')
 # ✅ Creates unique ForeignKey instances
 ```

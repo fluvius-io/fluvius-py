@@ -1,8 +1,8 @@
 import pytest
 from pytest import mark
 from sqlalchemy import text
-from user_domain.domain import UserDomain
-from user_domain.model import UserConnector
+from fluvius_test.user_domain.domain import UserDomain
+from fluvius_test.user_domain.model import UserConnector
 from fluvius.data import UUID_GENR
 from fluvius.domain.context import DomainTransport
 from fluvius.data import UUID_GENR

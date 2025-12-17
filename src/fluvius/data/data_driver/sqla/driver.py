@@ -13,6 +13,7 @@ from types import SimpleNamespace
 from typing import cast
 
 from fluvius.error import BadRequestError, InternalServerError
+
 from fluvius.data import logger, config
 from fluvius.data.exceptions import ItemNotFoundError, UnprocessableError, NoItemModifiedError
 from fluvius.data.query import BackendQuery
@@ -75,57 +76,57 @@ def sqla_error_handler(code_prefix):
                 return await func(*args, **kwargs)
             except asyncpg.exceptions.UniqueViolationError as e:
                 raise UnprocessableError(
-                    f"{code_prefix}.01",
-                    f"Duplicate entry detected. Record must be unique. [{e.orig.pgcode}]",
+                    f"{code_prefix}-01",
+                    f"Duplicate entry detected. Record must be unique. [{e.orig}]",
                     str(e.orig)
                 )
             except exc.IntegrityError as e:
                 raise UnprocessableError(
-                    f"{code_prefix}.02",
-                    f"Integrity constraint violated. Please check your input. [{e.orig.pgcode}]",
+                    f"{code_prefix}-02",
+                    f"Integrity constraint violated. Please check your input. [{e.orig}]",
                     str(e.orig)
                 )
             except exc.OperationalError as e:
                 raise UnprocessableError(
-                    f"{code_prefix}.03",
-                    f"The database is currently unreachable. Please try again later. [{e.orig.pgcode}]",
+                    f"{code_prefix}-03",
+                    f"The database is currently unreachable. Please try again later. [{e.orig}]",
                     str(e.orig)
                 )
             except exc.ProgrammingError as e:
                 if e.orig.pgcode == '42883':
                     raise BadRequestError(
-                        f"{code_prefix}.04.01",
+                        f"{code_prefix}-41",
                         "Undefined function error [42883]. Values must be in correct format.",
                         str(e.orig)
                     )
 
                 raise UnprocessableError(
-                    f"{code_prefix}.04",
-                    f"There was a syntax or structure error in the database query. [{e.orig.pgcode}]",
+                    f"{code_prefix}-04",
+                    f"There was a syntax or structure error in the database query. [{e.orig}]",
                     str(e.orig)
                 )
             except exc.DBAPIError as e:
                 if e.orig.pgcode == '2201X':
                     raise BadRequestError(
-                        f"{code_prefix}.05.01",
+                        f"{code_prefix}-51",
                         f"Invalid row count in result offset clause [{e.orig.pgcode}].",
                         str(e.orig)
                     )
                 else:
                     raise UnprocessableError(
-                        f"{code_prefix}.05",
+                        f"{code_prefix}-05",
                         f"A DBAPIError error occurred [{e.orig.pgcode}]",
                         str(e.orig)
                     )
             except exc.NoResultFound as e:
                 raise ItemNotFoundError(
-                    f"{code_prefix}.06",
+                    f"{code_prefix}-06",
                     f"Item Not Found: {str(e)}",
                     getattr(e, "orig", None)
                 )
             except exc.SQLAlchemyError as e:
                 raise UnprocessableError(
-                    f"{code_prefix}.07",
+                    f"{code_prefix}-07",
                     "An unexpected database error occurred while processing your request.",
                     getattr(e, "orig", None)
                 )
@@ -140,7 +141,7 @@ class _AsyncSessionConfiguration(object):
 
     def make_session(self):
         if not hasattr(self, "_async_sessionmaker"):
-            raise ValueError('AsyncSession connection is not established.')
+            raise InternalServerError('E00.101', 'AsyncSession connection is not established.')
 
         return self._async_sessionmaker()
 
@@ -164,17 +165,15 @@ class _AsyncSessionConfiguration(object):
     def set_bind(self, bind_dsn, loop=None, **kwargs):
         bind_dsn = build_dsn(bind_dsn)
         if not isinstance(bind_dsn, URL):
-            raise ValueError('Invalid URI: {0}'.format(bind_dsn))
+            raise BadRequestError('E00.102', 'Invalid URI: {0}'.format(bind_dsn))
 
         if hasattr(self, "_async_engine"):
-            raise ValueError('Engine already setup.')
+            raise BadRequestError('E00.103', 'Engine already setup.')
 
         engine = create_async_engine(
             bind_dsn,
-            isolation_level=config.DB_ISOLATION_LEVEL,
-            pool_recycle=config.DB_POOL_RECYCLE,
-            pool_size=config.DB_POOL_SIZE,
             json_serializer=serialize_json,
+            **(config.DB_CONFIG or {}),
             **kwargs
         )
 
@@ -212,13 +211,21 @@ class SqlaDriver(DataDriver, QueryBuilder):
         DEBUG_CONNECTOR and logger.info(f'[{self.__class__.__name__}] setup with DSN: {self.dsn}')
         dsn = self.__db_dsn__
         if dsn is None:
-            raise ValueError(f'No database DSN provided to: {self.__class__}')
+            raise BadRequestError('E00.104', f'No database DSN provided to: {self.__class__}')
         self._session_configuration = _AsyncSessionConfiguration(dsn)
         self._active_session = ContextVar('active_session', default=None)
 
     def __init_subclass__(cls):
         cls.__data_schema_registry__ = {}
         cls.__data_schema_base__ = create_data_schema_base(cls)
+    
+    @classmethod
+    def pgmetadata(cls):
+        return cls.__data_schema_base__.metadata
+    
+    @classmethod
+    def pgschema(cls):
+        return cls.__data_schema_base__
 
     @property
     def dsn(self):
@@ -235,8 +242,8 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
         return converted_sql, param_dict
 
-    async def connection(self):
-        return await self._session_configuration.connection()
+    def connect(self):
+        return self._session_configuration._async_engine.begin()
 
     @classmethod
     def validate_data_schema(cls, schema_model):
@@ -246,14 +253,14 @@ class SqlaDriver(DataDriver, QueryBuilder):
         if issubclass(schema_model, cls.__data_schema_base__):
             return schema_model
 
-        raise ValueError(f'{cls.__name__} only support subclass of [{cls.__data_schema_base__}]. Got: {schema_model}')
+        raise BadRequestError('E00.105', f'{cls.__name__} only support subclass of [{cls.__data_schema_base__}]. Got: {schema_model}')
 
     def _check_no_item_modified(self, cursor, expect, query=None):
         if cursor.rowcount != expect:
             msg = f"No items modified with update query [{cursor.rowcount} vs. {expect}]: {query}"
             if RAISE_NO_ITEM_MODIFIED_ERROR:
                 raise NoItemModifiedError(
-                    errcode="L1206",
+                    errcode="E00.006",
                     message=msg
                 )
 
@@ -266,7 +273,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
         if active_session is not None:
             if RAISE_NESTED_TRANSACTION_ERROR:
-                raise ValueError(f'Nested/concurrent transaction detected [{trace_msg}]: {active_session._trace_msg}')
+                raise InternalServerError('E00.106', f'Nested/concurrent transaction detected [{trace_msg}]: {active_session._trace_msg}')
             logger.exception(f'Nested/concurrent transaction detected [{trace_msg}]: {active_session._trace_msg}')
             yield active_session
             return
@@ -288,14 +295,14 @@ class SqlaDriver(DataDriver, QueryBuilder):
     @property
     def active_session(self):
         if self._active_session.get() is None:
-            raise RuntimeError('Operation must be run with in a tranasaction.')
+            raise InternalServerError('E00.107', 'Database operation must be run with in a transaction.')
 
         return self._active_session.get()
 
-    @sqla_error_handler('L1207')
+    @sqla_error_handler('E00.007')
     async def find_all(self, resource, query: BackendQuery):
         if query.offset != 0 or query.limit != BACKEND_QUERY_LIMIT:
-            raise ValueError(f'Invalid find all query: {query}')
+            raise BadRequestError('E00.108', f'Invalid find all query: {query}')
 
         return await self.query(resource, query)
 
@@ -362,7 +369,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
     def _unwrap_schema_list(self, item):
         return item.serialize()
 
-    @sqla_error_handler('L1201')
+    @sqla_error_handler('E00.001')
     async def find_one(self, resource, query: BackendQuery):
         data_schema = self.lookup_data_schema(resource)
         sess = self.active_session
@@ -372,8 +379,8 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
         return cursor.mappings().one()
 
-    @sqla_error_handler('L1202')
-    async def update_one(self, resource, query, **updates):
+    @sqla_error_handler('E00.002')
+    async def update_data(self, resource, query, **updates):
         if not query.identifier:
             raise ValueError(f'Invalid update query: {query}')
 
@@ -384,7 +391,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
         self._check_no_item_modified(cursor, 1, query)
         return self._unwrap_result(cursor)
 
-    @sqla_error_handler('L1203')
+    @sqla_error_handler('E00.003')
     async def remove_one(self, resource, query: BackendQuery):
         data_schema = self.lookup_data_schema(resource)
         if not query.identifier:
@@ -397,7 +404,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
         self._check_no_item_modified(cursor, 1, query)
         return self._unwrap_result(cursor)
 
-    @sqla_error_handler('L1204')
+    @sqla_error_handler('E00.004')
     async def insert(self, resource, values: dict | list):
         data_schema = self.lookup_data_schema(resource)
         stmt = self.build_insert(data_schema, values)
@@ -412,7 +419,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
         return self._unwrap_result(cursor)
 
-    @sqla_error_handler('L1205')
+    @sqla_error_handler('E00.005')
     async def upsert(self, resource, data):
         # Use dialect dependent (e.g. sqlite, postgres, mysql) version of the statement
         # See: connector.py [setup_sql_satemenet]
@@ -436,14 +443,14 @@ class SqlaDriver(DataDriver, QueryBuilder):
         self._check_no_item_modified(cursor, 1)
         return self._unwrap_result(cursor)
 
-    @sqla_error_handler('L1206')
+    @sqla_error_handler('E00.006')
     async def native_query(self, nquery, *params, unwrapper):
         if isinstance(nquery, PikaQueryBuilder):
             stmt = nquery.get_sql()
         elif isinstance(nquery, str):
             stmt = nquery
         else:
-            raise ValueError(f'[E92853] Invalid SQL query: {nquery}')
+            raise BadRequestError('E00.109', f'Invalid SQL query: {nquery}')
         
         # conn = await self.connection()
         # cursor = await conn.exec_driver_sql(stmt, params)

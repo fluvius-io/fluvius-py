@@ -69,7 +69,7 @@ def __closure__():
 
         def close(self, key):
             if key not in _pg_engines:
-                return logger.warn(f"Close non-existant connection [{key}]")
+                return logger.warning(f"Close non-existant connection [{key}]")
 
             _pg_engines.pop(key).dispose()
 

@@ -41,24 +41,27 @@ class SQLTrackerManager(DataAccessManagerBase):
         super().__init_subclass__()
 
     async def add_entry(self, model_name, **data):
-        data['_id'] = data.get('_id', UUID_GENR())
-        await self.connector.insert(model_name, data)
+        async with self.transaction():
+            data['_id'] = data.get('_id', UUID_GENR())
+            await self.connector.insert(model_name, data)
 
-        model_cls = self.lookup_model(model_name)
-        return self._wrap_model(model_cls, data)
+            model_cls = self.lookup_model(model_name)
+            return self._wrap_model(model_cls, data)
 
     async def update_entry(self, record, **updates):
-        model_name = self.lookup_record_model(record)
-        q = BackendQuery.create(identifier=record._id)
-        await self.connector.update_one(model_name, q, **updates)
-        return await self.fetch_entry(model_name, record._id)
+        async with self.transaction():
+            model_name = self.lookup_record_model(record)
+            q = BackendQuery.create(identifier=record._id)
+            await self.connector.update_data(model_name, q, **updates)
+            return await self.fetch_entry(model_name, record._id)
 
     async def fetch_entry(self, model_name, handle_id):
-        q = BackendQuery.create(identifier=handle_id)
-        item = await self.connector.find_one(model_name, q)
+        async with self.transaction():
+            q = BackendQuery.create(identifier=handle_id)
+            item = await self.connector.find_one(model_name, q)
 
-        model_cls = self.lookup_model(model_name)
-        return self._wrap_model(model_cls, item)
+            model_cls = self.lookup_model(model_name)
+            return self._wrap_model(model_cls, item)
 
 
 class SQLTracker(SQLTrackerManager):

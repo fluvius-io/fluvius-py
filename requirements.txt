@@ -18,6 +18,7 @@ pypika
 pyrsistent>=0.20.0
 ruff>=0.9.1
 sqlalchemy>=2.0.37
+sqlmodel
 typing-extensions>=4.5.0
 ulid-py>=1.1.0
 whenever>=0.7.3

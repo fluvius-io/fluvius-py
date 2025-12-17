@@ -14,3 +14,5 @@ DEFAULT_RESPONSE_TYPE = 'default-response'
 SQL_LOG_STORE_NAMESPACE = 'domain-audit'
 SQL_LOG_DB_DSN = "postgresql+asyncpg://fluvius_test:iyHu5WBQxiVXyLLJaYO0XJec@localhost:5432/fluvius_test"
 DEVELOPER_MODE = False
+
+COMMAND_PERMISSION = False

@@ -44,7 +44,7 @@ class WorkerClient(object):
             return None
 
         if not isinstance(tracker, FluviusWorkerTracker):
-            raise ValueError(f'Invalid worker tracker: {tracker}')
+            raise BadRequestError('W00.102', f'Invalid worker tracker: {tracker}')
 
         return tracker
 
@@ -66,7 +66,7 @@ class WorkerClient(object):
             data.pop('job_id')
             data["queue_name"] = queue_name
         else:
-            raise ValueError(f'Invalid job handle: {job}')
+            raise BadRequestError('W00.301', f'Invalid job handle: {job}')
 
         return data
 
@@ -85,8 +85,8 @@ class WorkerClient(object):
 
             if job_handle is None or job_handle.job_status != JobStatus.RECEIVED:
                 raise BadRequestError(
-                    errcode=400422,
-                    message="Cannot cancel this job. "
+                    'W00.303',
+                    "Cannot cancel this job. "
                     f"Current job status: {job_handle.job_status.label}."
                 )
 
@@ -143,7 +143,7 @@ class WorkerClient(object):
 
     async def open_pool(self, **kwargs):
         if hasattr(self, "_redis_pool"):
-            raise ValueError('Redis pool is already opened.')
+            raise BadRequestError('W00.302', 'Redis pool is already opened.')
 
         self._redis_pool = await arq.create_pool(
             self._redis_settings,

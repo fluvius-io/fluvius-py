@@ -1,5 +1,6 @@
 import iso8601
 from datetime import datetime, UTC
+from fluvius.error import BadRequestError
 from fluvius import config
 
 EPOCH = datetime.fromtimestamp(0, UTC)
@@ -46,7 +47,11 @@ def str_to_datetime(string, fmstr=config.EXCHANGE_DATE_FORMAT):
     try:
         return datetime.strptime(string, fmstr)
     except (ValueError, TypeError):
-        raise ValueError("Invalid date: %s [Code 3E1A95]" % string)
+        raise BadRequestError(
+            "H00.501",
+            f"Invalid date: {string}",
+            None
+        )
 
 
 def date_to_isoformat(dt):
@@ -56,7 +61,11 @@ def date_to_isoformat(dt):
     if isinstance(dt, datetime.date):
         return dt.isoformat()
 
-    raise ValueError("Invalid date: %s [Code 3E1A96]" % dt)
+    raise BadRequestError(
+        "H00.502",
+        f"Invalid date: {dt}",
+        None
+    )
 
 
 def parse_iso_datestring(dstr):
@@ -69,4 +78,8 @@ def parse_iso_datestring(dstr):
     try:
         return iso8601.parse_date(dstr).replace(tzinfo=None)
     except (ValueError, iso8601.iso8601.ParseError):
-        raise ValueError("Invalid iso datetime string: %s [Code 3E1A97]" % dstr)
+        raise BadRequestError(
+            "H00.503",
+            f"Invalid iso datetime string: {dstr}",
+            None
+        )

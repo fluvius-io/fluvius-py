@@ -10,10 +10,10 @@ from typing import Iterator, Optional, List, Type
 
 from fluvius.auth import AuthorizationContext
 from fluvius.data import UUID_GENR, DataModel
-from fluvius.helper import camel_to_lower, select_value, camel_to_title
+from fluvius.helper import camel_to_lower, select_value, camel_to_title, ImmutableNamespace
 from fluvius.helper.timeutil import timestamp
 from fluvius.helper.registry import ClassRegistry
-from fluvius.error import ForbiddenError
+from fluvius.error import ForbiddenError, InternalServerError
 from fluvius.casbin import PolicyManager, PolicyRequest
 
 from . import logger, config  # noqa
@@ -26,7 +26,8 @@ from . import response as cres
 from .aggregate import Aggregate, RestrictedAggregateProxy, AggregateRoot
 from .context import DomainContext as DomainContextData
 from .decorators import DomainEntityRegistry
-from .exceptions import CommandProcessingError
+from .message import MessageDispatcher
+from .exceptions import CommandProcessingError, DomainEntityError
 from .helper import consume_queue
 from .logstore import DomainLogStore
 from .signal import DomainSignal as sig, DomainSignalManager
@@ -55,25 +56,7 @@ def _setup_command_processor_selector(handler_list):
         try:
             return _hmap[bundle.command]
         except KeyError:
-            raise RuntimeError(f'No command handler provided for [{bundle.command}]')
-
-    return _select
-
-def _setup_message_dispatcher_selector(handler_list):
-    ''' @TODO:
-        1) Collect handler list from all bases classes rather than just the active class,
-        since the handler list of the parent class may changed after the subclass is initialized.
-
-        2) DONE: Switch handler selector to use a dictionary mapping. If there are alot of registered
-        items, a dictionary lookup could be faster
-    '''
-    _hmap = _build_handler_map(handler_list)
-
-    def _select(bundle):
-        try:
-            return _hmap[bundle.message]
-        except KeyError:
-            raise RuntimeError(f'No message dispatcher provided for [{bundle.message}]')
+            raise InternalServerError('D00.104', f'No command handler provided for [{bundle.command}]')
 
     return _select
 
@@ -90,14 +73,14 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
     __namespace__   = None
     __aggregate__   = None
     __statemgr__    = StateManager
+    __dispatcher__  = None
     __logstore__    = DomainLogStore
     __revision__    = 0       # API compatibility revision number
-    __config__      = SimpleNamespace
+    __config__      = ImmutableNamespace
     __context__     = DomainContextData
     __policymgr__   = None
 
     _cmd_processors = tuple()
-    _msg_dispatchers = tuple()
     _entity_registry = dict()
 
     _REGISTRY = {}
@@ -191,14 +174,29 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             return self._data.realm
 
     def __init_subclass__(cls):
-        if not hasattr(cls, '__namespace__'):
-            setattr(cls, '__namespace__', camel_to_lower(cls.__name__))
+        if not issubclass(cls.__aggregate__, Aggregate):
+            raise DomainEntityError('D00.202', f'Invalid domain aggregate: {cls.__aggregate__}')
+
+        if not cls.__namespace__:
+            raise DomainEntityError('D00.207', 'Domain does not have a namespace (__namespace__ = ...)')
 
         if cls.__namespace__ in Domain._REGISTRY:
-            raise ValueError(f'Domain already registered: {cls.__namespace__}')
+            raise DomainEntityError('D00.203', f'Domain already registered: {cls.__namespace__}')
 
-        if not issubclass(cls.__aggregate__, Aggregate):
-            raise ValueError(f'Invalid domain aggregate: {cls.__aggregate__}')
+        if cls.__dispatcher__ and not issubclass(cls.__dispatcher__, MessageDispatcher):
+            raise DomainEntityError('D00.204', f'Invalid message dispatcher: {cls.__dispatcher__}')
+
+        if not issubclass(cls.__context__, DomainContextData):
+            raise DomainEntityError('D00.204', f'Domain has invalid context [{cls.__context__}]')
+
+        if not issubclass(cls.__statemgr__, StateManager):
+            raise DomainEntityError('D00.205', f'Domain has invalid state manager [{cls.__statemgr__}]')
+
+        if not issubclass(cls.__logstore__, DomainLogStore):
+            raise DomainEntityError('D00.206', f'Domain has invalid log store [{cls.__logstore__}]')
+
+        if cls.__policymgr__ and not issubclass(cls.__policymgr__, PolicyManager):
+            raise DomainEntityError('D00.208', f'Domain has invalid policy manager [{cls.__policymgr__}]')
 
         Domain._REGISTRY[cls.__namespace__] = cls
 
@@ -240,37 +238,19 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
     def __init__(self, app=None, **config):
         self._app = self.validate_application(app)
-        self._config = self.validate_domain_config(config)
-        self._logstore = self.__logstore__(app, **config)
-        self._statemgr = self.__statemgr__(app, **config)
+        self._config = self.validate_config(config)
+        self._logstore = self.__logstore__(self, app, **config)
+        self._statemgr = self.__statemgr__(self, app, **config)
         self._policymgr = self.__policymgr__ and self.__policymgr__(self._statemgr)
         self._active_context = contextvars.ContextVar('domain_context', default=None)
+        self._dispatcher = self.__dispatcher__(self, app, **config) if self.__dispatcher__ else None
+
         self.cmd_processors = _setup_command_processor_selector(self._cmd_processors)
-        self.msg_dispatchers = _setup_message_dispatcher_selector(self._msg_dispatchers)
         self.register_signals()
 
-
-    def validate_domain_config(self, config):
-        if not issubclass(self.__aggregate__, Aggregate):
-            raise ValueError(f'Domain has invalid aggregate [{self.__aggregate__}]')
-
-        if not issubclass(self.__context__, DomainContextData):
-            raise ValueError(f'Domain has invalid context [{self.__context__}]')
-
-        if not issubclass(self.__statemgr__, StateManager):
-            raise ValueError(f'Domain has invalid state manager [{self.__statemgr__}]')
-
-        if not issubclass(self.__logstore__, DomainLogStore):
-            raise ValueError(f'Domain has invalid log store [{self.__logstore__}]')
-
-        if not self.__namespace__:
-            raise ValueError('Domain does not have a name [__namespace__]')
-
-        if self.__policymgr__ and not issubclass(self.__policymgr__, PolicyManager):
-            raise ValueError(f'Domain has invalid policy manager [{self.__policymgr__}]')
-
-
-        return self.__config__(**config)
+    def validate_config(self, config, **defaults):
+        config = defaults | config
+        return self.__config__(**{k.upper(): v for k, v in config.items()})
 
     def validate_application(self, app):
         return app
@@ -314,15 +294,18 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
     async def dispatch_messages(self, msg_queue):
         for msg_record in consume_queue(msg_queue):
-            for dispatcher in self.msg_dispatchers(msg_record):
-                await dispatcher(msg_record)
+            if self._dispatcher is None:
+                logger.warning(f'No message dispatcher setup for domain [{self.__class__}]. Message [{msg_record}] ignored.')
+                continue
+
+            await self._dispatcher.dispatch(msg_record)
 
     def create_command(self, cmd_key, cmd_data, aggroot):
         aggroot = AggregateRoot(*aggroot) if not isinstance(aggroot, AggregateRoot) else aggroot
         cmd_cls = self.lookup_command(cmd_key)
 
         if cmd_cls.Meta.resources and aggroot.resource not in cmd_cls.Meta.resources:
-            raise ForbiddenError('D10011', 'Command [%s] does not allow aggroot of resource [%s]' % (cmd_key, aggroot.resource))
+            raise ForbiddenError('D00.306', 'Command [%s] does not allow aggroot of resource [%s]' % (cmd_key, aggroot.resource))
 
         data = cmd_cls.Data.create(cmd_data)
 
@@ -342,24 +325,21 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         Override this method to authorize the command
         and set the selector scope in order to fetch the aggroot
         '''
+        if not config.COMMAND_PERMISSION:
+            return command
+
         cmdc = self.lookup_command(command.command)
         if not self.policymgr or not cmdc.Meta.policy_required:
             return command
 
-        rsid = "" if cmdc.Meta.new_resource else command.identifier 
-        reqs = PolicyRequest(
-            usr=ctx.data.user_id,
-            sub=ctx.data.profile_id,
-            org=ctx.data.organization_id,
-            dom=self.__namespace__,
-            res=command.resource,
-            rid=rsid,
-            act=command.command
-        )
+        rsid = str(command.identifier)
+        actn = f"{self.__namespace__}:{command.command}"
+        auth = ctx.authorization
+        reqs = PolicyRequest(auth_ctx=auth, act=actn, rid=rsid, cqrs='COMMAND', msg=f"Command [{actn}] on [{command.resource}]")
 
         resp = await self.policymgr.check_permission(reqs)
         if not resp.allowed:
-            raise ForbiddenError('D10012', f'Permission Failed: [{resp.narration}]')
+            raise ForbiddenError('D00.307', f'Insufficient permission to execute {resp.narration.message}', resp.narration.model_dump())
 
         return command
 
@@ -385,17 +365,17 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
                 yield evt
 
         if no_handler:
-            raise RuntimeError(f'Command has no handler: {cmd}')
+            raise InternalServerError('D00.106', f'Command has no handler: {cmd_bundle.command}')
 
     async def process_command_internal(self, ctx, stm, cmd) -> Iterator[ce.Event]:
         await self.logstore.add_command(cmd)
         await self.publish(sig.COMMAND_READY, cmd)
         meta = self.lookup_command(cmd.command)
         async for particle in self.invoke_processors(ctx, stm, cmd, meta):
-            if not isinstance(particle, (ce.EventRecord, cm.MessageRecord, cres.ResponseRecord, act.ActivityLog)):
-                raise RuntimeError(
-                    'Items returned from command processor must be a domain entity (event, messages, etc.). '
-                    'Got: [%s] while processing command: %s', particle, cmd)
+            if not isinstance(particle, (ce.EventRecord, cm.MessageBundle, cres.ResponseRecord, act.ActivityLog)):
+                msg = ('Items returned from command processor must be a domain entity (event, messages, etc.). ' +
+                       'Got: [%s] while processing command: %s' % (particle, cmd))
+                raise InternalServerError('D00.107', msg)
 
             # set trace values
             particle = particle.set(src_cmd=cmd._id)
@@ -405,7 +385,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
                 # and the mutations are generated.
                 await self.publish(sig.EVENT_COMMITED, cmd, event=particle)
                 yield particle
-            elif isinstance(particle, cm.MessageRecord):
+            elif isinstance(particle, cm.MessageBundle):
                 ctx.msg_queue.put(particle)
                 await self.publish(sig.MESSAGE_RECEIVED, cmd, message=particle)
             elif isinstance(particle, cres.ResponseRecord):
@@ -436,7 +416,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
     def context(self):
         ctx = self._active_context.get()
         if ctx is None:
-            raise RuntimeError('Domain session is not started yet.')
+            raise InternalServerError('D00.108', 'Domain session is not started yet.')
 
         return ctx
 
@@ -477,7 +457,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
         for resp in consume_queue(ctx.rsp_queue):
             if resp.response in responses:
-                raise RuntimeError(f'Duplicated response: [{resp.response}].')
+                raise InternalServerError('D00.109', f'Duplicated responses: [{resp.response}].')
 
             responses[resp.response] = resp.data
         return responses

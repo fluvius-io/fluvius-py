@@ -1,5 +1,6 @@
 from slugify import slugify
 from ruamel import yaml
+from fluvius.error import BadRequestError
 from fluvius.dmap import config
 from fluvius.dmap.interface import ResourceMeta, ReaderFinished, ReaderError
 
@@ -77,8 +78,10 @@ class DatamapProber(object):
                 variant = r.variant
                 filepath = r.filepath
             elif r.variant != variant:
-                raise ValueError(
-                    f'Readers have different variant [{variant}] != [{r.variant}] ({filepath}, {r.filepath})'
+                raise BadRequestError(
+                    "T00.191",
+                    f"Readers have different variant [{variant}] != [{r.variant}] ({filepath}, {r.filepath})",
+                    None
                 )
 
         def read():

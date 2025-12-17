@@ -29,7 +29,7 @@ class FilterPreset(object):
     DEFAULTS = {}
     def __init_subclass__(cls, name):
         if name in FilterPreset.REGISTRY:
-            raise ValueError("Preset already register")
+            raise BadRequestError('Q00.601', "Preset already register")
 
         filters = {}
         has_default: str = None
@@ -43,13 +43,13 @@ class FilterPreset(object):
 
             if flt.default:
                 if has_default:
-                    raise ValueError(f'Multiple default filters for preset [{cls}] {has_default} & {operator}')
+                    raise BadRequestError('Q00.602', f'Multiple default filters for preset [{cls}] {has_default} & {operator}')
                 has_default = operator
 
             filters[operator] = flt
 
         if not has_default:
-            raise ValueError(f'No default filter is set for preset [{cls}]')
+            raise BadRequestError('Q00.603', f'No default filter is set for preset [{cls}]')
 
         FilterPreset.REGISTRY[name] = filters
         FilterPreset.DEFAULTS[name] = has_default
@@ -60,14 +60,14 @@ class FilterPreset(object):
         try:
             return cls.REGISTRY[preset_name]
         except KeyError:
-            raise ValueError(f'Filter Preset [{preset_name}] does not exist.')
+            raise BadRequestError('Q00.604', f'Filter Preset [{preset_name}] does not exist.')
 
     @classmethod
     def default_filter(cls, preset_name):
         try:
             return cls.DEFAULTS[preset_name]
         except KeyError:
-            raise ValueError(f'Filter Preset [{preset_name}] does not exist.')
+            raise BadRequestError('Q00.604', f'Filter Preset [{preset_name}] does not exist.')
 
     @classmethod
     def generate(cls, field_name, field_alias, preset_name):
@@ -102,7 +102,7 @@ class Filter(BaseModel):
             assert "type" in value, "Input widget must have a type."
             return value
 
-        raise ValueError(f'Invalid input widget: {value}')
+        raise BadRequestError('Q00.605', f'Invalid input widget: {value}')
 
 
     def __init__(self, label, dtype="string", field=None, selector=None, input="text", **kwargs):
@@ -176,7 +176,7 @@ def validate_datetime_range(values: list[str]):
     start = str_to_datetime(start)
     end = str_to_datetime(end)
     if start > end:
-        raise ValueError("Start date must be before end date")
+        raise BadRequestError('Q00.606', "Start date must be before end date")
     
     return start, end
 
@@ -200,4 +200,5 @@ class DateFilterPreset(FilterPreset, name="date"):
 
 class EnumFilterPreset(FilterPreset, name="enum"):
     eq = Filter("Equals", dtype="string", input="string", default=True)
+    ne = Filter("Not Equals", dtype="string", input="string")
     in_ = Filter("In List", "string")

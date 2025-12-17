@@ -2,6 +2,7 @@ import secrets
 from collections.abc import Mapping
 
 from pyrsistent import PClass
+from sqlalchemy.orm import DeclarativeMeta
 
 from fluvius.data.identifier import identifier_factory  # noqa
 from fluvius.helper.timeutil import timestamp
@@ -36,7 +37,11 @@ def serialize_mapping(data):
     if isinstance(data, PClass):
         return data.serialize()
 
-    raise ValueError('Unable to convert value to mapping: %s' % str(data.__class__))
+    # Check if the class is a SQLAlchemy Declarative Model
+    if isinstance(data.__class__, DeclarativeMeta):
+        return data.serialize()
+
+    raise ValueError(f'Unable to convert value to mapping [{data.__class__}]')
 
 
 def parse_table_args(table_args):

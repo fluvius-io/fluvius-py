@@ -1,0 +1,21 @@
+export PYTHONPATH   := "../../lib:../../src:./"
+export FLUVIUS_CONFIG_FILE := "config.ini"
+
+
+help:
+    just --list
+
+run-app:
+    uvicorn src:app --host 0.0.0.0 --reload --reload-dir="../../src" --reload-dir="./"
+
+run-worker:
+    python src/worker.py
+
+up:
+    docker compose up -d
+
+down:
+    docker compose down
+
+logs:
+    docker compose logs -f

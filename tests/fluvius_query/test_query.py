@@ -18,7 +18,7 @@ import pytest
 import json
 from fluvius.query import QueryResource, logger, config, QueryManager, FrontendQuery, DomainQueryManager, Field
 from fluvius.data.serializer import serialize_json
-from sample_data_model import *
+from fluvius_test.sample_data_model import *
 
 from object_domain.query import ObjectDomainQueryManager
 

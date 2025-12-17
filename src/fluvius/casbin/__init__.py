@@ -10,6 +10,6 @@ __all__ = [
     'PolicyManager',
     'PolicyRequest',
     'PolicyResponse',
-    'PolicySchema'
+    'PolicySchema',
 ]
 

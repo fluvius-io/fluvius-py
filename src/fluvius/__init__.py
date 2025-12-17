@@ -1,3 +1,6 @@
+from ast import Module
+from types import ModuleType
+from typing import List, Tuple
 import importlib
 import logging
 
@@ -7,15 +10,14 @@ __version__ = "0.1.3-post2"
 __all__ = ('config', 'logger', 'setupModule')
 
 
-def setupModule(module_name, *upstreams):
+def setupModule(module_name: str, *upstreams: List[Module]) -> Tuple[ModuleType, logging.Logger]:
     from fluvius.logs import getLogger
     from fluvius.conf import getConfig
 
-    def _config_name(module):
-        if isinstance(module, str):
-            for suffix in ('._meta', '.conf', '._config', '.config', '.cfg'):
-                if module.endswith(suffix):
-                    return module.removesuffix(suffix)
+    def _config_name(module: str) -> str:
+        for suffix in ('._meta', '.conf', '._config', '.config', '.cfg'):
+            if module.endswith(suffix):
+                return module.removesuffix(suffix)
 
         return module
 
