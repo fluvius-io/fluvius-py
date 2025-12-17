@@ -15,7 +15,7 @@ class TestDataProcessEntry:
         )
         assert entry.file_name == 'data.csv'
         assert entry.status == 'PENDING'
-        assert entry._id is None
+        assert entry.id is None  # 'id' attribute, aliased as '_id' for serialization
         assert entry.mime_type is None
         assert entry.file_size is None
         assert entry.checksum_sha256 is None
@@ -23,7 +23,7 @@ class TestDataProcessEntry:
 
     def test_with_all_fields(self):
         entry = DataProcessEntry(
-            _id=1,
+            _id=1,  # Input uses alias '_id'
             file_name='data.csv',
             mime_type='text/csv',
             file_size=1024,
@@ -34,7 +34,7 @@ class TestDataProcessEntry:
             data_provider='vendor_a',
             data_variant='v1'
         )
-        assert entry._id == 1
+        assert entry.id == 1  # Access via 'id' attribute
         assert entry.file_name == 'data.csv'
         assert entry.mime_type == 'text/csv'
         assert entry.file_size == 1024

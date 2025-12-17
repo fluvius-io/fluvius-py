@@ -1,5 +1,5 @@
 from typing import Any
-from pydantic import ConfigDict, PrivateAttr
+from pydantic import ConfigDict, Field, PrivateAttr
 from fluvius.data import DataModel
 from fluvius.error import BadRequestError
 from fluvius.dmap.interface import InputAlreadyProcessedError, InputFile
@@ -11,9 +11,9 @@ DEBUG = config.DEBUG_MANAGER
 
 
 class DataProcessEntry(DataModel):
-    model_config = ConfigDict(frozen=True, extra='ignore')
+    model_config = ConfigDict(frozen=True, extra='ignore', populate_by_name=True)
 
-    _id: Any = None
+    id: Any = Field(default=None, alias='_id')
     file_name: Any = None
     mime_type: Any = None
     file_size: Any = None  # file_resource, process_name, process_signature is unique together

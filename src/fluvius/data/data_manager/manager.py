@@ -339,15 +339,8 @@ class DataAccessManager(DataAccessManagerBase):
 
         # NOTE: limit should > 1 so sqlalchemy `one()` can detect if there are more than one results returns
         # Validate incoming query before overwriting with find_one defaults
-        incoming_q = BackendQuery.create(q, **query)
-        if incoming_q.limit is not None and incoming_q.limit <= 1:
-            raise BadRequestError('E00.205', f'Invalid find_one query limit: {incoming_q}')
-        if incoming_q.offset is not None and incoming_q.offset != 0:
-            raise BadRequestError('E00.205', f'Invalid find_one query offset: {incoming_q}')
-        
-        q = incoming_q.set(limit=2, offset=0)
-
-        item = await self.connector.find_one(model_name, q)
+        incoming_q = BackendQuery.create(q, limit=2, offset=0, **query)
+        item = await self.connector.find_one(model_name, incoming_q)
         return self._wrap_item(model_name, item)
 
     async def exist(self, model_name: str, q=None, /, **query) -> DataModel:

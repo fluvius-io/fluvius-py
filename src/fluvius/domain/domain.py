@@ -64,23 +64,22 @@ def _setup_command_processor_selector(handler_list):
 
 class DomainMeta(DataModel):
     name: str = None
+    namespace: str = None
     revision: int = 0
-    desc: Optional[str] = None
+    description: Optional[str] = None
     tags: Optional[List[str]] = None
-    prefix: str
 
 
 class Domain(DomainSignalManager, DomainEntityRegistry):
-    __namespace__   = None
-    __aggregate__   = None
-    __statemgr__    = StateManager
-    __dispatcher__  = None
-    __evthandler__  = None
-    __logstore__    = DomainLogStore
-    __revision__    = 0       # API compatibility revision number
-    __config__      = ImmutableNamespace
-    __context__     = DomainContextData
-    __policymgr__   = None
+    __namespace__       = None
+    __aggregate__       = None
+    __statemgr__        = StateManager
+    __msgdispatcher__   = None
+    __evthandler__      = None
+    __logstore__        = DomainLogStore
+    __config__          = ImmutableNamespace
+    __context__         = DomainContextData
+    __policymgr__       = None
 
     _cmd_processors = tuple()
     _entity_registry = dict()
@@ -176,17 +175,20 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             return self._data.realm
 
     def __init_subclass__(cls):
-        if not issubclass(cls.__aggregate__, Aggregate):
-            raise DomainEntityError('D00.202', f'Invalid domain aggregate: {cls.__aggregate__}')
-
         if not cls.__namespace__:
             raise DomainEntityError('D00.207', 'Domain does not have a namespace (__namespace__ = ...)')
 
         if cls.__namespace__ in Domain._REGISTRY:
             raise DomainEntityError('D00.203', f'Domain already registered: {cls.__namespace__}')
 
-        if cls.__dispatcher__ and not issubclass(cls.__dispatcher__, MessageDispatcher):
-            raise DomainEntityError('D00.204', f'Invalid message dispatcher: {cls.__dispatcher__}')
+        if not issubclass(cls.__aggregate__, Aggregate):
+            raise DomainEntityError('D00.202', f'Invalid domain aggregate: {cls.__aggregate__}')
+
+        if cls.__msgdispatcher__ and not issubclass(cls.__msgdispatcher__, MessageDispatcher):
+            raise DomainEntityError('D00.204', f'Invalid message dispatcher: {cls.__msgdispatcher__}')
+
+        if cls.__evthandler__ and not issubclass(cls.__evthandler__, EventHandler):
+            raise DomainEntityError('D00.209', f'Invalid event handler: {cls.__evthandler__}')
 
         if not issubclass(cls.__context__, DomainContextData):
             raise DomainEntityError('D00.204', f'Domain has invalid context [{cls.__context__}]')
@@ -228,7 +230,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         cls.Event = EventBase
         cls.Meta = DomainMeta.create(cls.Meta, defaults={
             'name': camel_to_title(cls.__name__),
-            'prefix': cls.__namespace__,
+            'namespace': cls.__namespace__,
             'desc': (cls.__doc__ or '').strip(),
             'tags': [cls.__namespace__, ]
         })
@@ -245,7 +247,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         self._statemgr = self.__statemgr__(self, app, **config)
         self._policymgr = self.__policymgr__ and self.__policymgr__(self._statemgr)
         self._active_context = contextvars.ContextVar('domain_context', default=None)
-        self._dispatcher = self.__dispatcher__(self, app, **config) if self.__dispatcher__ else None
+        self._dispatcher = self.__msgdispatcher__(self, app, **config) if self.__msgdispatcher__ else None
         self._evthandler = self.__evthandler__(self, app, **config) if self.__evthandler__ else None
 
         self.cmd_processors = _setup_command_processor_selector(self._cmd_processors)
@@ -481,8 +483,8 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
     def metadata(self, **kwargs):
         return {
-            'id': self.__namespace__,
+            'id': self.Meta.namespace,
             'name': self.Meta.name,
-            'description': self.Meta.desc,
+            'description': self.Meta.description,
             'revision': self.Meta.revision,
         } | kwargs
