@@ -4,13 +4,10 @@ from dataclasses import is_dataclass, dataclass, field
 from fluvius.helper import camel_to_lower, validate_lower_dash
 from fluvius.data import logger, config
 from fluvius.data.constant import *
+from fluvius.data.exceptions import DataSchemaError
 
 _DEBUG = config.DEBUG
 _DRIVER_REGISTRY = {}
-
-
-class DataSchemaError(ValueError):
-    pass
 
 
 class DataDriver(object):
