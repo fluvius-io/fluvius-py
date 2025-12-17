@@ -1,7 +1,8 @@
-from .setup import lifespan
-from .helper import build_hatchet_config
 from hatchet_sdk import Hatchet
 from functools import wraps
+
+from .setup import lifespan
+from .helper import build_hatchet_config
 
 
 ATTR_TASK = '__task_params__'
