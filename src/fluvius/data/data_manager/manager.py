@@ -350,7 +350,7 @@ class DataAccessManager(DataAccessManagerBase):
             Return None if no entry found """
 
         try:
-            return self.find_one(model_name, q, **query)
+            return await self.find_one(model_name, q, **query)
         except ItemNotFoundError:
             return None
 
