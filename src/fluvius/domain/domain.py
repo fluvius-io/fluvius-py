@@ -116,8 +116,8 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
             return domain.__context__(
                 _id=UUID_GENR(),
-                domain=domain.__namespace__,
-                revision=domain.__revision__,
+                domain=domain.namespace,
+                revision=domain.revision,
                 **kwargs
             )
 
@@ -322,8 +322,8 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         data = cmd_cls.Data.create(cmd_data)
 
         return cc.CommandBundle(
-            domain=self.__namespace__,
-            revision=self.__revision__,
+            domain=self.namespace,
+            revision=self.revision,
             command=cmd_key,
             payload=data,
             resource=aggroot.resource,
@@ -432,6 +432,14 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
         return ctx
 
+    @property
+    def namespace(self):
+        return self.Meta.namespace
+
+    @property
+    def revision(self):
+        return self.Meta.revision
+
     async def process_command(self, *commands):
         # Ensure saving of context before processing command
         if not commands:
@@ -453,8 +461,8 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             for cmd in commands:
                 preauth_cmd = cmd.set(
                     context=ctx.data._id,
-                    domain=self.__namespace__,
-                    revision=self.__revision__
+                    domain=self.namespace,
+                    revision=self.revision
                 )
                 auth_cmd = await self.authorize_command(ctx, preauth_cmd)
                 async for evt in self.process_command_internal(ctx, stm, auth_cmd):
