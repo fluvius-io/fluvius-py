@@ -70,5 +70,5 @@ async def test_create_user(domain):
 
     result = await command_handler(domain, "invalidate-user", None, "user", user_id, context={"user_id": user_id})
     async with domain.statemgr.transaction():
-        user = await domain.statemgr.find_one('user', identifier=user_id)
+        user = await domain.statemgr.exist('user', identifier=user_id)
         assert user is None

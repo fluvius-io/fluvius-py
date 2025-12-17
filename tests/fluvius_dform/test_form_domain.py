@@ -244,7 +244,7 @@ async def test_remove_collection(domain):
     )
     
     async with domain.statemgr.transaction():
-        collection = await domain.statemgr.find_one('collection', identifier=collection_id)
+        collection = await domain.statemgr.exist('collection', identifier=collection_id)
         assert collection is None
 
 
@@ -393,7 +393,7 @@ async def test_remove_document(domain):
     )
     
     async with domain.statemgr.transaction():
-        document = await domain.statemgr.find_one('document', identifier=document_id)
+        document = await domain.statemgr.exist('document', identifier=document_id)
         assert document is None
 
 

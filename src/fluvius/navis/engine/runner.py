@@ -16,7 +16,7 @@ from fluvius.error import InternalServerError
 from .datadef import WorkflowStep, WorkflowStatus, StepStatus, WorkflowData, WorkflowMessage, WorkflowStage, WorkflowActivity, WorkflowStep
 from .mutation import MutationEnvelop
 from .workflow import Workflow, Stage, Step, Role, BEGIN_STATE, FINISH_STATE, BEGIN_LABEL, FINISH_LABEL
-from .router import ActivityRouter, WorkflowSelector
+from .router import WorkflowEventRouter, WorkflowSelector
 
 from . import logger, mutation as m
 
@@ -208,7 +208,7 @@ class WorkflowRunner(object):
                 raise WorkflowConfigurationError('P00.012', 'Stage [%s] is not defined for workflow [%s]' % (stage_key, cls.__key__))
 
             STEPS[step_key] = step_cls
-            ActivityRouter.connect_events(step_cls, wf_def.Meta.key, step_key)
+            WorkflowEventRouter.connect_events(step_cls, wf_def.Meta.key, step_key)
             logger.warning('STEP_KEY: %s',step_key)
 
         def define_stage(key, stage):
@@ -248,7 +248,7 @@ class WorkflowRunner(object):
         cls.__roles__ = ROLES
         cls.__stages__ = STAGES
 
-        ActivityRouter.connect_events(wf_def, wf_def.Meta.key)
+        WorkflowEventRouter.connect_events(wf_def, wf_def.Meta.key)
 
     def gen_stages(self):
         for idx, (key, stage) in enumerate(self.__stages__.items()):

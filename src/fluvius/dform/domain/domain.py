@@ -1,7 +1,9 @@
 from fluvius.domain.domain import Domain
+from fluvius.navis.domain import WorkflowEventHandler
+
 from .aggregate import FormAggregate
 from .model import FormDataManager
-from .. import config
+from .. import config, logger
 
 
 class FormDomain(Domain):
@@ -9,6 +11,7 @@ class FormDomain(Domain):
     __namespace__ = "form"
     __aggregate__ = FormAggregate
     __statemgr__ = FormDataManager
+    __evthandler__ = WorkflowEventHandler
 
     class Meta:
         name = "Form Management"

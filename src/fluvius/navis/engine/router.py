@@ -9,7 +9,7 @@ from . import logger  # noqa
 
 
 @dataclass
-class WorkflowEventHandler(object):
+class WorkflowRoutingEntry(object):
     wfdef_key: str
     step_key: str
     routing_func: Callable
@@ -69,7 +69,7 @@ def validate_wfevt_handler(wfevt_handler):
     return wfevt_handler
 
 
-class ActivityRouter(object):
+class WorkflowEventRouter(object):
     ROUTING_TABLE = {}
 
     @classmethod
@@ -152,7 +152,7 @@ class ActivityRouter(object):
             step_key = step_key or evt_step_key
 
             cls._connect(
-                evt_name, WorkflowEventHandler(wfdef_key, step_key, evt_router, handler_func, priority)
+                evt_name, WorkflowRoutingEntry(wfdef_key, step_key, evt_router, handler_func, priority)
             )
 
 

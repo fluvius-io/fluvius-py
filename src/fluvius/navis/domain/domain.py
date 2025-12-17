@@ -23,5 +23,6 @@ class WorkflowDomain(Domain):
 class WorkflowResponse(WorkflowDomain.Response):
     pass
 
+
 class StepResponse(WorkflowDomain.Response):
     pass
