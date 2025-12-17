@@ -5,9 +5,11 @@ This module provides sample DocumentTemplate definitions that demonstrate
 how to structure documents with sections and form references.
 
 Forms are referenced via FormNode using their registered form_key.
+Templates are automatically registered with DocumentTemplateRegistry.
 """
 from fluvius.dform.document import (
     DocumentTemplate,
+    DocumentTemplateRegistry,
     DocumentSection,
     ContentNode,
     FormNode,
@@ -198,7 +200,7 @@ FeedbackSurveyTemplate = DocumentTemplate(
 
 
 # ============================================================================
-# Export all templates
+# Register all templates with DocumentTemplateRegistry
 # ============================================================================
 
 TEMPLATES = [
@@ -207,6 +209,11 @@ TEMPLATES = [
     EmployeeInformationTemplate,
     FeedbackSurveyTemplate,
 ]
+
+# Register all templates
+for template in TEMPLATES:
+    DocumentTemplateRegistry.register(template)
+
 
 __all__ = [
     "LoanApplicationTemplate",

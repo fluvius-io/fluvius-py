@@ -209,6 +209,5 @@ __all__ = [
     "FormElement",
     "FormMeta",
     "FormModel",
-    "FormModelRegistry",
-    "DataElementModel"
+    "FormModelRegistry"
 ]

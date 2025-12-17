@@ -3,7 +3,7 @@ import queue
 from functools import wraps
 from contextlib import asynccontextmanager
 from fluvius.error import BadRequestError, PreconditionFailedError, ForbiddenError, InternalServerError
-from fluvius.error import DomainEntityError
+from fluvius.domain.exceptions import DomainEntityError
 
 from fluvius.data import UUID_TYPE, generate_etag, field, timestamp
 from typing import NamedTuple, Optional
