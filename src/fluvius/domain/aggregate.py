@@ -29,9 +29,9 @@ class AggregateRoot(NamedTuple):
     domain_iid: UUID_TYPE = None
 
 
-def validate_resource_spec(resource_spec: Optional[str | list[str] | tuple[str]]) -> tuple[str]:
+def validate_resource_spec(resource_spec: Optional[str | list[str] | tuple[str]]) -> Optional[tuple[str]]:
     if not resource_spec:
-        return tuple()
+        return None
 
     if isinstance(resource_spec, str):
         return (resource_spec,)
