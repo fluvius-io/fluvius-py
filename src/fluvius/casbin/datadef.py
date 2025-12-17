@@ -16,7 +16,7 @@ class ConditionLeaf(BaseModel):
     value: Union[str, Any]
 
     def to_query_statement(self):
-        return {f"{self.field}:{self.op}": self.value}
+        return {f"{self.field}.{self.op}": self.value}
 
 class ConditionNode(BaseModel):
     ALL: Optional[List[Union["ConditionNode", ConditionLeaf]]] = Field(None)
