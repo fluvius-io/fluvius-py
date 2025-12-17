@@ -74,62 +74,68 @@ def sqla_error_handler(code_prefix):
         async def wrapper(*args, **kwargs):
             try:
                 return await func(*args, **kwargs)
-            except asyncpg.exceptions.UniqueViolationError as e:
-                raise UnprocessableError(
-                    f"{code_prefix}-01",
-                    f"Duplicate entry detected. Record must be unique. [{e.orig}]",
-                    str(e.orig)
-                )
-            except exc.IntegrityError as e:
-                raise UnprocessableError(
-                    f"{code_prefix}-02",
-                    f"Integrity constraint violated. Please check your input. [{e.orig}]",
-                    str(e.orig)
-                )
-            except exc.OperationalError as e:
-                raise UnprocessableError(
-                    f"{code_prefix}-03",
-                    f"The database is currently unreachable. Please try again later. [{e.orig}]",
-                    str(e.orig)
-                )
-            except exc.ProgrammingError as e:
-                if e.orig.pgcode == '42883':
-                    raise BadRequestError(
-                        f"{code_prefix}-41",
-                        "Undefined function error [42883]. Values must be in correct format.",
-                        str(e.orig)
-                    )
+            except Exception as e:
+                logger.exception('SQLAlchemy Exception: %s', e)
 
-                raise UnprocessableError(
-                    f"{code_prefix}-04",
-                    f"There was a syntax or structure error in the database query. [{e.orig}]",
-                    str(e.orig)
-                )
-            except exc.DBAPIError as e:
-                if e.orig.pgcode == '2201X':
-                    raise BadRequestError(
-                        f"{code_prefix}-51",
-                        f"Invalid row count in result offset clause [{e.orig.pgcode}].",
-                        str(e.orig)
-                    )
-                else:
-                    raise UnprocessableError(
-                        f"{code_prefix}-05",
-                        f"A DBAPIError error occurred [{e.orig.pgcode}]",
-                        str(e.orig)
-                    )
-            except exc.NoResultFound as e:
-                raise ItemNotFoundError(
-                    f"{code_prefix}-06",
-                    f"Item Not Found: {str(e)}",
-                    getattr(e, "orig", None)
-                )
-            except exc.SQLAlchemyError as e:
-                raise UnprocessableError(
-                    f"{code_prefix}-07",
-                    "An unexpected database error occurred while processing your request.",
-                    getattr(e, "orig", None)
-                )
+                match e.__class__:
+                    case asyncpg.exceptions.UniqueViolationError:
+                        raise UnprocessableError(
+                            f"{code_prefix}-01",
+                            f"Duplicate entry detected. Record must be unique. [{e.orig}]",
+                            str(e.orig)
+                        )
+                    case exc.IntegrityError:
+                        raise UnprocessableError(
+                            f"{code_prefix}-02",
+                            f"Integrity constraint violated. Please check your input. [{e.orig}]",
+                            str(e.orig)
+                        )
+                    case exc.OperationalError:
+                        raise UnprocessableError(
+                            f"{code_prefix}-03",
+                            f"The database is currently unreachable. Please try again later. [{e.orig}]",
+                            str(e.orig)
+                        )
+                    case exc.ProgrammingError:
+                        if e.orig.pgcode == '42883':
+                            raise BadRequestError(
+                                f"{code_prefix}-41",
+                                "Undefined function error [42883]. Values must be in correct format.",
+                                str(e.orig)
+                            )
+
+                        raise UnprocessableError(
+                            f"{code_prefix}-04",
+                            f"There was a syntax or structure error in the database query. [{e.orig}]",
+                            str(e.orig)
+                        )
+                    case exc.DBAPIError:
+                        if e.orig.pgcode == '2201X':
+                            raise BadRequestError(
+                                f"{code_prefix}-51",
+                                f"Invalid row count in result offset clause [{e.orig.pgcode}].",
+                                str(e.orig)
+                            )
+
+                        raise UnprocessableError(
+                            f"{code_prefix}-05",
+                            f"A DBAPIError error occurred [{e.orig.pgcode}]",
+                            str(e.orig)
+                        )
+                    case exc.NoResultFound:
+                        raise ItemNotFoundError(
+                            f"{code_prefix}-06",
+                            f"Item Not Found: {str(e)}",
+                            str(getattr(e, "orig", None))
+                        )
+                    case exc.SQLAlchemyError:
+                        raise UnprocessableError(
+                            f"{code_prefix}-07",
+                            "An unexpected database error occurred while processing your request.",
+                            str(getattr(e, "orig", None))
+                        )
+                    case _:
+                        raise
         return wrapper
     return decorator
 

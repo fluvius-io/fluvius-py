@@ -336,13 +336,20 @@ class DataAccessManager(DataAccessManagerBase):
     async def find_one(self, model_name: str, q=None, /, **query) -> DataModel:
         """ Fetch exactly 1 item from the data store using either a query object or where statements
             Raises an error if there are 0 or multiple results """
+
         q = BackendQuery.create(q, **query, limit=1, offset=0)
         if q.limit != 1 or q.offset != 0:
             raise BadRequestError('E00.205', f'Invalid find_one query: {q}')
 
+        item = await self.connector.find_one(model_name, q)
+        return self._wrap_item(model_name, item)
+
+    async def find_first(self, model_name: str, q=None, /, **query) -> DataModel:
+        """ Fetch exactly 1 item from the data store using either a query object or where statements
+            Return None if no entry found """
+
         try:
-            item = await self.connector.find_one(model_name, q)
-            return self._wrap_item(model_name, item)
+            return self.find_one(model_name, q, **query)
         except ItemNotFoundError:
             return None
 

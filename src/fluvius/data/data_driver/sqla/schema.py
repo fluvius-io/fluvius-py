@@ -182,7 +182,7 @@ def create_data_schema_base(driver_cls=None):
 
             return self._changes
 
-        def serialize(self, show=None, hide=None, path=None, show_all=True, show_none=False):
+        def serialize(self, show=None, hide=None, path=None, show_all=True, show_none=False, show_relationships=False, show_properties=False):
             """ Return a dictionary representation of this model.
             """
 
@@ -210,8 +210,6 @@ def create_data_schema_base(driver_cls=None):
                 hide[:] = [prepend_path(x) for x in hide]
 
             columns = self.__table__.columns.keys()
-            relationships = self.__mapper__.relationships.keys()
-            properties = dir(self)
 
             for key in columns:
                 check = '%s.%s' % (path, key)
@@ -223,46 +221,50 @@ def create_data_schema_base(driver_cls=None):
                     if show_none or val is not None:
                         ret_data[key] = val
 
-            for key in relationships:
-                check = '%s.%s' % (path, key)
-                if check in hide or key in hidden:
-                    continue
-                if show_all or check in show or key in default:
-                    hide.append(check)
-                    is_list = self.__mapper__.relationships[key].uselist
-                    if is_list:
-                        ret_data[key] = []
-                        for item in getattr(self, key):
-                            ret_data[key].append(item.to_dict(
-                                show=show,
-                                hide=hide,
-                                path=('%s.%s' % (path, key.lower())),
-                                show_all=show_all,
-                            ))
-                    else:
-                        if self.__mapper__.relationships[key].query_class is not None:
-                            ret_data[key] = getattr(self, key).to_dict(
-                                show=show,
-                                hide=hide,
-                                path=('%s.%s' % (path, key.lower())),
-                                show_all=show_all,
-                            )
+            relationships = self.__mapper__.relationships.keys()
+            if show_relationships:
+                for key in relationships:
+                    check = '%s.%s' % (path, key)
+                    if check in hide or key in hidden:
+                        continue
+                    if show_all or check in show or key in default:
+                        hide.append(check)
+                        is_list = self.__mapper__.relationships[key].uselist
+                        if is_list:
+                            ret_data[key] = []
+                            for item in getattr(self, key):
+                                ret_data[key].append(item.to_dict(
+                                    show=show,
+                                    hide=hide,
+                                    path=('%s.%s' % (path, key.lower())),
+                                    show_all=show_all,
+                                ))
                         else:
-                            ret_data[key] = getattr(self, key)
+                            if self.__mapper__.relationships[key].query_class is not None:
+                                ret_data[key] = getattr(self, key).to_dict(
+                                    show=show,
+                                    hide=hide,
+                                    path=('%s.%s' % (path, key.lower())),
+                                    show_all=show_all,
+                                )
+                            else:
+                                ret_data[key] = getattr(self, key)
+            if show_properies:
+                properties = dir(self)
+                for key in list(set(properties) - set(columns) - set(relationships)):
+                    if key.startswith('_'):
+                        continue
+                    check = '%s.%s' % (path, key)
+                    if check in hide or key in hidden:
+                        continue
 
-            for key in list(set(properties) - set(columns) - set(relationships)):
-                if key.startswith('_'):
-                    continue
-                check = '%s.%s' % (path, key)
-                if check in hide or key in hidden:
-                    continue
+                    if show_all or check in show or key in default:
+                        val = getattr(self, key)
+                        try:
+                            ret_data[key] = json.loads(json.dumps(val))
+                        except:
+                            pass
 
-                if show_all or check in show or key in default:
-                    val = getattr(self, key)
-                    try:
-                        ret_data[key] = json.loads(json.dumps(val))
-                    except:
-                        pass
             return ret_data
     
     return DataSchemaBase
