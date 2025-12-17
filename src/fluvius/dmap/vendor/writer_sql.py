@@ -1,6 +1,5 @@
 ''' @TODO: Remove pandas dependency '''
 
-from pyrsistent import PClass, field
 from sqlalchemy import types
 from sqlalchemy.dialects.postgresql import UUID
 from fluvius.error import BadRequestError
@@ -37,9 +36,9 @@ TYPE_HINTS = {
 
 
 class SQLWriterConfig(WriterConfig):
-    uri = field(type=str)
-    schema = field(type=str)
-    mode = field(type=str, initial="append")
+    uri: str
+    schema: str
+    mode: str = "append"
 
 
 @register_writer('sql')

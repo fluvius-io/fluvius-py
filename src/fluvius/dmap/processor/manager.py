@@ -1,4 +1,6 @@
-from pyrsistent import PClass, field
+from typing import Any
+from pydantic import ConfigDict, PrivateAttr
+from fluvius.data import DataModel
 from fluvius.error import BadRequestError
 from fluvius.dmap.interface import InputAlreadyProcessedError, InputFile
 from fluvius.dmap import logger, config
@@ -8,24 +10,30 @@ from sqlalchemy import text, create_engine
 DEBUG = config.DEBUG_MANAGER
 
 
-class DataProcessEntry(PClass):
-    _id = field()
-    file_name = field()
-    mime_type = field()
-    file_size = field()  # file_resource, process_name, process_signature is unique together
-    checksum_sha256 = field()  # file_resource, process_name, process_signature is unique together
+class DataProcessEntry(DataModel):
+    model_config = ConfigDict(frozen=True, extra='ignore')
 
-    process_name = field()
+    _id: Any = None
+    file_name: Any = None
+    mime_type: Any = None
+    file_size: Any = None  # file_resource, process_name, process_signature is unique together
+    checksum_sha256: Any = None  # file_resource, process_name, process_signature is unique together
 
-    status = field()
-    status_message = field()
-    data_provider = field()
-    data_variant = field()
-    start_time = field()
-    finish_time = field()
-    last_updated = field()
+    process_name: Any = None
 
-    _process_manager = field(mandatory=True, serializer=lambda v, o: None)
+    status: Any = None
+    status_message: Any = None
+    data_provider: Any = None
+    data_variant: Any = None
+    start_time: Any = None
+    finish_time: Any = None
+    last_updated: Any = None
+
+    _process_manager: Any = PrivateAttr(default=None)
+
+    def __init__(self, _process_manager=None, **data):
+        super().__init__(**data)
+        object.__setattr__(self, '_process_manager', _process_manager)
 
     def update(self, **kwargs):
         self._process_manager.update_entry(self, **kwargs)
@@ -40,10 +48,8 @@ class DataProcessEntry(PClass):
         self._process_manager.update_entry(self, status=status, status_message=message)
         return self.set(status=status)
 
-    def serialize(self):
-        data = super(DataProcessEntry, self).serialize()
-        data.pop('_process_manager')
-        return data
+    def serialize(self, **kwargs):
+        return self.model_dump(**kwargs)
 
 
 class DataProcessManager(object):
@@ -140,10 +146,10 @@ class PostgresFileProcessManager(DataProcessManager):
             return None
 
     def _construct_entry(self, data):
-        return DataProcessEntry.create({
-            '_process_manager': self,
-            **data
-        }, ignore_extra=True)
+        return DataProcessEntry(
+            _process_manager=self,
+            **{k: v for k, v in data.items() if k != '_process_manager'}
+        )
 
     def register_file(
         self,
@@ -195,7 +201,7 @@ class PostgresFileProcessManager(DataProcessManager):
             + f'  "last_updated" = CURRENT_TIMESTAMP '
             + f'WHERE '
             + f'   checksum_sha256 = :checksum_sha256 AND '
-            + f'   process_name = :process_name'
+            + f'   process_name = = :process_name'
         )
 
         return self.run_query(
