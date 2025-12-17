@@ -55,7 +55,7 @@ class FileWriterConfig(WriterConfig):
     path: str | None = None
     csv_dialect: str = 'csvquote'
     file_extension: str | None = None
-    schema: str | None = None
+    db_schema: str | None = None
 
 
 class FileWriter(Writer):
@@ -82,7 +82,7 @@ class FileWriter(Writer):
                 None
             )
 
-        output_dir = os.path.join(self.config.path or '', self.config.schema or '')
+        output_dir = os.path.join(self.config.path or '', self.config.db_schema or '')
         try:
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)

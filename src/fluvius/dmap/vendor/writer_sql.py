@@ -37,7 +37,7 @@ TYPE_HINTS = {
 
 class SQLWriterConfig(WriterConfig):
     uri: str
-    schema: str
+    db_schema: str
     mode: str = "append"
 
 

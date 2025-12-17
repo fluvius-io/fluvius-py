@@ -129,6 +129,14 @@ class TestDataProcessEntry:
         assert entry.file_name == 'from_dict.csv'
         assert entry.status == 'PENDING'
 
+    def test_id_serializes_as_underscore_id(self):
+        """Test that id field serializes as '_id' (via alias)."""
+        entry = DataProcessEntry(_id=42, file_name='test.csv', status='PENDING')
+        data = entry.serialize()
+        
+        assert '_id' in data
+        assert data['_id'] == 42
+
 
 class TestDataProcessEntrySetStatus:
     """Tests for DataProcessEntry.set_status method."""
@@ -156,4 +164,3 @@ class TestDataProcessEntrySetStatus:
         
         assert result is entry
         assert result.status == 'PENDING'
-

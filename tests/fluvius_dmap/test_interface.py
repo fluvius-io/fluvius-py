@@ -313,3 +313,4 @@ class TestInputResourceKind:
         assert InputResourceKind.FILE.value == 'FILE'
         assert InputResourceKind.S3FILE.value == 'S3FILE'
         assert InputResourceKind.REST_API.value == 'REST_API'
+

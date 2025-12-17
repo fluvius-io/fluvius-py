@@ -100,7 +100,7 @@ class TestFileWriterConfig:
         assert config.path is None
         assert config.csv_dialect == 'csvquote'
         assert config.file_extension is None
-        assert config.schema is None
+        assert config.db_schema is None
 
     def test_with_all_fields(self):
         config = FileWriterConfig(
@@ -109,14 +109,14 @@ class TestFileWriterConfig:
             path='/tmp/output',
             csv_dialect='excel',
             file_extension='.csv',
-            schema='public'
+            db_schema='public'
         )
         assert config.name == 'csv_writer'
         assert config.transforms == ['format_dates']
         assert config.path == '/tmp/output'
         assert config.csv_dialect == 'excel'
         assert config.file_extension == '.csv'
-        assert config.schema == 'public'
+        assert config.db_schema == 'public'
 
     def test_inherits_from_writer_config(self):
         """Test that FileWriterConfig inherits WriterConfig fields."""
@@ -151,11 +151,11 @@ class TestSQLWriterConfig:
         config = SQLWriterConfig(
             name='sql_writer',
             uri='postgresql://localhost/db',
-            schema='public'
+            db_schema='public'
         )
         assert config.name == 'sql_writer'
         assert config.uri == 'postgresql://localhost/db'
-        assert config.schema == 'public'
+        assert config.db_schema == 'public'
         assert config.mode == 'append'
 
     def test_with_all_fields(self):
@@ -163,17 +163,17 @@ class TestSQLWriterConfig:
             name='sql_writer',
             transforms=['normalize'],
             uri='postgresql://user:pass@localhost:5432/mydb',
-            schema='data_import',
+            db_schema='data_import',
             mode='replace'
         )
         assert config.name == 'sql_writer'
         assert config.transforms == ['normalize']
         assert config.uri == 'postgresql://user:pass@localhost:5432/mydb'
-        assert config.schema == 'data_import'
+        assert config.db_schema == 'data_import'
         assert config.mode == 'replace'
 
     def test_missing_required_fields(self):
-        """Test that uri and schema are required."""
+        """Test that uri and db_schema are required."""
         with pytest.raises(ValidationError):
             SQLWriterConfig(name='test')
         
@@ -181,7 +181,7 @@ class TestSQLWriterConfig:
             SQLWriterConfig(name='test', uri='pg://localhost')
         
         with pytest.raises(ValidationError):
-            SQLWriterConfig(name='test', schema='public')
+            SQLWriterConfig(name='test', db_schema='public')
 
     def test_inherits_from_writer_config(self):
         """Test that SQLWriterConfig inherits WriterConfig fields."""
@@ -189,7 +189,7 @@ class TestSQLWriterConfig:
             name='test',
             transforms=['transform1'],
             uri='postgresql://localhost/db',
-            schema='public'
+            db_schema='public'
         )
         assert config.transforms == ['transform1']
 
@@ -198,7 +198,7 @@ class TestSQLWriterConfig:
         config = SQLWriterConfig(
             name='test',
             uri='postgresql://localhost/db',
-            schema='public'
+            db_schema='public'
         )
         with pytest.raises(ValidationError):
             config.mode = 'replace'
@@ -208,7 +208,7 @@ class TestSQLWriterConfig:
         config = SQLWriterConfig(
             name='test',
             uri='postgresql://localhost/db',
-            schema='public',
+            db_schema='public',
             mode='append'
         )
         updated = config.set(mode='replace')
@@ -221,13 +221,13 @@ class TestSQLWriterConfig:
         config = SQLWriterConfig(
             name='sql_writer',
             uri='postgresql://localhost/db',
-            schema='public'
+            db_schema='public'
         )
         data = config.serialize()
         
         assert isinstance(data, dict)
         assert data['name'] == 'sql_writer'
         assert data['uri'] == 'postgresql://localhost/db'
-        assert data['schema'] == 'public'
+        assert data['db_schema'] == 'public'
         assert data['mode'] == 'append'
 

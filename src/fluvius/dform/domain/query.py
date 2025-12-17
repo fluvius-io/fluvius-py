@@ -26,7 +26,7 @@ class FormQueryManager(DomainQueryManager):
     __data_manager__ = FormDataManager
 
     class Meta(DomainQueryManager.Meta):
-        prefix = FormDomain.Meta.prefix
+        prefix = FormDomain.Meta.namespace
         tags = FormDomain.Meta.tags
 
 
