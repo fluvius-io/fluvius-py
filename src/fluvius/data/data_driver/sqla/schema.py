@@ -1,5 +1,6 @@
 import json
 import sqlalchemy as sa
+from sqlalchemy import not_
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.dialects import postgresql as pg
 
@@ -8,6 +9,7 @@ from fluvius.data import logger
 from fluvius.data.constant import ITEM_ID_FIELD
 from fluvius.data.identifier import UUID_GENR
 from fluvius.data.helper import merge_table_args
+from fluvius.helper import timestamp
 
 
 def create_data_schema_base(driver_cls=None):
@@ -134,7 +136,7 @@ def create_data_schema_base(driver_cls=None):
                                 col = cls()
                                 col_changes = col.set_columns(**item)
                                 query.append(col)
-                                db.session.flush()
+                                # db.session.flush()
                                 if col_changes:
                                     col_changes['id'] = str(col.id)
                                     if rel in changes:
@@ -153,7 +155,7 @@ def create_data_schema_base(driver_cls=None):
                                 changes[rel].append(col_changes)
                             else:
                                 changes.update({rel: [col_changes]})
-                            db.session.delete(item)
+                            # db.session.delete(item)
 
                     else:
                         val = getattr(self, rel)
@@ -178,7 +180,7 @@ def create_data_schema_base(driver_cls=None):
         def set(self, **kwargs):
             self._changes = self._set_columns(**kwargs)
             if '_updated' in self.__table__.columns:
-                self._updated = datetime.utcnow()
+                self._updated = timestamp()
 
             return self._changes
 
@@ -262,8 +264,8 @@ def create_data_schema_base(driver_cls=None):
                         val = getattr(self, key)
                         try:
                             ret_data[key] = json.loads(json.dumps(val))
-                        except:
-                            pass
+                        except Exception:
+                            logger.exception('Error serializing %s', key)
 
             return ret_data
     

@@ -3,6 +3,8 @@ import queue
 from functools import wraps
 from contextlib import asynccontextmanager
 from fluvius.error import BadRequestError, PreconditionFailedError, ForbiddenError, InternalServerError
+from fluvius.error import DomainEntityError
+
 from fluvius.data import UUID_TYPE, generate_etag, field, timestamp
 from typing import NamedTuple, Optional
 
@@ -29,19 +31,18 @@ class AggregateRoot(NamedTuple):
 
 def validate_resource_spec(resource_spec: Optional[str | list[str] | tuple[str]]) -> tuple[str]:
     if not resource_spec:
-        return None
+        return tuple()
 
     if isinstance(resource_spec, str):
         return (resource_spec,)
 
     if isinstance(resource_spec, list):
-        return tuple[str](resource_spec)
+        return tuple(resource_spec)
 
     if isinstance(resource_spec, tuple):
         return resource_spec
 
-    from fluvius.domain.exceptions import DomainEntityError
-    raise DomainEntityError("D00.101", f"Invalid resource specification: {resource_spec}")
+    raise DomainEntityError("D00.201", f"Invalid resource specification: {resource_spec}")
 
 
 def action(evt_key=None, resources=None):

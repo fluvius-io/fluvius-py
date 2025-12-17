@@ -179,12 +179,6 @@ class DataAccessManagerBase(object):
         model_cls = record.__class__
         return cls._RESOURCES[model_cls]
 
-    def validate_config(self, config):
-        if isinstance(config, self.__config__):
-            return config
-
-        return self.__config__(**config)
-
     @property
     def connector(self):
         return self._connector
@@ -210,13 +204,6 @@ class DataAccessManagerBase(object):
     async def flush(self):
         await self.connector.flush()
         return self
-
-    @property
-    def context(self):
-        if self._context is None:
-            raise InternalServerError('E00.203', 'State Manager context is not initialized.')
-
-        return self._context
 
     def setup_connector(self, config):
         con_cls = self.__connector__

@@ -344,13 +344,15 @@ class WorkflowManager(object):
             if hasattr(wf_def.Meta, 'params_schema') and wf_def.Meta.params_schema:
                 try:
                     params_schema = wf_def.Meta.params_schema.model_json_schema()
-                except:
+                except Exception:
+                    logger.exception('Error serializing params schema for %s', wf_def.Meta.key)
                     params_schema = None
             
             if hasattr(wf_def.Meta, 'memory_schema') and wf_def.Meta.memory_schema:
                 try:
                     memory_schema = wf_def.Meta.memory_schema.model_json_schema()
-                except:
+                except Exception:
+                    logger.exception('Error serializing memory schema for %s', wf_def.Meta.key)
                     memory_schema = None
             
             # Get description from docstring

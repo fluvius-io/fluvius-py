@@ -17,7 +17,7 @@ class WorkflowQueryManager(DomainQueryManager):
     __data_manager__ = WorkflowDataManager
 
     class Meta(DomainQueryManager.Meta):
-        prefix = WorkflowDomain.Meta.prefix
+        prefix = WorkflowDomain.Meta.namespace
         tags = WorkflowDomain.Meta.tags
 
 

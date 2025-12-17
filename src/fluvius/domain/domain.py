@@ -185,7 +185,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             raise DomainEntityError('D00.202', f'Invalid domain aggregate: {cls.__aggregate__}')
 
         if cls.__msgdispatcher__ and not issubclass(cls.__msgdispatcher__, MessageDispatcher):
-            raise DomainEntityError('D00.204', f'Invalid message dispatcher: {cls.__msgdispatcher__}')
+            raise DomainEntityError('D00.214', f'Invalid message dispatcher: {cls.__msgdispatcher__}')
 
         if cls.__evthandler__ and not issubclass(cls.__evthandler__, EventHandler):
             raise DomainEntityError('D00.209', f'Invalid event handler: {cls.__evthandler__}')

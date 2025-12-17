@@ -6,7 +6,7 @@ from pyrsistent import PClass, field, pvector_field
 from fluvius.error import BadRequestError
 from fluvius.data import UUID_TYPE, identifier_factory
 from fluvius.constant import QUERY_OPERATOR_SEP, OPERATOR_SEP_NEGATE, RX_PARAM_SPLIT, DEFAULT_OPERATOR
-
+from fluvius.data import logger
 from . import config
 
 BACKEND_QUERY_LIMIT = config.BACKEND_QUERY_INTERNAL_LIMIT
@@ -77,7 +77,8 @@ def operator_statement(op_stmt: str, default_operator: str=DEFAULT_OPERATOR) -> 
 
     try:
         return OperatorStatement(field_name, operator, mode)
-    except:
+    except Exception:
+        logger.exception('Error creating operator statement for %s', op_stmt)
         raise BadRequestError('E00.303', f'Invalid query operator statement: {op_stmt}')
 
 
