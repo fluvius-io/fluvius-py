@@ -201,7 +201,7 @@ class PostgresFileProcessManager(DataProcessManager):
             + f'  "last_updated" = CURRENT_TIMESTAMP '
             + f'WHERE '
             + f'   checksum_sha256 = :checksum_sha256 AND '
-            + f'   process_name = = :process_name'
+            + f'   process_name = :process_name'
         )
 
         return self.run_query(

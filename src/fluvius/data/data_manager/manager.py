@@ -244,7 +244,7 @@ class DataAccessManagerBase(object):
     def _serialize(cls, model_name, item):
         model_cls = cls.lookup_model(model_name)
         if not isinstance(item, model_cls):
-            raise InternalServerError('E00.206', f'Cannot serialize item. It must be an instance of [{model}].')
+            raise InternalServerError('E00.206', f'Cannot serialize item. It must be an instance of [{model_name}].')
 
         return model_cls.serialize(item)
 
@@ -338,9 +338,14 @@ class DataAccessManager(DataAccessManagerBase):
             Raises an error if there are 0 or multiple results """
 
         # NOTE: limit should > 1 so sqlalchemy `one()` can detect if there are more than one results returns
-        q = BackendQuery.create(q, **query, limit=2, offset=0)
-        if q.limit <= 1 or q.offset != 0:
-            raise BadRequestError('E00.205', f'Invalid find_one query: {q}')
+        # Validate incoming query before overwriting with find_one defaults
+        incoming_q = BackendQuery.create(q, **query)
+        if incoming_q.limit is not None and incoming_q.limit <= 1:
+            raise BadRequestError('E00.205', f'Invalid find_one query limit: {incoming_q}')
+        if incoming_q.offset is not None and incoming_q.offset != 0:
+            raise BadRequestError('E00.205', f'Invalid find_one query offset: {incoming_q}')
+        
+        q = incoming_q.set(limit=2, offset=0)
 
         item = await self.connector.find_one(model_name, q)
         return self._wrap_item(model_name, item)

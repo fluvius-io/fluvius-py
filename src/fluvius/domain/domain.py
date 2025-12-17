@@ -75,6 +75,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
     __aggregate__   = None
     __statemgr__    = StateManager
     __dispatcher__  = None
+    __evthandler__  = None
     __logstore__    = DomainLogStore
     __revision__    = 0       # API compatibility revision number
     __config__      = ImmutableNamespace
@@ -245,6 +246,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         self._policymgr = self.__policymgr__ and self.__policymgr__(self._statemgr)
         self._active_context = contextvars.ContextVar('domain_context', default=None)
         self._dispatcher = self.__dispatcher__(self, app, **config) if self.__dispatcher__ else None
+        self._evthandler = self.__evthandler__(self, app, **config) if self.__evthandler__ else None
 
         self.cmd_processors = _setup_command_processor_selector(self._cmd_processors)
         self.register_signals()
