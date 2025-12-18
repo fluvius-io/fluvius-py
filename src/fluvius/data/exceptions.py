@@ -14,3 +14,7 @@ class ItemNotFoundError(NotFoundError):
 
 class NoItemModifiedError(NotFoundError):
     pass
+
+
+class MultipleResultsError(UnprocessableError):
+    pass

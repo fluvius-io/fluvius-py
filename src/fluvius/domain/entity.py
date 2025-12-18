@@ -2,7 +2,6 @@ from enum import IntEnum
 from fluvius.domain import logger
 from fluvius.data import BlankModel, DataModel
 from fluvius.helper import camel_to_title, camel_to_lower
-from .mutation import MutationType  # noqa
 
 
 DOMAIN_ENTITY_MARKER = "__entity_marker__"

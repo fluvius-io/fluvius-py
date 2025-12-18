@@ -17,8 +17,6 @@ __all__ = (
     "config",
     "DataAccessInterface",
     "DataModel",
-    "DataElement",
-    "DataRecord",
     "DataResource",
     "DateTimeField",
     "EnumField",

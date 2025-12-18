@@ -1,6 +1,7 @@
 import os
 import re
 import secrets
+from urllib.parse import urlparse
 
 from fluvius.query.helper import SCOPING_SIGN, SCOPING_SEP, PATH_QUERY_SIGN
 from fluvius.fastapi import config

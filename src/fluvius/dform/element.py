@@ -1,33 +1,30 @@
 """
 Element Type System
 
-Element types are created by inheriting ElementBase schema with a new table name
+Element types are created by inheriting ElementModel schema with a new table name
 and updated structure. Each element data schema defines a new element type and
 optionally has a Meta object containing the element type key, title, desc,
 data schema (optional), etc.
 
 Usage:
-    class TextInputData(DataModel):
+    class TextInputElementModel(ElementModel):
         value: str
-    
-    class TextInputElementBase(ElementBase):
-        __tablename__ = "text_input_element_data"
-        
+
         class Meta:
             key = "text-input"
             name = "Text Input"
             desc = "A text input element"
+            table_name = "text_input_element_data"
         
-        # Add custom columns as needed
-        custom_field = sa.Column(sa.String, nullable=True)
 """
+
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pg
 from typing import Optional, Dict, Any, ClassVar, Type
 from pydantic import Field
 
 from fluvius.data import DataModel, DomainSchema, FluviusJSONField
-from fluvius.helper import ClassRegistry, ImmutableNamespace
+from fluvius.helper import ClassRegistry, ImmutableNamespace, camel_to_lower
 from fluvius.data import DataAccessManager
 from fluvius.error import BadRequestError, InternalServerError
 
@@ -62,24 +59,18 @@ class ElementDataManager(DataAccessManager):
     __automodel__ = True
 
 
-class ElementSchema(FormConnector.pgschema()):
+class ElementSchema(FormConnector.pgschema(), DomainSchema):
     __abstract__ = True
 
 
 model_mapper = PydanticSQLAlchemyMapper(ElementSchema, schema=DFORM_DATA_DB_SCHEMA)
 
 
-class ElementModel(DataModel):
-    pass
-
-
-
-
 class ElementMeta(DataModel):
     """
-    Metadata for ElementBase schemas.
+    Metadata for ElementModel schemas.
     
-    Each ElementBase subclass can define a Meta class with:
+    Each ElementModel subclass can define a Meta class with:
     - key: Unique identifier for the element type (required)
     - name: Human-readable name (required)
     - desc: Description (optional)
@@ -87,8 +78,9 @@ class ElementMeta(DataModel):
     - attrs: Additional configuration (optional)
     """
     key: str
-    name: str
-    desc: Optional[str] = None
+    title: str
+    description: Optional[str] = None
+    table_name: Optional[str] = None
 
 
 
@@ -120,7 +112,7 @@ class ElementDataProvider(object):
         return {}
 
 
-class ElementBase(object):
+class DataElementModel(DataModel):
     """
     Base class for element data schema registration.
     
@@ -133,30 +125,28 @@ class ElementBase(object):
         class TextInputData(DataModel):
             value: str
         
-        class TextInputElementBase(ElementBase):
+        class TextInputElementModel(ElementModel):
             class Meta:
                 key = "text-input"
                 name = "Text Input"
                 desc = "A text input element"
     
     Note: ElementInstance (in schema.py) is used for actual data storage.
-    ElementBase is only for registration purposes.
+    ElementModel is only for registration purposes.
     """
 
     class Meta:
         pass
 
-    class Provider(ElementDataProvider):
+    class DataProvider(ElementDataProvider):
         pass
 
-    class Model(ElementModel):
-        pass
 
     # Note: Schema must be set to None for the base class
     # Subclasses should either:
     # 1. Let the mapper auto-generate Schema from Model (default)
     # 2. Define their own Schema class with __tablename__ and inherit from ElementSchema
-    Schema = None
+    Schema: ClassVar[Optional[Type]] = None
     
     def __init_subclass__(cls, **kwargs):
         """Convert Meta class to ElementMeta instance and register schema"""
@@ -168,7 +158,7 @@ class ElementBase(object):
         if not hasattr(cls, 'Meta'):
             raise InternalServerError(
                 "F00.102",
-                f"ElementBase subclass {cls.__name__} must define a Meta class",
+                f"ElementModel subclass {cls.__name__} must define a Meta class",
                 None
             )
         
@@ -176,26 +166,28 @@ class ElementBase(object):
         meta_cls = cls.Meta
         cls.Meta = ElementMeta.create(meta_cls, defaults={
             'key': getattr(meta_cls, 'key', None),
-            'name': getattr(meta_cls, 'name', cls.__name__),
+            'title': getattr(meta_cls, 'title', cls.__name__),
+            'description': getattr(meta_cls, 'description', cls.__doc__),
+            'table_name': getattr(meta_cls, 'table_name', camel_to_lower(cls.__name__)),
         })
 
         # Auto-generate Schema from Model if not provided
         # Requires __tablename__ to be set on the subclass
-        if cls.Schema is None and hasattr(cls, '__tablename__'):
-            cls.Schema = model_mapper.create_table_class(cls.Model, cls.__tablename__)
+        if cls.Schema is None:
+            cls.Schema = model_mapper.create_table_class(cls, cls.Meta.table_name)
         
         # Validate required fields
         if not cls.Meta.key:
             raise InternalServerError(
                 "F00.103",
-                f"ElementBase subclass {cls.__name__} Meta must define key",
+                f"ElementModel subclass {cls.__name__} Meta must define key",
                 None
             )
         
-        if not cls.Meta.name:
+        if not cls.Meta.title:
             raise InternalServerError(
                 "F00.104",
-                f"ElementBase subclass {cls.__name__} Meta must define name",
+                f"ElementModel subclass {cls.__name__} Meta must define title",
                 None
             )
         
@@ -203,17 +195,14 @@ class ElementBase(object):
         if cls.Schema is not None and not issubclass(cls.Schema, ElementSchema):
             raise InternalServerError('F00.201', f'Invalid element schema: {cls.Schema}')
 
-        if not issubclass(cls.Model, ElementModel):
-            raise InternalServerError('F00.202', f'Invalid element model: {cls.Model}')
-
-        if not issubclass(cls.Provider, ElementDataProvider):
-            raise InternalServerError('F00.203', f'Invalid element data provider: {cls.Provider}')
+        if not issubclass(cls.DataProvider, ElementDataProvider):
+            raise InternalServerError('F00.203', f'Invalid element data provider: {cls.DataProvider}')
 
         # Automatically register the schema in the registry using key
         # Use register() method with the key
-        ElementSchemaRegistry.register(cls.Meta.key)(cls)
+        ElementModelRegistry.register(cls.Meta.key)(cls)
 
 
-# Registry for ElementBase subclasses
+# Registry for ElementModel subclasses
 # Registration happens automatically via __init_subclass__
-ElementSchemaRegistry = ClassRegistry(ElementBase)
+ElementModelRegistry = ClassRegistry(DataElementModel)

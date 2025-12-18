@@ -1,15 +1,15 @@
 """Import workflow definitions command."""
 
 import click
-from ..helper import async_command
+from ..helper import async_command, import_modules
 
 
 @click.command()
 @click.option('--force', is_flag=True, help='Update existing workflow definitions')
-@click.option('--repository', '-r', type=str, multiple=True,
+@click.option('--repositories', '-r', type=str, multiple=True,
               help='Workflow repository to import definitions from')
 @async_command
-async def import_definitions(force: bool, repository: list[str]):
+async def import_definitions(force: bool, repositories: list[str]):
     """Import workflow definitions from registered workflows into the database.
     
     This command extracts metadata from all registered workflows and stores
@@ -19,20 +19,25 @@ async def import_definitions(force: bool, repository: list[str]):
     Example:
         fluvius wf import-definitions
         fluvius wf import-definitions --force
-        fluvius wf import-definitions --repository my_app.workflow_a --repository my_app.workflow_b
+        fluvius wf import-definitions --repositories my_app.workflow_a --repositories my_app.workflow_b
     """
     from fluvius.navis.engine.manager import WorkflowManager
     from fluvius.navis.model import WorkflowDataManager
+    from fluvius.navis import config as navis_config
     
     click.echo("=" * 80)
     click.echo("Workflow Definition Import")
     click.echo("=" * 80)
     
-    
     click.echo("\nGenerating workflow definitions...")
-    
+
+    # Get repositories from config if not provided
+    repos = repositories or getattr(navis_config, 'WORKFLOW_REPOSITORIES', [])
+    if repos:
+        import_modules(list(repos))
+
     # Generate workflow definitions from registered workflows
-    wfdefs = WorkflowManager.gen_wfdefs(*repository)
+    wfdefs = WorkflowManager.gen_wfdefs()
     
     if not wfdefs:
         click.echo("No workflow definitions generated.")
@@ -120,4 +125,3 @@ async def import_definitions(force: bool, repository: list[str]):
     # Exit with error code if there were errors
     if len(errors) > 0:
         raise click.ClickException(f"{len(errors)} error(s) occurred during import")
-        

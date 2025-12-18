@@ -3,6 +3,7 @@ from ..model import WorkflowDataManager
 from .domain import WorkflowDomain
 from .aggregate import WorkflowAggregate
 from .query import WorkflowQueryManager
+from .event import WorkflowEventHandler    
 
 from . import command, datadef
 
@@ -12,5 +13,6 @@ __all__ = [
     "WorkflowDataManager",
     "WorkflowQueryManager",
     "command",
-    "datadef"
+    "datadef",
+    "WorkflowEventHandler",
 ]

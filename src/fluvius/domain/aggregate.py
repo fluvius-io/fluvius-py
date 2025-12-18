@@ -14,8 +14,6 @@ from .message import MessageBundle
 from .response import DomainResponse, ResponseRecord
 from .helper import consume_queue
 
-from . import mutation
-
 IF_MATCH_HEADER = config.IF_MATCH_HEADER
 IF_MATCH_VERIFY = config.IF_MATCH_VERIFY
 DEFAULT_RESPONSE_TYPE = config.DEFAULT_RESPONSE_TYPE
