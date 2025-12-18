@@ -11,7 +11,7 @@ class CreateUserCmd(Command):
 	class Meta:
 		key = 'create-user'
 		name = 'Create User'
-		new_resource = True
+		resource_init = True
 		resource_docs = 'Resource key. e.g. `user`'
 
 	class Data(DataModel):

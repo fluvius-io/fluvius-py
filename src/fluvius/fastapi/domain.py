@@ -146,7 +146,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
         return cmd_metadata
 
     identifier_spec = "{identifier}"
-    if cmd_cls.Meta.new_resource:
+    if cmd_cls.Meta.resource_init:
         identifier_spec = ":new"
 
     if unscoped_path:
@@ -191,7 +191,7 @@ def register_command_handler(app, domain, cmd_cls, cmd_key, fq_name):
         "description": cmd_cls.Meta.desc,
         "schema": cmd_cls.Data.model_json_schema(),
         "urls": cmd_endpoints,
-        "genid": cmd_cls.Meta.new_resource
+        "genid": cmd_cls.Meta.resource_init
     }
 
     return cmd_metadata

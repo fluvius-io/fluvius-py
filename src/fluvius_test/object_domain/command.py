@@ -44,7 +44,7 @@ class CreateObjectCmd(Command):
     class Meta:
         key = 'create-object'
         name = 'Create Generic Object'
-        new_resource = True
+        resource_init = True
         api_docs = 'Resource key. E.g. `people-economist`'
 
     Data = PersonModel

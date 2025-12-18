@@ -29,7 +29,7 @@ class CreateCollection(Command):
         tags = ["form", "collection", "create"]
         auth_required = True
         description = "Create a new collection for organizing documents"
-        new_resource = True
+        resource_init = True
 
     Data = CreateCollectionData
 
@@ -88,7 +88,7 @@ class CreateDocument(Command):
         tags = ["form", "document", "create"]
         auth_required = True
         description = "Create a new document that can contain multiple forms"
-        new_resource = True
+        resource_init = True
 
     Data = CreateDocumentData
 
@@ -275,7 +275,7 @@ class InitializeForm(Command):
         tags = ["form", "create", "initialize"]
         auth_required = True
         description = "Create and initialize a form submission with element structure"
-        new_resource = True
+        resource_init = True
 
     Data = InitializeFormData
 

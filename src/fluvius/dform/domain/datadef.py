@@ -90,19 +90,44 @@ class AddDocumentToCollectionData(DataModel):
 
 # Document Node Commands
 class CreateDocumentNodeData(DataModel):
-    """Data for creating a document node (section/content)"""
+    """
+    Data for creating a document node.
+    
+    Supports different node types:
+    - "section": Container node with children (use title, desc)
+    - "content": Text/header/graphic content (use title, content, ctype)
+    - "form": Form reference (use form_key, attrs for overrides)
+    """
     node_key: str
-    section_name: str
+    node_type: str = "section"  # "section", "content", "form"
     parent_node: Optional[UUID_TYPE] = None  # Parent node ID for nesting
-    desc: Optional[str] = None
     order: Optional[int] = None
+    
+    # Common fields
+    title: Optional[str] = None  # Title for sections and content
+    desc: Optional[str] = None  # Description
+    
+    # Content node fields
+    content: Optional[str] = None  # Content text/html/markdown
+    ctype: Optional[str] = None  # Content type: "text", "header", "graphic", "html", "markdown"
+    
+    # Form node fields
+    form_key: Optional[str] = None  # Reference to form in FormRegistry
+    
+    # Extensible attributes
+    attrs: Optional[Dict[str, Any]] = None  # Overrides, metadata, styling, etc.
 
 
 class UpdateDocumentNodeData(DataModel):
     """Data for updating document node properties"""
-    section_name: Optional[str] = None
-    desc: Optional[str] = None
+    node_type: Optional[str] = None
     order: Optional[int] = None
+    title: Optional[str] = None
+    desc: Optional[str] = None
+    content: Optional[str] = None
+    ctype: Optional[str] = None
+    form_key: Optional[str] = None
+    attrs: Optional[Dict[str, Any]] = None
 
 
 class RemoveDocumentNodeData(DataModel):

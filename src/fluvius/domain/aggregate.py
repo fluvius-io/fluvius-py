@@ -98,14 +98,14 @@ class Aggregate(object):
         )
 
     @asynccontextmanager
-    async def command_aggregate(self, context, command_bundle, command_meta):
+    async def command_aggregate(self, context, command_bundle, command_class):
         if getattr(self, '_context', None):
             raise InternalServerError('D00.110', 'Overlapping context: %s' % str(context))
 
         self._evt_queue = queue.Queue()
         self._context = context
         self._command = command_bundle
-        self._cmdmeta = command_meta
+        self._cmdclass = command_class
         self._aggroot = AggregateRoot(
             self._command.resource,
             self._command.identifier,
@@ -117,27 +117,27 @@ class Aggregate(object):
             await self.fetch_command_rootobj(self._aggroot)
         )
 
-        await self.before_command(context, command_bundle, command_meta)
+        await self.before_command(context, command_bundle, command_class)
         yield RestrictedAggregateProxy(self)
         
         if not self._evt_queue.empty():
             raise InternalServerError('D00.102', 'All events must be consumed by the command handler.')
 
-        await self.after_command(context, command_bundle, command_meta)
+        await self.after_command(context, command_bundle, command_class)
         self._command = None
-        self._cmdmeta = None
+        self._cmdclass = None
         self._aggroot = None
         self._rootobj = None
         self._context = None
     
-    async def before_command(self, context, command_bundle, command_meta):
+    async def before_command(self, context, command_bundle, command_class):
         pass
 
-    async def after_command(self, context, command_bundle, command_meta):
+    async def after_command(self, context, command_bundle, command_class):
         pass
 
     async def fetch_command_rootobj(self, aggroot):
-        if self._cmdmeta.Meta.new_resource:
+        if self._cmdclass.Meta.resource_init:
             return None
 
         def if_match():

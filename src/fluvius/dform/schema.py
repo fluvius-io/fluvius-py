@@ -221,18 +221,36 @@ class DocumentCollection(FormDataSchema):
 
 
 class DocumentNode(FormDataSchema):
-    """Section instances created from template sections"""
+    """
+    Document nodes for storing all types of content within a document.
+    
+    Supports multiple node types:
+    - "section": Container node with children (title, desc)
+    - "content": Text/header/graphic content (title, content, ctype)
+    - "form": Form reference (form_key, attrs for overrides)
+    """
     __tablename__ = "document_node"
     __table_args__ = (
         sa.UniqueConstraint('document_id', 'node_key', name='uq_doc_node_key'),
     )
 
-    document_id = document_fk("doc_sec_doc")
-    parent_node = sa.Column(pg.UUID, nullable=True)
-    node_key = sa.Column(sa.String, nullable=False)
-    section_name = sa.Column(sa.String, nullable=False)
-    desc = sa.Column(sa.String, nullable=True)
+    document_id = document_fk("doc_node_doc")
+    parent_node = sa.Column(pg.UUID, nullable=True)  # Self-referential for nesting
+    form_key = sa.Column(sa.String, nullable=False)  # Unique key within document
+    node_type = sa.Column(sa.String, nullable=False, default="section")  # "section", "content", "form"
     order = sa.Column(sa.Integer, nullable=False, default=0)
+    
+    # Common fields
+    title = sa.Column(sa.String, nullable=True)  # Title for sections and content
+    desc = sa.Column(sa.String, nullable=True)  # Description
+    
+    # Content node fields
+    content = sa.Column(sa.Text, nullable=True)  # Content text/html/markdown
+    content_type = sa.Column(sa.String, nullable=True)  # Content type: "text", "header", "graphic", "html", "markdown"
+    
+   
+    # Extensible attributes (overrides, metadata, styling, etc.)
+    attrs = sa.Column(FluviusJSONField, nullable=True)
 
 
 class FormSubmission(FormDataSchema):
@@ -252,7 +270,6 @@ class FormSubmission(FormDataSchema):
     status = sa.Column(sa.String, nullable=False, default="draft")
 
 
-
 class FormElement(FormDataSchema):
     """Element instances created from element definitions"""
     __tablename__ = "form_element"
@@ -263,7 +280,7 @@ class FormElement(FormDataSchema):
     form_submission_id = form_submission_fk("form_elem_form_sub")
     element_registry_id = element_registry_fk("form_elem_elem_reg")
     element_name = sa.Column(sa.String, nullable=False)
-    index = sa.Column(sa.Integer, nullable=False, default=0)
+    index = sa.Column(sa.Integer, nullable=False, default=-1)
     required = sa.Column(sa.Boolean, nullable=False, default=False)
     data = sa.Column(FluviusJSONField, nullable=True)
     status = sa.Column(sa.String, nullable=False, default="draft")

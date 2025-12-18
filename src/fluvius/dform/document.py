@@ -19,7 +19,10 @@ from . import logger
 
 class DocumentNode(DataModel):
     """Base class for all document nodes"""
-    
+    title: str
+    content: str
+    content_type: str = "text"  # "text", "header", "graphic", etc.
+ 
     def to_json(self) -> dict:
         """Convert node to JSON-serializable dict"""
         return {
@@ -30,10 +33,7 @@ class DocumentNode(DataModel):
 
 class ContentNode(DocumentNode):
     """Content node for text, headers, or graphics"""
-    title: str
-    content: str
-    ctype: str = "text"  # "text", "header", "graphic", etc.
-    
+
     def to_json(self) -> dict:
         """Convert content node to JSON"""
         return {
@@ -47,7 +47,7 @@ class ContentNode(DocumentNode):
 class FormNode(DocumentNode):
     """Reference to a FormModel by key"""
     form_key: str
-    override: dict = {}  # Override form properties (header, footer, etc.)
+    attrs: dict = {}  # Override form properties (header, footer, etc.)
     
     @model_validator(mode='after')
     def validate_form_key(self):
@@ -59,7 +59,6 @@ class FormNode(DocumentNode):
 
 class DocumentSection(DocumentNode):
     """Section within a document template"""
-    title: str
     children: list["AnyDocumentNode"] = []
 
     @model_validator(mode="after")

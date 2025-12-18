@@ -9,11 +9,11 @@ from types import SimpleNamespace
 from typing import Iterator, Optional, List, Type
 
 from fluvius.auth import AuthorizationContext
-from fluvius.data import UUID_GENR, DataModel
+from fluvius.data import UUID_GENR, UUID_TYPE, DataModel
 from fluvius.helper import camel_to_lower, select_value, camel_to_title, ImmutableNamespace
 from fluvius.helper.timeutil import timestamp
 from fluvius.helper.registry import ClassRegistry
-from fluvius.error import ForbiddenError, InternalServerError
+from fluvius.error import BadRequestError, ForbiddenError, InternalServerError
 from fluvius.casbin import PolicyManager, PolicyRequest
 from fluvius.domain.event import EventHandler
 
@@ -246,7 +246,8 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         self._logstore = self.__logstore__(self, app, **config)
         self._statemgr = self.__statemgr__(self, app, **config)
         self._policymgr = self.__policymgr__ and self.__policymgr__(self._statemgr)
-        self._active_context = contextvars.ContextVar('domain_context', default=None)
+        self._context = contextvars.ContextVar('domain_context', default=None)
+        self._aggroot = contextvars.ContextVar('domain_aggroot', default=None)
         self._dispatcher = self.__msgdispatcher__(self, app, **config) if self.__msgdispatcher__ else None
         self._evthandler = self.__evthandler__(self, app, **config) if self.__evthandler__ else None
 
@@ -311,10 +312,32 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
                 continue
 
             await self._dispatcher.dispatch(msg_record)
+    
+    @contextmanager
+    def aggroot(self, resource, identifier=None, domain_sid=None, domain_iid=None):
+        aggroot = (resource, identifier, domain_sid, domain_iid)
+        self._aggroot.set(aggroot)
+        yield aggroot
+        self._aggroot.set(None)
+    
+    def validate_aggroot(self, aggroot: tuple[str, UUID_TYPE, UUID_TYPE, UUID_TYPE], resource_init=False):
+        resource, identifier, domain_sid, domain_iid = aggroot
 
-    def create_command(self, cmd_key, cmd_data, aggroot):
-        aggroot = AggregateRoot(*aggroot) if not isinstance(aggroot, AggregateRoot) else aggroot
+        if not (isinstance(resource, str) and resource):
+            raise BadRequestError('D00.410', f'Invalid aggroot resource: {resource}')
+
+        if resource_init and not identifier:
+            identifier = UUID_GENR()
+        
+        if not isinstance(identifier, UUID_TYPE):
+            raise BadRequestError('D00.412', f'Invalid aggroot identifier: {identifier}')
+
+        return AggregateRoot(resource, identifier, domain_sid, domain_iid)
+
+    def create_command(self, cmd_key, cmd_data, aggroot: tuple[str, UUID_TYPE, UUID_TYPE, UUID_TYPE] = None):
+        aggroot = aggroot or self._aggroot.get()
         cmd_cls = self.lookup_command(cmd_key)
+        aggroot = self.validate_aggroot(aggroot, cmd_cls.Meta.resource_init)
 
         if cmd_cls.Meta.resources and aggroot.resource not in cmd_cls.Meta.resources:
             raise ForbiddenError('D00.306', 'Command [%s] does not allow aggroot of resource [%s]' % (cmd_key, aggroot.resource))
@@ -416,17 +439,17 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
     @contextmanager
     def session(self, authorization: Optional[AuthorizationContext], service_proxy=None, **kwargs):
-        ctx = self._active_context.get()
+        ctx = self._context.get()
         assert ctx is None, f'Context is already set for domain: {ctx}.'
 
         ctx = self.Context(self, authorization, service_proxy, **kwargs)
-        self._active_context.set(ctx)
+        self._context.set(ctx)
         yield self
-        self._active_context.set(None)
+        self._context.set(None)
 
     @property
     def context(self):
-        ctx = self._active_context.get()
+        ctx = self._context.get()
         if ctx is None:
             raise InternalServerError('D00.108', 'Domain session is not started yet.')
 
