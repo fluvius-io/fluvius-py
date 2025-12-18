@@ -33,6 +33,7 @@ class DocumentNode(DataModel):
 
 class ContentNode(DocumentNode):
     """Content node for text, headers, or graphics"""
+    ctype: str = "text"  # Alias for content_type used in templates
 
     def to_json(self) -> dict:
         """Convert content node to JSON"""
@@ -47,6 +48,8 @@ class ContentNode(DocumentNode):
 class FormNode(DocumentNode):
     """Reference to a FormModel by key"""
     form_key: str
+    title: str = ""  # Optional for FormNode - can be derived from form
+    content: str = ""  # Optional for FormNode - form provides content
     attrs: dict = {}  # Override form properties (header, footer, etc.)
     
     @model_validator(mode='after')
@@ -59,6 +62,8 @@ class FormNode(DocumentNode):
 
 class DocumentSection(DocumentNode):
     """Section within a document template"""
+    title: str = ""  # Optional for sections
+    content: str = ""  # Optional for sections
     children: list["AnyDocumentNode"] = []
 
     @model_validator(mode="after")

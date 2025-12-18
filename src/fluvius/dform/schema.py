@@ -51,7 +51,7 @@ def collection_fk(constraint_name, **kwargs):
 def template_fk(constraint_name, **kwargs):
     """Create a foreign key reference to the template table"""
     return sa.Column(pg.UUID, sa.ForeignKey(
-        f'{DFORM_DEFS_SCHEMA}.template._id',
+        f'{DFORM_DEFS_SCHEMA}.template_registry._id',
         ondelete='CASCADE',
         onupdate='CASCADE',
         name=f'fk_tpl_{constraint_name}'
@@ -236,7 +236,8 @@ class DocumentNode(FormDataSchema):
 
     document_id = document_fk("doc_node_doc")
     parent_node = sa.Column(pg.UUID, nullable=True)  # Self-referential for nesting
-    form_key = sa.Column(sa.String, nullable=False)  # Unique key within document
+    node_key = sa.Column(sa.String, nullable=False)  # Unique key within document
+    form_key = sa.Column(sa.String, nullable=True)  # Reference to form registry (for form nodes)
     node_type = sa.Column(sa.String, nullable=False, default="section")  # "section", "content", "form"
     order = sa.Column(sa.Integer, nullable=False, default=0)
     

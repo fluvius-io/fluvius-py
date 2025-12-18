@@ -113,7 +113,7 @@ class TestDocumentTemplateToJson:
                     title="Application Section",
                     children=[
                         FormNode(form_key="applicant-info"),
-                        FormNode(form_key="employment-details", override={"header": "Custom Header"}),
+                        FormNode(form_key="employment-details", attrs={"header": "Custom Header"}),
                     ]
                 ),
             ]
@@ -129,7 +129,7 @@ class TestDocumentTemplateToJson:
         assert section["children"][0]["form_key"] == "applicant-info"
         assert section["children"][1]["node_type"] == "FormNode"
         assert section["children"][1]["form_key"] == "employment-details"
-        assert section["children"][1]["override"]["header"] == "Custom Header"
+        assert section["children"][1]["attrs"]["header"] == "Custom Header"
         
         # Print JSON output
         print("\n=== Template with Form Nodes JSON ===")

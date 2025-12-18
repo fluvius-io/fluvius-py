@@ -191,5 +191,4 @@ class SubmitFormData(DataModel):
     """
     payload: Dict[str, Dict[str, Any]]  # {"element_key": {data}, ...}
     replace: bool = False  # Remove elements not in the payload
-    validate: bool = True  # Validate required elements before submitting
     status: str = "submitted"  # "draft", "submitted", etc.

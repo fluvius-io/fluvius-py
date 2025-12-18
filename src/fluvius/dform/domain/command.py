@@ -275,7 +275,6 @@ class InitializeForm(Command):
         tags = ["form", "create", "initialize"]
         auth_required = True
         description = "Create and initialize a form submission with element structure"
-        resource_init = True
 
     Data = InitializeFormData
 
