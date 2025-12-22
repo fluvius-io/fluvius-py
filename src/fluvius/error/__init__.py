@@ -10,10 +10,11 @@ class FluviusException(Exception):
     label = "Internal Error"
     errcode = "A00.000"
 
-    def __init__(self, errcode, message, details=None):
+    def __init__(self, errcode, message, details=None, errdata=None):
         self.message = message
         self.details = details
         self.errcode = errcode
+        self.errdata = errdata
 
         DEBUG_APP_EXCEPTION and logger.exception(message)
 
@@ -26,9 +27,9 @@ class FluviusException(Exception):
     @property
     def content(self):
         if not self.details:
-            return {"errcode": self.errcode, "message": self.message}
+            return {"errcode": self.errcode, "message": self.message, "errdata": self.errdata}
 
-        return {"errcode": self.errcode, "message": self.message, "details": self.details}
+        return {"errcode": self.errcode, "message": self.message, "details": self.details, "errdata": self.errdata}
 
 
 class NotFoundError(FluviusException):
