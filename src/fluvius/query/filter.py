@@ -128,8 +128,9 @@ class TextSearchPreset(FilterPreset, name="textsearch"):
 
 
 class UUIDFilterPreset(FilterPreset, name="uuid"):
-    eq = Filter("Equals", "uuid", default=True)
+    eq  = Filter("Equals", "uuid", default=True)
     in_ = Filter("In List", "uuid")
+    ne  = Filter("Not Equals", "uuid")
 
 
 class StringFilterPreset(FilterPreset, name="string"):
