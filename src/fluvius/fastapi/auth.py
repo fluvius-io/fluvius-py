@@ -146,6 +146,18 @@ class FluviusAuthProfileProvider(object):
         return auth_context
 
     async def setup_context(self, auth_user: KeycloakTokenPayload) -> AuthorizationContext:
+        # Extract roles from Keycloak token claims
+        realm_roles = auth_user.realm_access.get('roles', []) if auth_user.realm_access else []
+        
+        # Extract client-specific roles if needed
+        client_roles = []
+        if auth_user.resource_access:
+            for client, access in auth_user.resource_access.items():
+                client_roles.extend(access.get('roles', []))
+        
+        # Combine all roles
+        all_roles = tuple(set(realm_roles + client_roles))
+        
         profile = SessionProfile(
             id=auth_user.jti,
             name=auth_user.name,
@@ -153,7 +165,7 @@ class FluviusAuthProfileProvider(object):
             given_name=auth_user.given_name,
             email=auth_user.email,
             username=auth_user.preferred_username,
-            roles=('user', 'staff', 'provider'),
+            roles=all_roles,
             org_id=auth_user.sub,
             usr_id=auth_user.sid
         )
@@ -162,8 +174,12 @@ class FluviusAuthProfileProvider(object):
             id=auth_user.sub,
             name=auth_user.family_name
         )
-        iamroles = ('sysadmin', 'operator')
-        realm = 'default'
+        
+        # Extract IAM roles from realm roles (filter for admin/operator roles)
+        iamroles = tuple(role for role in realm_roles if role in ('sysadmin', 'operator', 'admin'))
+        
+        # Extract realm from token issuer or use a default
+        realm = getattr(auth_user, 'iss', '').split('/realms/')[-1] if hasattr(auth_user, 'iss') else 'default'
 
         return AuthorizationContext(
             realm = realm,

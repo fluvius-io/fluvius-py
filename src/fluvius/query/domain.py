@@ -51,11 +51,6 @@ class DomainQueryManager(QueryManager):
     ):
         """ Execute the backend query with the state manager and return """
         resource = query_resource.backend_model()
-        print(f"DEBUG: execute_query resource={resource} identifier={query_resource._identifier}")
-        print(f"DEBUG: Meta={query_resource.Meta}")
-        if hasattr(query_resource.Meta, 'backend_model'):
-             print(f"DEBUG: Meta.backend_model={query_resource.Meta.backend_model}")
-        
         async with self.data_manager.transaction():
             data = await self.data_manager.connector_query(resource, backend_query, return_meta=meta)
             return data, meta
