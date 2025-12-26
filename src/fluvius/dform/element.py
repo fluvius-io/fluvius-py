@@ -253,14 +253,6 @@ class DataElementModel(DataModel):
         # Auto-generate Schema from Model if not provided
         # Requires __tablename__ to be set on the subclass
         if cls.Schema is None:
-            # Ensure model fields are populated (Pydantic v2)
-            if not cls.model_fields:
-                try:
-                    cls.model_rebuild(force=True)
-                except Exception:
-                    # Ignore if rebuild fails (might be abstract or partial)
-                    pass
-
             # Fallback: if model_fields empty (e.g. during initialization), inspect annotations manually
             # This happens if Pydantic hasn't fully populated the class yet
             extra_columns = {}
