@@ -153,7 +153,6 @@ class InitializeFormData(DataModel):
     # Form creation fields
     form_registry_id: UUID_TYPE  # Reference to form in registry
     form_key: str
-    section_key: str
     title: str
     desc: Optional[str] = None
     order: Optional[int] = None

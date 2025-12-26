@@ -268,6 +268,7 @@ class FormSubmission(FormDataSchema):
     form_key = sa.Column(sa.String, nullable=False)
     title = sa.Column(sa.String, nullable=False)
     desc = sa.Column(sa.String, nullable=True)
+    order = sa.Column(sa.Integer, nullable=False, default=0)
     locked = sa.Column(sa.Boolean, nullable=False, default=False)
     status = sa.Column(sa.String, nullable=False, default="draft")
 
@@ -276,12 +277,12 @@ class FormElement(FormDataSchema):
     """Element instances created from element definitions"""
     __tablename__ = "form_element"
     __table_args__ = (
-        sa.UniqueConstraint('form_id', 'elem_id', 'index', name='uq_form_element_name'),
+        sa.UniqueConstraint('form_submission_id', 'element_registry_id', 'index', name='uq_form_element_name'),
     )
 
-    form_id = form_submission_fk("form_elem_form_sub")
-    elem_id = element_registry_fk("form_elem_elem_reg")
-    field_name = sa.Column(sa.String, nullable=False)
+    form_submission_id = form_submission_fk("form_elem_form_sub")
+    element_registry_id = element_registry_fk("form_elem_elem_reg")
+    element_name = sa.Column(sa.String, nullable=False)
     index = sa.Column(sa.Integer, nullable=False, default=-1)
     required = sa.Column(sa.Boolean, nullable=False, default=False)
     data = sa.Column(FluviusJSONField, nullable=True)

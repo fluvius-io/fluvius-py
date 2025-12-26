@@ -168,7 +168,6 @@ async def test_initialize_form_basic(domain):
     payload = {
         "form_registry_id": form_reg["form_registry_id"],
         "form_key": "contact-form",
-        "section_key": "personal-info",
         "title": "Contact Information Form",
         "desc": "Fill in your contact details",
     }
@@ -185,7 +184,6 @@ async def test_initialize_form_basic(domain):
         )
         assert len(form) == 1
         assert form[0].title == "Contact Information Form"
-        assert form[0].section_key == "personal-info"
         assert form[0].status == "draft"
         assert form[0].locked is False
 
@@ -200,7 +198,6 @@ async def test_initialize_form_with_initial_data(domain):
     payload = {
         "form_registry_id": form_reg["form_registry_id"],
         "form_key": "prefilled-form",
-        "section_key": "personal-info",
         "title": "Pre-filled Form",
         "initial_data": {
             f"first_name_{suffix}": {"value": "John"},
@@ -238,7 +235,6 @@ async def test_initialize_form_duplicate_key_fails(domain):
     payload = {
         "form_registry_id": form_reg["form_registry_id"],
         "form_key": "unique-form",
-        "section_key": "section-1",
         "title": "First Form",
     }
     
@@ -249,7 +245,6 @@ async def test_initialize_form_duplicate_key_fails(domain):
     payload2 = {
         "form_registry_id": form_reg["form_registry_id"],
         "form_key": "unique-form",
-        "section_key": "section-2",
         "title": "Second Form",
     }
     
@@ -274,7 +269,6 @@ async def test_update_form_basic(domain):
     payload = {
         "form_registry_id": form_reg["form_registry_id"],
         "form_key": "update-test-form",
-        "section_key": "section-1",
         "title": "Original Title",
     }
     
@@ -314,7 +308,6 @@ async def test_update_form_status(domain):
     payload = {
         "form_registry_id": form_reg["form_registry_id"],
         "form_key": "status-test-form",
-        "section_key": "section-1",
         "title": "Status Test",
     }
     
@@ -355,7 +348,6 @@ async def test_remove_form(domain):
     payload = {
         "form_registry_id": form_reg["form_registry_id"],
         "form_key": "remove-test-form",
-        "section_key": "section-1",
         "title": "Form to Remove",
     }
     
@@ -394,7 +386,6 @@ async def test_submit_form_basic(domain):
     init_payload = {
         "form_registry_id": form_reg["form_registry_id"],
         "form_key": "submit-test-form",
-        "section_key": "section-1",
         "title": "Submit Test Form",
     }
     
@@ -450,7 +441,6 @@ async def test_submit_form_as_draft(domain):
     init_payload = {
         "form_registry_id": form_reg["form_registry_id"],
         "form_key": "draft-test-form",
-        "section_key": "section-1",
         "title": "Draft Test Form",
     }
     
@@ -493,7 +483,6 @@ async def test_submit_form_update_existing_elements(domain):
     init_payload = {
         "form_registry_id": form_reg["form_registry_id"],
         "form_key": "update-elements-form",
-        "section_key": "section-1",
         "title": "Update Elements Form",
         "initial_data": {
             f"first_name_{suffix}": {"value": "Original"},
@@ -542,7 +531,6 @@ async def test_submit_form_with_replace(domain):
     init_payload = {
         "form_registry_id": form_reg["form_registry_id"],
         "form_key": "replace-test-form",
-        "section_key": "section-1",
         "title": "Replace Test Form",
         "initial_data": {
             f"first_name_{suffix}": {"value": "John"},
@@ -600,7 +588,6 @@ async def test_submit_locked_form_fails(domain):
     init_payload = {
         "form_registry_id": form_reg["form_registry_id"],
         "form_key": "locked-test-form",
-        "section_key": "section-1",
         "title": "Locked Test Form",
     }
     
@@ -652,7 +639,6 @@ async def test_full_form_workflow(domain):
     init_payload = {
         "form_registry_id": form_reg["form_registry_id"],
         "form_key": "workflow-form",
-        "section_key": "personal",
         "title": "Application Form",
     }
     
