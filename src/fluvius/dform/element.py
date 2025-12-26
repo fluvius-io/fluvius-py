@@ -253,7 +253,35 @@ class DataElementModel(DataModel):
         # Auto-generate Schema from Model if not provided
         # Requires __tablename__ to be set on the subclass
         if cls.Schema is None:
-            cls.Schema = model_mapper.create_table_class(cls, cls.Meta.table_name)
+            # Ensure model fields are populated (Pydantic v2)
+            if not cls.model_fields:
+                try:
+                    cls.model_rebuild(force=True)
+                except Exception:
+                    # Ignore if rebuild fails (might be abstract or partial)
+                    pass
+
+            # Fallback: if model_fields empty (e.g. during initialization), inspect annotations manually
+            # This happens if Pydantic hasn't fully populated the class yet
+            extra_columns = {}
+            if not cls.model_fields and hasattr(cls, '__annotations__'):
+                from pydantic.fields import FieldInfo
+                for name, annotation in cls.__annotations__.items():
+                    if name.startswith('_'): continue
+                    
+                    # Create column manually
+                    try:
+                        col = model_mapper.create_column(name, annotation, FieldInfo(annotation=annotation))
+                        extra_columns[name] = col
+                    except Exception:
+                        pass
+            
+            # Create schema class with any extra columns found via fallback
+            cls.Schema = model_mapper.create_table_class(
+                cls, 
+                cls.Meta.table_name, 
+                extra_columns=extra_columns if extra_columns else None
+            )
         
         # Validate required fields
         if not cls.Meta.key:
