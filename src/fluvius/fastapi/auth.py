@@ -28,9 +28,25 @@ from typing import Optional, Awaitable, Callable
 from . import config, logger
 from .setup import on_startup
 from .helper import uri, generate_client_token, generate_session_id, validate_direct_url
+import secrets
 
 IDEMPOTENCY_KEY = config.RESP_HEADER_IDEMPOTENCY
 DEVELOPER_MODE = config.DEVELOPER_MODE
+CSRF_TOKEN_LENGTH = 32
+
+
+def generate_csrf_token() -> str:
+    """Generate a cryptographically secure CSRF token"""
+    return secrets.token_urlsafe(CSRF_TOKEN_LENGTH)
+
+
+def validate_csrf_token(request: Request, token: str) -> bool:
+    """Validate CSRF token from request against session"""
+    session_token = request.session.get('csrf_token')
+    if not session_token or not token:
+        return False
+    # Use constant-time comparison to prevent timing attacks
+    return secrets.compare_digest(session_token, token)
 
 
 def auth_required(inject_ctx=False, **auth_kwargs):
@@ -44,22 +60,23 @@ def auth_required(inject_ctx=False, **auth_kwargs):
                 # Exceptions raised in middleware may not always be caught by FastAPI's exception handlers
                 content = e.content
 
+                # Log full error server-side but never expose to client
                 if DEVELOPER_MODE:
                     import traceback
-                    content = content or {}
-                    content['traceback'] = traceback.format_exc()
+                    logger.error(f"Auth error: {e}\n{traceback.format_exc()}")
+                    # Still don't expose traceback to client even in dev mode for security
 
                 return JSONResponse(
                     status_code=e.status_code,
                     content=content
                 )
             except Exception as e:
-                if DEVELOPER_MODE:
-                    logger.exception(e)
+                # Always log server-side
+                logger.exception(f"Unexpected auth error: {e}")
 
                 return JSONResponse(
                     status_code=500,
-                    content={"errcode": "S00.501", "message": str(e)}
+                    content={"errcode": "S00.501", "message": "Unexpected auth error: {e}"}
                 )
 
             if inject_ctx:
@@ -279,10 +296,23 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
             session_id=generate_session_id(request.session)
         )
 
+        # Regenerate session to prevent session fixation
+        old_data = dict(request.session)
+        request.session.clear()
+        request.session.update(old_data)
+        
         request.session[config.SES_USER_FIELD] = id_data
-        next_url = validate_direct_url(request.session["next"], config.DEFAULT_SIGNIN_REDIRECT_URI)
+        next_url = validate_direct_url(request.session.get("next"), config.DEFAULT_SIGNIN_REDIRECT_URI)
         response = RedirectResponse(url=next_url)
-        response.set_cookie(config.SES_ID_TOKEN_FIELD, id_token)
+        
+        # Set secure cookie flags
+        response.set_cookie(
+            config.SES_ID_TOKEN_FIELD, 
+            id_token,
+            httponly=True,
+            secure=config.COOKIE_HTTPS_ONLY,
+            samesite=config.COOKIE_SAME_SITE_POLICY
+        )
         auth_event.authorization_success.send(request, user=id_data)
 
         return response
@@ -305,8 +335,18 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
     async def info(request: Request):
         return request.state.auth_context
 
+    @api("csrf-token")
+    async def get_csrf_token(request: Request):
+        """Get or generate CSRF token for the current session"""
+        if 'csrf_token' not in request.session:
+            request.session['csrf_token'] = generate_csrf_token()
+        return {"csrf_token": request.session['csrf_token']}
+
     @api("sign-in")
     async def sign_in(request: Request):
+        # Generate and store CSRF token
+        csrf_token = generate_csrf_token()
+        request.session['csrf_token'] = csrf_token
         request.session["next"] = request.query_params.get('next')
         callback_uri = validate_direct_url(request.query_params.get('callback'), config.DEFAULT_CALLBACK_URI)
         return await oauth.keycloak.authorize_redirect(request, callback_uri)
@@ -315,24 +355,42 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
     async def sign_up(request: Request):
         return RedirectResponse(url=KEYCLOAK_SIGNUP_URI)
 
-    @api("sign-out")
+    @api("sign-out", method=app.post)
     async def sign_out(request: Request):
         """ Log out user globally (including Keycloak) """
+        
+        # Validate CSRF token for POST requests
+        form_data = await request.form()
+        csrf_token = form_data.get('csrf_token') or request.headers.get('X-CSRF-Token')
+        if not validate_csrf_token(request, csrf_token):
+            raise HTTPException(status_code=403, detail="Invalid CSRF token")
 
         redirect_uri = validate_direct_url(
-            request.query_params.get('redirect_uri'),
+            form_data.get('redirect_uri') or request.query_params.get('redirect_uri'),
             config.DEFAULT_LOGOUT_REDIRECT_URI
         )
         
         id_data = request.session.get(config.SES_USER_FIELD)
         id_token = request.cookies.get(config.SES_ID_TOKEN_FIELD)
-        keycloak_logout_url = f"{KEYCLOAK_LOGOUT_URI}?{urlencode({'id_token_hint': id_token, 'post_logout_redirect_uri': redirect_uri})}"
+        
+        # Only proceed with logout if we have a valid session
+        if id_token and id_data:
+            keycloak_logout_url = f"{KEYCLOAK_LOGOUT_URI}?{urlencode({'id_token_hint': id_token, 'post_logout_redirect_uri': redirect_uri})}"
+        else:
+            # No valid session, just redirect
+            keycloak_logout_url = redirect_uri
 
         request.session.clear()
         response = RedirectResponse(url=keycloak_logout_url)
-        response.delete_cookie(config.SES_ID_TOKEN_FIELD)
+        response.delete_cookie(
+            config.SES_ID_TOKEN_FIELD,
+            httponly=True,
+            secure=config.COOKIE_HTTPS_ONLY,
+            samesite=config.COOKIE_SAME_SITE_POLICY
+        )
 
-        auth_event.user_logout.send(request, user=id_data)
+        if id_data:
+            auth_event.user_logout.send(request, user=id_data)
 
         return response
 
