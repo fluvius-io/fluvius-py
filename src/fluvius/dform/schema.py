@@ -141,6 +141,7 @@ class TemplateRegistry(FormRegistrySchema):
         sa.UniqueConstraint('template_key', name='uq_template_key'),
     )
 
+    serial_no = sa.Column(sa.BigInteger, sa.Sequence('template_registry_serial_seq', schema=DFORM_DEFS_SCHEMA), nullable=False, unique=True)
     template_key = sa.Column(sa.String, nullable=False)
     template_name = sa.Column(sa.String, nullable=False)
     desc = sa.Column(sa.String, nullable=True)
@@ -156,6 +157,7 @@ class FormRegistry(FormRegistrySchema):
         sa.UniqueConstraint('form_key', name='uq_form_def_key'),
     )
 
+    serial_no = sa.Column(sa.BigInteger, sa.Sequence('form_registry_serial_seq', schema=DFORM_DEFS_SCHEMA), nullable=False, unique=True)
     form_key = sa.Column(sa.String, nullable=False)
     title = sa.Column(sa.String, nullable=False)
     desc = sa.Column(sa.String, nullable=True)
@@ -168,6 +170,7 @@ class ElementRegistry(FormRegistrySchema):
         sa.UniqueConstraint('element_key', name='uq_elem_def_key'),
     )
 
+    serial_no = sa.Column(sa.BigInteger, sa.Sequence('element_registry_serial_seq', schema=DFORM_DEFS_SCHEMA), nullable=False, unique=True)
     element_key = sa.Column(sa.String, nullable=False)
     element_label = sa.Column(sa.String, nullable=True)
     element_schema = sa.Column(FluviusJSONField, nullable=False)
@@ -263,10 +266,8 @@ class FormSubmission(FormDataSchema):
 
     document_id = document_fk("form_inst_doc")
     form_key = sa.Column(sa.String, nullable=False)
-    section_key = sa.Column(sa.String, nullable=False)
     title = sa.Column(sa.String, nullable=False)
     desc = sa.Column(sa.String, nullable=True)
-    order = sa.Column(sa.Integer, nullable=False, default=0)
     locked = sa.Column(sa.Boolean, nullable=False, default=False)
     status = sa.Column(sa.String, nullable=False, default="draft")
 
@@ -275,12 +276,12 @@ class FormElement(FormDataSchema):
     """Element instances created from element definitions"""
     __tablename__ = "form_element"
     __table_args__ = (
-        sa.UniqueConstraint('form_submission_id', 'element_name', 'index', name='uq_form_element_name'),
+        sa.UniqueConstraint('form_id', 'elem_id', 'index', name='uq_form_element_name'),
     )
 
-    form_submission_id = form_submission_fk("form_elem_form_sub")
-    element_registry_id = element_registry_fk("form_elem_elem_reg")
-    element_name = sa.Column(sa.String, nullable=False)
+    form_id = form_submission_fk("form_elem_form_sub")
+    elem_id = element_registry_fk("form_elem_elem_reg")
+    field_name = sa.Column(sa.String, nullable=False)
     index = sa.Column(sa.Integer, nullable=False, default=-1)
     required = sa.Column(sa.Boolean, nullable=False, default=False)
     data = sa.Column(FluviusJSONField, nullable=True)

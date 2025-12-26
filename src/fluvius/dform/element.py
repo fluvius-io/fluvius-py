@@ -18,9 +18,13 @@ Usage:
         
 """
 
+import hashlib
+import json
+import uuid
+from typing import Optional, Dict, Any, ClassVar, Type, get_origin, get_args
+
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pg
-from typing import Optional, Dict, Any, ClassVar, Type
 from pydantic import Field
 
 from fluvius.data import DataModel, DomainSchema, FluviusJSONField
@@ -139,6 +143,82 @@ class DataElementModel(DataModel):
 
     class DataProvider(ElementDataProvider):
         pass
+
+    @classmethod
+    def _type_to_string(cls, annotation: Any) -> str:
+        """Convert a type annotation to a stable string representation."""
+        if annotation is None:
+            return "None"
+        
+        # Handle basic types
+        if isinstance(annotation, type):
+            return f"{annotation.__module__}.{annotation.__qualname__}"
+        
+        # Handle generic types (List[str], Optional[int], etc.)
+        origin = get_origin(annotation)
+        if origin is not None:
+            args = get_args(annotation)
+            origin_str = cls._type_to_string(origin)
+            args_str = ", ".join(cls._type_to_string(arg) for arg in args)
+            return f"{origin_str}[{args_str}]"
+        
+        # Fallback to string representation
+        return str(annotation)
+
+    @classmethod
+    def element_signature(cls) -> str:
+        """
+        Generate a stable hash/UUID that is unique to the model's field structure.
+        
+        The signature is based on:
+        - Field names
+        - Field types (annotations)
+        - Field defaults
+        - Field metadata (constraints, validators, etc.)
+        
+        Returns:
+            A UUID string that uniquely identifies this model's schema structure.
+        """
+        fields_info = []
+        
+        for field_name, field_info in sorted(cls.model_fields.items()):
+            field_data = {
+                "name": field_name,
+                "type": cls._type_to_string(field_info.annotation),
+                "is_required": field_info.is_required(),
+            }
+            
+            # Include default value if present (use repr for stable serialization)
+            if field_info.default is not None:
+                field_data["default"] = repr(field_info.default)
+            
+            if field_info.default_factory is not None:
+                # Use the factory's qualified name for stability
+                factory = field_info.default_factory
+                if hasattr(factory, '__qualname__'):
+                    field_data["default_factory"] = factory.__qualname__
+                else:
+                    field_data["default_factory"] = str(factory)
+            
+            # Include field constraints/metadata if present
+            if field_info.title:
+                field_data["title"] = field_info.title
+            if field_info.description:
+                field_data["description"] = field_info.description
+            if field_info.alias:
+                field_data["alias"] = field_info.alias
+            
+            fields_info.append(field_data)
+        
+        # Create a deterministic JSON string
+        canonical_str = json.dumps(fields_info, sort_keys=True, separators=(',', ':'))
+        
+        # Generate SHA-256 hash
+        hash_bytes = hashlib.sha256(canonical_str.encode('utf-8')).digest()
+        
+        # Convert to UUID5-style UUID using the hash (first 16 bytes)
+        # This creates a deterministic UUID from the hash
+        return str(uuid.UUID(bytes=hash_bytes[:16], version=5))
 
 
     # Note: Schema must be set to None for the base class

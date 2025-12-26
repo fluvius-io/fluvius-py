@@ -371,3 +371,4 @@ class TestFormSchemaAPI:
         data = response.json()
         assert data["key"] == "applicant-info"
         assert "schema" in data
+    
