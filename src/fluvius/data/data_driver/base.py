@@ -34,9 +34,9 @@ class DataDriver(object):
             if cls.__data_schema_base__ and issubclass(schema, cls.__data_schema_base__):
                 return schema
 
-            raise DataSchemaError(f'Invalid resource specification: {schema}')
+            raise DataSchemaError('E00.110', f'Invalid resource specification: {schema}')
         except KeyError:
-            raise DataSchemaError(f'Data schema is not registered: {schema}')
+            raise DataSchemaError('E00.111', f'Data schema is not registered: {schema}')
 
     @classmethod
     def register_schema(cls, data_schema=None, /, name=None):
