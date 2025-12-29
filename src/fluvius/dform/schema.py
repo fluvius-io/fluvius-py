@@ -261,11 +261,11 @@ class FormSubmission(FormDataSchema):
     """Form instances created from form definitions"""
     __tablename__ = "form_submission"
     __table_args__ = (
-        sa.UniqueConstraint('document_id', 'form_key', name='uq_form_inst_key'),
+        sa.UniqueConstraint('document_id', 'form_reg_id', name='uq_form_inst_key'),
     )
 
     document_id = document_fk("form_inst_doc")
-    form_key = sa.Column(sa.String, nullable=False)
+    form_reg_id = form_registry_fk("form_inst_form_reg")
     title = sa.Column(sa.String, nullable=False)
     desc = sa.Column(sa.String, nullable=True)
     order = sa.Column(sa.Integer, nullable=False, default=0)
@@ -277,12 +277,12 @@ class FormElement(FormDataSchema):
     """Element instances created from element definitions"""
     __tablename__ = "form_element"
     __table_args__ = (
-        sa.UniqueConstraint('form_submission_id', 'element_registry_id', 'index', name='uq_form_element_name'),
+        sa.UniqueConstraint('form_id', 'elem_reg_id', 'index', name='uq_form_element_name'),
     )
 
-    form_submission_id = form_submission_fk("form_elem_form_sub")
-    element_registry_id = element_registry_fk("form_elem_elem_reg")
-    element_name = sa.Column(sa.String, nullable=False)
+    form_id = form_submission_fk("form_elem_form_sub")
+    elem_reg_id = element_registry_fk("form_elem_elem_reg")
+    elem_name = sa.Column(sa.String, nullable=False)
     index = sa.Column(sa.Integer, nullable=False, default=-1)
     required = sa.Column(sa.Boolean, nullable=False, default=False)
     data = sa.Column(FluviusJSONField, nullable=True)

@@ -9,7 +9,7 @@ from ..helper import async_command, import_modules
 @click.option('--repositories', '-r', type=str, multiple=True,
               help='Workflow repository to import definitions from')
 @async_command
-async def import_definitions(force: bool, repositories: list[str]):
+async def register(force: bool, repositories: list[str]):
     """Import workflow definitions from registered workflows into the database.
     
     This command extracts metadata from all registered workflows and stores
@@ -17,9 +17,9 @@ async def import_definitions(force: bool, repositories: list[str]):
     definitions. Use --force to update existing ones.
     
     Example:
-        fluvius wf import-definitions
-        fluvius wf import-definitions --force
-        fluvius wf import-definitions --repositories my_app.workflow_a --repositories my_app.workflow_b
+        fluvius wf register
+        fluvius wf register --force
+        fluvius wf register --repositories my_app.workflow_a --repositories my_app.workflow_b
     """
     from fluvius.navis.engine.manager import WorkflowManager
     from fluvius.navis.model import WorkflowDataManager

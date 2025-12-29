@@ -11,12 +11,12 @@ from fluvius.dform.schema import ElementRegistry, FormRegistry
 from fluvius.manager.db.base import convert_to_async_dsn, async_command
 from fluvius.manager.helper import import_modules
 
-@click.command("register-all")
+@click.command("register")
 @click.option('--repositories', '-r', type=str, multiple=True,
               help='Repository modules to import (e.g. myapp.forms)')
 @click.option('--update', is_flag=True, help='Update existing entries')
 @async_command
-async def register_all(repositories, update):
+async def register(repositories, update):
     """Register all defined elements and forms in the database."""
     
     # Import repositories

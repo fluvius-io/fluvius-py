@@ -102,7 +102,7 @@ async def test_query_resources(domain, auth_ctx):
             "form_submission",
             _id=sub_id,
             document_id=doc_id,
-            form_key=form_def.form_key,
+            form_reg_id=form_id,
             title="My Submission",
             status="draft"
         )
@@ -113,9 +113,9 @@ async def test_query_resources(domain, auth_ctx):
         field = domain.statemgr.create(
             "form_element",
             _id=field_id,
-            form_submission_id=sub_id,
-            element_registry_id=element_id,
-            element_name="field_1",
+            form_id=sub_id,
+            elem_reg_id=element_id,
+            elem_name="field_1",
             data={"value": "test data"}
         )
         await domain.statemgr.insert(field)
@@ -171,8 +171,8 @@ async def test_query_resources(domain, auth_ctx):
     assert res[0].title == "My Submission"
     
     # 8. Form Element
-    fe_query = FrontendQuery(user_query={'form_submission_id': str(sub_id)})
+    fe_query = FrontendQuery(user_query={'form_id': str(sub_id)})
     res, _ = await qm.query_resource(auth_ctx, 'form-element', fe_query)
     assert len(res) >= 1
-    assert res[0].element_name == "field_1"
+    assert res[0].elem_name == "field_1"
     assert res[0].data['value'] == "test data"

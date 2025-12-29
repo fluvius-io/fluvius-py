@@ -164,7 +164,7 @@ class FormSubmissionQuery(DomainQueryResource):
 
     id: UUID_TYPE = PrimaryID("Form Submission ID")
     document_id: UUID_TYPE = UUIDField("Document ID")
-    form_key: str = StringField("Form Key")
+    form_reg_id: UUID_TYPE = UUIDField("Form Registry ID")
     title: str = StringField("Title")
     desc: str = StringField("Description")
     order: int = IntegerField("Order")
@@ -182,9 +182,9 @@ class FormElementQuery(DomainQueryResource):
         backend_model = "form_element"
 
     id: UUID_TYPE = PrimaryID("Form Element ID")
-    form_submission_id: UUID_TYPE = UUIDField("Form Submission ID")
-    element_registry_id: UUID_TYPE = UUIDField("Element Registry ID")
-    element_name: str = StringField("Element Name")
+    form_id: UUID_TYPE = UUIDField("Form Submission ID")
+    elem_reg_id: UUID_TYPE = UUIDField("Element Registry ID")
+    elem_name: str = StringField("Element Name")
     index: int = IntegerField("Index")
     required: bool = BooleanField("Required")
     data: dict = DictField("Data", hidden=True)
