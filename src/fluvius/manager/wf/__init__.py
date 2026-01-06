@@ -3,7 +3,7 @@
 import click
 
 # Import and register commands
-from .import_definitions import import_definitions
+from .register import register
 
 
 @click.group()
@@ -11,5 +11,5 @@ def wf_commands():
     """Workflow management commands."""
     pass
 
-wf_commands.add_command(import_definitions)
+wf_commands.add_command(register)
 

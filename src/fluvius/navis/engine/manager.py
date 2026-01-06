@@ -160,6 +160,9 @@ class WorkflowManager(object):
             'add-step': self._persist_add_step,
             'update-step': self._persist_update_step,
             'set-memory': self._persist_set_memory,
+            'set-params': self._persist_set_params,
+            'set-output': self._persist_set_output,
+            'set-step-memory': self._persist_set_step_memory,
             'add-participant': self._persist_add_participant,
             'del-participant': self._persist_del_participant,
             'add-stage': self._persist_add_stage
@@ -217,16 +220,37 @@ class WorkflowManager(object):
 
     async def _persist_update_step(self, tx, wf_mut: MutationEnvelop):
         """Update an existing step record."""
-        updates = wf_mut.mutation.model_dump(exclude_none=True)            
+        step_id = wf_mut.mutation.step_id
+        updates = wf_mut.mutation.model_dump(exclude_none=True, exclude={'step_id'})            
         if updates:
-            await tx.update_data('workflow_step', wf_mut.step_id, **updates)
+            await tx.update_data('workflow_step', step_id, **updates)
 
     async def _persist_set_memory(self, tx, wf_mut: MutationEnvelop):
-        """Set workflow or step memory records."""
+        """Set workflow memory records."""
         values = wf_mut.mutation.model_dump(exclude_none=True)
         values['_id'] = wf_mut.workflow_id
         values['workflow_id'] = wf_mut.workflow_id
-        await tx.upsert_data('workflow_memory', values)
+        await tx.upsert_data('workflow_data', values)
+
+    async def _persist_set_params(self, tx, wf_mut: MutationEnvelop):
+        """Set workflow params records."""
+        values = wf_mut.mutation.model_dump(exclude_none=True)
+        values['_id'] = wf_mut.workflow_id
+        values['workflow_id'] = wf_mut.workflow_id
+        await tx.upsert_data('workflow_data', values)
+
+    async def _persist_set_output(self, tx, wf_mut: MutationEnvelop):
+        """Set workflow output records."""
+        values = wf_mut.mutation.model_dump(exclude_none=True)
+        values['_id'] = wf_mut.workflow_id
+        values['workflow_id'] = wf_mut.workflow_id
+        await tx.upsert_data('workflow_data', values)
+
+    async def _persist_set_step_memory(self, tx, wf_mut: MutationEnvelop):
+        """Set step memory by updating the step record."""
+        step_id = wf_mut.mutation.step_id
+        memory = wf_mut.mutation.memory
+        await tx.update_data('workflow_step', step_id, memory=memory)
 
     async def _persist_add_participant(self, tx, wf_mut: MutationEnvelop):
         """Add a participant record."""

@@ -273,7 +273,7 @@ class WorkflowRunner(object):
             order=self._counter
         ))
 
-    def mutate(self, mut_name, _step_id=None, **kwargs):
+    def mutate(self, mut_name, **kwargs):
         if self._transaction_id is None:
             raise WorkflowExecutionError('P00.010', f'Mutation [{mut_name}] generated outside of a transaction.')
 
@@ -290,7 +290,6 @@ class WorkflowRunner(object):
             workflow_id=self._id,
             action=act_ctx.action_name,
             mutation=mut_cls(**kwargs),
-            step_id=act_ctx.step_id,
             order=self._counter
         )
         self._mut_queue.put(mutation)
@@ -358,7 +357,7 @@ class WorkflowRunner(object):
             kwargs['status'] = StepStatus.ACTIVE
 
         step._data = step._data.set(**kwargs)
-        self.mutate('update-step', **kwargs)
+        self.mutate('update-step', step_id=step.id, **kwargs)
         return kwargs
 
     def _update_workflow(self, **kwargs):
@@ -493,14 +492,14 @@ class WorkflowRunner(object):
         sid = str(_step_id)
         self._stepsm.setdefault(sid, {})
         self._stepsm[sid].update(kwargs)
-        self.mutate('set-memory', stepsm=self._stepsm)
+        self.mutate('set-step-memory', step_id=_step_id, memory=self._stepsm[sid])
     
     def _set_output(self, **kwargs):
         if not kwargs:
             return
 
         self._output.update(kwargs)
-        self.mutate('set-memory', output=self._output)
+        self.mutate('set-output', output=self._output)
     
     def _get_memory(self, _step_id=None):
         data = {} | self._memory
@@ -671,7 +670,7 @@ class WorkflowRunner(object):
     
     def _set_params(self, params):
         self._params = params
-        self.mutate('set-memory', params=params)
+        self.mutate('set-params', params=params)
     
     def _add_stage(self, stage):
         self.mutate('add-stage', data=stage)

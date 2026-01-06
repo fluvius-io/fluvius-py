@@ -5,7 +5,7 @@ from fluvius.data import UUID_TYPE, DataModel
 from .domain import WorkflowDomain
 from ..model import WorkflowDataManager
 from ..status import WorkflowStatus, StepStatus
-from ..viewdef import WorkflowBaseSchema
+from .. import viewdef
 
 class WorkflowScope(DataModel):
     __default_key__ = 'workflow_id'

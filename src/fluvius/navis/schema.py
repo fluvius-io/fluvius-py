@@ -73,6 +73,7 @@ class WorkflowStep(WorkflowBaseSchema):
     stm_state = sa.Column(sa.String, nullable=False)
     stm_label = sa.Column(sa.String, nullable=True)
     src_step = sa.Column(pg.UUID, nullable=True)
+    memory = sa.Column(FluviusJSONField, nullable=True)
     ts_due = sa.Column(sa.DateTime(timezone=True), nullable=True)
     ts_start = sa.Column(sa.DateTime(timezone=True), nullable=True)
     ts_finish = sa.Column(sa.DateTime(timezone=True), nullable=True)
@@ -99,11 +100,10 @@ class WorkflowParticipant(WorkflowBaseSchema):
     role = sa.Column(sa.String, nullable=False)
 
 
-class WorkflowMemory(WorkflowBaseSchema):
-    __tablename__ = "workflow_memory"
+class WorkflowData(WorkflowBaseSchema):
+    __tablename__ = "workflow_data"
 
     workflow_id = workflow_fk("memory_workflow_id", unique=True)
-    stepsm = sa.Column(FluviusJSONField, nullable=True)
     params = sa.Column(FluviusJSONField, nullable=True)
     memory = sa.Column(FluviusJSONField, nullable=True)
     output = sa.Column(FluviusJSONField, nullable=True)
@@ -178,10 +178,15 @@ create_view_workflow = sa.DDL(f'''
 CREATE OR REPLACE VIEW "{DB_SCHEMA}"."_workflow" AS
 SELECT
   wf.*,
-  wm.stepsm,
   wm.params,
   wm.memory,
   wm.output,
+  COALESCE(
+    (SELECT jsonb_object_agg(st2._id::text, st2.memory)
+     FROM "{DB_SCHEMA}"."workflow_step" st2
+     WHERE st2.workflow_id = wf._id AND st2.memory IS NOT NULL),
+    '{{}}'::jsonb
+  ) AS stepsm,
   jsonb_agg(
     DISTINCT jsonb_build_object(
       '_id', ws._id,
@@ -206,7 +211,8 @@ SELECT
           'selector', st.selector,
           'stm_state', st.stm_state,
           'stm_label', st.stm_label,
-          'status', st.status
+          'status', st.status,
+          'memory', st.memory
         )
       ) FILTER (WHERE st._id IS NOT NULL),
       '[]'::jsonb
@@ -214,7 +220,7 @@ SELECT
 FROM "{DB_SCHEMA}"."workflow" wf
 LEFT JOIN "{DB_SCHEMA}"."workflow_stage" ws ON ws.workflow_id = wf._id
 LEFT JOIN "{DB_SCHEMA}"."workflow_step" st ON st.workflow_id = wf._id
-LEFT JOIN "{DB_SCHEMA}"."workflow_memory" wm ON wm._id = wf._id
+LEFT JOIN "{DB_SCHEMA}"."workflow_data" wm ON wm.workflow_id = wf._id
 GROUP BY wf._id, wm._id;
 ''')
 
