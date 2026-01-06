@@ -152,8 +152,8 @@ class FluviusWorker(object):
         self.ctx = {"queue_name": self.__queue_name__, **self._downstream_clients, "worker_id": UUID_GENR()}
 
     def run(self, *args, **kwargs):
-        worker = arq.Worker(ctx=self.ctx, **self.build_settings(**kwargs))
-        return worker.run(*args, **kwargs)
+        self._worker = arq.Worker(ctx=self.ctx, **self.build_settings(**kwargs))
+        return self._worker.run(*args, **kwargs)
 
     def _gather_exports(self):
         functions = []
@@ -403,9 +403,9 @@ class FluviusWorker(object):
             self._handle,
             status=WorkerStatus.STOPPED,
             stop_time=timestamp(),
-            jobs_complete = self.jobs_complete,
-            jobs_failed = self.jobs_failed,
-            jobs_retried = self.jobs_retried,
+            jobs_complete = self._worker.jobs_complete,
+            jobs_failed = self._worker.jobs_failed,
+            jobs_retried = self._worker.jobs_retried,
             jobs_queued = len(self.tasks)
         )
 
@@ -422,9 +422,9 @@ class FluviusWorker(object):
                 self._handle,
                 status=WorkerStatus.RUNNING,
                 heart_beat=timestamp(),
-                jobs_complete = self.jobs_complete,
-                jobs_failed = self.jobs_failed,
-                jobs_retried = self.jobs_retried,
+                jobs_complete = self._worker.jobs_complete,
+                jobs_failed = self._worker.jobs_failed,
+                jobs_retried = self._worker.jobs_retried,
                 jobs_queued = len(self.tasks)
 
             )

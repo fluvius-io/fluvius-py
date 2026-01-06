@@ -26,11 +26,6 @@ class MediaDataConnector(SqlaDriver):
     __db_dsn__ = config.MEDIA_DB_DSN
 
 
-class MediaManager(DataAccessManager):
-    __connector__ = MediaDataConnector
-    __automodel__ = True
-
-
 class MediaSchema(MediaDataConnector.__data_schema_base__):
     __abstract__ = True
     __table_args__ = {'schema': config.MEDIA_DB_SCHEMA}
@@ -56,6 +51,11 @@ class MediaEntry(MediaSchema):
     xattrs = sa.Column(sa.String(256))
     cdn_exp = sa.Column(sa.DateTime(timezone=True))
     cdn_url = sa.Column(sa.String(1024))
+
+
+class MediaManager(DataAccessManager):
+    __connector__ = MediaDataConnector
+    __automodel__ = True
 
 
 # class MediaFilesystem(MediaSchema):

@@ -177,7 +177,7 @@ class QueryResource(BaseModel):
 
     @classmethod
     def base_query(self, context, scope):
-        return None
+        return scope
 
 
     def model_dump(self, **kwargs):

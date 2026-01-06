@@ -6,6 +6,7 @@ from fluvius.data import exceptions, UUID_GENF, UUID_TYPE
 from fluvius.helper.timeutil import timestamp
 from fluvius.tracker import SQLTrackerManager, JobStatus, WorkerStatus, config as tracker_config
 from fluvius.error import BadRequestError
+from fluvius.error.tracker import ErrorTracker
 
 from . import config, logger
 
@@ -22,6 +23,12 @@ def format_uuid(_id):
 
 
 class FluviusWorkerTracker(SQLTrackerManager):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if config.ERROR_TRACKING_PROVIDER:
+            self.error_tracker = ErrorTracker.get_tracker(config.ERROR_TRACKING_PROVIDER)
+
     def progress_updater(self, job_handle):
         async def _update_progress(progress: float, message: str):
             return await self.update_entry(
@@ -62,7 +69,7 @@ class FluviusWorkerTracker(SQLTrackerManager):
                     job_progress=0,
                     job_status=JobStatus.RECEIVED,
                     job_try=context.job_try,
-                    queue_name=context.app.queue_name,
+                    queue_name=context.queue_name,
                     score=context.score,
                     start_time=timestamp(),
                     worker_id=context.worker_id,
@@ -88,6 +95,7 @@ class FluviusWorkerTracker(SQLTrackerManager):
                         err_message=str(e if not hasattr(e, 'message') else e.message)
                     )
                     logger.info('Job cancelled but status not updated correctly.')
+                self.error_tracker.capture_exception(e)
                 raise
             except (TimeoutError, Exception) as e:
                 tb = traceback.format_exc() if COLLECT_TRACEBACK else None
@@ -99,6 +107,7 @@ class FluviusWorkerTracker(SQLTrackerManager):
                     err_message=str(e if not hasattr(e, 'message') else e.message),
                     err_trace=tb
                 )
+                self.error_tracker.capture_exception(e)
                 raise
 
             await self.update_entry(job_handle,

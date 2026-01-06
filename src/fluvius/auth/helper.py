@@ -1,7 +1,7 @@
 import base64
 import json
 
-import jwt
+from authlib.jose import jwt
 
 from fluvius.error import UnauthorizedError
 

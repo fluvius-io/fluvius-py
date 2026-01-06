@@ -364,7 +364,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             return command
 
         cmdc = self.lookup_command(command.command)
-        if not self.policymgr or not cmdc.Meta.policy_required:
+        if not self.policymgr or not cmdc.Meta.policy_required or not ctx.authorization:
             return command
 
         rsid = str(command.identifier)

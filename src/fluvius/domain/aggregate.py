@@ -92,8 +92,13 @@ class Aggregate(object):
         self.statemgr = domain.statemgr
 
     def __init_subclass__(cls):
+        # Collect all actions from the class and its base classes
+        # cls.__dict__ don't include base class methods
+
         cls._actions = tuple(
-            name for name, method in cls.__dict__.items() 
+            name
+            for base in cls.__mro__
+            for name, method in base.__dict__.items()
             if hasattr(method, '__domain_event__')
         )
 

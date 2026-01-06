@@ -34,9 +34,9 @@ def __closure__():
         def get_engine(self, dsn, key=None, **cfg):
             key = key or dsn
             if key not in _pg_engines:
-                pool_size = cfg.get("pool_size", config.DB_POOL_SIZE)
-                pool_timeout = cfg.get("pool_size", config.DB_POOL_TIMEOUT)
-                max_overflow = cfg.get("max_overflow", config.DB_MAX_OVERFLOW)
+                pool_size = cfg.get("pool_size", config.DB_CONFIG.get("pool_size"))
+                pool_timeout = cfg.get("pool_timeout", config.DB_CONFIG.get("pool_timeout"))
+                max_overflow = cfg.get("max_overflow", config.DB_CONFIG.get("max_overflow"))
 
                 engine_options = dict(
                     pool_size=pool_size,
