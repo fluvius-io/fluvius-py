@@ -337,7 +337,7 @@ class WorkflowRunner(object):
             updates['progress'] = progress
 
         if updates:
-            self._update_workflow(**updates)
+            self._set_state(**updates)
         
         return updates
 
@@ -360,14 +360,14 @@ class WorkflowRunner(object):
         self.mutate('update-step', step_id=step.id, **kwargs)
         return kwargs
 
-    def _update_workflow(self, **kwargs):
+    def _set_state(self, **kwargs):
         new_status = kwargs.get('status')
         # note: new status and existing status
         if new_status and self.status not in (WorkflowStatus.ACTIVE, WorkflowStatus.NEW):
             raise WorkflowExecutionError('P00.006', f'Workflow at [{self.status}] is not allowed to be updated.')
 
         self._workflow = self._workflow.set(**kwargs)
-        self.mutate('update-workflow', **kwargs)
+        self.mutate('set-state', **kwargs)
         return kwargs
 
     def run_hook(self, handler_func, wf_context, *args, **kwargs):
@@ -557,7 +557,7 @@ class WorkflowRunner(object):
 
     @workflow_action('start', allow_statuses=WorkflowStatus.NEW, external=True)
     def start(self):
-        self._update_workflow(status=WorkflowStatus.ACTIVE, ts_start=timestamp())
+        self._set_state(status=WorkflowStatus.ACTIVE, ts_start=timestamp())
         return self
 
     @workflow_action('trigger', allow_statuses=WorkflowStatus._ACTIVE, external=True)
@@ -578,22 +578,22 @@ class WorkflowRunner(object):
 
     @workflow_action('cancel', allow_statuses=WorkflowStatus._EDITABLE, hook_name='cancelled')
     def cancel_workflow(self):
-        self._update_workflow(status=WorkflowStatus.CANCELLED)
+        self._set_state(status=WorkflowStatus.CANCELLED)
         return self
 
     @workflow_action('abort', allow_statuses=WorkflowStatus.DEGRADED, hook_name='aborted')
     def abort_workflow(self):
-        self._update_workflow(status=WorkflowStatus.FAILED)
+        self._set_state(status=WorkflowStatus.FAILED)
         return self
     
     @workflow_action('pause', allow_statuses=WorkflowStatus.ACTIVE, hook_name='paused')
     def pause_workflow(self):
-        self._update_workflow(status=WorkflowStatus.PAUSED, paused=self.status)
+        self._set_state(status=WorkflowStatus.PAUSED, paused=self.status)
         return self
 
     @workflow_action('resume', allow_statuses=WorkflowStatus.PAUSED, hook_name='resumed')
     def resume_workflow(self):
-        self._update_workflow(status=self._workflow.paused, paused=None)
+        self._set_state(status=self._workflow.paused, paused=None)
         return self
 
     @workflow_action('add_task', allow_statuses=WorkflowStatus._ACTIVE, hook_name='task_added')
@@ -622,7 +622,7 @@ class WorkflowRunner(object):
         return self
 
     def update_workflow(self, **kwargs):
-        self._update_workflow(**kwargs)
+        self._set_state(**kwargs)
         return self
 
     @workflow_action('add_step', allow_statuses=WorkflowStatus._ACTIVE)

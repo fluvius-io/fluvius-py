@@ -32,14 +32,13 @@ class UpdateStep(WorkflowMutation):
     ts_transit: Optional[datetime] = None
 
 
-class UpdateWorkflow(WorkflowMutation):
+class SetState(WorkflowMutation):
     status: Optional[WorkflowStatus] = None
+    paused: Optional[WorkflowStatus] = None
     progress: Optional[float] = None
-    etag: Optional[str] = None
     ts_start: Optional[datetime] = None
     ts_expire: Optional[datetime] = None
     ts_finish: Optional[datetime] = None
-    ts_transit: Optional[datetime] = None
 
 
 class AddStep(WorkflowMutation):

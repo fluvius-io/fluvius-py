@@ -47,12 +47,6 @@ class WorkflowSchema(WorkflowBaseSchema):
     title = sa.Column(sa.String, nullable=True)
     desc = sa.Column(sa.String, nullable=True)
     note = sa.Column(sa.String, nullable=True)
-    status = sa.Column(sa.Enum(WorkflowStatus, name="workflow_status"), nullable=False)
-    paused = sa.Column(sa.Enum(WorkflowStatus, name="workflow_status"), nullable=True)
-    progress = sa.Column(sa.Float, default=0.0)
-    ts_start = sa.Column(sa.DateTime(timezone=True), nullable=True)
-    ts_expire = sa.Column(sa.DateTime(timezone=True), nullable=True)
-    ts_finish = sa.Column(sa.DateTime(timezone=True), nullable=True)
     sys_tag = sa.Column(pg.ARRAY(sa.String), nullable=True)
     usr_tag = sa.Column(pg.ARRAY(sa.String), nullable=True)
 
@@ -100,10 +94,16 @@ class WorkflowParticipant(WorkflowBaseSchema):
     role = sa.Column(sa.String, nullable=False)
 
 
-class WorkflowData(WorkflowBaseSchema):
-    __tablename__ = "workflow_data"
+class WorkflowState(WorkflowBaseSchema):
+    __tablename__ = "workflow_state"
 
-    workflow_id = workflow_fk("memory_workflow_id", unique=True)
+    workflow_id = workflow_fk("state_workflow_id", unique=True)
+    status = sa.Column(sa.Enum(WorkflowStatus, name="workflow_status"), nullable=False)
+    paused = sa.Column(sa.Enum(WorkflowStatus, name="workflow_status"), nullable=True)
+    progress = sa.Column(sa.Float, default=0.0)
+    ts_start = sa.Column(sa.DateTime(timezone=True), nullable=True)
+    ts_expire = sa.Column(sa.DateTime(timezone=True), nullable=True)
+    ts_finish = sa.Column(sa.DateTime(timezone=True), nullable=True)
     params = sa.Column(FluviusJSONField, nullable=True)
     memory = sa.Column(FluviusJSONField, nullable=True)
     output = sa.Column(FluviusJSONField, nullable=True)
@@ -178,6 +178,12 @@ create_view_workflow = sa.DDL(f'''
 CREATE OR REPLACE VIEW "{DB_SCHEMA}"."_workflow" AS
 SELECT
   wf.*,
+  wm.status,
+  wm.paused,
+  wm.progress,
+  wm.ts_start,
+  wm.ts_expire,
+  wm.ts_finish,
   wm.params,
   wm.memory,
   wm.output,
@@ -220,7 +226,7 @@ SELECT
 FROM "{DB_SCHEMA}"."workflow" wf
 LEFT JOIN "{DB_SCHEMA}"."workflow_stage" ws ON ws.workflow_id = wf._id
 LEFT JOIN "{DB_SCHEMA}"."workflow_step" st ON st.workflow_id = wf._id
-LEFT JOIN "{DB_SCHEMA}"."workflow_data" wm ON wm.workflow_id = wf._id
+LEFT JOIN "{DB_SCHEMA}"."workflow_state" wm ON wm.workflow_id = wf._id
 GROUP BY wf._id, wm._id;
 ''')
 
