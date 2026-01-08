@@ -21,12 +21,12 @@ def extract_jwt_key(jwks_keyset, token):
     except StopIteration:
         raise UnauthorizedError('A00.001', f'Public key not found for kid: {kid}')
 
-async def decode_ac_token(jwks_keyset, ac_token: str):
+def decode_ac_token(jwks_keyset, ac_token: str):
     # This will parse the JWT and extract both the header and payload
     key = extract_jwt_key(jwks_keyset, ac_token)
     return jwt.decode(ac_token, key)
 
-async def decode_id_token(jwks_keyset, id_token: str, issuer: str, audience: str):
+def decode_id_token(jwks_keyset, id_token: str, issuer: str, audience: str):
     key = extract_jwt_key(jwks_keyset, id_token)
 
     # Decode and validate
