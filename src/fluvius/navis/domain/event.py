@@ -39,34 +39,33 @@ class WorkflowEventHandler(EventHandler):
         
     
     async def process_event(self, event, statemgr):
-        logger.warning(f"event data process: {event.data}")
-        logger.warning(f"event name process: {event.event}")
-        logger.warning(f"domain: {self._domain}")
-
         if not event.data:
             return
-        if isinstance(event.data, dict):
-            data = event.data
-        else:
-            data = event.data.model_dump()
 
-        event_dict = data.get("event_data", {}) or {}
-        wfdef_key = data.get("wfdef_key")
-        workflow_id = data.get("workflow_id")
+        data = event.data if isinstance(event.data, dict) else event.data.model_dump()
 
-        evt_data = SimpleNamespace(**event_dict)
-
-        logger.warning(f"wfdef_key: {wfdef_key}, workflow_id: {workflow_id}")
-        
-        if not (wfdef_key and workflow_id):
+        resource_id = data.get("document_id")
+        if not resource_id:
             return
 
-        async with self.workflow_manager._datamgr.transaction():
-            wf_instance = await self.workflow_manager.load_workflow_by_id(
-                wfdef_key, workflow_id
-            )
-            logger.warning(f"wf_instance: {wf_instance}")
-            
-            # with wf_instance.transaction():
-            async for wf_instance in self.workflow_manager.process_event(event.event, evt_data):
-                await self.workflow_manager.commit_workflow(wf_instance)
+        evt_data = SimpleNamespace(
+            resource_name="document",
+            resource_id=resource_id,
+            step_selector=data.get("form_submission_id"),
+        )
+
+        wm = self.workflow_manager
+
+        async with wm._datamgr.transaction():
+            wf = await wm.load_workflow_by_resource("document", resource_id)
+
+            router = wm.__router__
+            wf_key = wf.key
+            event_name = event.event
+
+            handlers = router.ROUTING_TABLE.get(event_name)
+            if not handlers or not any(h.wfdef_key == wf_key for h in handlers):
+                return
+
+            async for updated_wf in wm.process_event(event_name, evt_data):
+                await wm.commit_workflow(updated_wf)

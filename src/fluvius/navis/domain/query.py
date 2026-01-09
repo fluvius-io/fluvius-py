@@ -11,6 +11,9 @@ class WorkflowScope(DataModel):
     __default_key__ = 'workflow_id'
     workflow_id: UUID_TYPE
 
+class StepScope(DataModel):
+    __default_key__ = 'step_id'
+    step_id: UUID_TYPE
 
 class WorkflowQueryManager(DomainQueryManager):
     """Query manager for workflow domain"""
@@ -68,6 +71,7 @@ class WorkflowStepQuery(DomainQueryResource):
     src_step: UUID_TYPE = UUIDField("Origin Step ID")
     ts_start: str = DatetimeField("Start Time")
     ts_finish: str = DatetimeField("Finish Time")
+    memory: dict = DictField("Step Memory", hidden=True)
 
 
 @resource('workflow-participant')
