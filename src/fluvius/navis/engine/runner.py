@@ -598,14 +598,19 @@ class WorkflowRunner(object):
 
     @workflow_action('add_task', allow_statuses=WorkflowStatus._ACTIVE, hook_name='task_added')
     def add_task(self, /, src_step, task_key, **kwargs):
+        from fluvius.navis.engine.datadef import WorkflowTask
         task_id = UUID_GENF(task_key, self._id)
-        task = {
-            'id': task_id,
-            'src_step': src_step,
-            'title': kwargs.get('title', ''),
-            'status': StepStatus.ACTIVE,
-            'workflow_id': self._id,
-        }
+        task = WorkflowTask(
+            id=task_id,
+            workflow_id=self.id,
+            task_name= task_key,
+            step_id=str(src_step),
+            task_key=task_key,
+            name=kwargs.get('name'),
+            desc=kwargs.get('desc'),
+            resource=kwargs.get('resource'),
+            resource_id=kwargs.get('resource_id')
+        )
         self.mutate('add-task', task=task)
         return self
 

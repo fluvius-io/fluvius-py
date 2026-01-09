@@ -48,7 +48,7 @@ class FastAPIDomainManager(DomainManager):
             return {
                 "id": domain.__namespace__,
                 "name": domain.__namespace__,
-                "description": domain.Meta.desc,
+                "description": domain.Meta.description,
                 "externalDocs": {
                     "description": "Metadata",
                     "url": f"http://localhost:8000{metadata_uri}"

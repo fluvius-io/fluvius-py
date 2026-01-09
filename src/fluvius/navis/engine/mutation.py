@@ -1,4 +1,4 @@
-from .datadef import WorkflowDataModel, WorkflowStep, WorkflowData, WorkflowParticipant, WorkflowStatus, StepStatus, WorkflowStage
+from .datadef import WorkflowDataModel, WorkflowStep, WorkflowData, WorkflowParticipant, WorkflowStatus, StepStatus, WorkflowStage, WorkflowTask
 from datetime import datetime
 from typing import Optional
 from pydantic import Field, field_serializer, ConfigDict
@@ -82,6 +82,8 @@ class DelParticipant(WorkflowMutation):
 class AddStage(WorkflowMutation):
     data: WorkflowStage
 
+class AddTask(WorkflowMutation):
+    task: WorkflowTask
 
 class MutationEnvelop(WorkflowDataModel):
     name: str

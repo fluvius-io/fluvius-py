@@ -28,7 +28,14 @@ class WorkflowActivity(WorkflowDataModel):
 
 
 class WorkflowTask(WorkflowDataModel):
+    id: UUID_TYPE
     workflow_id: UUID_TYPE
+    step_id: str
+    task_name: str
+    name: Optional[str] = None
+    desc: Optional[str] = None
+    resource: Optional[str] = None
+    resource_id: Optional[UUID_TYPE] = None
 
 
 class WorkflowRoles(WorkflowDataModel):
