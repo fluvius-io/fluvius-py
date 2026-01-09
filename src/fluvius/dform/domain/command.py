@@ -11,6 +11,7 @@ from .datadef import (
     # Form Commands
     InitializeFormData, UpdateFormData, RemoveFormData, SubmitFormData,
 )
+from fluvius.domain import logger
 
 Command = FormDomain.Command
 
@@ -94,18 +95,7 @@ class CreateDocument(Command):
 
     async def _process(self, agg, stm, payload):
         document = await agg.create_document(payload)
-        document_dict = {
-            "_id": str(document._id),
-            "template_id": str(document.template_id),
-            "document_key": document.document_key,
-            "document_name": document.document_name,
-            "desc": document.desc,
-            "version": document.version,
-            "organization_id": str(document.organization_id) if document.organization_id else None,
-            "resource_id": str(document.resource_id) if document.resource_id else None,
-            "resource_name": document.resource_name,
-        }
-        yield agg.create_response(document_dict, _type="document-response")
+        yield agg.create_response(serialize_mapping(document), _type="document-response")
 
 
 class UpdateDocument(Command):

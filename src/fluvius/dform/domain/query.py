@@ -17,8 +17,8 @@ class DocumentScope(DataModel):
 
 
 class FormSubmissionScope(DataModel):
-    __default_key__ = 'form_submission_id'
-    form_submission_id: UUID_TYPE
+    __default_key__ = 'form_id'
+    form_id: UUID_TYPE
 
 
 class FormQueryManager(DomainQueryManager):

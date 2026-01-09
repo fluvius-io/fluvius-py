@@ -599,7 +599,7 @@ class FormAggregate(Aggregate):
         # Check if form with same key already exists in document
         existing = await self.statemgr.query(
             "form_submission",
-            where={"document_id": document._id, "form_key": data.form_key},
+            where={"document_id": document._id, "form_reg_id": data.form_registry_id},
             limit=1
         )
         if existing:
@@ -626,7 +626,8 @@ class FormAggregate(Aggregate):
             "form_submission",
             _id=form_submission_id,
             document_id=document._id,
-            form_key=data.form_key,
+            # form_key=data.form_key,
+            form_reg_id=data.form_registry_id,
             title=data.title,
             desc=data.desc,
             order=order,
@@ -708,7 +709,8 @@ class FormAggregate(Aggregate):
         return {
             "form_submission_id": str(form_submission_id),
             "document_id": str(document._id),
-            "form_key": form_submission.form_key,
+            # "form_key": form_submission.form_key,
+            "form_reg_id": form_submission.form_reg_id,
             "title": form_submission.title,
             "elements": created_elements,
             "status": "initialized",
@@ -765,8 +767,8 @@ class FormAggregate(Aggregate):
             existing_elements = await self.statemgr.query(
                 "form_element",
                 where={
-                    "form_submission_id": form_submission._id,
-                    "element_name": element_name,
+                    "form_id": form_submission._id,
+                    "elem_name": element_name,
                 },
                 limit=1
             )
@@ -835,8 +837,8 @@ class FormAggregate(Aggregate):
         )
         
         return {
+            "document_id": str(form_submission.document_id),
             "form_submission_id": str(form_submission._id),
-            "form_key": form_submission.form_key,
             "elements": processed_elements,
             "status": data.status,
             "locked": should_lock,
