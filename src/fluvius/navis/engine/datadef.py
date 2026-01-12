@@ -5,7 +5,7 @@ from enum import Enum
 from types import SimpleNamespace
 from typing import List, Dict, Optional, Callable
 from fluvius.data import DataModel, Field, UUID_GENF, UUID_GENR, UUID_TYPE
-from ..status import WorkflowStatus, StepStatus, StageStatus    
+from ..status import WorkflowStatus, StepStatus, StageStatus, TaskStatus
 from ..model import WorkflowDataManager
 
 RX_STATE = re.compile(r'^[A-Z][A-Z\d_]*$')
@@ -28,14 +28,12 @@ class WorkflowActivity(WorkflowDataModel):
 
 
 class WorkflowTask(WorkflowDataModel):
-    id: UUID_TYPE
+    id: UUID_TYPE = Field(default_factory=UUID_GENR, alias='_id')
     workflow_id: UUID_TYPE
     step_id: str
-    task_name: str
     name: Optional[str] = None
+    status: TaskStatus = Field(default=TaskStatus.RUNNING)
     desc: Optional[str] = None
-    resource: Optional[str] = None
-    resource_id: Optional[UUID_TYPE] = None
 
 
 class WorkflowRoles(WorkflowDataModel):

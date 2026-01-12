@@ -325,18 +325,8 @@ class WorkflowManager(object):
         task = wf_mut.mutation.task
         task_dict = task.model_dump()
         task_dict['workflow_id'] = wf_mut.workflow_id
-            
-        await self._dispatch_worker_task(task.task_name)
-        
-        # await tx.insert_data('workflow_task', task_dict)
-    
-    async def _dispatch_worker_task(self, task_key: str):
-        from fluvius.navis.domain.client import NavisClient
-        client = NavisClient()
 
-        await client.send(
-            task_key
-        )
+        await tx.insert_data('workflow_task', task_dict)
 
     @classmethod
     def register(cls, wf_cls):

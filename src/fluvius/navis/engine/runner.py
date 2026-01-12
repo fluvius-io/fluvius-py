@@ -1,7 +1,8 @@
-from fluvius.navis.engine.datadef import WorkflowActivity, WorkflowMessage
+from fluvius.navis.engine.datadef import WorkflowActivity, WorkflowMessage, WorkflowTask
 from fluvius.navis.engine.mutation import MutationEnvelop
 import queue
 import collections
+import asyncio
 
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -598,18 +599,18 @@ class WorkflowRunner(object):
 
     @workflow_action('add_task', allow_statuses=WorkflowStatus._ACTIVE, hook_name='task_added')
     def add_task(self, /, src_step, task_key, **kwargs):
-        from fluvius.navis.engine.datadef import WorkflowTask
+        from fluvius.navis.domain.client import NavisClient
+        client = NavisClient()
+        client = client.send(task_key)
+        asyncio.create_task(client)
+
         task_id = UUID_GENF(task_key, self._id)
         task = WorkflowTask(
             id=task_id,
             workflow_id=self.id,
-            task_name= task_key,
             step_id=str(src_step),
-            task_key=task_key,
             name=kwargs.get('name'),
             desc=kwargs.get('desc'),
-            resource=kwargs.get('resource'),
-            resource_id=kwargs.get('resource_id')
         )
         self.mutate('add-task', task=task)
         return self
