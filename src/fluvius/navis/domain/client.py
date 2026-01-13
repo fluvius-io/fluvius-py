@@ -1,7 +1,7 @@
-from fluvius.worker import WorkerClient, SQLWorkTracker
+from fluvius.worker import DomainWorkerClient, SQLWorkTracker
 from pipe import Pipe
 
-class NavisClient(WorkerClient):
+class NavisClient(DomainWorkerClient):
     __queue_name__ = 'navis-domain-client'
     __tracker__ = SQLWorkTracker
 

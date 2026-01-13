@@ -600,13 +600,45 @@ class WorkflowRunner(object):
     @workflow_action('add_task', allow_statuses=WorkflowStatus._ACTIVE, hook_name='task_added')
     def add_task(self, /, src_step, task_key, **kwargs):
         from fluvius.navis.domain.client import NavisClient
-        client = NavisClient()
-        client = client.send(task_key)
-        asyncio.create_task(client)
+        from fluvius.worker.datadef import WorkerContext
+        
+        async def _send_task():
+            client = NavisClient()
+            
+            resource_name = kwargs.get('resource_name')
+            if not resource_name:
+                resource_name = self.resource_name
+                if not resource_name:
+                    raise WorkflowExecutionError('P00.018', 'resource_name is required for add_task')
+            
+            resource_id = kwargs.get('resource_id')
+            if not resource_id:
+                resource_id = self.resource_id
+            
+            context = kwargs.get('_context')
+            if not context:
+                context = WorkerContext()
+            
+            await client.send(
+                task_key,                                  
+                command=task_key,
+                resource=resource_name,
+                identifier=resource_id,
+                payload=kwargs.get('payload'),
+                domain_sid=kwargs.get('domain_sid'),
+                domain_iid=kwargs.get('domain_iid'),
+                _context=context,
+                _headers=kwargs.get('_headers'),
+            )
+            
+        try:
+            loop = asyncio.get_event_loop()
+            asyncio.ensure_future(_send_task(), loop=loop)
+        except RuntimeError:
+            asyncio.run(_send_task())
 
-        task_id = UUID_GENF(task_key, self._id)
         task = WorkflowTask(
-            id=task_id,
+            id=UUID_GENR(),
             workflow_id=self.id,
             step_id=str(src_step),
             name=kwargs.get('name'),
