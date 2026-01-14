@@ -151,7 +151,7 @@ class InitializeFormData(DataModel):
     aggroot: document (creates new form_submission)
     """
     # Form creation fields
-    form_registry_id: UUID_TYPE  # Reference to form in registry
+    form_submission_id: Optional[UUID_TYPE] = None  # If not provided, a new ID is generated
     form_key: str
     title: str
     desc: Optional[str] = None

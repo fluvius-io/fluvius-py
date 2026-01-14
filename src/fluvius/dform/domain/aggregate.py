@@ -1,6 +1,8 @@
 from fluvius.domain.aggregate import Aggregate, action
-from fluvius.data import UUID_GENR, timestamp
+from fluvius.data import UUID_GENR
 from fluvius.error import NotFoundError, BadRequestError
+from fluvius.dform.document import DocumentTemplateRegistry, DocumentSection, FormNode, ContentNode
+from fluvius.data import UUID_TYPE
 
 from .. import logger
 
@@ -63,6 +65,47 @@ class FormAggregate(Aggregate):
             "collection_id": str(collection._id),
             "status": "removed",
         }
+    
+    async def _create_document_nodes(self, document_id: UUID_TYPE, nodes: list, parent_id: UUID_TYPE):
+        for index, node_def in enumerate(nodes):
+            node_type = None
+            ctype = None
+            form_key = None
+            attrs = {}
+            content = getattr(node_def, 'content', None)
+            title = getattr(node_def, 'title', None)
+            
+            if isinstance(node_def, DocumentSection):
+                node_type = "section"
+            
+            if isinstance(node_def, ContentNode):
+                node_type = "content"
+                ctype = node_def.ctype
+            
+            if isinstance(node_def, FormNode):
+                node_type = 'form'
+                form_key = node_def.form_key
+                attrs = node_def.attrs
+            
+            node_id = UUID_GENR()
+            node_resource = self.init_resource(
+                "document_node",
+                _id=node_id,
+                document_id=document_id,
+                parent_node=parent_id,
+                node_key=str(UUID_GENR()),
+                node_type=node_type,
+                order=index,
+                title=title,
+                content=content,
+                ctype=ctype,
+                form_key=form_key,
+                attrs=attrs
+            )
+            await self.statemgr.insert(node_resource)
+            
+            if isinstance(node_def, DocumentSection) and node_def.children:
+                await self._create_document_nodes(document_id, node_def.children, node_id)
 
     @action("document-created")
     async def create_document(self, data):
@@ -90,7 +133,15 @@ class FormAggregate(Aggregate):
             resource_name=data.resource_name,
         )
         await self.statemgr.insert(document)
-        
+
+        template_def = DocumentTemplateRegistry.get(template.template_key)
+        if template_def and template_def.children:
+            await self._create_document_nodes(
+                document_id=document._id,
+                nodes=template_def.children,
+                parent_id=None
+            )
+            
         # Collect collection IDs to add document to
         collection_ids = []
         if data.collection_id:
@@ -588,18 +639,18 @@ class FormAggregate(Aggregate):
         document = self.rootobj
         
         # Verify form registry entry exists
-        form_registry = await self.statemgr.fetch('form_registry', data.form_registry_id)
+        form_registry = await self.statemgr.exist('form_registry', where={"form_key": data.form_key})
         if not form_registry:
             raise NotFoundError(
                 "F00.209",
-                f"Form registry entry not found: {data.form_registry_id}",
+                f"Form registry entry not found: {data.form_key}",
                 None
             )
         
         # Check if form with same key already exists in document
         existing = await self.statemgr.query(
             "form_submission",
-            where={"document_id": document._id, "form_reg_id": data.form_registry_id},
+            where={"document_id": document._id, "form_reg_id": form_registry._id},
             limit=1
         )
         if existing:
@@ -619,15 +670,14 @@ class FormAggregate(Aggregate):
                 limit=1
             )
             order = (max_order[0].order + 1) if max_order else 0
-        
+        # raise ValueError(data)
         # Create form submission
-        form_submission_id = UUID_GENR()
+        form_submission_id = data.form_submission_id if data.form_submission_id else UUID_GENR()
         form_submission = self.init_resource(
             "form_submission",
             _id=form_submission_id,
             document_id=document._id,
-            # form_key=data.form_key,
-            form_reg_id=data.form_registry_id,
+            form_reg_id=form_registry._id,
             title=data.title,
             desc=data.desc,
             order=order,
@@ -798,9 +848,9 @@ class FormAggregate(Aggregate):
                     element = self.init_resource(
                         "form_element",
                         _id=UUID_GENR(),
-                        form_submission_id=form_submission._id,
-                        element_registry_id=elem_registry[0]._id,
-                        element_name=element_name,
+                        form_id=form_submission._id,
+                        elem_reg_id=elem_registry[0]._id,
+                        elem_name=element_name,
                         index=0,
                         required=False,
                         data=element_data,
