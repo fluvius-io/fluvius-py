@@ -52,6 +52,7 @@ class WorkflowEventHandler(EventHandler):
             resource_name="document",
             resource_id=resource_id,
             step_selector=data.get("form_submission_id"),
+            event_data=data
         )
 
         wm = self.workflow_manager

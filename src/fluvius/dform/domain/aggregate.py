@@ -670,7 +670,6 @@ class FormAggregate(Aggregate):
                 limit=1
             )
             order = (max_order[0].order + 1) if max_order else 0
-        # raise ValueError(data)
         # Create form submission
         form_submission_id = data.form_submission_id if data.form_submission_id else UUID_GENR()
         form_submission = self.init_resource(
@@ -759,7 +758,6 @@ class FormAggregate(Aggregate):
         return {
             "form_submission_id": str(form_submission_id),
             "document_id": str(document._id),
-            # "form_key": form_submission.form_key,
             "form_reg_id": form_submission.form_reg_id,
             "title": form_submission.title,
             "elements": created_elements,
