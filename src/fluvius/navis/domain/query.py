@@ -81,12 +81,15 @@ class WorkflowParticipantQuery(DomainQueryResource):
     class Meta(DomainQueryResource.Meta):
         description = "List workflow participants and their roles"
         scope_required = WorkflowScope
-        backend_model = "workflow_participant"
+        backend_model = "_workflow_participant"
 
-    id: UUID_TYPE = PrimaryID("Participant ID")
     workflow_id: UUID_TYPE = UUIDField("Workflow ID")
     user_id: UUID_TYPE = UUIDField("User ID")
     role: str = StringField("Participant Role")
+    username: str = StringField("User Name")
+    full_name: str = StringField("User Full Name")
+    email: str = StringField("User Email")
+    phone: str = StringField("User Phone")
 
 
 @resource('workflow-stage')

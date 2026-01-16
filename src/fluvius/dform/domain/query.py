@@ -20,6 +20,9 @@ class FormSubmissionScope(DataModel):
     __default_key__ = 'form_id'
     form_id: UUID_TYPE
 
+class FormRegistryScope(DataModel):
+    __default_key__ = 'form_key'
+    form_key: str
 
 class FormQueryManager(DomainQueryManager):
     """Query manager for form domain"""
@@ -131,6 +134,7 @@ class FormRegistryQuery(DomainQueryResource):
 
     class Meta(DomainQueryResource.Meta):
         description = "List and search form definitions"
+        scope_required = FormRegistryScope
         backend_model = "form_registry"
 
     id: UUID_TYPE = PrimaryID("Form Registry ID")
