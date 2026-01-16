@@ -56,9 +56,9 @@ class FastapiMQTTClient(MQTTClient):
         MqttEvent.on_subscribe.send(self, mid=mid, qos=qos, properties=properties)
         MQTT_DEBUG and logger.info(f"/MQTT/ SUBSCRIBED [{self._client_id}] QOS: {qos}")
 
-    def notify(self, profile_id, kind: str, target: str, msg: dict, batch_id=None):
+    def notify(self, scope_id, kind: str, target: str, msg: dict, batch_id=None):
         payl = serialize_json(dict(**msg, _kind=kind, _target=target))
-        chan = f"{profile_id}/{MQTT_CLIENT_CHANNEL}"
+        chan = f"{scope_id}/{MQTT_CLIENT_CHANNEL}"
 
         if batch_id is None:
             return self.publish(
