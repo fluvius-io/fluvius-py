@@ -12,11 +12,11 @@ class KeycloakTokenPayload(DataModel):
     iss: AnyUrl
     aud: str
     sub: UUID
-    typ: Literal["ID"]
+    typ: Literal["ID", "Bearer"]
     azp: str
     nonce: str
     session_state: UUID = None
-    at_hash: str
+    at_hash: str = None
     acr: Optional[str] = None
     sid: UUID
     email_verified: bool

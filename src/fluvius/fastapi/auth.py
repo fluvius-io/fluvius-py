@@ -5,6 +5,7 @@ from urllib.parse import urlencode
 
 from authlib.integrations.starlette_client import OAuth
 from authlib.jose import jwt, JsonWebKey
+from authlib.jose.errors import DecodeError
 from authlib.jose.util import extract_header
 from fastapi import Request, Depends, HTTPException, Response
 from fastapi.responses import RedirectResponse, JSONResponse
@@ -144,11 +145,14 @@ class FluviusAuthProfileProvider(object):
         return KeycloakTokenPayload(**claims_token)
 
     def get_auth_token(self, request: Request) -> Optional[str]:
-        # You can optionally decode and validate the token here
-        if not (id_token := request.cookies.get("id_token")):
-            return None
+        if id_token := request.cookies.get(config.SES_ID_TOKEN_FIELD):
+            return request.session.get(config.SES_USER_FIELD)
 
-        return request.session.get("user")
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.lower().startswith("bearer "):
+            return auth_helper.decode_ac_token(request.app.state.jwks_keyset, auth_header[7:])
+        
+        return None
 
     async def get_auth_context(self, request: Request, **kwargs) -> Optional[AuthorizationContext]:
         try:
@@ -156,7 +160,7 @@ class FluviusAuthProfileProvider(object):
             if not auth_token:
                 return None
             auth_user = self.authorize_claims(auth_token)
-        except (KeyError, ValueError):
+        except (KeyError, ValueError, DecodeError):
             raise UnauthorizedError("S00.004", "Authorization Failed: Missing or invalid claims token")
 
         auth_context = await self.setup_context(auth_user)
@@ -286,8 +290,8 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
         if not id_token:
             raise HTTPException(status_code=400, detail="Missing ID token")
 
-        id_data = await auth_helper.decode_id_token(request.app.state.jwks_keyset, id_token, KEYCLOAK_ISSUER, KEYCLOAK_CLIENT_ID)
-        ac_data = await auth_helper.decode_ac_token(request.app.state.jwks_keyset, ac_token)
+        id_data = auth_helper.decode_id_token(request.app.state.jwks_keyset, id_token, KEYCLOAK_ISSUER, KEYCLOAK_CLIENT_ID)
+        ac_data = auth_helper.decode_ac_token(request.app.state.jwks_keyset, ac_token)
 
         id_data.update(
             realm_access=ac_data.get("realm_access"),

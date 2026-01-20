@@ -37,6 +37,8 @@ class MediaEntry(MediaSchema):
     _id = sa.Column(pg.UUID, primary_key=True, nullable=False, default=UUID_GENR, server_default=sa.text("uuid_generate_v4()"))
     _created = sa.Column(sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()"))
     _updated = sa.Column(sa.DateTime(timezone=True), nullable=True)
+    _etag = sa.Column(sa.String(64), nullable=True)
+    _deleted = sa.Column(sa.DateTime(timezone=True), nullable=True)     
     filename = sa.Column(sa.String(1024), nullable=False)
     filehash = sa.Column(sa.CHAR(64))
     filemime = sa.Column(sa.String(256))

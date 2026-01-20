@@ -81,7 +81,9 @@ def setup_exception_handler(app: FastAPI) -> FastAPI:
 
 
 def setup_error_handler(app: FastAPI) -> FastAPI:
-    DEVELOPER_MODE = config.DEVELOPER_MODE
+    from fluvius.error import config as errconf
+
+    DEVELOPER_MODE = errconf.DEVELOPER_MODE
 
     exception_handler = setup_exception_handler(app)
 
@@ -91,7 +93,7 @@ def setup_error_handler(app: FastAPI) -> FastAPI:
 
         if DEVELOPER_MODE:
             content = exc.content or {}
-            content['traceback'] = traceback.format_exc()
+            content['tracebk'] = traceback.format_exc()
 
         return JSONResponse(
             status_code=exc.status_code,
@@ -102,12 +104,12 @@ def setup_error_handler(app: FastAPI) -> FastAPI:
     async def validation_error_exception_handler(request: Request, exc: ValidationError):
         content = {
             "errcode": "A422.01",
-            "details": exc.errors(),
-            "message": str(exc),
+            "errdata": exc.errors(),
+            "errmesg": str(exc),
         }
         
         if DEVELOPER_MODE:
-            content['traceback'] = traceback.format_exc()
+            content['tracebk'] = traceback.format_exc()
 
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -117,12 +119,12 @@ def setup_error_handler(app: FastAPI) -> FastAPI:
     @exception_handler(ValueError)
     async def value_error_exception_handler(request: Request, exc: ValueError):
         content = {
-            "message": str(exc),
+            "errmesg": str(exc),
             "errcode": "A400.01",
         }
 
         if DEVELOPER_MODE:
-            content['traceback'] = traceback.format_exc()
+            content['tracebk'] = traceback.format_exc()
 
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -132,12 +134,12 @@ def setup_error_handler(app: FastAPI) -> FastAPI:
     @exception_handler(RuntimeError)
     async def runtime_error_exception_handler(request: Request, exc: RuntimeError):
         content = {
-            "message": str(exc),
+            "errmesg": str(exc),
             "errcode": "A422.02",
         }
 
         if DEVELOPER_MODE:
-            content['traceback'] = traceback.format_exc()
+            content['tracebk'] = traceback.format_exc()
 
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -148,13 +150,13 @@ def setup_error_handler(app: FastAPI) -> FastAPI:
     async def response_validation_exception_handler(request: Request, exc: ResponseValidationError):
         logger.error(f"Response validation failed: {exc}")
         content = {
-            "message": "Internal Server Error - Response Validation Failed",
+            "errmesg": "Internal Server Error - Response Validation Failed",
             "errcode": "A500.02",
-            "details": str(exc.errors()),
+            "errdata": str(exc.errors()),
         }
 
         if DEVELOPER_MODE:
-            content['traceback'] = traceback.format_exc()
+            content['tracebk'] = traceback.format_exc()
 
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
