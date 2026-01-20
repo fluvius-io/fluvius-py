@@ -1,7 +1,7 @@
 import traceback
 from uuid import uuid4
 from typing import Optional
-from . import config
+from . import config, logger
 
 
 class ErrorTracker:
