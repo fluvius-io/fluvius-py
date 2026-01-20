@@ -1,21 +1,26 @@
-from fluvius import config, logger
+from ._meta import config, logger
 from .tracker import ErrorTracker
 
 
-DEBUG_APP_EXCEPTION = config.DEBUG_APP_EXCEPTION
+DEVELOPER_MODE = config.DEVELOPER_MODE
 
 
 class FluviusException(Exception):
     status_code = 500
     label = "Internal Error"
+    tracebk = None
 
     def __init__(self, errcode, errmesg, errdata=None, errhint=None):
-        self.errmesg = errmesg
-        self.errcode = errcode
-        self.errdata = errdata
-        self.errhint = errhint
+        self.errmesg = errmesg  # Error message, 1 line that describing the error.
+        self.errcode = errcode  # Unique code that identify the error, must be visbily hard-coded at the error creation.
+        self.errdata = errdata  # Technical data for troubleshooting the error.
+        self.errhint = errhint  # User hint on how to resolve the error.
 
-        DEBUG_APP_EXCEPTION and logger.exception(errmesg)
+        if DEVELOPER_MODE:
+            import traceback
+            self.tracebk = traceback.format_exc()
+
+            logger.exception(errmesg)
 
     def __str__(self):
         return f"[{self.status_code}] >CODE> {self.errcode} >MESG> {self.errmesg} >DATA> {self.errdata} >HINT> {self.errhint}"
@@ -27,7 +32,9 @@ class FluviusException(Exception):
                 ("errcode", self.errcode),
                 ("errmesg", self.errmesg),
                 ("errdata", self.errdata),
-                ("errhint", self.errhint))
+                ("errhint", self.errhint),
+                ("tracebk", self.tracebk)
+            )
             if v is not None
         }
 
