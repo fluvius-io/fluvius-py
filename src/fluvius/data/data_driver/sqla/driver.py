@@ -79,63 +79,66 @@ def sqla_error_handler(code_prefix):
                 return await func(*args, **kwargs)
             except Exception as e:
                 logger.exception('SQLAlchemy Operation Error: %s', e)
+                orig_e = getattr(e, 'orig', None)
+                orig_s = str(orig_e) if orig_e else None
+                pgcode = getattr(orig_e, 'pgcode', None) if orig_e else None
 
                 match e.__class__:
                     case asyncpg.exceptions.UniqueViolationError:
                         raise UnprocessableError(
                             f"{code_prefix}-01",
-                            f"Duplicate entry detected. Record must be unique. [{e.orig}]",
-                            str(e.orig)
+                            f"Duplicate entry detected. Record must be unique.",
+                            orig_s
                         )
                     case exc.IntegrityError:
                         raise UnprocessableError(
                             f"{code_prefix}-02",
-                            f"Integrity constraint violated. Please check your input. [{e.orig}]",
-                            str(e.orig)
+                            f"Integrity constraint violated. Please check your input.",
+                            orig_s
                         )
                     case exc.OperationalError:
                         raise UnprocessableError(
                             f"{code_prefix}-03",
-                            f"The database is currently unreachable. Please try again later. [{e.orig}]",
-                            str(e.orig)
+                            f"The database is currently unreachable. Please try again later.",
+                            orig_s
                         )
                     case exc.ProgrammingError:
                         if e.orig.pgcode == '42883':
                             raise BadRequestError(
                                 f"{code_prefix}-41",
                                 "Undefined function error [42883]. Values must be in correct format.",
-                                str(e.orig)
+                                orig_s
                             )
 
                         raise UnprocessableError(
                             f"{code_prefix}-04",
-                            f"There was a syntax or structure error in the database query. [{e.orig}]",
-                            str(e.orig)
+                            f"There was a syntax or structure error in the database query.",
+                            orig_s
                         )
                     case exc.DBAPIError:
                         if e.orig.pgcode == '2201X':
                             raise BadRequestError(
                                 f"{code_prefix}-51",
-                                f"Invalid row count in result offset clause [{e.orig.pgcode}].",
-                                str(e.orig)
+                                f"Invalid row count in result offset clause [pg:{pgcode}].",
+                                orig_s
                             )
 
                         raise UnprocessableError(
                             f"{code_prefix}-05",
-                            f"A DBAPIError error occurred [{e.orig.pgcode}]",
-                            str(e.orig)
+                            f"A DBAPIError error occurred [pg:{pgcode}]",
+                            orig_s
                         )
                     case exc.NoResultFound:
                         raise ItemNotFoundError(
                             f"{code_prefix}-06",
                             f"Item Not Found: {str(e)}",
-                            str(getattr(e, "orig", None))
+                            orig_s
                         )
                     case exc.SQLAlchemyError:
                         raise UnprocessableError(
                             f"{code_prefix}-07",
                             "An unexpected database error occurred while processing your request.",
-                            str(getattr(e, "orig", None))
+                            orig_s
                         )
                     case _:
                         raise

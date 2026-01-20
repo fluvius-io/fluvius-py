@@ -8,28 +8,28 @@ DEBUG_APP_EXCEPTION = config.DEBUG_APP_EXCEPTION
 class FluviusException(Exception):
     status_code = 500
     label = "Internal Error"
-    errcode = "A00.000"
 
-    def __init__(self, errcode, message, details=None, errdata=None):
-        self.message = message
-        self.details = details
+    def __init__(self, errcode, errmesg, errdata=None, errhint=None):
+        self.errmesg = errmesg
         self.errcode = errcode
         self.errdata = errdata
+        self.errhint = errhint
 
-        DEBUG_APP_EXCEPTION and logger.exception(message)
+        DEBUG_APP_EXCEPTION and logger.exception(errmesg)
 
     def __str__(self):
-        if self.details is None:
-            return f"{self.errcode} [{self.status_code}] >> {self.message}"
-
-        return f"{self.errcode} [{self.status_code}] >> {self.message} >> {self.details}"
+        return f"[{self.status_code}] >CODE> {self.errcode} >MESG> {self.errmesg} >DATA> {self.errdata} >HINT> {self.errhint}"
 
     @property
     def content(self):
-        if not self.details:
-            return {"errcode": self.errcode, "message": self.message, "errdata": self.errdata}
-
-        return {"errcode": self.errcode, "message": self.message, "details": self.details, "errdata": self.errdata}
+        return {
+            k: v for (k, v) in (
+                ("errcode", self.errcode),
+                ("errmesg", self.errmesg),
+                ("errdata", self.errdata),
+                ("errhint", self.errhint))
+            if v is not None
+        }
 
 
 class NotFoundError(FluviusException):
@@ -47,7 +47,7 @@ class PreconditionFailedError(FluviusException):
 class BadRequestError(FluviusException):
     label = "Bad Request"
     status_code = 400
-    errcode = "APP00.400"
+    errcode = "A00.400"
 
 
 class UnauthorizedError(FluviusException):
@@ -82,4 +82,5 @@ class InternalServerError(FluviusException):
 
 class AssertionFailed(BadRequestError):
     label = "Assertion Failed"
-    errcode = "APP00.400"
+    status_code = 400
+    errcode = "A00.405"
