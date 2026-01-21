@@ -22,7 +22,10 @@ from fluvius.auth import (
     AuthorizationContext, 
     KeycloakTokenPayload, 
     SessionProfile, 
-    SessionOrganization, event as auth_event, helper as auth_helper)
+    SessionOrganization,
+    event as auth_event,
+    helper as auth_helper
+)
 from fluvius.helper import when
 from pipe import Pipe
 from typing import Optional, Awaitable, Callable
