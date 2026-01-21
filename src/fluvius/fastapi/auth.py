@@ -364,7 +364,7 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
         return RedirectResponse(url=KEYCLOAK_SIGNUP_URI)
 
 
-    @api("sign-out", methods=['POST', 'GET'] if config.ALLOW_LOGOUT_GET_METHOD else ['POST'])
+    @api("sign-out", methods=['POST', 'GET'] if config.ALLOW_SIGN_OUT_GET_METHOD else ['POST'])
     async def sign_out(request: Request):
         """ Log out user globally (including Keycloak) """
 
@@ -402,9 +402,6 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
             auth_event.user_logout.send(request, user=id_data)
 
         return response
-
-    if config.ALLOW_LOGOUT_GET_METHOD:
-        api("logout")(sign_out)
 
     oauth = setup_oauth()
 
