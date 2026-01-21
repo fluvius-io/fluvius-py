@@ -18,9 +18,13 @@ Usage:
         
 """
 
+import hashlib
+import json
+import uuid
+from typing import Optional, Dict, Any, ClassVar, Type, get_origin, get_args
+
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pg
-from typing import Optional, Dict, Any, ClassVar, Type
 from pydantic import Field
 
 from fluvius.data import DataModel, DomainSchema, FluviusJSONField
@@ -42,13 +46,12 @@ from .mapper import PydanticSQLAlchemyMapper
 # This is necessary for cross-schema foreign key references
 # Even with use_alter=True, SQLAlchemy needs to know about the referenced tables
 from .schema import (
-    FormConnector, DocumentForm, ElementInstance, ElementDefinition,
-    ElementGroupInstance, FormDefinition, DocumentSection  # noqa: F401
+    FormConnector  # noqa: F401
 )
 
 
-DFORM_DATA_DB_SCHEMA = config.DFORM_DATA_DB_SCHEMA
-DEFINITION_DB_SCHEMA = config.DEFINITION_DB_SCHEMA
+DFORM_DATA_SCHEMA = config.DFORM_DATA_SCHEMA
+DFORM_DEFS_SCHEMA = config.DFORM_DEFS_SCHEMA
 DB_DSN = config.DB_DSN
 
 
@@ -63,7 +66,7 @@ class ElementSchema(FormConnector.pgschema(), DomainSchema):
     __abstract__ = True
 
 
-model_mapper = PydanticSQLAlchemyMapper(ElementSchema, schema=DFORM_DATA_DB_SCHEMA)
+model_mapper = PydanticSQLAlchemyMapper(ElementSchema, schema=DFORM_DATA_SCHEMA)
 
 
 class ElementMeta(DataModel):
@@ -117,7 +120,7 @@ class DataElementModel(DataModel):
     Base class for element data schema registration.
     
     This class is used for registering element types via Meta classes.
-    Element data is now stored in ElementInstance (defined in schema.py).
+    Element data is stored in FormElement (defined in schema.py).
     
     Element types are registered by creating subclasses with Meta classes:
     
@@ -131,7 +134,7 @@ class DataElementModel(DataModel):
                 name = "Text Input"
                 desc = "A text input element"
     
-    Note: ElementInstance (in schema.py) is used for actual data storage.
+    Note: FormElement (in schema.py) is used for actual data storage.
     ElementModel is only for registration purposes.
     """
 
@@ -140,6 +143,82 @@ class DataElementModel(DataModel):
 
     class DataProvider(ElementDataProvider):
         pass
+
+    @classmethod
+    def _type_to_string(cls, annotation: Any) -> str:
+        """Convert a type annotation to a stable string representation."""
+        if annotation is None:
+            return "None"
+        
+        # Handle basic types
+        if isinstance(annotation, type):
+            return f"{annotation.__module__}.{annotation.__qualname__}"
+        
+        # Handle generic types (List[str], Optional[int], etc.)
+        origin = get_origin(annotation)
+        if origin is not None:
+            args = get_args(annotation)
+            origin_str = cls._type_to_string(origin)
+            args_str = ", ".join(cls._type_to_string(arg) for arg in args)
+            return f"{origin_str}[{args_str}]"
+        
+        # Fallback to string representation
+        return str(annotation)
+
+    @classmethod
+    def element_signature(cls) -> str:
+        """
+        Generate a stable hash/UUID that is unique to the model's field structure.
+        
+        The signature is based on:
+        - Field names
+        - Field types (annotations)
+        - Field defaults
+        - Field metadata (constraints, validators, etc.)
+        
+        Returns:
+            A UUID string that uniquely identifies this model's schema structure.
+        """
+        fields_info = []
+        
+        for field_name, field_info in sorted(cls.model_fields.items()):
+            field_data = {
+                "name": field_name,
+                "type": cls._type_to_string(field_info.annotation),
+                "is_required": field_info.is_required(),
+            }
+            
+            # Include default value if present (use repr for stable serialization)
+            if field_info.default is not None:
+                field_data["default"] = repr(field_info.default)
+            
+            if field_info.default_factory is not None:
+                # Use the factory's qualified name for stability
+                factory = field_info.default_factory
+                if hasattr(factory, '__qualname__'):
+                    field_data["default_factory"] = factory.__qualname__
+                else:
+                    field_data["default_factory"] = str(factory)
+            
+            # Include field constraints/metadata if present
+            if field_info.title:
+                field_data["title"] = field_info.title
+            if field_info.description:
+                field_data["description"] = field_info.description
+            if field_info.alias:
+                field_data["alias"] = field_info.alias
+            
+            fields_info.append(field_data)
+        
+        # Create a deterministic JSON string
+        canonical_str = json.dumps(fields_info, sort_keys=True, separators=(',', ':'))
+        
+        # Generate SHA-256 hash
+        hash_bytes = hashlib.sha256(canonical_str.encode('utf-8')).digest()
+        
+        # Convert to UUID5-style UUID using the hash (first 16 bytes)
+        # This creates a deterministic UUID from the hash
+        return str(uuid.UUID(bytes=hash_bytes[:16], version=5))
 
 
     # Note: Schema must be set to None for the base class
@@ -174,7 +253,27 @@ class DataElementModel(DataModel):
         # Auto-generate Schema from Model if not provided
         # Requires __tablename__ to be set on the subclass
         if cls.Schema is None:
-            cls.Schema = model_mapper.create_table_class(cls, cls.Meta.table_name)
+            # Fallback: if model_fields empty (e.g. during initialization), inspect annotations manually
+            # This happens if Pydantic hasn't fully populated the class yet
+            extra_columns = {}
+            if not cls.model_fields and hasattr(cls, '__annotations__'):
+                from pydantic.fields import FieldInfo
+                for name, annotation in cls.__annotations__.items():
+                    if name.startswith('_'): continue
+                    
+                    # Create column manually
+                    try:
+                        col = model_mapper.create_column(name, annotation, FieldInfo(annotation=annotation))
+                        extra_columns[name] = col
+                    except Exception:
+                        pass
+            
+            # Create schema class with any extra columns found via fallback
+            cls.Schema = model_mapper.create_table_class(
+                cls, 
+                cls.Meta.table_name, 
+                extra_columns=extra_columns if extra_columns else None
+            )
         
         # Validate required fields
         if not cls.Meta.key:

@@ -3,125 +3,9 @@ from typing import Optional, Dict, Any, List
 
 
 # ============================================================================
-# TEMPLATE DEFINITION COMMANDS
-# ============================================================================
-
-# Template Commands
-class CreateTemplateData(DataModel):
-    """Data for creating a new document template"""
-    template_key: str
-    template_name: str
-    collection_id: Optional[UUID_TYPE] = None  # Optional: add template to collection
-    collection_ids: Optional[List[UUID_TYPE]] = None  # Optional: add template to multiple collections
-    desc: Optional[str] = None
-    version: Optional[int] = 1
-    order: Optional[int] = None  # Optional order in collections
-    owner_id: Optional[UUID_TYPE] = None
-    organization_id: Optional[str] = None
-
-
-class UpdateTemplateData(DataModel):
-    """Data for updating template properties"""
-    template_name: Optional[str] = None
-    desc: Optional[str] = None
-    version: Optional[int] = None
-    owner_id: Optional[UUID_TYPE] = None
-    organization_id: Optional[str] = None
-
-
-class RemoveTemplateData(DataModel):
-    """Data for removing a template"""
-    pass  # Identifier is in aggroot
-
-
-# Section Definition Commands
-class CreateTemplateSectionData(DataModel):
-    """Data for creating a section definition within a template"""
-    section_key: str
-    section_name: str
-    desc: Optional[str] = None
-    order: Optional[int] = None
-
-
-class UpdateTemplateSectionData(DataModel):
-    """Data for updating section definition properties"""
-    section_name: Optional[str] = None
-    desc: Optional[str] = None
-    order: Optional[int] = None
-
-
-class RemoveTemplateSectionData(DataModel):
-    """Data for removing a section definition"""
-    pass  # Identifier is in aggroot
-
-
-# Form Definition Commands
-class CreateFormDefinitionData(DataModel):
-    """Data for creating a form definition within a section definition"""
-    form_key: str
-    title: str
-    desc: Optional[str] = None
-    order: Optional[int] = None
-
-
-class UpdateFormDefinitionData(DataModel):
-    """Data for updating form definition properties"""
-    title: Optional[str] = None
-    desc: Optional[str] = None
-    order: Optional[int] = None
-
-
-class RemoveFormDefinitionData(DataModel):
-    """Data for removing a form definition"""
-    pass  # Identifier is in aggroot
-
-
-# Element Group Definition Commands
-class CreateFormElementGroupData(DataModel):
-    """Data for creating an element group definition within a form definition"""
-    group_key: str
-    group_name: Optional[str] = None
-    desc: Optional[str] = None
-    order: Optional[int] = None
-
-
-class UpdateFormElementGroupData(DataModel):
-    """Data for updating element group definition properties"""
-    group_name: Optional[str] = None
-    desc: Optional[str] = None
-    order: Optional[int] = None
-
-
-class RemoveFormElementGroupData(DataModel):
-    """Data for removing an element group definition"""
-    pass  # Identifier is in aggroot
-
-
-# Element Definition Commands
-class CreateElementDefinitionData(DataModel):
-    """Data for creating an element definition"""
-    element_key: str
-    element_label: Optional[str] = None
-    element_schema: Dict[str, Any]  # Schema defining the element type and validation
-
-
-class UpdateElementDefinitionData(DataModel):
-    """Data for updating element definition properties"""
-    element_label: Optional[str] = None
-    order: Optional[int] = None
-    required: Optional[bool] = None
-    validation_rules: Optional[Dict[str, Any]] = None
-    resource_id: Optional[UUID_TYPE] = None
-    resource_name: Optional[str] = None
-
-
-class RemoveElementDefinitionData(DataModel):
-    """Data for removing an element definition"""
-    pass  # Identifier is in aggroot
-
-
-# ============================================================================
 # DATA INSTANCE COMMANDS
+# Note: Registry tables (TemplateRegistry, FormRegistry, ElementRegistry) are
+# populated by developers directly, not through domain commands.
 # ============================================================================
 
 # Collection Commands
@@ -184,10 +68,9 @@ class CopyDocumentData(DataModel):
     """Data for copying a document instance"""
     new_document_key: str
     new_document_name: Optional[str] = None
-    copy_sections: bool = True  # Copy section instances
-    copy_forms: bool = True  # Copy form instances
-    copy_element_groups: bool = True  # Copy element group instances
-    copy_elements: bool = True  # Copy element instances
+    copy_nodes: bool = True  # Copy document nodes
+    copy_form_submissions: bool = True  # Copy form submissions
+    copy_form_elements: bool = True  # Copy form elements
     target_collection_id: Optional[UUID_TYPE] = None  # Optional: add copied document to this collection
     order: Optional[int] = None  # Optional order in target collection
 
@@ -205,85 +88,106 @@ class AddDocumentToCollectionData(DataModel):
     order: Optional[int] = None  # Optional order in collection
 
 
-# Section Instance Commands
-class CreateSectionInstanceData(DataModel):
-    """Data for creating a section instance from a section definition"""
-    template_section_id: UUID_TYPE
-    instance_key: str
-    instance_name: Optional[str] = None
+# Document Node Commands
+class CreateDocumentNodeData(DataModel):
+    """
+    Data for creating a document node.
+    
+    Supports different node types:
+    - "section": Container node with children (use title, desc)
+    - "content": Text/header/graphic content (use title, content, ctype)
+    - "form": Form reference (use form_key, attrs for overrides)
+    """
+    node_key: str
+    node_type: str = "section"  # "section", "content", "form"
+    parent_node: Optional[UUID_TYPE] = None  # Parent node ID for nesting
     order: Optional[int] = None
+    
+    # Common fields
+    title: Optional[str] = None  # Title for sections and content
+    desc: Optional[str] = None  # Description
+    
+    # Content node fields
+    content: Optional[str] = None  # Content text/html/markdown
+    ctype: Optional[str] = None  # Content type: "text", "header", "graphic", "html", "markdown"
+    
+    # Form node fields
+    form_key: Optional[str] = None  # Reference to form in FormRegistry
+    
+    # Extensible attributes
+    attrs: Optional[Dict[str, Any]] = None  # Overrides, metadata, styling, etc.
 
 
-class UpdateSectionInstanceData(DataModel):
-    """Data for updating section instance properties"""
-    instance_name: Optional[str] = None
+class UpdateDocumentNodeData(DataModel):
+    """Data for updating document node properties"""
+    node_type: Optional[str] = None
     order: Optional[int] = None
-
-
-class RemoveSectionInstanceData(DataModel):
-    """Data for removing a section instance"""
-    pass  # Identifier is in aggroot
-
-
-# Form Instance Commands
-class CreateFormInstanceData(DataModel):
-    """Data for creating a form instance from a form definition"""
-    form_definition_id: UUID_TYPE
-    instance_key: str
-    instance_name: Optional[str] = None
-
-
-class UpdateFormInstanceData(DataModel):
-    """Data for updating form instance properties"""
-    instance_name: Optional[str] = None
+    title: Optional[str] = None
+    desc: Optional[str] = None
+    content: Optional[str] = None
+    ctype: Optional[str] = None
+    form_key: Optional[str] = None
     attrs: Optional[Dict[str, Any]] = None
 
 
-class RemoveFormInstanceData(DataModel):
-    """Data for removing a form instance"""
+class RemoveDocumentNodeData(DataModel):
+    """Data for removing a document node"""
     pass  # Identifier is in aggroot
 
 
-# Element Group Instance Commands
-class CreateElementGroupInstanceData(DataModel):
-    """Data for creating an element group instance from an element group definition"""
-    form_element_group_id: UUID_TYPE
-    instance_key: str
-    instance_name: Optional[str] = None
+# ============================================================================
+# FORM COMMANDS (aggroot = form_submission for Update/Remove/Submit)
+# ============================================================================
+
+class InitializeFormData(DataModel):
+    """
+    Data for creating and initializing a form submission.
+    
+    This command:
+    - Creates a new form submission from a form registry entry
+    - Sets up the form elements based on form registry definition
+    - Optionally populates elements with prior data from another form submission
+    
+    aggroot: document (creates new form_submission)
+    """
+    # Form creation fields
+    form_registry_id: UUID_TYPE  # Reference to form in registry
+    form_key: str
+    title: str
+    desc: Optional[str] = None
     order: Optional[int] = None
+    # Initialization options
+    source_submission_id: Optional[UUID_TYPE] = None  # Populate from prior submission
+    element_keys: Optional[List[str]] = None  # Only initialize these elements (None = all)
+    initial_data: Optional[Dict[str, Dict[str, Any]]] = None  # {"element_key": {data}}
 
 
-class UpdateElementGroupInstanceData(DataModel):
-    """Data for updating element group instance properties"""
-    instance_name: Optional[str] = None
+class UpdateFormData(DataModel):
+    """Data for updating form properties"""
+    title: Optional[str] = None
+    desc: Optional[str] = None
     order: Optional[int] = None
+    status: Optional[str] = None  # "draft", "submitted", etc.
 
 
-class RemoveElementGroupInstanceData(DataModel):
-    """Data for removing an element group instance"""
+class RemoveFormData(DataModel):
+    """Data for removing a form"""
     pass  # Identifier is in aggroot
-
-
-# Element Instance Commands
-class PopulateElementData(DataModel):
-    """Data for populating an element instance with prior data"""
-    element_definition_id: UUID_TYPE
-    element_group_id: Optional[UUID_TYPE] = None  # If provided, populate from specific element group instance
-
-
-class PopulateFormData(DataModel):
-    """Data for populating a form instance with prior data"""
-    form_definition_id: UUID_TYPE
-    form_id: Optional[UUID_TYPE] = None  # If provided, populate from specific form instance
-    element_definition_ids: Optional[List[UUID_TYPE]] = None  # If provided, only populate these element definitions
-
-
-class SaveFormData(DataModel):
-    """Data for saving form instance data (multiple elements)"""
-    data: Dict[str, Dict[str, Any]]  # {"<element_key>": {<element_data>}}
 
 
 class SubmitFormData(DataModel):
-    """Data for submitting form instance (saves and locks from further editing)"""
-    data: Dict[str, Dict[str, Any]]  # {"<element_key>": {<element_data>}}
-
+    """
+    Data for submitting/saving form data.
+    
+    This command:
+    - Updates existing element data
+    - Creates new elements if they don't exist
+    - Removes elements not in the payload (if replace=True)
+    - Validates required elements (if validate=True)
+    - Sets form status (default "submitted", use "draft" for save without submit)
+    
+    aggroot: form_submission
+    """
+    payload: Dict[str, Dict[str, Any]]  # {"element_key": {data}, ...}
+    replace: bool = False  # Remove elements not in the payload
+    status: str = "submitted"  # "draft", "submitted", etc.

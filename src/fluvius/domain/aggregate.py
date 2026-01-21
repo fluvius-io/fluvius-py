@@ -3,6 +3,8 @@ import queue
 from functools import wraps
 from contextlib import asynccontextmanager
 from fluvius.error import BadRequestError, PreconditionFailedError, ForbiddenError, InternalServerError
+from fluvius.domain.exceptions import DomainEntityError
+
 from fluvius.data import UUID_TYPE, generate_etag, field, timestamp
 from typing import NamedTuple, Optional
 
@@ -27,7 +29,7 @@ class AggregateRoot(NamedTuple):
     domain_iid: UUID_TYPE = None
 
 
-def validate_resource_spec(resource_spec: Optional[str | list[str] | tuple[str]]) -> tuple[str]:
+def validate_resource_spec(resource_spec: Optional[str | list[str] | tuple[str]]) -> Optional[tuple[str]]:
     if not resource_spec:
         return None
 
@@ -35,13 +37,12 @@ def validate_resource_spec(resource_spec: Optional[str | list[str] | tuple[str]]
         return (resource_spec,)
 
     if isinstance(resource_spec, list):
-        return tuple[str](resource_spec)
+        return tuple(resource_spec)
 
     if isinstance(resource_spec, tuple):
         return resource_spec
 
-    from fluvius.domain.exceptions import DomainEntityError
-    raise DomainEntityError("D00.101", f"Invalid resource specification: {resource_spec}")
+    raise DomainEntityError("D00.201", f"Invalid resource specification: {resource_spec}")
 
 
 def action(evt_key=None, resources=None):
@@ -102,14 +103,14 @@ class Aggregate(object):
         )
 
     @asynccontextmanager
-    async def command_aggregate(self, context, command_bundle, command_meta):
+    async def command_aggregate(self, context, command_bundle, command_class):
         if getattr(self, '_context', None):
             raise InternalServerError('D00.110', 'Overlapping context: %s' % str(context))
 
         self._evt_queue = queue.Queue()
         self._context = context
         self._command = command_bundle
-        self._cmdmeta = command_meta
+        self._cmdclass = command_class
         self._aggroot = AggregateRoot(
             self._command.resource,
             self._command.identifier,
@@ -121,27 +122,27 @@ class Aggregate(object):
             await self.fetch_command_rootobj(self._aggroot)
         )
 
-        await self.before_command(context, command_bundle, command_meta)
+        await self.before_command(context, command_bundle, command_class)
         yield RestrictedAggregateProxy(self)
         
         if not self._evt_queue.empty():
             raise InternalServerError('D00.102', 'All events must be consumed by the command handler.')
 
-        await self.after_command(context, command_bundle, command_meta)
+        await self.after_command(context, command_bundle, command_class)
         self._command = None
-        self._cmdmeta = None
+        self._cmdclass = None
         self._aggroot = None
         self._rootobj = None
         self._context = None
     
-    async def before_command(self, context, command_bundle, command_meta):
+    async def before_command(self, context, command_bundle, command_class):
         pass
 
-    async def after_command(self, context, command_bundle, command_meta):
+    async def after_command(self, context, command_bundle, command_class):
         pass
 
     async def fetch_command_rootobj(self, aggroot):
-        if self._cmdmeta.Meta.new_resource:
+        if self._cmdclass.Meta.resource_init:
             return None
 
         def if_match():

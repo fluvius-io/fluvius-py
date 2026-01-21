@@ -6,7 +6,6 @@ from fluvius.helper import safe_filename
 from fluvius.dmap import logger
 from fluvius.dmap.interface import WriterConfig
 from fluvius.dmap.processor.transform import process_tfspec
-from pyrsistent import PClass, field
 
 
 class Writer(object):
@@ -53,10 +52,10 @@ class Writer(object):
 
 
 class FileWriterConfig(WriterConfig):
-    path = field(type=(str, type(None)), initial=lambda: None)
-    csv_dialect = field(type=str, initial=lambda: 'csvquote')
-    file_extension = field(type=(str, type(None)), initial=lambda: None)
-    schema = field(type=(str, type(None)), initial=lambda: None)
+    path: str | None = None
+    csv_dialect: str = 'csvquote'
+    file_extension: str | None = None
+    db_schema: str | None = None
 
 
 class FileWriter(Writer):
@@ -83,7 +82,7 @@ class FileWriter(Writer):
                 None
             )
 
-        output_dir = os.path.join(self.config.path or '', self.config.schema or '')
+        output_dir = os.path.join(self.config.path or '', self.config.db_schema or '')
         try:
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)

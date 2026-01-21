@@ -15,7 +15,20 @@ from typing import cast
 from fluvius.error import BadRequestError, InternalServerError
 
 from fluvius.data import logger, config
-from fluvius.data.exceptions import ItemNotFoundError, UnprocessableError, NoItemModifiedError
+from fluvius.data.exceptions import (
+    ItemNotFoundError,
+    NoItemModifiedError,
+    DuplicateEntryError,
+    IntegrityConstraintError,
+    DatabaseConnectionError,
+    QuerySyntaxError,
+    DatabaseAPIError,
+    UnexpectedDatabaseError,
+    InvalidQueryValueError,
+    DatabaseConfigurationError,
+    DatabaseTransactionError,
+    DataSchemaError,
+)
 from fluvius.data.query import BackendQuery
 from fluvius.data.serializer import serialize_json
 from fluvius.data.data_driver import DataDriver
@@ -70,7 +83,12 @@ def build_dsn(config):
 
 def sqla_error_handler(code_prefix):
     """ We need to standardize (ie. mapping) the driver exceptions to standard Fluvius Data Driver Exceptions
-        so the error handling code on the data manager layer can be consistent """
+        so the error handling code on the data manager layer can be consistent.
+
+        Note: We use isinstance() checks instead of match e.__class__ because SQLAlchemy
+        wraps underlying database exceptions, so direct class comparison doesn't work.
+        The order of checks matters - more specific exceptions must be checked first.
+    """
 
     def decorator(func):
         @wraps(func)
@@ -78,70 +96,74 @@ def sqla_error_handler(code_prefix):
             try:
                 return await func(*args, **kwargs)
             except Exception as e:
-                logger.exception('SQLAlchemy Operation Error: %s', e)
                 orig_e = getattr(e, 'orig', None)
                 orig_s = str(orig_e) if orig_e else None
                 pgcode = getattr(orig_e, 'pgcode', None) if orig_e else None
 
-                match e.__class__:
-                    case asyncpg.exceptions.UniqueViolationError:
-                        raise UnprocessableError(
+                # Check for asyncpg unique violation (wrapped in IntegrityError)
+                if isinstance(e, exc.IntegrityError):
+                    if orig_e and isinstance(orig_e, asyncpg.exceptions.UniqueViolationError):
+                        raise DuplicateEntryError(
                             f"{code_prefix}-01",
                             f"Duplicate entry detected. Record must be unique.",
                             orig_s
                         )
-                    case exc.IntegrityError:
-                        raise UnprocessableError(
-                            f"{code_prefix}-02",
-                            f"Integrity constraint violated. Please check your input.",
-                            orig_s
-                        )
-                    case exc.OperationalError:
-                        raise UnprocessableError(
-                            f"{code_prefix}-03",
-                            f"The database is currently unreachable. Please try again later.",
-                            orig_s
-                        )
-                    case exc.ProgrammingError:
-                        if e.orig.pgcode == '42883':
-                            raise BadRequestError(
-                                f"{code_prefix}-41",
-                                "Undefined function error [42883]. Values must be in correct format.",
-                                orig_s
-                            )
+                    # Other integrity errors (foreign key, check constraints, etc.)
+                    raise IntegrityConstraintError(
+                        f"{code_prefix}-02",
+                        f"Integrity constraint violated. Please check your input.",
+                        orig_s
+                    )
 
-                        raise UnprocessableError(
-                            f"{code_prefix}-04",
-                            f"There was a syntax or structure error in the database query.",
-                            orig_s
-                        )
-                    case exc.DBAPIError:
-                        if e.orig.pgcode == '2201X':
-                            raise BadRequestError(
-                                f"{code_prefix}-51",
-                                f"Invalid row count in result offset clause [pg:{pgcode}].",
-                                orig_s
-                            )
+                if isinstance(e, exc.OperationalError):
+                    raise DatabaseConnectionError(
+                        f"{code_prefix}-03",
+                        f"The database is currently unreachable. Please try again later.",
+                        orig_s
+                    )
 
-                        raise UnprocessableError(
-                            f"{code_prefix}-05",
-                            f"A DBAPIError error occurred [pg:{pgcode}]",
+                if isinstance(e, exc.ProgrammingError):
+                    if pgcode == '42883':
+                        raise InvalidQueryValueError(
+                            f"{code_prefix}-41",
+                            "Undefined function error [42883]. Values must be in correct format.",
                             orig_s
                         )
-                    case exc.NoResultFound:
-                        raise ItemNotFoundError(
-                            f"{code_prefix}-06",
-                            f"Item Not Found: {str(e)}",
+                    raise QuerySyntaxError(
+                        f"{code_prefix}-04",
+                        f"There was a syntax or structure error in the database query.",
+                        orig_s
+                    )
+
+                if isinstance(e, exc.DBAPIError):
+                    if pgcode == '2201X':
+                        raise InvalidQueryValueError(
+                            f"{code_prefix}-51",
+                            f"Invalid row count in result offset clause [{pgcode}].",
                             orig_s
                         )
-                    case exc.SQLAlchemyError:
-                        raise UnprocessableError(
-                            f"{code_prefix}-07",
-                            "An unexpected database error occurred while processing your request.",
-                            orig_s
-                        )
-                    case _:
-                        raise
+                    raise DatabaseAPIError(
+                        f"{code_prefix}-05",
+                        f"A database API error occurred [{pgcode}].",
+                        orig_s
+                    )
+
+                if isinstance(e, exc.NoResultFound):
+                    raise ItemNotFoundError(
+                        f"{code_prefix}-06",
+                        f"Item Not Found: {str(e)}",
+                        orig_s
+                    )
+
+                if isinstance(e, exc.SQLAlchemyError):
+                    raise UnexpectedDatabaseError(
+                        f"{code_prefix}-07",
+                        "An unexpected database error occurred while processing your request.",
+                        orig_s
+                    )
+
+                # Re-raise unknown exceptions
+                raise
         return wrapper
     return decorator
 
@@ -153,7 +175,7 @@ class _AsyncSessionConfiguration(object):
 
     def make_session(self):
         if not hasattr(self, "_async_sessionmaker"):
-            raise InternalServerError('E00.101', 'AsyncSession connection is not established.')
+            raise DatabaseConfigurationError('E00.101', 'AsyncSession connection is not established.')
 
         return self._async_sessionmaker()
 
@@ -177,10 +199,10 @@ class _AsyncSessionConfiguration(object):
     def set_bind(self, bind_dsn, loop=None, **kwargs):
         bind_dsn = build_dsn(bind_dsn)
         if not isinstance(bind_dsn, URL):
-            raise BadRequestError('E00.102', 'Invalid URI: {0}'.format(bind_dsn))
+            raise DatabaseConfigurationError('E00.102', 'Invalid URI: {0}'.format(bind_dsn))
 
         if hasattr(self, "_async_engine"):
-            raise BadRequestError('E00.103', 'Engine already setup.')
+            raise DatabaseConfigurationError('E00.103', 'Engine already setup.')
 
         engine = create_async_engine(
             bind_dsn,
@@ -223,7 +245,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
         DEBUG_CONNECTOR and logger.info(f'[{self.__class__.__name__}] setup with DSN: {self.dsn}')
         dsn = self.__db_dsn__
         if dsn is None:
-            raise BadRequestError('E00.104', f'No database DSN provided to: {self.__class__}')
+            raise DatabaseConfigurationError('E00.104', f'No database DSN provided to: {self.__class__}')
         self._session_configuration = _AsyncSessionConfiguration(dsn)
         self._active_session = ContextVar('active_session', default=None)
 
@@ -265,7 +287,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
         if issubclass(schema_model, cls.__data_schema_base__):
             return schema_model
 
-        raise BadRequestError('E00.105', f'{cls.__name__} only support subclass of [{cls.__data_schema_base__}]. Got: {schema_model}')
+        raise DataSchemaError('E00.105', f'{cls.__name__} only support subclass of [{cls.__data_schema_base__}]. Got: {schema_model}')
 
     def _check_no_item_modified(self, cursor, expect, query=None):
         if cursor.rowcount != expect:
@@ -285,7 +307,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
 
         if active_session is not None:
             if RAISE_NESTED_TRANSACTION_ERROR:
-                raise InternalServerError('E00.106', f'Nested/concurrent transaction detected [{trace_msg}]: {active_session._trace_msg}')
+                raise DatabaseTransactionError('E00.106', f'Nested/concurrent transaction detected [{trace_msg}]: {active_session._trace_msg}')
             logger.exception(f'Nested/concurrent transaction detected [{trace_msg}]: {active_session._trace_msg}')
             yield active_session
             return
@@ -307,14 +329,14 @@ class SqlaDriver(DataDriver, QueryBuilder):
     @property
     def active_session(self):
         if self._active_session.get() is None:
-            raise InternalServerError('E00.107', 'Database operation must be run with in a transaction.')
+            raise DatabaseTransactionError('E00.107', 'Database operation must be run within a transaction.')
 
         return self._active_session.get()
 
     @sqla_error_handler('E00.007')
     async def find_all(self, resource, query: BackendQuery):
         if query.offset != 0 or query.limit != BACKEND_QUERY_LIMIT:
-            raise BadRequestError('E00.108', f'Invalid find all query: {query}')
+            raise InvalidQueryValueError('E00.108', f'Invalid find all query: {query}')
 
         return await self.query(resource, query)
 
@@ -462,7 +484,7 @@ class SqlaDriver(DataDriver, QueryBuilder):
         elif isinstance(nquery, str):
             stmt = nquery
         else:
-            raise BadRequestError('E00.109', f'Invalid SQL query: {nquery}')
+            raise InvalidQueryValueError('E00.109', f'Invalid SQL query: {nquery}')
         
         # conn = await self.connection()
         # cursor = await conn.exec_driver_sql(stmt, params)

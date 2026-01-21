@@ -9,11 +9,11 @@ from types import SimpleNamespace
 from typing import Iterator, Optional, List, Type
 
 from fluvius.auth import AuthorizationContext
-from fluvius.data import UUID_GENR, DataModel
+from fluvius.data import UUID_GENR, UUID_TYPE, DataModel
 from fluvius.helper import camel_to_lower, select_value, camel_to_title, ImmutableNamespace
 from fluvius.helper.timeutil import timestamp
 from fluvius.helper.registry import ClassRegistry
-from fluvius.error import ForbiddenError, InternalServerError
+from fluvius.error import BadRequestError, ForbiddenError, InternalServerError
 from fluvius.casbin import PolicyManager, PolicyRequest
 from fluvius.domain.event import EventHandler
 
@@ -64,22 +64,22 @@ def _setup_command_processor_selector(handler_list):
 
 class DomainMeta(DataModel):
     name: str = None
+    namespace: str = None
     revision: int = 0
-    desc: Optional[str] = None
+    description: Optional[str] = None
     tags: Optional[List[str]] = None
-    prefix: str
 
 
 class Domain(DomainSignalManager, DomainEntityRegistry):
-    __namespace__   = None
-    __aggregate__   = None
-    __statemgr__    = StateManager
-    __dispatcher__  = None
-    __logstore__    = DomainLogStore
-    __revision__    = 0       # API compatibility revision number
-    __config__      = ImmutableNamespace
-    __context__     = DomainContextData
-    __policymgr__   = None
+    __namespace__       = None
+    __aggregate__       = None
+    __statemgr__        = StateManager
+    __msgdispatcher__   = None
+    __evthandler__      = None
+    __logstore__        = DomainLogStore
+    __config__          = ImmutableNamespace
+    __context__         = DomainContextData
+    __policymgr__       = None
 
     _cmd_processors = tuple()
     _entity_registry = dict()
@@ -116,8 +116,8 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
             return domain.__context__(
                 _id=UUID_GENR(),
-                domain=domain.__namespace__,
-                revision=domain.__revision__,
+                domain=domain.namespace,
+                revision=domain.revision,
                 **kwargs
             )
 
@@ -175,17 +175,20 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             return self._data.realm
 
     def __init_subclass__(cls):
-        if not issubclass(cls.__aggregate__, Aggregate):
-            raise DomainEntityError('D00.202', f'Invalid domain aggregate: {cls.__aggregate__}')
-
         if not cls.__namespace__:
             raise DomainEntityError('D00.207', 'Domain does not have a namespace (__namespace__ = ...)')
 
         if cls.__namespace__ in Domain._REGISTRY:
             raise DomainEntityError('D00.203', f'Domain already registered: {cls.__namespace__}')
 
-        if cls.__dispatcher__ and not issubclass(cls.__dispatcher__, MessageDispatcher):
-            raise DomainEntityError('D00.204', f'Invalid message dispatcher: {cls.__dispatcher__}')
+        if not issubclass(cls.__aggregate__, Aggregate):
+            raise DomainEntityError('D00.202', f'Invalid domain aggregate: {cls.__aggregate__}')
+
+        if cls.__msgdispatcher__ and not issubclass(cls.__msgdispatcher__, MessageDispatcher):
+            raise DomainEntityError('D00.214', f'Invalid message dispatcher: {cls.__msgdispatcher__}')
+
+        if cls.__evthandler__ and not issubclass(cls.__evthandler__, EventHandler):
+            raise DomainEntityError('D00.209', f'Invalid event handler: {cls.__evthandler__}')
 
         if not issubclass(cls.__context__, DomainContextData):
             raise DomainEntityError('D00.204', f'Domain has invalid context [{cls.__context__}]')
@@ -227,7 +230,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         cls.Event = EventBase
         cls.Meta = DomainMeta.create(cls.Meta, defaults={
             'name': camel_to_title(cls.__name__),
-            'prefix': cls.__namespace__,
+            'namespace': cls.__namespace__,
             'desc': (cls.__doc__ or '').strip(),
             'tags': [cls.__namespace__, ]
         })
@@ -243,8 +246,10 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         self._logstore = self.__logstore__(self, app, **config)
         self._statemgr = self.__statemgr__(self, app, **config)
         self._policymgr = self.__policymgr__ and self.__policymgr__(self._statemgr)
-        self._active_context = contextvars.ContextVar('domain_context', default=None)
-        self._dispatcher = self.__dispatcher__(self, app, **config) if self.__dispatcher__ else None
+        self._context = contextvars.ContextVar('domain_context', default=None)
+        self._aggroot = contextvars.ContextVar('domain_aggroot', default=None)
+        self._dispatcher = self.__msgdispatcher__(self, app, **config) if self.__msgdispatcher__ else None
+        self._evthandler = self.__evthandler__(self, app, **config) if self.__evthandler__ else None
 
         self.cmd_processors = _setup_command_processor_selector(self._cmd_processors)
         self.register_signals()
@@ -307,10 +312,32 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
                 continue
 
             await self._dispatcher.dispatch(msg_record)
+    
+    @contextmanager
+    def aggroot(self, resource, identifier=None, domain_sid=None, domain_iid=None):
+        aggroot = (resource, identifier, domain_sid, domain_iid)
+        self._aggroot.set(aggroot)
+        yield aggroot
+        self._aggroot.set(None)
+    
+    def validate_aggroot(self, aggroot: tuple[str, UUID_TYPE, UUID_TYPE, UUID_TYPE], resource_init=False):
+        resource, identifier, domain_sid, domain_iid = aggroot
 
-    def create_command(self, cmd_key, cmd_data, aggroot):
-        aggroot = AggregateRoot(*aggroot) if not isinstance(aggroot, AggregateRoot) else aggroot
+        if not (isinstance(resource, str) and resource):
+            raise BadRequestError('D00.410', f'Invalid aggroot resource: {resource}')
+
+        if resource_init and not identifier:
+            identifier = UUID_GENR()
+        
+        if not isinstance(identifier, UUID_TYPE):
+            raise BadRequestError('D00.412', f'Invalid aggroot identifier: {identifier}')
+
+        return AggregateRoot(resource, identifier, domain_sid, domain_iid)
+
+    def create_command(self, cmd_key, cmd_data, aggroot: tuple[str, UUID_TYPE, UUID_TYPE, UUID_TYPE] = None):
+        aggroot = aggroot or self._aggroot.get()
         cmd_cls = self.lookup_command(cmd_key)
+        aggroot = self.validate_aggroot(aggroot, cmd_cls.Meta.resource_init)
 
         if cmd_cls.Meta.resources and aggroot.resource not in cmd_cls.Meta.resources:
             raise ForbiddenError('D00.306', 'Command [%s] does not allow aggroot of resource [%s]' % (cmd_key, aggroot.resource))
@@ -318,8 +345,8 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
         data = cmd_cls.Data.create(cmd_data)
 
         return cc.CommandBundle(
-            domain=self.__namespace__,
-            revision=self.__revision__,
+            domain=self.namespace,
+            revision=self.revision,
             command=cmd_key,
             payload=data,
             resource=aggroot.resource,
@@ -412,21 +439,29 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
     @contextmanager
     def session(self, authorization: Optional[AuthorizationContext], service_proxy=None, **kwargs):
-        ctx = self._active_context.get()
+        ctx = self._context.get()
         assert ctx is None, f'Context is already set for domain: {ctx}.'
 
         ctx = self.Context(self, authorization, service_proxy, **kwargs)
-        self._active_context.set(ctx)
+        self._context.set(ctx)
         yield self
-        self._active_context.set(None)
+        self._context.set(None)
 
     @property
     def context(self):
-        ctx = self._active_context.get()
+        ctx = self._context.get()
         if ctx is None:
             raise InternalServerError('D00.108', 'Domain session is not started yet.')
 
         return ctx
+
+    @property
+    def namespace(self):
+        return self.Meta.namespace
+
+    @property
+    def revision(self):
+        return self.Meta.revision
 
     async def process_command(self, *commands):
         # Ensure saving of context before processing command
@@ -449,8 +484,8 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             for cmd in commands:
                 preauth_cmd = cmd.set(
                     context=ctx.data._id,
-                    domain=self.__namespace__,
-                    revision=self.__revision__
+                    domain=self.namespace,
+                    revision=self.revision
                 )
                 auth_cmd = await self.authorize_command(ctx, preauth_cmd)
                 async for evt in self.process_command_internal(ctx, stm, auth_cmd):
@@ -479,8 +514,8 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
 
     def metadata(self, **kwargs):
         return {
-            'id': self.__namespace__,
+            'id': self.Meta.namespace,
             'name': self.Meta.name,
-            'description': self.Meta.desc,
+            'description': self.Meta.description,
             'revision': self.Meta.revision,
         } | kwargs

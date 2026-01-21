@@ -28,7 +28,7 @@ class PersonalInfoElement(DataElementModel):
         key = "personal-info"
         title = "Personal Information"
         description = "Collects personal information including name and date of birth"
-        table_name = "elem_personal_info"
+        table_name = "dfe_personal_info"
 
 
 class AddressElement(DataElementModel):
@@ -44,7 +44,7 @@ class AddressElement(DataElementModel):
         key = "address"
         title = "Address"
         description = "Collects physical address information"
-        table_name = "elem_address"
+        table_name = "dfe_address"
 
 
 class PhoneNumberElement(DataElementModel):
@@ -58,7 +58,7 @@ class PhoneNumberElement(DataElementModel):
         key = "phone-number"
         title = "Phone Number"
         description = "Collects phone number with type classification"
-        table_name = "elem_phone_number"
+        table_name = "dfe_phone_number"
 
 
 class EmailElement(DataElementModel):
@@ -71,7 +71,7 @@ class EmailElement(DataElementModel):
         key = "email"
         title = "Email Address"
         description = "Collects email address information"
-        table_name = "elem_email"
+        table_name = "dfe_email"
 
 
 # ============================================================================
@@ -90,7 +90,7 @@ class TextFieldElement(DataElementModel):
         key = "text-field"
         title = "Text Field"
         description = "Single-line text input field"
-        table_name = "elem_text_field"
+        table_name = "dfe_text_field"
 
 
 class TextAreaElement(DataElementModel):
@@ -104,7 +104,7 @@ class TextAreaElement(DataElementModel):
         key = "text-area"
         title = "Text Area"
         description = "Multi-line text input field"
-        table_name = "elem_text_area"
+        table_name = "dfe_text_area"
 
 
 class NumberFieldElement(DataElementModel):
@@ -119,7 +119,7 @@ class NumberFieldElement(DataElementModel):
         key = "number-field"
         title = "Number Field"
         description = "Numeric input field with optional bounds"
-        table_name = "elem_number_field"
+        table_name = "dfe_number_field"
 
 
 class DateFieldElement(DataElementModel):
@@ -133,7 +133,7 @@ class DateFieldElement(DataElementModel):
         key = "date-field"
         title = "Date Field"
         description = "Date picker input field"
-        table_name = "elem_date_field"
+        table_name = "dfe_date_field"
 
 
 class SelectFieldElement(DataElementModel):
@@ -147,7 +147,7 @@ class SelectFieldElement(DataElementModel):
         key = "select-field"
         title = "Select Field"
         description = "Dropdown select field"
-        table_name = "elem_select_field"
+        table_name = "dfe_select_field"
 
 
 class CheckboxElement(DataElementModel):
@@ -159,7 +159,7 @@ class CheckboxElement(DataElementModel):
         key = "checkbox"
         title = "Checkbox"
         description = "Single checkbox input"
-        table_name = "elem_checkbox"
+        table_name = "dfe_checkbox"
 
 
 class RadioGroupElement(DataElementModel):
@@ -172,7 +172,7 @@ class RadioGroupElement(DataElementModel):
         key = "radio-group"
         title = "Radio Group"
         description = "Radio button group for single selection"
-        table_name = "elem_radio_group"
+        table_name = "dfe_radio_group"
 
 
 # ============================================================================
@@ -192,7 +192,7 @@ class FileUploadElement(DataElementModel):
         key = "file-upload"
         title = "File Upload"
         description = "File upload input"
-        table_name = "elem_file_upload"
+        table_name = "dfe_file_upload"
 
 
 class ImageUploadElement(DataElementModel):
@@ -208,7 +208,7 @@ class ImageUploadElement(DataElementModel):
         key = "image-upload"
         title = "Image Upload"
         description = "Image upload with preview"
-        table_name = "elem_image_upload"
+        table_name = "dfe_image_upload"
 
 
 # ============================================================================
@@ -225,7 +225,7 @@ class SignatureElement(DataElementModel):
         key = "signature"
         title = "Signature"
         description = "Digital signature capture"
-        table_name = "elem_signature"
+        table_name = "dfe_signature"
 
 
 class RatingElement(DataElementModel):
@@ -238,4 +238,4 @@ class RatingElement(DataElementModel):
         key = "rating"
         title = "Rating"
         description = "Star rating input"
-        table_name = "elem_rating"
+        table_name = "dfe_rating"

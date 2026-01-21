@@ -47,7 +47,7 @@ class CommandMeta(DataModel):
     tags: List[str] = []
     scope_required: Optional[Dict] = None
     scope_optional: Optional[Dict] = None
-    new_resource: bool = False
+    resource_init: bool = False
     auth_required: bool = True
     policy_required: bool = True
     resource_desc: Optional[str] = None

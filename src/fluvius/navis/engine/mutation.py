@@ -20,6 +20,7 @@ class WorkflowMutation(WorkflowDataModel):
         REGISTRY[key] = cls
 
 class UpdateStep(WorkflowMutation):
+    step_id: UUID_TYPE
     title: Optional[str] = None
     stm_state: Optional[str] = None
     stm_label: Optional[str] = None
@@ -31,14 +32,13 @@ class UpdateStep(WorkflowMutation):
     ts_transit: Optional[datetime] = None
 
 
-class UpdateWorkflow(WorkflowMutation):
+class SetState(WorkflowMutation):
     status: Optional[WorkflowStatus] = None
+    paused: Optional[WorkflowStatus] = None
     progress: Optional[float] = None
-    etag: Optional[str] = None
     ts_start: Optional[datetime] = None
     ts_expire: Optional[datetime] = None
     ts_finish: Optional[datetime] = None
-    ts_transit: Optional[datetime] = None
 
 
 class AddStep(WorkflowMutation):
@@ -49,16 +49,27 @@ class InitializeWorkflow(WorkflowMutation):
     workflow: WorkflowData
 
 
-class SetMemory(WorkflowMutation):
+class SetParams(WorkflowMutation):
     params: Optional[dict] = None
-    memory: Optional[dict] = None
-    stepsm: Optional[dict] = None
+
+
+class SetOutput(WorkflowMutation):
     output: Optional[dict] = None
+
+
+class SetMemory(WorkflowMutation):
+    memory: Optional[dict] = None
+
+
+class SetStepMemory(WorkflowMutation):
+    step_id: UUID_TYPE
+    memory: Optional[dict] = None
 
 
 class AddParticipant(WorkflowMutation):
     user_id: UUID_TYPE
     role: str
+
 
 class AddRole(WorkflowMutation):
     name: str
@@ -71,10 +82,10 @@ class DelParticipant(WorkflowMutation):
 class AddStage(WorkflowMutation):
     data: WorkflowStage
 
+
 class MutationEnvelop(WorkflowDataModel):
     name: str
     workflow_id: UUID_TYPE
-    step_id: Optional[UUID_TYPE] = None
     transaction_id: Optional[UUID_TYPE] = None
     action: str
     mutation: WorkflowMutation

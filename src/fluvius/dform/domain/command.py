@@ -1,19 +1,23 @@
-from fluvius.data import serialize_mapping, UUID_GENR
+from fluvius.data import serialize_mapping
 from .domain import FormDomain
-from . import datadef
 from .datadef import (
+    # Collection
     CreateCollectionData, UpdateCollectionData, RemoveCollectionData,
-    CreateDocumentData, UpdateDocumentData, RemoveDocumentData, CopyDocumentData, MoveDocumentData,
-    AddDocumentToCollectionData,
-    PopulateElementData,
-    PopulateFormData,
-    SaveFormData,
-    SubmitFormData
+    # Document
+    CreateDocumentData, UpdateDocumentData, RemoveDocumentData,
+    CopyDocumentData, MoveDocumentData, AddDocumentToCollectionData,
+    # Document Node
+    CreateDocumentNodeData, UpdateDocumentNodeData, RemoveDocumentNodeData,
+    # Form Commands
+    InitializeFormData, UpdateFormData, RemoveFormData, SubmitFormData,
 )
-from fluvius.domain.event import EventRecord 
 
 Command = FormDomain.Command
 
+
+# ============================================================================
+# COLLECTION COMMANDS
+# ============================================================================
 
 class CreateCollection(Command):
     """Create a new collection"""
@@ -25,7 +29,7 @@ class CreateCollection(Command):
         tags = ["form", "collection", "create"]
         auth_required = True
         description = "Create a new collection for organizing documents"
-        new_resource = True
+        resource_init = True
 
     Data = CreateCollectionData
 
@@ -70,6 +74,10 @@ class RemoveCollection(Command):
         yield agg.create_response(serialize_mapping(result), _type="form-response")
 
 
+# ============================================================================
+# DOCUMENT COMMANDS
+# ============================================================================
+
 class CreateDocument(Command):
     """Create a new document"""
 
@@ -80,7 +88,7 @@ class CreateDocument(Command):
         tags = ["form", "document", "create"]
         auth_required = True
         description = "Create a new document that can contain multiple forms"
-        new_resource = True
+        resource_init = True
 
     Data = CreateDocumentData
 
@@ -93,11 +101,9 @@ class CreateDocument(Command):
             "document_name": document.document_name,
             "desc": document.desc,
             "version": document.version,
-            "organization_id": str(document.organization_id),
+            "organization_id": str(document.organization_id) if document.organization_id else None,
             "resource_id": str(document.resource_id) if document.resource_id else None,
             "resource_name": document.resource_name,
-            "created_at": document.created_at.isoformat() if hasattr(document, 'created_at') and document.created_at else None,
-            "updated_at": document.updated_at.isoformat() if hasattr(document, 'updated_at') and document.updated_at else None,
         }
         yield agg.create_response(document_dict, _type="document-response")
 
@@ -147,7 +153,7 @@ class CopyDocument(Command):
         resources = ("document",)
         tags = ["form", "document", "copy"]
         auth_required = True
-        description = "Copy a document with all its forms, sections, and elements"
+        description = "Copy a document with all its nodes, form submissions, and elements"
 
     Data = CopyDocumentData
 
@@ -192,96 +198,145 @@ class AddDocumentToCollection(Command):
         yield agg.create_response(serialize_mapping(result), _type="form-response")
 
 
-class PopulateElement(Command):
-    """Populate element with prior data"""
+# ============================================================================
+# DOCUMENT NODE COMMANDS
+# ============================================================================
+
+class CreateDocumentNode(Command):
+    """Create a document node (section/content)"""
 
     class Meta:
-        key = 'populate-element'
-        name = 'Populate Element'
-        resources = ("element_definition",)
-        tags = ["form", "element", "populate"]
+        key = 'create-document-node'
+        name = 'Create Document Node'
+        resources = ("document",)
+        tags = ["form", "document", "node", "create"]
         auth_required = True
-        description = "Repopulate an element with prior data from a form instance"
+        description = "Create a new document node (section or content block)"
 
-    Data = PopulateElementData
+    Data = CreateDocumentNodeData
 
     async def _process(self, agg, stm, payload):
-        result = await agg.populate_element(payload)
+        result = await agg.create_document_node(payload)
         yield agg.create_response(serialize_mapping(result), _type="form-response")
 
 
-class PopulateForm(Command):
-    """Populate form with prior data"""
+class UpdateDocumentNode(Command):
+    """Update document node properties"""
 
     class Meta:
-        key = 'populate-form'
-        name = 'Populate Form'
-        resources = ("form_definition",)
-        tags = ["form", "populate"]
+        key = 'update-document-node'
+        name = 'Update Document Node'
+        resources = ("document_node",)
+        tags = ["form", "document", "node", "update"]
         auth_required = True
-        description = "Repopulate a form (multiple elements) with prior data from a form instance"
+        description = "Update document node properties"
 
-    Data = PopulateFormData
+    Data = UpdateDocumentNodeData
 
     async def _process(self, agg, stm, payload):
-        result = await agg.populate_form(payload)
+        result = await agg.update_document_node(payload)
         yield agg.create_response(serialize_mapping(result), _type="form-response")
 
 
-class SaveForm(Command):
-    """Save form data (multiple elements) but still allow further editing"""
+class RemoveDocumentNode(Command):
+    """Remove a document node"""
 
     class Meta:
-        key = 'save-form'
-        name = 'Save Form'
-        resources = ("document_form",)
-        tags = ["form", "save"]
+        key = 'remove-document-node'
+        name = 'Remove Document Node'
+        resources = ("document_node",)
+        tags = ["form", "document", "node", "remove"]
         auth_required = True
-        description = "Save form data (multiple elements) but still allow further editing"
+        description = "Remove a document node"
 
-    Data = SaveFormData
+    Data = RemoveDocumentNodeData
 
     async def _process(self, agg, stm, payload):
-        result = await agg.save_form(payload)
+        result = await agg.remove_document_node(payload)
+        yield agg.create_response(serialize_mapping(result), _type="form-response")
+
+
+# ============================================================================
+# FORM COMMANDS
+# ============================================================================
+
+class InitializeForm(Command):
+    """
+    Create and initialize a form submission with element structure.
+    
+    This command creates a new form submission from a form registry entry,
+    sets up the form elements, and optionally populates them with prior data.
+    """
+
+    class Meta:
+        key = 'initialize-form'
+        name = 'Initialize Form'
+        resources = ("document",)
+        tags = ["form", "create", "initialize"]
+        auth_required = True
+        description = "Create and initialize a form submission with element structure"
+
+    Data = InitializeFormData
+
+    async def _process(self, agg, stm, payload):
+        result = await agg.initialize_form(payload)
+        yield agg.create_response(serialize_mapping(result), _type="form-response")
+
+
+class UpdateForm(Command):
+    """Update form properties"""
+
+    class Meta:
+        key = 'update-form'
+        name = 'Update Form'
+        resources = ("form_submission",)
+        tags = ["form", "update"]
+        auth_required = True
+        description = "Update form properties"
+
+    Data = UpdateFormData
+
+    async def _process(self, agg, stm, payload):
+        result = await agg.update_form(payload)
+        yield agg.create_response(serialize_mapping(result), _type="form-response")
+
+
+class RemoveForm(Command):
+    """Remove a form"""
+
+    class Meta:
+        key = 'remove-form'
+        name = 'Remove Form'
+        resources = ("form_submission",)
+        tags = ["form", "remove"]
+        auth_required = True
+        description = "Remove a form"
+
+    Data = RemoveFormData
+
+    async def _process(self, agg, stm, payload):
+        result = await agg.remove_form(payload)
         yield agg.create_response(serialize_mapping(result), _type="form-response")
 
 
 class SubmitForm(Command):
-    """Submit form (saves element data and locks from further editing)"""
+    """
+    Submit/save form data.
+    
+    This command saves element data and sets form status.
+    Use status="draft" to save without submitting, or status="submitted" to lock.
+    """
 
     class Meta:
         key = 'submit-form'
         name = 'Submit Form'
-        resources = ("document_form",)
-        tags = ["form", "submit"]
+        resources = ("form_submission",)
+        tags = ["form", "submit", "save"]
         auth_required = True
-        description = "Save element data and lock it from further editing"
+        description = "Submit/save form data with configurable status"
 
     Data = SubmitFormData
 
     async def _process(self, agg, stm, payload):
         result = await agg.submit_form(payload)
-       
-        yield EventRecord(
-            _id=UUID_GENR(),
-            event='approve-credit',
-            src_cmd=agg.get_aggroot().identifier,
-            args={},
-            data={
-                "event_name": "approve-credit",
-                "wfdef_key": "loan-application-process",
-                "workflow_id": "feee59ce-4f29-4a58-ae89-8c3cb4b856bf",
-                "event_data": {
-                    "resource_id": "a7e1c778-3ca5-405b-915d-f21aa30e8158",
-                    "resource_name": "workflow_definition",
-                    "step_selector": "f6f6fac6-4eb4-5939-894a-363bbd9a7b6f",
-                    "additionalProp1": {}
-                },
-                "target_step_id": "f6f6fac6-4eb4-5939-894a-363bbd9a7b6f",
-                "priority": "null"
-            }
-            
-        )
-        
         yield agg.create_response(result, _type="form-response")
-

@@ -1,11 +1,12 @@
 import base64
 import httpx
 import json
+import secrets
+
 from urllib.parse import urlencode
 
 from authlib.integrations.starlette_client import OAuth
 from authlib.jose import jwt, JsonWebKey
-from authlib.jose.errors import DecodeError
 from authlib.jose.util import extract_header
 from fastapi import Request, Depends, HTTPException, Response
 from fastapi.responses import RedirectResponse, JSONResponse
@@ -15,7 +16,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from types import SimpleNamespace
 
 
-from fluvius.error import UnauthorizedError, FluviusException, BadRequestError
+from fluvius.error import UnauthorizedError, FluviusException, BadRequestError, config as errconf
 from fluvius.data import DataModel
 from fluvius.auth import (
     AuthorizationContext, 
@@ -29,16 +30,56 @@ from typing import Optional, Awaitable, Callable
 from . import config, logger
 from .setup import on_startup
 from .helper import uri, generate_client_token, generate_session_id, validate_direct_url
+from fluvius.error import DEVELOPER_MODE
 
 IDEMPOTENCY_KEY = config.RESP_HEADER_IDEMPOTENCY
-DEVELOPER_MODE = config.DEVELOPER_MODE
+DEVELOPER_MODE = errconf.DEVELOPER_MODE
+CSRF_TOKEN_LENGTH = 32
+
+
+def generate_csrf_token() -> str:
+    """Generate a cryptographically secure CSRF token"""
+    return secrets.token_urlsafe(CSRF_TOKEN_LENGTH)
+
+
+def validate_csrf_token(request: Request, token: str) -> bool:
+    """Validate CSRF token from request against session"""
+    session_token = request.session.get('csrf_token')
+    if not session_token or not token:
+        return False
+    # Use constant-time comparison to prevent timing attacks
+    return secrets.compare_digest(session_token, token)
 
 
 def auth_required(inject_ctx=False, **auth_kwargs):
     def decorator(endpoint):
         @wraps(endpoint)
         async def wrapper(request: Request, *args, **kwargs):
-            auth_context = await request.app.state.get_auth_context(request, **auth_kwargs)
+            try:
+                auth_context = await request.app.state.get_auth_context(request, **auth_kwargs)
+            except FluviusException as e:
+                # Handle FluviusException directly in middleware to ensure proper status codes
+                # Exceptions raised in middleware may not always be caught by FastAPI's exception handlers
+                content = e.content
+
+                # Log full error server-side but never expose to client
+                if DEVELOPER_MODE:
+                    import traceback
+                    logger.error(f"Auth error: {e}\n{traceback.format_exc()}")
+                    # Still don't expose traceback to client even in dev mode for security
+
+                return JSONResponse(
+                    status_code=e.status_code,
+                    content=content
+                )
+            except Exception as e:
+                # Always log server-side
+                logger.exception(f"Unexpected auth error: {e}")
+
+                return JSONResponse(
+                    status_code=500,
+                    content={"errcode": "S00.501", "message": "Unexpected auth error: {e}"}
+                )
 
             if inject_ctx:
                 return await endpoint(request, auth_context, *args, **kwargs)
@@ -105,14 +146,11 @@ class FluviusAuthProfileProvider(object):
         return KeycloakTokenPayload(**claims_token)
 
     def get_auth_token(self, request: Request) -> Optional[str]:
-        if id_token := request.cookies.get(config.SES_ID_TOKEN_FIELD):
-            return request.session.get(config.SES_USER_FIELD)
+        # You can optionally decode and validate the token here
+        if not (id_token := request.cookies.get("id_token")):
+            return None
 
-        auth_header = request.headers.get("Authorization")
-        if auth_header and auth_header.lower().startswith("bearer "):
-            return auth_helper.decode_ac_token(request.app.state.jwks_keyset, auth_header[7:])
-        
-        return None
+        return request.session.get("user")
 
     async def get_auth_context(self, request: Request, **kwargs) -> Optional[AuthorizationContext]:
         try:
@@ -120,13 +158,25 @@ class FluviusAuthProfileProvider(object):
             if not auth_token:
                 return None
             auth_user = self.authorize_claims(auth_token)
-        except (KeyError, ValueError, DecodeError):
+        except (KeyError, ValueError):
             raise UnauthorizedError("S00.004", "Authorization Failed: Missing or invalid claims token")
 
         auth_context = await self.setup_context(auth_user)
         return auth_context
 
     async def setup_context(self, auth_user: KeycloakTokenPayload) -> AuthorizationContext:
+        # Extract roles from Keycloak token claims
+        realm_roles = auth_user.realm_access.get('roles', []) if auth_user.realm_access else []
+
+        # Extract client-specific roles if needed
+        client_roles = []
+        if auth_user.resource_access:
+            for client, access in auth_user.resource_access.items():
+                client_roles.extend(access.get('roles', []))
+
+        # Combine all roles
+        all_roles = tuple(set(realm_roles + client_roles))
+
         profile = SessionProfile(
             id=auth_user.jti,
             name=auth_user.name,
@@ -134,7 +184,7 @@ class FluviusAuthProfileProvider(object):
             given_name=auth_user.given_name,
             email=auth_user.email,
             username=auth_user.preferred_username,
-            roles=('user', 'staff', 'provider'),
+            roles=all_roles,
             org_id=auth_user.sub,
             usr_id=auth_user.sid
         )
@@ -143,8 +193,12 @@ class FluviusAuthProfileProvider(object):
             id=auth_user.sub,
             name=auth_user.family_name
         )
-        iamroles = ('sysadmin', 'operator')
-        realm = 'default'
+
+        # Extract IAM roles from realm roles (filter for admin/operator roles)
+        iamroles = tuple(role for role in realm_roles if role in ('sysadmin', 'operator', 'admin'))
+
+        # Extract realm from token issuer or use a default
+        realm = getattr(auth_user, 'iss', '').split('/realms/')[-1] if hasattr(auth_user, 'iss') else 'default'
 
         return AuthorizationContext(
             realm = realm,
@@ -234,8 +288,8 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
         if not id_token:
             raise HTTPException(status_code=400, detail="Missing ID token")
 
-        id_data = auth_helper.decode_id_token(request.app.state.jwks_keyset, id_token, KEYCLOAK_ISSUER, KEYCLOAK_CLIENT_ID)
-        ac_data = auth_helper.decode_ac_token(request.app.state.jwks_keyset, ac_token)
+        id_data = await auth_helper.decode_id_token(request.app.state.jwks_keyset, id_token, KEYCLOAK_ISSUER, KEYCLOAK_CLIENT_ID)
+        ac_data = await auth_helper.decode_ac_token(request.app.state.jwks_keyset, ac_token)
 
         id_data.update(
             realm_access=ac_data.get("realm_access"),
@@ -244,10 +298,23 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
             session_id=generate_session_id(request.session)
         )
 
+        # Regenerate session to prevent session fixation
+        old_data = dict(request.session)
+        request.session.clear()
+        request.session.update(old_data)
+
         request.session[config.SES_USER_FIELD] = id_data
-        next_url = validate_direct_url(request.session["next"], config.DEFAULT_SIGNIN_REDIRECT_URI)
+        next_url = validate_direct_url(request.session.get("next"), config.DEFAULT_SIGNIN_REDIRECT_URI)
         response = RedirectResponse(url=next_url)
-        response.set_cookie(config.SES_ID_TOKEN_FIELD, id_token)
+
+        # Set secure cookie flags
+        response.set_cookie(
+            config.SES_ID_TOKEN_FIELD,
+            id_token,
+            httponly=True,
+            secure=config.COOKIE_HTTPS_ONLY,
+            samesite=config.COOKIE_SAME_SITE_POLICY
+        )
         auth_event.authorization_success.send(request, user=id_data)
 
         return response
@@ -270,8 +337,18 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
     async def info(request: Request):
         return request.state.auth_context
 
+    @api("csrf-token")
+    async def get_csrf_token(request: Request):
+        """Get or generate CSRF token for the current session"""
+        if 'csrf_token' not in request.session:
+            request.session['csrf_token'] = generate_csrf_token()
+        return {"csrf_token": request.session['csrf_token']}
+
     @api("sign-in")
     async def sign_in(request: Request):
+        # Generate and store CSRF token
+        csrf_token = generate_csrf_token()
+        request.session['csrf_token'] = csrf_token
         request.session["next"] = request.query_params.get('next')
         callback_uri = validate_direct_url(request.query_params.get('callback'), config.DEFAULT_CALLBACK_URI)
         return await oauth.keycloak.authorize_redirect(request, callback_uri)
@@ -280,24 +357,42 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
     async def sign_up(request: Request):
         return RedirectResponse(url=KEYCLOAK_SIGNUP_URI)
 
-    @api("sign-out")
+    @api("sign-out", method=app.post)
     async def sign_out(request: Request):
         """ Log out user globally (including Keycloak) """
 
+        # Validate CSRF token for POST requests
+        form_data = await request.form()
+        csrf_token = form_data.get('csrf_token') or request.headers.get('X-CSRF-Token')
+        if not validate_csrf_token(request, csrf_token):
+            raise HTTPException(status_code=403, detail="Invalid CSRF token")
+
         redirect_uri = validate_direct_url(
-            request.query_params.get('redirect_uri'),
+            form_data.get('redirect_uri') or request.query_params.get('redirect_uri'),
             config.DEFAULT_LOGOUT_REDIRECT_URI
         )
         
         id_data = request.session.get(config.SES_USER_FIELD)
         id_token = request.cookies.get(config.SES_ID_TOKEN_FIELD)
-        keycloak_logout_url = f"{KEYCLOAK_LOGOUT_URI}?{urlencode({'id_token_hint': id_token, 'post_logout_redirect_uri': redirect_uri})}"
+
+        # Only proceed with logout if we have a valid session
+        if id_token and id_data:
+            keycloak_logout_url = f"{KEYCLOAK_LOGOUT_URI}?{urlencode({'id_token_hint': id_token, 'post_logout_redirect_uri': redirect_uri})}"
+        else:
+            # No valid session, just redirect
+            keycloak_logout_url = redirect_uri
 
         request.session.clear()
         response = RedirectResponse(url=keycloak_logout_url)
-        response.delete_cookie(config.SES_ID_TOKEN_FIELD)
+        response.delete_cookie(
+            config.SES_ID_TOKEN_FIELD,
+            httponly=True,
+            secure=config.COOKIE_HTTPS_ONLY,
+            samesite=config.COOKIE_SAME_SITE_POLICY
+        )
 
-        auth_event.user_logout.send(request, user=id_data)
+        if id_data:
+            auth_event.user_logout.send(request, user=id_data)
 
         return response
 

@@ -1,4 +1,4 @@
-from pyrsistent import PClass, field
+from pydantic import model_validator
 
 from fluvius.dmap import logger
 from fluvius.dmap.interface import DataLoop, DataElement, ReaderConfig
@@ -17,18 +17,19 @@ class FileValidationError(Exception):
 
 
 class TabularReaderConfig(ReaderConfig):
-    required_headers = field(type=(list, type(None)), initial=lambda: None)
-    required_fields = field(type=(list, type(None)), initial=lambda: None)
-    no_headers = field(type=bool, initial=lambda: False)
-    ignore_invalid_rows = field(type=bool, initial=lambda: False)
-    trim_spaces = field(type=bool, initial=lambda: False)
-    null_values = field(type=(list, type(None)), initial=lambda: None)
+    required_headers: list | None = None
+    required_fields: list | None = None
+    no_headers: bool = False
+    ignore_invalid_rows: bool = False
+    trim_spaces: bool = False
+    null_values: list | None = None
 
-    def __invariant__(record):
-        if record.no_headers is not False:
-            return (isinstance(record.required_headers, list), '[required_headers] needed if [no_headers] is set')
-
-        return (True, None)
+    @model_validator(mode='after')
+    def check_no_headers_requires_required_headers(self):
+        if self.no_headers is not False:
+            if not isinstance(self.required_headers, list):
+                raise ValueError('[required_headers] needed if [no_headers] is set')
+        return self
 
 
 class TabularReader(BaseReader):

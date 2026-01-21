@@ -4,6 +4,10 @@ from .domain.query import FormQueryManager
 from .domain.model import FormDataManager
 from .element import ElementDataManager, DataElementModel, ElementModelRegistry
 from .form import FormModel, FormModelRegistry, FormElement
+from .document import (
+    DocumentTemplate, DocumentTemplateRegistry, DocumentSection,
+    DocumentNode, ContentNode, FormNode
+)
 from .schema import FormConnector
 from .fastapi import setup_dform
 
@@ -15,5 +19,7 @@ __all__ = [
     "FormDomain", "FormResponse", "FormConnector", "FormQueryManager",
     "FormDataManager", "ElementDataManager", "DataElementModel",
     "ElementModelRegistry", "FormModel", "FormModelRegistry", "FormElement",
+    "DocumentTemplate", "DocumentTemplateRegistry", "DocumentSection",
+    "DocumentNode", "ContentNode", "FormNode",
     "setup_dform",
 ]

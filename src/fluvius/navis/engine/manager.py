@@ -156,10 +156,13 @@ class WorkflowManager(object):
         """Build dispatch table using mutation registry keys."""
         return {
             'initialize-workflow': self._persist_initialize_workflow,
-            'update-workflow': self._persist_update_workflow,
+            'set-state': self._persist_set_state,
             'add-step': self._persist_add_step,
             'update-step': self._persist_update_step,
             'set-memory': self._persist_set_memory,
+            'set-params': self._persist_set_params,
+            'set-output': self._persist_set_output,
+            'set-step-memory': self._persist_set_step_memory,
             'add-participant': self._persist_add_participant,
             'del-participant': self._persist_del_participant,
             'add-stage': self._persist_add_stage
@@ -197,18 +200,37 @@ class WorkflowManager(object):
                     updates[field] = value
         return updates
 
-    async def _persist_initialize_workflow(self, tx, wf_mut: MutationEnvelop):
-        """Create a new workflow record."""
-        wf_data = wf_mut.mutation.workflow
-        workflow_dict = wf_data.model_dump()
-        await tx.insert_data('workflow', workflow_dict)
+    # Fields that belong to workflow_state (dynamic/runtime state)
+    WORKFLOW_STATE_FIELDS = {'status', 'paused', 'progress', 'ts_start', 'ts_expire', 'ts_finish', 'params', 'memory', 'output'}
 
-    async def _persist_update_workflow(self, tx, wf_mut: MutationEnvelop):
-        """Update an existing workflow record."""
+    async def _persist_initialize_workflow(self, tx, wf_mut: MutationEnvelop):
+        """Create workflow record and workflow_state record."""
+        wf_data = wf_mut.mutation.workflow
+        workflow_dict = wf_data.model_dump(by_alias=True)
+        workflow_id = workflow_dict['_id']
+        
+        # Split into static (workflow) and dynamic (workflow_state) fields
+        workflow_state_values = {
+            '_id': workflow_id,
+            'workflow_id': workflow_id,
+            'status': wf_data.status,  # Ensure status is always set
+        }
+        
+        for field in self.WORKFLOW_STATE_FIELDS:
+            if field in workflow_dict:
+                workflow_state_values[field] = workflow_dict.pop(field)
+        
+        # Insert static workflow data
+        await tx.insert_data('workflow', workflow_dict)
+        # Insert dynamic workflow state
+        await tx.insert_data('workflow_state', workflow_state_values)
+
+    async def _persist_set_state(self, tx, wf_mut: MutationEnvelop):
+        """Update workflow_state record for dynamic fields."""
         updates = wf_mut.mutation.model_dump(exclude_none=True)
             
         if updates:
-            await tx.update_data('workflow', wf_mut.workflow_id, **updates)
+            await tx.update_data('workflow_state', wf_mut.workflow_id, **updates)
 
     async def _persist_add_step(self, tx, wf_mut: MutationEnvelop):
         """Add a new step record."""
@@ -217,16 +239,31 @@ class WorkflowManager(object):
 
     async def _persist_update_step(self, tx, wf_mut: MutationEnvelop):
         """Update an existing step record."""
-        updates = wf_mut.mutation.model_dump(exclude_none=True)            
+        step_id = wf_mut.mutation.step_id
+        updates = wf_mut.mutation.model_dump(exclude_none=True, exclude={'step_id'})            
         if updates:
-            await tx.update_data('workflow_step', wf_mut.step_id, **updates)
+            await tx.update_data('workflow_step', step_id, **updates)
 
     async def _persist_set_memory(self, tx, wf_mut: MutationEnvelop):
-        """Set workflow or step memory records."""
-        values = wf_mut.mutation.model_dump(exclude_none=True)
-        values['_id'] = wf_mut.workflow_id
-        values['workflow_id'] = wf_mut.workflow_id
-        await tx.upsert_data('workflow_memory', values)
+        """Set workflow memory records."""
+        memory = wf_mut.mutation.memory
+        await tx.update_data('workflow_state', wf_mut.workflow_id, memory=memory)
+
+    async def _persist_set_params(self, tx, wf_mut: MutationEnvelop):
+        """Set workflow params records."""
+        params = wf_mut.mutation.params
+        await tx.update_data('workflow_state', wf_mut.workflow_id, params=params)
+
+    async def _persist_set_output(self, tx, wf_mut: MutationEnvelop):
+        """Set workflow output records."""
+        output = wf_mut.mutation.output
+        await tx.update_data('workflow_state', wf_mut.workflow_id, output=output)
+
+    async def _persist_set_step_memory(self, tx, wf_mut: MutationEnvelop):
+        """Set step memory by updating the step record."""
+        step_id = wf_mut.mutation.step_id
+        memory = wf_mut.mutation.memory
+        await tx.update_data('workflow_step', step_id, memory=memory)
 
     async def _persist_add_participant(self, tx, wf_mut: MutationEnvelop):
         """Add a participant record."""
@@ -344,13 +381,15 @@ class WorkflowManager(object):
             if hasattr(wf_def.Meta, 'params_schema') and wf_def.Meta.params_schema:
                 try:
                     params_schema = wf_def.Meta.params_schema.model_json_schema()
-                except:
+                except Exception:
+                    logger.exception('Error serializing params schema for %s', wf_def.Meta.key)
                     params_schema = None
             
             if hasattr(wf_def.Meta, 'memory_schema') and wf_def.Meta.memory_schema:
                 try:
                     memory_schema = wf_def.Meta.memory_schema.model_json_schema()
-                except:
+                except Exception:
+                    logger.exception('Error serializing memory schema for %s', wf_def.Meta.key)
                     memory_schema = None
             
             # Get description from docstring

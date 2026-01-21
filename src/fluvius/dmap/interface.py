@@ -1,7 +1,9 @@
 import os
 from enum import Enum
-from pyrsistent import PClass, field
+from typing import Any
 from collections import namedtuple
+from pydantic import Field, field_validator
+from fluvius.data import DataModel
 from fluvius.error import BadRequestError
 from fluvius.helper import osutil
 
@@ -21,11 +23,14 @@ class InputResourceKind(Enum):
 
 
 def _validate_list(v):
+    if v is None:
+        return []
+
     if isinstance(v, str):
         return [v]
 
     if isinstance(v, (list, tuple)):
-        return v
+        return list(v)
 
     raise BadRequestError(
         "T00.201",
@@ -35,6 +40,9 @@ def _validate_list(v):
 
 
 def _validate_writer(w):
+    if w is None:
+        return {}
+
     if isinstance(w, str):
         return {'name': w}
 
@@ -52,52 +60,93 @@ class OutputRow(tuple):
     pass
 
 
-class ReaderConfig(PClass):
-    name             = field(type=str)
-    debug_log        = field(type=(str, type(None)), initial=lambda: None)
-    error_log        = field(type=(str, type(None)), initial=lambda: None)
-    transforms       = field(type=list, initial=list, factory=_validate_list)
+class ReaderConfig(DataModel):
+    name: str
+    debug_log: str | None = None
+    error_log: str | None = None
+    transforms: list = Field(default_factory=list)
+
+    @field_validator('transforms', mode='before')
+    @classmethod
+    def validate_transforms(cls, v):
+        return _validate_list(v)
 
 
-class WriterConfig(PClass):
-    name             = field(type=str)
-    transforms       = field(type=list, initial=list, factory=_validate_list)
+class WriterConfig(DataModel):
+    name: str
+    transforms: list = Field(default_factory=list)
+
+    @field_validator('transforms', mode='before')
+    @classmethod
+    def validate_transforms(cls, v):
+        return _validate_list(v)
 
 
-class PipelineConfig(PClass):
-    key              = field(type=str)
-    transaction      = field(type=(str, type(None)), initial=lambda: None)
-    mapping          = field(type=dict)
-    transforms       = field(type=list, initial=list, factory=_validate_list)
-    writer           = field(type=dict, initial=dict, factory=_validate_writer)
-    coercer_profile  = field(type=str, initial=lambda: 'generic')
-    allow_ctx_buffer = field(type=bool, initial=True)
+class PipelineConfig(DataModel):
+    key: str
+    transaction: str | None = None
+    mapping: dict
+    transforms: list = Field(default_factory=list)
+    writer: dict = Field(default_factory=dict)
+    coercer_profile: str = 'generic'
+    allow_ctx_buffer: bool = True
+
+    @field_validator('transforms', mode='before')
+    @classmethod
+    def validate_transforms(cls, v):
+        return _validate_list(v)
+
+    @field_validator('writer', mode='before')
+    @classmethod
+    def validate_writer(cls, v):
+        return _validate_writer(v)
 
 
-class DataProcessManagerConfig(PClass):
-    name            = field(type=str)
-    process_name    = field(type=str)
-    process_tracker = field(type=dict)
-    force_import    = field(type=bool, initial=lambda: False)
+class DataProcessManagerConfig(DataModel):
+    name: str
+    process_name: str
+    process_tracker: dict
+    force_import: bool = False
 
 
-class DataProcessConfig(PClass):
-    inputs          = field(type=dict, initial=dict, factory=_validate_writer)
-    manager         = field(type=(DataProcessManagerConfig, type(None)), factory=DataProcessManagerConfig.create)
-    reader          = field(type=dict, initial=dict)
-    writer          = field(type=dict, initial=dict, factory=_validate_writer)
-    pipelines       = field(type=dict, initial=dict)
-    metadata        = field(type=dict, initial=dict)
+class DataProcessConfig(DataModel):
+    inputs: dict = Field(default_factory=dict)
+    manager: DataProcessManagerConfig | None = None
+    reader: dict = Field(default_factory=dict)
+    writer: dict = Field(default_factory=dict)
+    pipelines: dict = Field(default_factory=dict)
+    metadata: dict = Field(default_factory=dict)
+
+    @field_validator('inputs', mode='before')
+    @classmethod
+    def validate_inputs(cls, v):
+        return _validate_writer(v)
+
+    @field_validator('writer', mode='before')
+    @classmethod
+    def validate_writer_field(cls, v):
+        return _validate_writer(v)
+
+    @field_validator('manager', mode='before')
+    @classmethod
+    def validate_manager(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, DataProcessManagerConfig):
+            return v
+        if isinstance(v, dict):
+            return DataProcessManagerConfig(**v)
+        return v
 
 
-class InputFile(PClass):
-    filename = field(type=str)
-    filepath = field(type=str)
-    filesize = field()
-    filetype = field()
-    source_id = field(type=(int, type(None)), initial=lambda: None)
-    sha256sum = field(type=(str, type(None)), initial=lambda: None)
-    metadata = field()
+class InputFile(DataModel):
+    filename: str
+    filepath: str
+    filesize: Any = None
+    filetype: Any = None
+    source_id: int | None = None
+    sha256sum: str | None = None
+    metadata: Any = None
 
     @classmethod
     def from_file(cls, filepath, **kwargs):

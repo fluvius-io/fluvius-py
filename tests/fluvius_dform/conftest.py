@@ -45,11 +45,11 @@ async def setup_db_once():
     # Drop and recreate schemas to ensure a clean state (use CASCADE to handle FK constraints)
     async with db.begin() as conn:
         # Drop schemas with CASCADE to remove all dependent objects
-        await conn.execute(text(f"DROP SCHEMA IF EXISTS {config.DEFINITION_DB_SCHEMA} CASCADE"))
-        await conn.execute(text(f"DROP SCHEMA IF EXISTS {config.DFORM_DATA_DB_SCHEMA} CASCADE"))
+        await conn.execute(text(f"DROP SCHEMA IF EXISTS {config.DFORM_DEFS_SCHEMA} CASCADE"))
+        await conn.execute(text(f"DROP SCHEMA IF EXISTS {config.DFORM_DATA_SCHEMA} CASCADE"))
         # Recreate schemas
-        await conn.execute(text(f"CREATE SCHEMA {config.DEFINITION_DB_SCHEMA}"))
-        await conn.execute(text(f"CREATE SCHEMA {config.DFORM_DATA_DB_SCHEMA}"))
+        await conn.execute(text(f"CREATE SCHEMA {config.DFORM_DEFS_SCHEMA}"))
+        await conn.execute(text(f"CREATE SCHEMA {config.DFORM_DATA_SCHEMA}"))
         await conn.commit()
     
     # Create all form tables

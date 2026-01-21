@@ -355,19 +355,20 @@ class TestFormSchemaAPI:
         response = await client.get("/dform/form-types")
         
         # May return 404 if endpoint not implemented
-        if response.status_code == 200:
-            data = response.json()
-            assert "form_types" in data
-            
-            keys = [ft["key"] for ft in data["form_types"]]
-            assert "applicant-info" in keys
+        assert response.status_code == 200
+        data = response.json()
+        assert "form_types" in data
+        
+        keys = [ft["key"] for ft in data["form_types"]]
+        assert "applicant-info" in keys
     
     async def test_get_form_schema(self, client):
         """Test getting JSON schema for a form"""
         response = await client.get("/dform/form-schema/applicant-info")
         
         # May return 404 if endpoint not implemented
-        if response.status_code == 200:
-            data = response.json()
-            assert data["key"] == "applicant-info"
-            assert "schema" in data
+        assert response.status_code == 200
+        data = response.json()
+        assert data["key"] == "applicant-info"
+        assert "schema" in data
+    
