@@ -45,6 +45,9 @@ dependencies = [
     "whenever>=0.7.3",
     "python-dateutil>=2.9.0.post0",
     "croniter>=6.0.0",
+    "h11>=0.16.0",
+    "urllib3>=2.6.3"
+
 ]
 
 [dependency-groups]
