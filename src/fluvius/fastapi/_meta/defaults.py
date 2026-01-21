@@ -54,6 +54,6 @@ MQTT_PERMISSIONS = [
 ]
 
 MQTT_DEBUG = True
-ALLOW_SIGN_OUT_GET_METHOD = False
+VALIDATE_CSRF_TOKEN = False
 AUTH_REALMS_CONFIG = {}
 ERROR_TRACKING_PROVIDER = "NullTracker" # "PosthogTracker" or "SentryTracker"

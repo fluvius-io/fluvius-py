@@ -32,7 +32,8 @@ class FastAPIDomainManager(DomainManager):
     def setup_domain_endpoints(self):
         self.initialize_domains(self.app)
         def _setup_domain(domain):
-            metadata_uri = f"/_meta/{domain.__namespace__}/"
+            namespace = domain.Meta.namespace
+            metadata_uri = f"/_meta/{namespace}/"
             cmd_details = {
                 cmd['key']: cmd for cmd in
                 (
@@ -46,8 +47,8 @@ class FastAPIDomainManager(DomainManager):
                 return domain.metadata(commands = cmd_details)
 
             return {
-                "id": domain.__namespace__,
-                "name": domain.__namespace__,
+                "id": namespace,
+                "name": namespace,
                 "description": domain.Meta.description,
                 "externalDocs": {
                     "description": "Metadata",

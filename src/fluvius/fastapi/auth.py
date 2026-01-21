@@ -17,6 +17,7 @@ from types import SimpleNamespace
 
 
 from fluvius.error import (
+    ForbiddenError,
     UnauthorizedError,
     FluviusException,
     BadRequestError,
@@ -84,7 +85,7 @@ def auth_required(inject_ctx=False, **auth_kwargs):
 
                 return JSONResponse(
                     status_code=500,
-                    content={"errcode": "S00.501", "message": "Unexpected auth error: {e}"}
+                    content={"errcode": "S00.501", "errmesg": "Unexpected auth error: {e}"}
                 )
 
             if inject_ctx:
@@ -93,7 +94,7 @@ def auth_required(inject_ctx=False, **auth_kwargs):
             if not auth_context:
                 return JSONResponse(
                     status_code=401,
-                    content={"errcode": "S00.401", "message": "User is not authenticated"}
+                    content={"errcode": "S00.401", "errmesg": "User is not authenticated"}
                 )
 
             request.state.auth_context = auth_context
@@ -353,29 +354,33 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
     @api("sign-in")
     async def sign_in(request: Request):
         # Generate and store CSRF token
+        params = request.query_params
+        headers = request.headers
+
         csrf_token = generate_csrf_token()
         request.session['csrf_token'] = csrf_token
-        request.session["next"] = request.query_params.get('next')
-        callback_uri = validate_direct_url(request.query_params.get('callback'), config.DEFAULT_CALLBACK_URI)
+        request.session["next"] = params.get('next')
+        callback_uri = validate_direct_url(params.get('callback'), config.DEFAULT_CALLBACK_URI)
         return await oauth.keycloak.authorize_redirect(request, callback_uri)
 
     @api("sign-up")
     async def sign_up(request: Request):
         return RedirectResponse(url=KEYCLOAK_SIGNUP_URI)
 
-
-    @api("sign-out", methods=['POST', 'GET'] if config.ALLOW_SIGN_OUT_GET_METHOD else ['POST'])
+    @api("sign-out", method=app.get)
     async def sign_out(request: Request):
         """ Log out user globally (including Keycloak) """
+        params = request.query_params
+        headers = request.headers
 
         # Validate CSRF token for POST requests
-        form_data = await request.form()
-        csrf_token = form_data.get('csrf_token') or request.headers.get('X-CSRF-Token')
-        if not validate_csrf_token(request, csrf_token):
-            raise HTTPException(status_code=403, detail="Invalid CSRF token")
+        if config.VALIDATE_CSRF_TOKEN:
+            csrf_token = params.get('csrf_token') or headers.get('X-CSRF-Token')
+            if not validate_csrf_token(request, csrf_token):
+                raise HTTPException(status_code=403, detail="Invalid CSRF token")
 
         redirect_uri = validate_direct_url(
-            form_data.get('redirect_uri') or request.query_params.get('redirect_uri'),
+            params.get('redirect_uri') or headers.get('X-Redirect-Uri'),
             config.DEFAULT_LOGOUT_REDIRECT_URI
         )
 
