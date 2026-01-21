@@ -1,7 +1,7 @@
+import secrets
 import base64
 import httpx
 import json
-import secrets
 
 from urllib.parse import urlencode
 
@@ -10,22 +10,22 @@ from authlib.jose import jwt, JsonWebKey
 from authlib.jose.util import extract_header
 from fastapi import Request, Depends, HTTPException, Response
 from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.error import config as errconf
 from functools import wraps
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from types import SimpleNamespace
 
 
-from fluvius.error import UnauthorizedError, FluviusException, BadRequestError, config as errconf
+from fluvius.error import UnauthorizedError, FluviusException, BadRequestError
 from fluvius.data import DataModel
 from fluvius.auth import (
-    AuthorizationContext, 
-    KeycloakTokenPayload, 
-    SessionProfile, 
+    AuthorizationContext,
+    KeycloakTokenPayload,
+    SessionProfile,
     SessionOrganization,
     event as auth_event,
-    helper as auth_helper
-)
+    helper as auth_helper)
 from fluvius.helper import when
 from pipe import Pipe
 from typing import Optional, Awaitable, Callable
@@ -33,7 +33,6 @@ from typing import Optional, Awaitable, Callable
 from . import config, logger
 from .setup import on_startup
 from .helper import uri, generate_client_token, generate_session_id, validate_direct_url
-from fluvius.error import DEVELOPER_MODE
 
 IDEMPOTENCY_KEY = config.RESP_HEADER_IDEMPOTENCY
 DEVELOPER_MODE = errconf.DEVELOPER_MODE
@@ -291,8 +290,8 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
         if not id_token:
             raise HTTPException(status_code=400, detail="Missing ID token")
 
-        id_data = await auth_helper.decode_id_token(request.app.state.jwks_keyset, id_token, KEYCLOAK_ISSUER, KEYCLOAK_CLIENT_ID)
-        ac_data = await auth_helper.decode_ac_token(request.app.state.jwks_keyset, ac_token)
+        id_data = auth_helper.decode_id_token(request.app.state.jwks_keyset, id_token, KEYCLOAK_ISSUER, KEYCLOAK_CLIENT_ID)
+        ac_data = auth_helper.decode_ac_token(request.app.state.jwks_keyset, ac_token)
 
         id_data.update(
             realm_access=ac_data.get("realm_access"),
@@ -374,7 +373,7 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
             form_data.get('redirect_uri') or request.query_params.get('redirect_uri'),
             config.DEFAULT_LOGOUT_REDIRECT_URI
         )
-        
+
         id_data = request.session.get(config.SES_USER_FIELD)
         id_token = request.cookies.get(config.SES_ID_TOKEN_FIELD)
 
