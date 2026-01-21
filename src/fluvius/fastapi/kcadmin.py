@@ -4,7 +4,9 @@ from aiohttp import BasicAuth, ClientSession
 from fluvius.data import nullable, PClass, field
 from fluvius.error import BadRequestError, ForbiddenError
 from fluvius.fastapi import config, logger
-from .restriction import RESTRICTION
+from .restriction import EMAIL_DOMAIN_RESTRICTION
+
+RX_EMAIL = re.compile(r"(?<=@)(\S+$)")
 
 SUCCESS_CODES = [200, 201, 202, 203, 204, 205, 206, 207, 208, 226]
 
@@ -266,15 +268,21 @@ class KCAdmin(object):
         resp = self._get(endpoint, error_message="Get admin events failed")
         return await resp.json()
 
-    def check_whitelist_email(self, domain):
-        if domain not in config.WHITELIST_DOMAIN:
+    def check_whitelist_email(self, domain: str, whitelist: list):
+        if not whitelist:
+            return
+
+        if domain not in whitelist:
             raise ForbiddenError(
                 "S00.403",
                 "To prevent member data exposure, this email address is not allowed to log in to the system."  # noqa: E501
             )
 
-    def check_blacklist_email(self, domain):
-        if domain in RESTRICTION:
+    def check_blacklist_email(self, domain: str, blacklist: list):
+        if not blacklist:
+            return
+
+        if (domain in EMAIL_DOMAIN_RESTRICTION) or (domain in blacklist):
             raise ForbiddenError(
                 "S00.404",
                 "To prevent member data exposure, this email address is not allowed to log in to the system."  # noqa: E501
@@ -282,13 +290,9 @@ class KCAdmin(object):
 
     def email_restriction(self, user_data):
         try:
-            domain = re.search(
-                r"(?<=@)(\S+$)", user_data.get("email")).group(0)
-            if config.WHITELIST_DOMAIN:
-                self.check_whitelist_email(domain)
-
-            if config.BLACKLIST_DOMAIN:
-                self.check_blacklist_email(domain)
+            domain = RX_EMAIL.search(user_data.get("email")).group(0)
+            self.check_whitelist_email(domain, config.WHITELIST_DOMAIN)
+            self.check_blacklist_email(domain, config.BLACKLIST_DOMAIN)
         except AttributeError:
             raise BadRequestError(
                 "S00.203",
