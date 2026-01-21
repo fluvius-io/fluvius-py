@@ -364,20 +364,18 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
     async def sign_up(request: Request):
         return RedirectResponse(url=KEYCLOAK_SIGNUP_URI)
 
-    SIGN_OUT_METHODS = ['POST', 'GET'] if config.ALLOW_SIGN_OUT_GET_METHOD else ['POST']
-    @api("sign-out", method=app.api_route, methods=SIGN_OUT_METHODS)
+    @api("sign-out", method=app.get)
     async def sign_out(request: Request):
         """ Log out user globally (including Keycloak) """
 
         # Validate CSRF token for POST requests
-        form_data = await request.form()
         if config.VALIDATE_CSRF_TOKEN:
-            csrf_token = form_data.get('csrf_token') or request.headers.get('X-CSRF-Token')
+            csrf_token = request.query_params.get('csrf_token') or request.headers.get('X-CSRF-Token')
             if not validate_csrf_token(request, csrf_token):
                 raise HTTPException(status_code=403, detail="Invalid CSRF token")
 
         redirect_uri = validate_direct_url(
-            form_data.get('redirect_uri') or request.query_params.get('redirect_uri'),
+            request.query_params.get('redirect_uri') or request.headers.get('X-Redirect-Uri'),
             config.DEFAULT_LOGOUT_REDIRECT_URI
         )
 
