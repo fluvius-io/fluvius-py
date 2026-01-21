@@ -22,7 +22,7 @@ readme = "docs/README.md"
 requires-python = ">=3.12"
 license = "MIT"
 dependencies = [
-    "aiohttp>=3.11.11",
+    "aiohttp>=3.13.3",
     "aioredis>=2.0.0",
     "arq>=0.26.3",
     "asyncpg>=0.30.0",
@@ -36,6 +36,7 @@ dependencies = [
     "h11>=0.16.0",
     "iso8601",
     "jsonurl-py>=0.4.0",
+    "mcp>=1.23.0",
     "pipe>=2.2",
     "pydantic[email]>=2.11.4",
     "pypika",
