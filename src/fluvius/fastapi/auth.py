@@ -17,6 +17,7 @@ from types import SimpleNamespace
 
 
 from fluvius.error import (
+    ForbiddenError,
     UnauthorizedError,
     FluviusException,
     BadRequestError,
@@ -370,9 +371,10 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
 
         # Validate CSRF token for POST requests
         form_data = await request.form()
-        csrf_token = form_data.get('csrf_token') or request.headers.get('X-CSRF-Token')
-        if not validate_csrf_token(request, csrf_token):
-            raise HTTPException(status_code=403, detail="Invalid CSRF token")
+        if config.VALIDATE_CSRF_TOKEN:
+            csrf_token = form_data.get('csrf_token') or request.headers.get('X-CSRF-Token')
+            if not validate_csrf_token(request, csrf_token):
+                raise HTTPException(status_code=403, detail="Invalid CSRF token")
 
         redirect_uri = validate_direct_url(
             form_data.get('redirect_uri') or request.query_params.get('redirect_uri'),
