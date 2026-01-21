@@ -84,7 +84,7 @@ def build_dsn(config):
 def sqla_error_handler(code_prefix):
     """ We need to standardize (ie. mapping) the driver exceptions to standard Fluvius Data Driver Exceptions
         so the error handling code on the data manager layer can be consistent.
-        
+
         Note: We use isinstance() checks instead of match e.__class__ because SQLAlchemy
         wraps underlying database exceptions, so direct class comparison doesn't work.
         The order of checks matters - more specific exceptions must be checked first.
@@ -96,32 +96,30 @@ def sqla_error_handler(code_prefix):
             try:
                 return await func(*args, **kwargs)
             except Exception as e:
-                logger.exception('SQLAlchemy Operation Error: %s', e)
-                
-                orig = getattr(e, 'orig', None)
-                orig_str = str(orig) if orig else None
-                pgcode = getattr(orig, 'pgcode', None) if orig else None
+                orig_e = getattr(e, 'orig', None)
+                orig_s = str(orig_e) if orig_e else None
+                pgcode = getattr(orig_e, 'pgcode', None) if orig_e else None
 
                 # Check for asyncpg unique violation (wrapped in IntegrityError)
                 if isinstance(e, exc.IntegrityError):
-                    if orig and isinstance(orig, asyncpg.exceptions.UniqueViolationError):
+                    if orig_e and isinstance(orig_e, asyncpg.exceptions.UniqueViolationError):
                         raise DuplicateEntryError(
                             f"{code_prefix}-01",
-                            f"Duplicate entry detected. Record must be unique. [{orig}]",
-                            orig_str
+                            f"Duplicate entry detected. Record must be unique.",
+                            orig_s
                         )
                     # Other integrity errors (foreign key, check constraints, etc.)
                     raise IntegrityConstraintError(
                         f"{code_prefix}-02",
-                        f"Integrity constraint violated. Please check your input. [{orig}]",
-                        orig_str
+                        f"Integrity constraint violated. Please check your input.",
+                        orig_s
                     )
 
                 if isinstance(e, exc.OperationalError):
                     raise DatabaseConnectionError(
                         f"{code_prefix}-03",
-                        f"The database is currently unreachable. Please try again later. [{orig}]",
-                        orig_str
+                        f"The database is currently unreachable. Please try again later.",
+                        orig_s
                     )
 
                 if isinstance(e, exc.ProgrammingError):
@@ -129,12 +127,12 @@ def sqla_error_handler(code_prefix):
                         raise InvalidQueryValueError(
                             f"{code_prefix}-41",
                             "Undefined function error [42883]. Values must be in correct format.",
-                            orig_str
+                            orig_s
                         )
                     raise QuerySyntaxError(
                         f"{code_prefix}-04",
-                        f"There was a syntax or structure error in the database query. [{orig}]",
-                        orig_str
+                        f"There was a syntax or structure error in the database query.",
+                        orig_s
                     )
 
                 if isinstance(e, exc.DBAPIError):
@@ -142,26 +140,26 @@ def sqla_error_handler(code_prefix):
                         raise InvalidQueryValueError(
                             f"{code_prefix}-51",
                             f"Invalid row count in result offset clause [{pgcode}].",
-                            orig_str
+                            orig_s
                         )
                     raise DatabaseAPIError(
                         f"{code_prefix}-05",
                         f"A database API error occurred [{pgcode}].",
-                        orig_str
+                        orig_s
                     )
 
                 if isinstance(e, exc.NoResultFound):
                     raise ItemNotFoundError(
                         f"{code_prefix}-06",
                         f"Item Not Found: {str(e)}",
-                        orig_str
+                        orig_s
                     )
 
                 if isinstance(e, exc.SQLAlchemyError):
                     raise UnexpectedDatabaseError(
                         f"{code_prefix}-07",
                         "An unexpected database error occurred while processing your request.",
-                        orig_str
+                        orig_s
                     )
 
                 # Re-raise unknown exceptions
