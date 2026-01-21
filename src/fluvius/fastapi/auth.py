@@ -10,14 +10,18 @@ from authlib.jose import jwt, JsonWebKey
 from authlib.jose.util import extract_header
 from fastapi import Request, Depends, HTTPException, Response
 from fastapi.responses import RedirectResponse, JSONResponse
-from fastapi.error import config as errconf
 from functools import wraps
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from types import SimpleNamespace
 
 
-from fluvius.error import UnauthorizedError, FluviusException, BadRequestError
+from fluvius.error import (
+    UnauthorizedError,
+    FluviusException,
+    BadRequestError,
+    config as errconf
+)
 from fluvius.data import DataModel
 from fluvius.auth import (
     AuthorizationContext,
@@ -359,7 +363,8 @@ def configure_authentication(app, config=config, base_path="/auth", auth_profile
     async def sign_up(request: Request):
         return RedirectResponse(url=KEYCLOAK_SIGNUP_URI)
 
-    @api("sign-out", method=app.post)
+
+    @api("sign-out", methods=['POST', 'GET'] if config.ALLOW_LOGOUT_GET_METHOD else ['POST'])
     async def sign_out(request: Request):
         """ Log out user globally (including Keycloak) """
 
