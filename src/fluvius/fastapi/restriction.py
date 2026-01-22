@@ -1,4 +1,4 @@
-RESTRICTION = [
+EMAIL_DOMAIN_RESTRICTION = [
     "0-mail.com",
     "0815.ru",
     "0clickemail.com",

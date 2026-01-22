@@ -12,7 +12,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fluvius"
-version = "0.1.3-post2"
+version = "0.2.0-rc0"
 authors = [
     { name = "Hung X. Le", email = "hunglx@adaptive-bits.com" },
     { name = "Phu V. Nguyen", email = "phunv@adaptive-bits.com" },
@@ -20,9 +20,9 @@ authors = [
 description = "Fluvius Framework (https://fluvius.io)"
 readme = "docs/README.md"
 requires-python = ">=3.12"
-license = "MIT"
+license = "GPL-3.0-or-later"
 dependencies = [
-    "aiohttp>=3.11.11",
+    "aiohttp>=3.13.3",
     "aioredis>=2.0.0",
     "arq>=0.26.3",
     "asyncpg>=0.30.0",
@@ -33,16 +33,19 @@ dependencies = [
     "fastapi",
     "fastapi-mcp>=0.3.3",
     "fsspec>=2025.3.2",
+    "greenlet>=3.3.0",
     "h11>=0.16.0",
     "iso8601",
     "jsonurl-py>=0.4.0",
+    "mcp>=1.23.0",
     "pipe>=2.2",
     "pydantic[email]>=2.11.4",
     "pypika",
     "pyrsistent>=0.20.0",
     "python-dateutil>=2.9.0.post0",
+    "requests>=2.32.4",
     "ruff>=0.9.1",
-    "sqlalchemy>=2.0.37",
+    "sqlalchemy[asyncio]>=2.0.37",
     "sqlmodel",
     "starlette>=0.49.1",
     "ulid-py>=1.1.0",
@@ -52,10 +55,11 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "pandas",
     "pyinstrument>=5.0.1",
-    "pytest>=8.3.5",
     "pytest-asyncio>=0.26.0",
     "pytest-html>=4.1.1",
+    "pytest>=8.3.5",
     "sanic-testing>=24.6.0",
     "yappi>=1.6.10",
 ]

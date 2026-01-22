@@ -6,7 +6,7 @@ import logging
 
 from .conf import defaults
 
-__version__ = "0.1.3-post2"
+__version__ = "0.2.0-rc0"
 __all__ = ('config', 'logger', 'setupModule')
 
 
