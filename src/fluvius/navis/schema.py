@@ -251,7 +251,7 @@ AS SELECT wp._id,
     wp._etag,
     wp._realm
    FROM {DB_SCHEMA}.workflow_participant wp
-     JOIN rfx_user."user" u ON u._id = wp.user_id
+     JOIN {DB_SCHEMA}."user" u ON u._id = wp.user_id
   WHERE wp._deleted IS NULL AND u._deleted IS NULL;
 ''')
 
