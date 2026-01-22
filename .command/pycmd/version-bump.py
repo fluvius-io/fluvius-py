@@ -6,6 +6,7 @@ import re
 
 from pathlib import Path
 from collections import namedtuple
+from click import echo
 
 RX_PEP440_LABEL = re.compile(r"^(a|b|rc|post|dev)(\d*)$", re.VERBOSE)
 RX_VERSION_STR =  re.compile(r"(\d+)\.(\d+)\.(\d+)-?([\w]*)")
@@ -14,11 +15,24 @@ INIT_FILE_PATH = Path("src/fluvius/__init__.py")  # 👈 Replace with your actua
 
 Version = namedtuple("Version", ["major", "minor", "patch", "label"])
 
+
+def error(message):
+    raise click.ClickException("[E] {message}")
+
+
+def info(message):
+    return echo(f"/i/ {message}")
+
+
+def warning(message):
+    return echo(f"/!\\ {message}")
+
+
 def parse_version_str(version_str):
     """Parse a version string like '1.2.3-final' into a Version namedtuple."""
     match = RX_VERSION_STR.match(version_str)
     if not match:
-        raise click.ClickException(f"Invalid version format: {version_str}")
+        error(f"Invalid version format: {version_str}")
     major, minor, patch, label = match.groups()
     return Version(int(major), int(minor), int(patch), label or "final")
 
@@ -41,12 +55,13 @@ def get_version():
     init_content = INIT_FILE_PATH.read_text()
     match = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', init_content)
     if not match:
-        raise click.ClickException("No __version__ declaration found in __init__.py")
+        error("No __version__ declaration found in __init__.py")
+        
     init_version_str = match.group(1)
 
     # Compare both
     if toml_version_str != init_version_str:
-        raise click.ClickException(
+        error(
             f"Version mismatch:\n"
             f"  pyproject.toml: {toml_version_str}\n"
             f"  __init__.py:    {init_version_str}"
@@ -60,8 +75,7 @@ def set_version(version: Version):
 
     prompt = f'Commit all pending changes and set library version to: {version_str} \n>> Do you want to continue?'
     if not click.confirm(prompt, default=False):
-        click.echo("❌ Action cancelled.")
-        return
+        return warning("Action cancelled.")
 
     # Update pyproject.toml
     pyproject_content = PYPROJECT_PATH.read_text()
@@ -71,10 +85,10 @@ def set_version(version: Version):
         pyproject_content,
     )
     if count == 0:
-        raise click.ClickException("Version field not found in pyproject.toml")
+        error("Version field not found in pyproject.toml")
 
     PYPROJECT_PATH.write_text(new_pyproject_content)
-    click.echo(f"[pyproject.toml] Updated to version {version_str}")
+    info(f"[pyproject.toml] Updated to version {version_str}")
 
     # Update __init__.py
     init_content = INIT_FILE_PATH.read_text()
@@ -84,14 +98,14 @@ def set_version(version: Version):
         init_content,
     )
     if count == 0:
-        raise click.ClickException("No __version__ declaration found in __init__.py")
+        error("No __version__ declaration found in __init__.py")
 
     INIT_FILE_PATH.write_text(new_init_content)
-    click.echo(f"[{INIT_FILE_PATH}] __version__ updated to {version_str}")
+    info(f"[{INIT_FILE_PATH}] __version__ updated to {version_str}")
 
-    click.echo(sh.git('add', f'.'))
-    click.echo(sh.git('commit', f'-m', f'Bump version to: {version_str}'))
-    click.echo(sh.git('tag', f'releases/gh/{version_str}'))
+    echo(sh.git('add', f'.'))
+    echo(sh.git('commit', f'-m', f'Bump version to: {version_str}'))
+    echo(sh.git('tag', f'releases/gh/{version_str}'))
 
 
 def validate_release_label(value):
@@ -102,7 +116,7 @@ def validate_release_label(value):
         return  None
 
     if not RX_PEP440_LABEL.match(value):
-        raise click.ClickException(f'Invalid release label [{value}]. Must follow PEP-440: (a|b|rc|post|dev)(\\d*).')
+        error(f'[E] Invalid release label [{value}]. Must follow PEP-440: (a|b|rc|post|dev)(\\d*).')
 
     return value
 
@@ -125,13 +139,13 @@ def update_release(release_type, release_label=None):
             set_version(next_version)
         case 'label':
             if not label:
-                raise click.ClickException('Release label is not provided.')
+                error('[E] Release label is not provided.')
 
             next_version = Version(current.major, current.minor, current.patch, label)
             set_version(next_version)
         case _:
-            click.echo(f"Current version: {version_to_str(current)}")
-            click.echo(f"   - Usage: release [major|minor|patch|label] [label_value]")
+            info(f"Current version: {version_to_str(current)}")
+            info(f"Usage: release [major|minor|patch|label] [label_value]")
 
     return 0
 
