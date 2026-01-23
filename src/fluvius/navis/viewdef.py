@@ -35,3 +35,16 @@ class WorkflowViewSchema(WorkflowBaseSchema):
     ts_finish = sa.Column(sa.DateTime(timezone=True), nullable=True)
     sys_tag = sa.Column(pg.ARRAY(sa.String), nullable=True)
     usr_tag = sa.Column(pg.ARRAY(sa.String), nullable=True)
+
+class WorkflowParticipantVireSchema(WorkflowBaseSchema):
+    __tablename__ = "_workflow_participant"
+    __external__ = True
+    __table_args__ = {'info': {'is_view': True}}
+
+    workflow_id = sa.Column(pg.UUID, nullable=False)
+    user_id = sa.Column(pg.UUID, nullable=False)
+    role = sa.Column(sa.String, nullable=False)
+    username = sa.Column(sa.String, nullable=True)
+    full_name = sa.Column(sa.String, nullable=True)
+    email = sa.Column(sa.String, nullable=True)
+    phone = sa.Column(sa.String, nullable=True)

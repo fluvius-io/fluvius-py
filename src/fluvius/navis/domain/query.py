@@ -11,6 +11,9 @@ class WorkflowScope(DataModel):
     __default_key__ = 'workflow_id'
     workflow_id: UUID_TYPE
 
+class StepScope(DataModel):
+    __default_key__ = 'step_id'
+    step_id: UUID_TYPE
 
 class WorkflowQueryManager(DomainQueryManager):
     """Query manager for workflow domain"""
@@ -68,6 +71,7 @@ class WorkflowStepQuery(DomainQueryResource):
     src_step: UUID_TYPE = UUIDField("Origin Step ID")
     ts_start: str = DatetimeField("Start Time")
     ts_finish: str = DatetimeField("Finish Time")
+    memory: dict = DictField("Step Memory", hidden=True)
 
 
 @resource('workflow-participant')
@@ -77,12 +81,15 @@ class WorkflowParticipantQuery(DomainQueryResource):
     class Meta(DomainQueryResource.Meta):
         description = "List workflow participants and their roles"
         scope_required = WorkflowScope
-        backend_model = "workflow_participant"
+        backend_model = "_workflow_participant"
 
-    id: UUID_TYPE = PrimaryID("Participant ID")
     workflow_id: UUID_TYPE = UUIDField("Workflow ID")
     user_id: UUID_TYPE = UUIDField("User ID")
     role: str = StringField("Participant Role")
+    username: str = StringField("User Name")
+    full_name: str = StringField("User Full Name")
+    email: str = StringField("User Email")
+    phone: str = StringField("User Phone")
 
 
 @resource('workflow-stage')

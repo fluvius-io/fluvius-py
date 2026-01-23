@@ -62,40 +62,12 @@ def auth_required(inject_ctx=False, **auth_kwargs):
     def decorator(endpoint):
         @wraps(endpoint)
         async def wrapper(request: Request, *args, **kwargs):
-            try:
-                auth_context = await request.app.state.get_auth_context(request, **auth_kwargs)
-            except FluviusException as e:
-                # Handle FluviusException directly in middleware to ensure proper status codes
-                # Exceptions raised in middleware may not always be caught by FastAPI's exception handlers
-                content = e.content
-
-                # Log full error server-side but never expose to client
-                if DEVELOPER_MODE:
-                    import traceback
-                    logger.error(f"Auth error: {e}\n{traceback.format_exc()}")
-                    # Still don't expose traceback to client even in dev mode for security
-
-                return JSONResponse(
-                    status_code=e.status_code,
-                    content=content
-                )
-            except Exception as e:
-                # Always log server-side
-                logger.exception(f"Unexpected auth error: {e}")
-
-                return JSONResponse(
-                    status_code=500,
-                    content={"errcode": "S00.501", "errmesg": "Unexpected auth error: {e}"}
-                )
-
+            auth_context = await request.app.state.get_auth_context(request, **auth_kwargs)
             if inject_ctx:
                 return await endpoint(request, auth_context, *args, **kwargs)
 
             if not auth_context:
-                return JSONResponse(
-                    status_code=401,
-                    content={"errcode": "S00.401", "errmesg": "User is not authenticated"}
-                )
+                raise UnauthorizedError("S00.401", "User is not authenticated")
 
             request.state.auth_context = auth_context
             return await endpoint(request, *args, **kwargs)
@@ -153,11 +125,14 @@ class FluviusAuthProfileProvider(object):
         return KeycloakTokenPayload(**claims_token)
 
     def get_auth_token(self, request: Request) -> Optional[str]:
-        # You can optionally decode and validate the token here
-        if not (id_token := request.cookies.get("id_token")):
-            return None
+        if request.cookies.get(config.SES_ID_TOKEN_FIELD):
+            return request.session.get(config.SES_USER_FIELD)
 
-        return request.session.get("user")
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.lower().startswith("bearer "):
+            return auth_helper.decode_ac_token(request.app.state.jwks_keyset, auth_header[7:])
+        
+        return None
 
     async def get_auth_context(self, request: Request, **kwargs) -> Optional[AuthorizationContext]:
         try:

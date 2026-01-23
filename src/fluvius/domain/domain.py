@@ -489,6 +489,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
                 )
                 auth_cmd = await self.authorize_command(ctx, preauth_cmd)
                 async for evt in self.process_command_internal(ctx, stm, auth_cmd):
+                    ctx.evt_queue.put(evt)
                     await self.logstore.add_event(evt)
             
             # Before exiting transaction manager context                    
@@ -496,6 +497,7 @@ class Domain(DomainSignalManager, DomainEntityRegistry):
             await self.publish(sig.TRANSACTION_COMMITTING, self, aggregate=agg)
 
         await self.publish(sig.TRANSACTION_COMMITTED, self)
+        await self.handle_events(ctx.evt_queue)
         await self.dispatch_messages(ctx.msg_queue)
 
         for resp in consume_queue(ctx.rsp_queue):

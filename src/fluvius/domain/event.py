@@ -4,7 +4,7 @@ from fluvius.helper import ImmutableNamespace
 from .record import DomainEntityRecord
 from .entity import DomainEntity
 from fluvius.helper import ImmutableNamespace
-
+from pydantic import ConfigDict
 
 class EventRecord(DomainEntityRecord):
     event     = field(type=str)
@@ -14,7 +14,10 @@ class EventRecord(DomainEntityRecord):
 
 
 class Event(DomainEntity):
-    pass
+    
+    class Data(DataModel):
+        model_config = ConfigDict(frozen=True, extra='allow')
+        pass
 
 
 class EventHandler(object):

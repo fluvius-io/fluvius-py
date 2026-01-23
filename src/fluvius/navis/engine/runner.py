@@ -1,7 +1,8 @@
-from fluvius.navis.engine.datadef import WorkflowActivity, WorkflowMessage
+from fluvius.navis.engine.datadef import WorkflowActivity, WorkflowMessage, WorkflowTask
 from fluvius.navis.engine.mutation import MutationEnvelop
 import queue
 import collections
+import asyncio
 
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -12,7 +13,7 @@ from fluvius.data import UUID_GENF, UUID_GENR, UUID_TYPE
 from fluvius.helper import timestamp, consume_queue
 
 from ..error import WorkflowExecutionError, WorkflowConfigurationError, StepTransitionError
-from fluvius.error import InternalServerError
+from fluvius.error import InternalServerError, BadRequestError
 from .datadef import WorkflowStep, WorkflowStatus, StepStatus, WorkflowData, WorkflowMessage, WorkflowStage, WorkflowActivity, WorkflowStep
 from .mutation import MutationEnvelop
 from .workflow import Workflow, Stage, Step, Role, BEGIN_STATE, FINISH_STATE, BEGIN_LABEL, FINISH_LABEL
@@ -598,14 +599,45 @@ class WorkflowRunner(object):
 
     @workflow_action('add_task', allow_statuses=WorkflowStatus._ACTIVE, hook_name='task_added')
     def add_task(self, /, src_step, task_key, **kwargs):
-        task_id = UUID_GENF(task_key, self._id)
-        task = {
-            'id': task_id,
-            'src_step': src_step,
-            'title': kwargs.get('title', ''),
-            'status': StepStatus.ACTIVE,
-            'workflow_id': self._id,
-        }
+        from fluvius.navis.domain import NavisClient
+        from fluvius.worker.datadef import WorkerContext
+        
+        resource_name = kwargs.get('resource_name') or self.resource_name
+        if not resource_name:
+            raise BadRequestError('P00.402', 'resource_name is required for add_task')
+        
+        resource_id = kwargs.get('resource_id') or self.resource_id   
+        context = kwargs.get('_context') or  WorkerContext()
+        
+        async def _send_task():
+            try: 
+                client = NavisClient()    
+                await client.send(
+                    task_key,
+                    command=task_key,
+                    resource=resource_name,
+                    identifier=resource_id,
+                    payload=kwargs.get('payload'),
+                    domain_sid=kwargs.get('domain_sid'),
+                    domain_iid=kwargs.get('domain_iid'),
+                    _context=context,
+                    _headers=kwargs.get('_headers'),
+                )
+            except Exception as e:
+                raise WorkflowExecutionError('P00.001', f'Failed to dispatch worker task: {str(e)}')
+        try:
+            loop = asyncio.get_running_loop()
+            asyncio.run_coroutine_threadsafe(_send_task(), loop=loop)
+        except RuntimeError:
+            asyncio.run(_send_task())
+
+        task = WorkflowTask(
+            id=UUID_GENR(),
+            workflow_id=self.id,
+            step_id=str(src_step),
+            name=kwargs.get('name'),
+            desc=kwargs.get('desc'),
+        )
         self.mutate('add-task', task=task)
         return self
 
@@ -666,6 +698,50 @@ class WorkflowRunner(object):
             raise WorkflowExecutionError('P00.007', f'Cannot recover from a non-error status: {step.status}')
 
         self._update_step(step, status=StepStatus.ACTIVE)
+        return self
+    
+    @step_action('add_task', allow_statuses=WorkflowStatus._ACTIVE, hook_name='task_added')
+    def step_add_task(self, step_id, src_step, task_key, **kwargs):
+        from fluvius.navis.domain import NavisClient
+        from fluvius.worker.datadef import WorkerContext
+        
+        resource_name = kwargs.get('resource_name') or self.resource_name
+        if not resource_name:
+            raise BadRequestError('P00.402', 'resource_name is required for add_task')
+        
+        resource_id = kwargs.get('resource_id') or self.resource_id   
+        context = kwargs.get('_context') or  WorkerContext()
+        
+        async def _send_task():
+            try: 
+                client = NavisClient()    
+                await client.send(
+                    task_key,
+                    command=task_key,
+                    resource=resource_name,
+                    identifier=resource_id,
+                    payload=kwargs.get('payload'),
+                    domain_sid=kwargs.get('domain_sid'),
+                    domain_iid=kwargs.get('domain_iid'),
+                    _context=context,
+                    _headers=kwargs.get('_headers'),
+                )
+            except Exception as e:
+                raise WorkflowExecutionError('P00.001', f'Failed to dispatch worker task: {str(e)}')
+        try:
+            loop = asyncio.get_running_loop()
+            asyncio.run_coroutine_threadsafe(_send_task(), loop=loop)
+        except RuntimeError:
+            asyncio.run(_send_task())
+
+        task = WorkflowTask(
+            id=UUID_GENR(),
+            workflow_id=self.id,
+            step_id=str(src_step),
+            name=kwargs.get('name'),
+            desc=kwargs.get('desc'),
+        )
+        self.mutate('add-task', task=task)
         return self
     
     def _set_params(self, params):

@@ -22,6 +22,7 @@ class CreateWorkflow(Command):
         tags = ["workflow", "create"]
         auth_required = True
         description = "Create a new workflow instance from a workflow definition"
+        resource_init = True
 
     Data = CreateWorkflowData
 

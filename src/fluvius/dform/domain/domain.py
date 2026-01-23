@@ -28,4 +28,5 @@ class FormResponse(FormDomain.Response):
 
 
 class DocumentResponse(FormDomain.Response):
-    Data = FormDataManager.lookup_model('document')
+    # Data = FormDataManager.lookup_model('document')
+    pass

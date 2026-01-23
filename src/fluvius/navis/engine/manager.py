@@ -86,6 +86,21 @@ class WorkflowManager(object):
 
         return self._wfbyids[wfdef_key, workflow_id]
     
+    async def load_workflow_by_resource(self, resource_name, resource_id):    
+        wf_data = await self._datamgr.find_one('_workflow', where=dict(
+            resource_name=resource_name,
+            resource_id=resource_id
+        ))
+        if not wf_data:
+            raise NotFoundError(f'Workflow not found for resource: {resource_name}:{resource_id}')
+
+        wfdef_key = wf_data.wfdef_key
+        wf_engine = self.__registry__[wfdef_key]
+        
+        wf = wf_engine(wf_data)
+        
+        return wf
+    
     async def _log_mutation(self, tx, wf_mut: MutationEnvelop):
         await tx.insert_data('workflow_mutation', wf_mut.model_dump())
 
@@ -165,7 +180,8 @@ class WorkflowManager(object):
             'set-step-memory': self._persist_set_step_memory,
             'add-participant': self._persist_add_participant,
             'del-participant': self._persist_del_participant,
-            'add-stage': self._persist_add_stage
+            'add-stage': self._persist_add_stage,
+            'add-task': self._persist_add_task
         }
 
     async def _persist_single_mutation(self, tx, wf_mut: MutationEnvelop):
@@ -304,6 +320,13 @@ class WorkflowManager(object):
         stage_data['workflow_id'] = wf_mut.workflow_id
 
         await tx.insert_data('workflow_stage', stage_data)
+        
+    async def _persist_add_task(self, tx, wf_mut: MutationEnvelop):
+        task = wf_mut.mutation.task
+        task_dict = task.model_dump()
+        task_dict['workflow_id'] = wf_mut.workflow_id
+
+        await tx.insert_data('workflow_task', task_dict)
 
     @classmethod
     def register(cls, wf_cls):

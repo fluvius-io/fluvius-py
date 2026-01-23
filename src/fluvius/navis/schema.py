@@ -230,6 +230,34 @@ LEFT JOIN "{DB_SCHEMA}"."workflow_state" wm ON wm.workflow_id = wf._id
 GROUP BY wf._id, wm._id;
 ''')
 
+create_view_workflow_participant = sa.DDL(f'''
+CREATE OR REPLACE VIEW "{DB_SCHEMA}"."_workflow_participant"
+AS SELECT wp._id,
+    wp.workflow_id,
+    wp.user_id,
+    wp.role,
+    u.username,
+    u.telecom__email AS email,
+    u.telecom__phone AS phone,
+    u.status,
+    u.active,
+    u.is_super_admin,
+    concat_ws(' '::text, u.name__prefix, u.name__family, u.name__middle, u.name__given, u.name__suffix) AS full_name,
+    wp._created,
+    wp._updated,
+    wp._deleted,
+    wp._creator,
+    wp._updater,
+    wp._etag,
+    wp._realm
+   FROM {DB_SCHEMA}.workflow_participant wp
+     JOIN {DB_SCHEMA}."user" u ON u._id = wp.user_id
+  WHERE wp._deleted IS NULL AND u._deleted IS NULL;
+''')
+
 drop_view_workflow = sa.DDL(f'''DROP VIEW IF EXISTS "{DB_SCHEMA}"._workflow;''')
+drop_view_workflow_participant = sa.DDL(f'''DROP VIEW IF EXISTS "{DB_SCHEMA}"._workflow_participant;''')
 sa.event.listen(WorkflowBaseSchema.metadata, "before_drop", drop_view_workflow)
+sa.event.listen(WorkflowBaseSchema.metadata, "before_drop", drop_view_workflow_participant)
 sa.event.listen(WorkflowBaseSchema.metadata, "after_create", create_view_workflow)
+sa.event.listen(WorkflowBaseSchema.metadata, "after_create", create_view_workflow_participant)
